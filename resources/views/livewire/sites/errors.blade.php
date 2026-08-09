@@ -35,12 +35,13 @@
             @else
                 <section class="dply-card min-w-0 overflow-hidden p-0">
                     <x-workspace-panel-head
-                    class="border-b border-brand-ink/10"
-                    icon="heroicon-o-exclamation-triangle"
-                    :title="__('Errors')"
-                    :note="__('Every failure for this site — deploys, SSL, connectivity, and more. Newest first. Dismiss what you’ve handled; retry where supported.')"
-                    tone="danger"
-                />
+                        dense
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-exclamation-triangle"
+                        :title="__('Errors')"
+                        :note="__('Failures for this site — newest first. Dismiss what you’ve handled; retry where supported.')"
+                        tone="danger"
+                    />
 
                     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                         <x-server-workspace-tablist
@@ -67,32 +68,66 @@
                         </x-server-workspace-tablist>
                     </div>
 
-                    <div wire:loading.block wire:target="setErrorsWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
-                        <span class="sr-only">{{ __('Loading…') }}</span>
-                        <div class="space-y-3" aria-hidden="true">
-                            <div class="flex flex-wrap gap-1.5">
-                                @foreach (range(1, 5) as $chip)
-                                    <span class="inline-flex h-7 w-16 animate-pulse rounded-full bg-brand-ink/10"></span>
-                                @endforeach
-                            </div>
-                            @foreach (range(1, 4) as $row)
-                                <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
-                                    <span class="mt-0.5 h-7 w-7 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
-                                    <div class="min-w-0 flex-1 space-y-2">
-                                        <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                                        <div class="h-2.5 w-32 animate-pulse rounded bg-brand-ink/10"></div>
-                                    </div>
+                    {{-- Per-tab skeleton: Stream = chips + rows; Notifications = strip + list/form. --}}
+                    @php $bar = 'animate-pulse rounded bg-brand-ink/10'; @endphp
+                    @foreach (['stream', 'notifications'] as $skeletonTab)
+                        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setErrorsWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                            <span class="sr-only">{{ __('Loading section…') }}</span>
+                            @if ($skeletonTab === 'stream')
+                                <div class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-3 py-2 sm:px-4" aria-hidden="true">
+                                    @foreach ([16, 20, 14, 18, 16] as $chip)
+                                        <span class="h-6 rounded-full {{ $bar }}" style="width: {{ $chip * 4 }}px;"></span>
+                                    @endforeach
                                 </div>
-                            @endforeach
+                                <div class="divide-y divide-brand-ink/10" aria-hidden="true">
+                                    @foreach (range(1, 5) as $row)
+                                        <div class="flex items-start gap-2.5 px-3 py-2.5 sm:px-4">
+                                            <span class="h-6 w-6 shrink-0 rounded-full {{ $bar }}"></span>
+                                            <div class="min-w-0 flex-1 space-y-1.5">
+                                                <div class="h-2.5 w-48 max-w-full {{ $bar }}"></div>
+                                                <div class="h-2 w-2/3 {{ $bar }}"></div>
+                                            </div>
+                                            <span class="h-2 w-16 shrink-0 {{ $bar }}"></span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4" aria-hidden="true">
+                                    <span class="h-4 w-4 shrink-0 {{ $bar }}"></span>
+                                    <span class="h-3.5 w-28 shrink-0 {{ $bar }}"></span>
+                                    <span class="h-4 w-px shrink-0 bg-brand-ink/10"></span>
+                                    <span class="h-2.5 min-w-0 flex-1 {{ $bar }}"></span>
+                                    <span class="h-6 w-32 shrink-0 rounded-lg {{ $bar }}"></span>
+                                </div>
+                                <div class="divide-y divide-brand-ink/10" aria-hidden="true">
+                                    @foreach (range(1, 2) as $channel)
+                                        <div class="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+                                            <div class="min-w-0 flex-1 space-y-1.5">
+                                                <div class="h-2.5 w-36 max-w-full {{ $bar }}"></div>
+                                                <div class="h-2 w-16 {{ $bar }}"></div>
+                                            </div>
+                                            <span class="h-5 w-24 shrink-0 rounded-full {{ $bar }}"></span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                <div class="grid gap-3 border-t border-brand-ink/10 px-3 py-3 sm:grid-cols-2 sm:px-4" aria-hidden="true">
+                                    @foreach (range(1, 2) as $field)
+                                        <div class="space-y-1.5">
+                                            <div class="h-2.5 w-16 {{ $bar }}"></div>
+                                            <div class="h-9 w-full rounded-lg {{ $bar }}"></div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
-                    </div>
+                    @endforeach
 
-                    <div wire:loading.remove wire:target="setErrorsWorkspaceTab" class="min-w-0">
+                    <div wire:loading.class="hidden" wire:target="setErrorsWorkspaceTab" class="min-w-0">
                         @if ($errorsTab === 'stream')
                             @include('livewire.sites.partials.errors.reference-lookup')
                             @include('livewire.partials.error-stream', ['errorStreamNested' => true])
 
-                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
                                 <x-cli-snippet :command="'dply sites:errors '.$site->slug" />
                             </div>
                         @endif

@@ -41,12 +41,17 @@ final readonly class ServerlessIndexRow
             $deployedLabel = __('Never deployed');
         }
 
-        $manageHref = $site->server_id
-            ? route('sites.show', ['server' => $site->server_id, 'site' => $site->id])
-            : null;
         $journeyHref = $site->server_id
             ? route('serverless.journey', ['server' => $site->server_id, 'site' => $site->id])
             : null;
+        // Never-live / failed first deploy → manage opens the journey (same
+        // destination SiteWorkspaceController redirects sites.show to).
+        $manageHref = null;
+        if ($site->server_id) {
+            $manageHref = (! $isLive && $site->last_deploy_at === null && $journeyHref !== null)
+                ? $journeyHref
+                : route('sites.show', ['server' => $site->server_id, 'site' => $site->id]);
+        }
 
         $repo = trim((string) ($site->git_repository_url ?? ''));
 
@@ -107,7 +112,8 @@ final readonly class ServerlessIndexRow
     {
         return match ($status) {
             Site::STATUS_FUNCTIONS_ACTIVE => __('Live'),
-            Site::STATUS_FUNCTIONS_CONFIGURED => __('Configured'),
+            Site::STATUS_FUNCTIONS_CONFIGURED => __('Deploying'),
+            Site::STATUS_FUNCTIONS_FAILED => __('Failed'),
             default => $status !== ''
                 ? (string) str($status)->replace(['_', '-'], ' ')->title()
                 : __('Deploying'),
@@ -119,6 +125,7 @@ final readonly class ServerlessIndexRow
         return match ($status) {
             Site::STATUS_FUNCTIONS_ACTIVE => 'bg-brand-forest/15 text-brand-forest',
             Site::STATUS_FUNCTIONS_CONFIGURED => 'bg-brand-sand/60 text-brand-moss',
+            Site::STATUS_FUNCTIONS_FAILED => 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
             default => 'bg-brand-gold/20 text-brand-ink',
         };
     }

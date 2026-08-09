@@ -1,29 +1,24 @@
-<div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
-    <div class="flex items-start gap-3">
-        <x-icon-badge>
-            <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Enable') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Enable scheduler for a site') }}</h3>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Creates a cron entry under the site\'s system user and wraps it with dply-scheduler-tick for heartbeat tracking.') }}</p>
-        </div>
-    </div>
-</div>
+<x-workspace-panel-head
+    dense
+    icon="heroicon-o-plus-circle"
+    :title="__('Enable scheduler for a site')"
+    :note="__('Creates a cron entry under the site\'s system user and wraps it with dply-scheduler-tick for heartbeat tracking.')"
+    class="border-b border-brand-ink/10"
+/>
 
 @if ($sites->isEmpty())
-    <div class="px-6 py-10 text-center">
-        <p class="text-sm font-semibold text-brand-ink">{{ __('No sites on this server yet.') }}</p>
-        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ __('Add a site first, then return here to enable its scheduler.') }}</p>
-        <div class="mt-5 flex justify-center">
-            <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
-        </div>
+    <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-3 py-5 text-center sm:px-4">
+        <p class="text-xs text-brand-moss">
+            <span class="font-semibold text-brand-ink">{{ __('No sites on this server yet.') }}</span>
+            {{ __('Add a site first, then return here to enable its scheduler.') }}
+        </p>
+        <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
     </div>
 @else
     @if (! empty($preflight_results))
-        <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 sm:px-4">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Preflight results') }}</p>
-            <ul class="mt-2 space-y-1">
+            <ul class="mt-1.5 space-y-1">
                 @foreach ($preflight_results as $check)
                     @php
                         $statusChip = match ($check['status']) {
@@ -32,8 +27,8 @@
                             default => ['classes' => 'bg-red-50 text-red-800 ring-red-200', 'label' => __('fail')],
                         };
                     @endphp
-                    <li class="flex flex-wrap items-baseline gap-2 text-xs">
-                        <span class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ring-1 {{ $statusChip['classes'] }}">{{ $statusChip['label'] }}</span>
+                    <li class="flex flex-wrap items-baseline gap-1.5 text-[11px]">
+                        <span class="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 font-semibold uppercase tracking-wide ring-1 {{ $statusChip['classes'] }}">{{ $statusChip['label'] }}</span>
                         <span class="font-mono text-brand-mist">{{ $check['key'] }}</span>
                         <span class="text-brand-moss">{{ $check['message'] }}</span>
                     </li>
@@ -42,7 +37,7 @@
         </div>
     @endif
 
-    <form wire:submit="enableSchedulerForSite" class="space-y-4 px-6 py-6">
+    <form wire:submit="enableSchedulerForSite" class="space-y-3 px-3 py-3 sm:px-4">
         @if ($contextSite)
             <div>
                 <x-input-label for="enable_site_display" value="{{ __('Site') }}" />
@@ -51,7 +46,7 @@
         @else
             <div>
                 <x-input-label for="enable_site_id" value="{{ __('Site') }}" />
-                <select id="enable_site_id" wire:model.live="enable_site_id" class="{{ $input }} mt-1">
+                <select id="enable_site_id" wire:model.live="enable_site_id" class="{{ $input }} mt-1 !py-1.5 !text-xs">
                     <option value="">{{ __('Pick a site…') }}</option>
                     @foreach ($sites as $site)
                         <option value="{{ $site->id }}">{{ $site->name }}</option>
@@ -61,56 +56,56 @@
         @endif
 
         @if ($enableTargetSite === null)
-            <p class="text-sm text-brand-moss">{{ __('Pick a site to see scheduler options for its detected stack.') }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Pick a site to see scheduler options for its detected stack.') }}</p>
         @elseif ($showLaravelSchedulerEnable)
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="enable_framework_laravel" value="{{ __('Scheduler') }}" />
                     <p id="enable_framework_laravel" class="mt-1 text-sm text-brand-ink">{{ __('Laravel — `php artisan schedule:run`') }}</p>
                 </div>
                 <div>
                     <x-input-label for="enable_cron_expression" value="{{ __('Cadence') }}" />
-                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 font-mono" placeholder="* * * * *" />
+                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 !py-1.5 font-mono !text-xs" placeholder="* * * * *" />
                 </div>
             </div>
         @elseif ($showRailsSchedulerEnable)
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="enable_framework_rails" value="{{ __('Scheduler') }}" />
                     <p id="enable_framework_rails" class="mt-1 text-sm text-brand-ink">{{ __('Rails — `bundle exec whenever --update-crontab`') }}</p>
                 </div>
                 <div>
                     <x-input-label for="enable_cron_expression" value="{{ __('Cadence') }}" />
-                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 font-mono" placeholder="* * * * *" />
+                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 !py-1.5 font-mono !text-xs" placeholder="* * * * *" />
                 </div>
             </div>
         @elseif ($showCustomSchedulerEnable)
-            <div class="space-y-4">
+            <div class="space-y-3">
                 <div>
                     <x-input-label for="enable_custom_command" value="{{ __('Scheduler command') }}" />
                     <textarea
                         id="enable_custom_command"
                         wire:model="enable_custom_command"
-                        rows="3"
-                        class="{{ $input }} mt-1 font-mono text-sm"
+                        rows="2"
+                        class="{{ $input }} mt-1 font-mono text-xs"
                         placeholder="cd /var/www/app/current && ./bin/cron"
                     ></textarea>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Bare shell command Dply wraps with dply-scheduler-tick. Include `cd` to the app directory if needed.') }}</p>
+                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Bare shell command Dply wraps with dply-scheduler-tick. Include `cd` to the app directory if needed.') }}</p>
                 </div>
                 <div>
                     <x-input-label for="enable_cron_expression" value="{{ __('Cadence') }}" />
-                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 font-mono" placeholder="* * * * *" />
+                    <input id="enable_cron_expression" type="text" wire:model="enable_cron_expression" class="{{ $input }} mt-1 !py-1.5 font-mono !text-xs" placeholder="* * * * *" />
                 </div>
             </div>
         @endif
 
         @if ($showLaravelSchedulerEnable)
-            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5 text-[11px] text-brand-moss">
                 {{ __('Prefer a long-running daemon? ') }}<a href="{{ route('servers.workers', $server) }}?preset=laravel-schedule{{ $enableTargetSite ? '&site='.$enableTargetSite->id : '' }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('Add a schedule:work supervisor program') }}</a>{{ __(' instead.') }}
             </p>
         @endif
 
-        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-4">
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-3">
             <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="enableSchedulerForSite" :disabled="! $opsReady || $enableTargetSite === null">
                 <span wire:loading.remove wire:target="enableSchedulerForSite">{{ __('Enable scheduler') }}</span>

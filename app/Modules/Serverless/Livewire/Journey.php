@@ -172,6 +172,7 @@ class Journey extends Component
         $serverErrored = $server->status === Server::STATUS_ERROR;
 
         $siteActive = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
+        $siteFailed = $site->status === Site::STATUS_FUNCTIONS_FAILED;
         $deployStatus = $deployment?->status;
         $deployRunning = $deployStatus === SiteDeployment::STATUS_RUNNING;
 
@@ -186,7 +187,7 @@ class Journey extends Component
         $deploySteps = [];
         foreach ($deployment?->phaseSteps(ServerlessDeployProgress::PHASE) ?? [] as $step) {
             $state = (string) ($step['state'] ?? 'pending');
-            if ($deployStatus === SiteDeployment::STATUS_FAILED && $state === 'active') {
+            if (($deployStatus === SiteDeployment::STATUS_FAILED || $siteFailed) && $state === 'active') {
                 $state = 'failed';
             }
             $deploySteps[] = [
@@ -208,7 +209,7 @@ class Journey extends Component
         $deployState = match (true) {
             $namespaceState !== 'done' => 'pending',
             $deployRunning => 'active',
-            $deployStatus === SiteDeployment::STATUS_FAILED => 'failed',
+            $deployStatus === SiteDeployment::STATUS_FAILED || $siteFailed => 'failed',
             $deployStatus === SiteDeployment::STATUS_SUCCESS || $siteActive => 'done',
             default => 'active',
         };
@@ -296,7 +297,7 @@ class Journey extends Component
             $bridging => __('Starting deploy…'),
             $live => __('Function is live'),
             $cancelled => __('Deploy cancelled'),
-            $failed => __('Deploy stopped'),
+            $failed => __('Deploy failed'),
             $deployState === 'active' => __('Building & deploying…'),
             $namespaceState === 'active' => __('Provisioning namespace…'),
             default => __('Starting deploy…'),

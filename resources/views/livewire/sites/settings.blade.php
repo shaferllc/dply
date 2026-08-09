@@ -204,6 +204,7 @@
                     @elseif ($section === 'runtime')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
                             <x-workspace-panel-head
+                                dense
                                 class="border-b border-brand-ink/10"
                                 :icon="$sectionHeader['icon']"
                                 :title="$sectionHeader['title']"

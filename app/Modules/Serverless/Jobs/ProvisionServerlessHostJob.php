@@ -151,7 +151,10 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
     private function deployConfiguredFunctions(Server $server): void
     {
         $server->sites()
-            ->where('status', Site::STATUS_FUNCTIONS_CONFIGURED)
+            ->whereIn('status', [
+                Site::STATUS_FUNCTIONS_CONFIGURED,
+                Site::STATUS_FUNCTIONS_FAILED,
+            ])
             ->get()
             ->each(fn (Site $site) => RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL));
     }

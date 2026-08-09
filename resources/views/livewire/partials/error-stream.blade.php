@@ -16,26 +16,26 @@
 @endphp
 
 {{-- Live tail while open; cheap, scoped to this view only. --}}
-<div wire:poll.6s @class(['space-y-4' => ! $nested])>
+<div wire:poll.6s @class(['space-y-3' => ! $nested])>
     {{-- Controls --}}
     <div @class([
-        'flex flex-wrap items-center justify-between gap-3',
-        'border-b border-brand-ink/10 px-5 py-4 sm:px-6' => $nested,
+        'flex flex-wrap items-center justify-between gap-2',
+        'border-b border-brand-ink/10 px-3 py-2 sm:px-4' => $nested,
     ])>
-        <div class="flex flex-wrap items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1">
             <button type="button" wire:click="setCategory('')"
-                class="rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset {{ $category === '' ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40' }}">
+                class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $category === '' ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
                 {{ __('All') }} <span class="opacity-60">{{ array_sum($facets) }}</span>
             </button>
             @foreach ($facets as $cat => $count)
                 <button type="button" wire:click="setCategory('{{ $cat }}')"
-                    class="rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset {{ $category === $cat ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40' }}">
+                    class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $category === $cat ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
                     {{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $cat)) }} <span class="opacity-60">{{ $count }}</span>
                 </button>
             @endforeach
         </div>
-        <div class="flex items-center gap-3">
-            <label class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-brand-moss">
+        <div class="flex items-center gap-2.5">
+            <label class="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-brand-moss">
                 <input type="checkbox" wire:model.live="showDismissed" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest">
                 {{ __('Show dismissed') }}
             </label>
@@ -44,7 +44,7 @@
                      components) instead of the native browser confirm(). --}}
                 <button type="button"
                     wire:click="openConfirmActionModal('dismissAll', [], @js(__('Dismiss all open errors?')), @js(__('This dismisses every open error in this list. You can re-show dismissed errors with the filter. This does not fix the underlying issues.')), @js(__('Dismiss all')), false)"
-                    class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/40">
+                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40 dark:bg-brand-ink/5">
                     {{ __('Dismiss all') }}
                 </button>
             @endif
@@ -54,11 +54,12 @@
     {{-- Stream --}}
     @if ($events->isEmpty())
         <div @class([
-            'dply-card px-6 py-10' => ! $nested,
-            'px-5 py-10 sm:px-6' => $nested,
+            'dply-card px-4 py-6' => ! $nested,
+            'px-3 py-6 sm:px-4' => $nested,
         ])>
             <x-empty-state
                 borderless
+                compact
                 icon="heroicon-o-check-circle"
                 tone="sage"
                 :title="$showDismissed ? __('No errors') : __('No open errors')"
@@ -69,33 +70,33 @@
         </div>
     @else
         <div @class([
-            'dply-card divide-y divide-brand-ink/5 overflow-hidden' => ! $nested,
-            'divide-y divide-brand-ink/5' => $nested,
+            'dply-card divide-y divide-brand-ink/10 overflow-hidden' => ! $nested,
+            'divide-y divide-brand-ink/10' => $nested,
         ])>
             @foreach ($events as $event)
-                <div class="flex items-start gap-3 px-5 py-4 {{ $event->dismissed_at ? 'opacity-55' : '' }}" wire:key="err-{{ $event->id }}" x-data="{ open: false }">
-                    <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $event->dismissed_at ? 'bg-brand-ink/5 text-brand-mist' : 'bg-rose-50 text-rose-600 ring-1 ring-rose-600/15' }}">
-                        <x-heroicon-s-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
+                <div class="flex items-start gap-2.5 px-3 py-2.5 sm:px-4 {{ $event->dismissed_at ? 'opacity-55' : '' }}" wire:key="err-{{ $event->id }}" x-data="{ open: false }">
+                    <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full {{ $event->dismissed_at ? 'bg-brand-ink/5 text-brand-mist' : 'bg-rose-50 text-rose-600 ring-1 ring-rose-600/15 dark:bg-rose-500/10' }}">
+                        <x-heroicon-s-exclamation-triangle class="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span class="text-sm font-semibold text-brand-ink">{{ $event->title }}</span>
-                            <span class="rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $event->category)) }}</span>
+                            <span class="rounded-full bg-brand-sand/50 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $event->category)) }}</span>
                             @if ($event->dismissed_at)
                                 <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dismissed') }}</span>
                             @endif
+                            <span class="text-[11px] text-brand-mist">{{ $event->occurred_at?->diffForHumans() }}</span>
                         </div>
-                        <p class="mt-0.5 text-xs text-brand-mist">{{ $event->occurred_at?->diffForHumans() }}</p>
                         @if (filled($event->detail))
-                            <div class="mt-1.5">
-                                <p class="font-mono text-xs leading-relaxed text-brand-moss {{ '' }}" x-bind:class="open ? '' : 'line-clamp-2'">{{ $event->detail }}</p>
+                            <div class="mt-0.5">
+                                <p class="font-mono text-[11px] leading-snug text-brand-moss" x-bind:class="open ? '' : 'line-clamp-2'">{{ $event->detail }}</p>
                                 @if (strlen($event->detail) > 140)
                                     <button type="button" x-on:click="open = !open" class="mt-0.5 text-[11px] font-semibold text-brand-forest hover:underline" x-text="open ? '{{ __('Show less') }}' : '{{ __('Show more') }}'"></button>
                                 @endif
                             </div>
                         @endif
                     </div>
-                    <div class="flex shrink-0 items-center gap-1.5">
+                    <div class="flex shrink-0 items-center gap-1">
                         @php
                             $rem = $event->dismissed_at ? null : $event->remediation();
                             $recAction = $rem ? (collect($rem['actions'])->firstWhere('recommended', true) ?? ($rem['actions'][0] ?? null)) : null;
@@ -104,9 +105,9 @@
                             {{-- Link action: the fix lives on another page (e.g. an expired
                                  Git token), not in an SSH script — navigate, don't dispatch. --}}
                             <a href="{{ route($recAction['route']) }}" wire:navigate
-                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-600"
                                 title="{{ $rem['title'] }}">
-                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" /> {{ $recAction['label'] }}
+                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ $recAction['label'] }}
                             </a>
                         @elseif ($rem && $recAction)
                             <button type="button"
@@ -115,19 +116,19 @@
                                     ['label' => __('Runs on'), 'value' => $event->server?->name ?? __('the server')],
                                     ['label' => __('How'), 'value' => __('dply runs this over SSH, then resolves this error if it succeeds. You can re-run the original operation afterward.'), 'multiline' => true],
                                 ]))"
-                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
                                 title="{{ $rem['title'] }}">
-                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" /> {{ __('Fix') }}
+                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Fix') }}
                             </button>
                         @endif
                         @if ($event->isRetryable() && ! $event->dismissed_at)
                             <button type="button" wire:click="retry('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="retry('{{ $event->id }}')"
-                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" /> {{ __('Retry') }}
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Retry') }}
                             </button>
                         @endif
                         @if ($event->link_url)
-                            <a href="{{ $event->link_url }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
+                            <a href="{{ $event->link_url }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-forest hover:bg-brand-sand/40 dark:bg-brand-ink/5">
                                 {{ __('Open') }} <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                             </a>
                         @endif
@@ -136,24 +137,24 @@
                              is undefined elsewhere, so ?? false hides it for site error views. --}}
                         @if (($showLogCorrelation ?? false) && $event->server_id)
                             <button type="button" wire:click="openLogsForError('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="openLogsForError('{{ $event->id }}')"
-                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40 disabled:opacity-60">
-                                <x-heroicon-o-bars-3-bottom-left class="h-4 w-4" aria-hidden="true" /> {{ __('Logs') }}
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-forest hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
+                                <x-heroicon-o-bars-3-bottom-left class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Logs') }}
                             </button>
                         @endif
                         @if ($event->dismissed_at)
-                            <button type="button" wire:click="restore('{{ $event->id }}')" class="rounded-lg px-2 py-1 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Restore') }}">
-                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                            <button type="button" wire:click="restore('{{ $event->id }}')" class="rounded-lg px-1.5 py-0.5 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Restore') }}">
+                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                         @else
-                            <button type="button" wire:click="dismiss('{{ $event->id }}')" class="rounded-lg px-2 py-1 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Dismiss') }}">
-                                <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                            <button type="button" wire:click="dismiss('{{ $event->id }}')" class="rounded-lg px-1.5 py-0.5 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Dismiss') }}">
+                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                         @endif
                     </div>
                 </div>
             @endforeach
         </div>
-        <div @class(['border-t border-brand-ink/10 px-5 py-4 sm:px-6' => $nested])>
+        <div @class(['border-t border-brand-ink/10 px-3 py-2.5 sm:px-4' => $nested])>
             {{ $events->links() }}
         </div>
     @endif

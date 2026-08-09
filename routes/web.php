@@ -645,10 +645,23 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
         // A serverless function is not a server — the DO Functions namespace
         // is an implementation detail. Send the operator straight to the
-        // function workspace instead of a server-shaped overview.
+        // function workspace (or deploy journey when it never went live).
         if ($server->isDigitalOceanFunctionsHost()) {
             $function = $server->sites()->orderBy('created_at')->first();
             if ($function !== null) {
+                if (
+                    in_array($function->status, [
+                        Site::STATUS_FUNCTIONS_CONFIGURED,
+                        Site::STATUS_FUNCTIONS_FAILED,
+                    ], true)
+                    && $function->last_deploy_at === null
+                ) {
+                    return redirect()->route('serverless.journey', [
+                        'server' => $server,
+                        'site' => $function,
+                    ]);
+                }
+
                 return redirect()->route('sites.show', ['server' => $server, 'site' => $function]);
             }
         }

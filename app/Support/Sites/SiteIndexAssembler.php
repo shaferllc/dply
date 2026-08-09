@@ -32,6 +32,7 @@ final class SiteIndexAssembler
                 Site::STATUS_ERROR,
                 Site::STATUS_CONTAINER_FAILED,
                 Site::STATUS_EDGE_FAILED,
+                Site::STATUS_FUNCTIONS_FAILED,
                 Site::STATUS_SCAFFOLD_FAILED,
             ], true);
         $isReady = $site->isReadyForTraffic();
@@ -145,6 +146,7 @@ final class SiteIndexAssembler
             Site::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             Site::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             Site::STATUS_FUNCTIONS_ACTIVE => 'functions active',
+            Site::STATUS_FUNCTIONS_FAILED => 'functions failed',
             Site::STATUS_CUSTOM_ACTIVE => 'custom active',
             default => str_replace('_', ' ', $status),
         };

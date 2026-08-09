@@ -262,6 +262,14 @@ trait TracksProvisioningStatus
             }
         }
 
+        // Same idea for serverless: a failed first deploy must not open the
+        // normal function workspace. `last_deploy_at` is only set on success,
+        // so it's the "has ever been live" signal (redeploy failures on an
+        // already-active function keep STATUS_FUNCTIONS_ACTIVE).
+        if ($this->status === self::STATUS_FUNCTIONS_FAILED && $this->last_deploy_at !== null) {
+            return true;
+        }
+
         return false;
     }
 
@@ -321,6 +329,7 @@ trait TracksProvisioningStatus
             self::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
+            self::STATUS_FUNCTIONS_FAILED => 'functions failed',
             self::STATUS_CUSTOM_ACTIVE => 'custom active',
             default => str_replace('_', ' ', $this->status),
         };

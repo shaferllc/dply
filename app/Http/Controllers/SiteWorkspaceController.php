@@ -20,6 +20,24 @@ class SiteWorkspaceController
         abort_unless($site->server_id === $server->id, 404);
         Gate::authorize('view', $site);
 
+        // Serverless: keep never-live (or failed first-deploy) functions on the
+        // deploy journey — don't open the normal site workspace that reads as
+        // "created successfully". Mirrors Edge's provisioning shell for
+        // edge_failed / edge_provisioning before the first publish.
+        if (
+            $server->isDigitalOceanFunctionsHost()
+            && in_array($site->status, [
+                Site::STATUS_FUNCTIONS_CONFIGURED,
+                Site::STATUS_FUNCTIONS_FAILED,
+            ], true)
+            && $site->last_deploy_at === null
+        ) {
+            return redirect()->route('serverless.journey', [
+                'server' => $server,
+                'site' => $site,
+            ]);
+        }
+
         // Choose-app flow: a site without an application installed must pick
         // one before its workspace is usable — both freshly-created bare
         // sites and existing repo-less web sites. Funnel it to the picker.

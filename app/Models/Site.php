@@ -137,6 +137,14 @@ class Site extends Model
 
     public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
 
+    /**
+     * First deploy (or pre-live retry) failed. Mirrors {@see STATUS_EDGE_FAILED}
+     * / {@see STATUS_CONTAINER_FAILED}: the Site row is kept for retry/delete,
+     * but must not present as a healthy live function. Redeploy failures on an
+     * already-active function leave {@see STATUS_FUNCTIONS_ACTIVE} alone.
+     */
+    public const STATUS_FUNCTIONS_FAILED = 'functions_failed';
+
     public const STATUS_CONTAINER_PROVISIONING = 'container_provisioning';
 
     public const STATUS_CONTAINER_ACTIVE = 'container_active';

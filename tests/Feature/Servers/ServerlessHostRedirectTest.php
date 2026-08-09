@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 test('serverless host overview redirects to the function workspace', function () {
     $user = User::factory()->create();
@@ -25,6 +26,8 @@ test('serverless host overview redirects to the function workspace', function ()
         'server_id' => $server->id,
         'organization_id' => $org->id,
         'user_id' => $user->id,
+        'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        'last_deploy_at' => now()->subHour(),
         'meta' => ['runtime_profile' => 'digitalocean_functions_web'],
     ]);
 
@@ -33,4 +36,28 @@ test('serverless host overview redirects to the function workspace', function ()
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
         ->assertRedirect(route('sites.show', ['server' => $server, 'site' => $function]));
+});
+
+test('never-live serverless host overview redirects to the deploy journey', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $server = Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+    ]);
+    $function = Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'status' => Site::STATUS_FUNCTIONS_FAILED,
+        'meta' => ['runtime_profile' => 'digitalocean_functions_web'],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('servers.overview', $server))
+        ->assertRedirect(route('serverless.journey', ['server' => $server, 'site' => $function]));
 });

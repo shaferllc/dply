@@ -1,50 +1,55 @@
 @php
     $detectedFramework = strtolower((string) ($site->resolvedRuntimeAppDetection()['framework'] ?? ''));
     $isRailsLike = $detectedFramework === 'rails' || $site->shouldShowRailsRuntimeSettings();
+    $panelBody = 'px-5 py-3 sm:px-6';
+    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
 @endphp
 
-<section class="border-b border-brand-ink/10">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ruby') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ruby runtime') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                @if ($isRailsLike)
-                    {{ __('Ruby/Rails-specific runtime settings. Stored on the site for deploy scripts and operator reference.') }}
-                @else
-                    {{ __('Ruby runtime settings. Rails-specific knobs appear when the repository inspector detects a Rails app.') }}
-                @endif
-            </p>
-        </div>
-    </div>
+@if ($isRailsLike)
+    <form wire:submit="saveRuntimePreferences" class="border-b border-brand-ink/10">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-command-line"
+            :title="__('Ruby / Rails')"
+            :note="__('Stored on the site for deploy scripts and operator reference.')"
+        >
+            <x-slot:actions>
+                <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="saveRuntimePreferences">
+                    <span wire:loading.remove wire:target="saveRuntimePreferences">{{ __('Save') }}</span>
+                    <span wire:loading wire:target="saveRuntimePreferences">{{ __('Saving…') }}</span>
+                </x-primary-button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7 space-y-6">
-    @if ($isRailsLike)
-        <form wire:submit="saveRuntimePreferences" class="space-y-6">
+        <div class="{{ $panelBody }}">
             <div class="max-w-md">
-                <x-input-label for="rails_env" :value="__('RAILS_ENV')" />
+                <x-input-label for="rails_env" :value="__('RAILS_ENV')" class="!text-xs" />
                 <x-text-input id="rails_env" wire:model="rails_env" class="mt-1 block w-full font-mono text-sm" placeholder="production" />
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Stored on the site for deploy scripts and operator reference. Align with your Puma/Thruster and systemd configuration. The same value also appears under Deploy → Rollout and web server.') }}</p>
+                <p class="{{ $fieldHelp }}">{{ __('Align with Puma/Thruster and systemd. Also appears under Deploy → Rollout and web server.') }}</p>
                 <x-input-error :messages="$errors->get('rails_env')" class="mt-1" />
             </div>
-
-            <div class="border-t border-brand-ink/10 pt-6">
-                <x-primary-button type="submit">{{ __('Save Ruby runtime settings') }}</x-primary-button>
-            </div>
-        </form>
-    @else
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 text-sm text-brand-moss">
-            <p class="font-medium text-brand-ink">{{ __('No Ruby-specific knobs detected') }}</p>
-            <p class="mt-1">{{ __('Once a Rails (or other Ruby) framework is detected from the repository, framework-specific settings will appear here.') }}</p>
         </div>
-    @endif
-    </div>
-</section>
+    </form>
+@else
+    <section class="border-b border-brand-ink/10">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-command-line"
+            :title="__('Ruby runtime')"
+            :note="__('Rails-specific knobs appear when the repository inspector detects a Rails app.')"
+        />
+        <div class="{{ $panelBody }}">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
+                <span class="font-semibold text-brand-ink">{{ __('No Ruby-specific knobs detected.') }}</span>
+                {{ __('Once a Rails (or other Ruby) framework is detected from the repository, framework-specific settings will appear here.') }}
+            </p>
+        </div>
+    </section>
+@endif
 
-<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
     <x-cli-snippet :commands="[
         ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version=3.3'],
         ['label' => __('Set start command'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'bundle exec puma -C config/puma.rb\' --port=3000'],

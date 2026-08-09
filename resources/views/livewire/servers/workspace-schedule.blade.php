@@ -19,7 +19,7 @@
         $laravel_tab = 'commands';
     @endphp
 
-    <div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         @include('livewire.sites.partials.workspace-breadcrumb-bar', [
             'server' => $server,
             'site' => $site,
@@ -28,7 +28,7 @@
             'contextualDocSlug' => app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolveForSiteSection($site, 'schedule'),
         ])
 
-        <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+        <div class="lg:grid lg:grid-cols-12 lg:gap-10">
             @include('livewire.sites.settings.partials.sidebar')
 
             <main class="min-w-0 lg:col-span-9">

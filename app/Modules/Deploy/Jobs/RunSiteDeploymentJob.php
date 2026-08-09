@@ -215,6 +215,13 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'deployment_id' => $deployment->id,
             ], $this->timeout + 120);
 
+            // Retrying a failed first serverless deploy: leave the "failed"
+            // badge and return to configured-while-deploying so the journey /
+            // index read as in-flight, not still broken.
+            if ($this->site->status === Site::STATUS_FUNCTIONS_FAILED) {
+                $this->site->update(['status' => Site::STATUS_FUNCTIONS_CONFIGURED]);
+            }
+
             $this->notifyDeploymentStarted($deployment, $notificationPublisher);
 
             $ephemeralCredential = null;
@@ -395,6 +402,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                     'log_output' => $msg,
                     'finished_at' => now(),
                 ]);
+                $this->markServerlessFirstDeployFailed();
                 $this->cacheIdempotencyFailure($deployment, $msg);
                 Log::warning('RunSiteDeploymentJob failed', ['site_id' => $this->site->id, 'error' => $msg]);
                 $this->auditDeploy($deployment, $ephemeralCredential);
@@ -427,6 +435,33 @@ class RunSiteDeploymentJob implements ShouldQueue
             $lock->release();
             $this->clearIdempotencyInflight();
         }
+    }
+
+    /**
+     * First serverless deploy never went live — mark the Site failed so the
+     * workspace/index can't look like a healthy created app. Already-live
+     * functions keep {@see Site::STATUS_FUNCTIONS_ACTIVE} on redeploy failure.
+     */
+    private function markServerlessFirstDeployFailed(): void
+    {
+        $this->site->refresh();
+
+        if (! $this->site->usesFunctionsRuntime()) {
+            return;
+        }
+
+        if ($this->site->status === Site::STATUS_FUNCTIONS_ACTIVE || $this->site->last_deploy_at !== null) {
+            return;
+        }
+
+        if (! in_array($this->site->status, [
+            Site::STATUS_FUNCTIONS_CONFIGURED,
+            Site::STATUS_FUNCTIONS_FAILED,
+        ], true)) {
+            return;
+        }
+
+        $this->site->update(['status' => Site::STATUS_FUNCTIONS_FAILED]);
     }
 
     /**
@@ -811,6 +846,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                     .'Deployment failed: '.$reason),
                 'finished_at' => now(),
             ]);
+            $this->markServerlessFirstDeployFailed();
         }
     }
 }

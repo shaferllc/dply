@@ -144,6 +144,31 @@ test('retry deploy dispatches a deployment', function () {
     Bus::assertDispatched(RunSiteDeploymentJob::class);
 });
 
+test('failed first deploy shows deploy failed not stopped', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+        siteStatus: Site::STATUS_FUNCTIONS_FAILED,
+    );
+    SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_FAILED,
+        'log_output' => 'Repository preflight failed',
+        'started_at' => now(),
+        'finished_at' => now(),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Deploy failed')
+        ->assertSee('This app is not live')
+        ->assertDontSee('Deploy stopped');
+});
+
 test('redeploy dispatches a deployment for a live function', function () {
     Bus::fake();
     [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_READY, serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']], siteStatus: Site::STATUS_FUNCTIONS_ACTIVE);

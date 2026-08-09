@@ -9,8 +9,17 @@
     $lastDeployedAt = $serverless['last_deployed_at'] ?? null;
     $revision = trim((string) ($serverless['last_revision_id'] ?? ''));
     $isActive = $site->status === \App\Models\Site::STATUS_FUNCTIONS_ACTIVE;
-    $statusBadgeClass = $isActive ? 'bg-brand-forest/15 text-brand-forest' : 'bg-brand-gold/20 text-brand-ink';
-    $statusLabel = $isActive ? __('Live') : __('Configured — deploying');
+    $isFailed = $site->status === \App\Models\Site::STATUS_FUNCTIONS_FAILED;
+    $statusBadgeClass = match (true) {
+        $isActive => 'bg-brand-forest/15 text-brand-forest',
+        $isFailed => 'bg-rose-100 text-rose-800',
+        default => 'bg-brand-gold/20 text-brand-ink',
+    };
+    $statusLabel = match (true) {
+        $isActive => __('Live'),
+        $isFailed => __('Failed — not live'),
+        default => __('Configured — deploying'),
+    };
     $costEstimate = app(\App\Modules\Serverless\Services\ServerlessCostEstimator::class)->forSite($site);
 
     // Status pill summarising the routing surface — links to the full
@@ -121,7 +130,7 @@
                     wire:loading.attr="disabled"
                     wire:target="redeployServerlessFunction"
                     class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
-                <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Deploy function') }}</span>
+                <span wire:loading.remove wire:target="redeployServerlessFunction">{{ $isFailed ? __('Retry deploy') : __('Deploy function') }}</span>
                 <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
             </button>
             <a href="{{ route('serverless.journey', ['server' => $server, 'site' => $site]) }}"

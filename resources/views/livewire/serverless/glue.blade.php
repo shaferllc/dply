@@ -12,7 +12,7 @@
         icon="heroicon-o-link"
     >
         <x-slot:actions>
-            <x-docs-link slug="edge-deploy-triggers" :label="__('Deploy triggers')" />
+            <x-docs-link size="md" slug="edge-deploy-triggers" :label="__('Deploy triggers')" />
             <x-outline-link href="{{ route('serverless.index') }}" wire:navigate>
                 <x-heroicon-o-bolt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                 {{ __('All apps') }}

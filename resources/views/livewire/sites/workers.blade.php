@@ -1,3 +1,11 @@
+{{-- Standalone Workers page — merged chrome (no floating hero / stacked cards). --}}
+@php
+    $latestQueue = $queueHistory->first();
+    $workerCommandPlaceholder = $site->isLaravelFrameworkDetected()
+        ? 'php artisan queue:work'
+        : ($site->isRailsFrameworkDetected() ? 'bundle exec sidekiq' : 'node worker.js');
+@endphp
+
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
@@ -6,31 +14,27 @@
         'currentIcon' => 'bolt',
     ])
 
-    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9" wire:poll.15s>
+        <main class="min-w-0 lg:col-span-9" wire:poll.15s>
             <section class="dply-card min-w-0 overflow-hidden p-0">
                 <x-workspace-panel-head
+                    dense
                     class="border-b border-brand-ink/10"
                     icon="heroicon-o-cpu-chip"
                     :title="__('Workers')"
-                    :note="__('Long-running engine processes — queue consumers and background workers tied to this app.')"
+                    :note="__('Long-running engine processes — queue consumers and background workers for this app.')"
                 />
-            </section>
 
-            @if ($secretMismatchDetected)
-                <section class="dply-card overflow-hidden border-amber-200">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="flex items-start gap-3 min-w-0 flex-1">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                @if ($secretMismatchDetected)
+                    <div class="border-b border-amber-200/80 bg-amber-50/60 px-3 py-2.5 sm:px-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex min-w-0 flex-1 items-start gap-2.5">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-800" aria-hidden="true" />
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function holds a stale command secret') }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The latest tick was rejected by the function with "invalid command secret" — its baked DPLY_COMMAND_SECRET doesn\'t match what dply is signing requests with. Redeploy once to bake the current secret into the function; ticks succeed from there on.') }}</p>
+                                    <p class="text-sm font-semibold text-brand-ink">{{ __('Function holds a stale command secret') }}</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Latest tick rejected — redeploy once to bake the current secret into the function.') }}</p>
                                 </div>
                             </div>
                             <button
@@ -38,34 +42,25 @@
                                 wire:click="redeployToRefreshSecret"
                                 wire:loading.attr="disabled"
                                 wire:target="redeployToRefreshSecret"
-                                class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:cursor-wait disabled:opacity-60"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:cursor-wait disabled:opacity-60"
                             >
-                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="redeployToRefreshSecret" />
-                                <span wire:loading.remove wire:target="redeployToRefreshSecret">{{ __('Redeploy to refresh secret') }}</span>
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="redeployToRefreshSecret" />
+                                <span wire:loading.remove wire:target="redeployToRefreshSecret">{{ __('Redeploy') }}</span>
                                 <span wire:loading wire:target="redeployToRefreshSecret">{{ __('Queueing…') }}</span>
                             </button>
                         </div>
                     </div>
-                </section>
-            @endif
+                @endif
 
-            @if (($dns['status'] ?? null) === 'failed')
-                <section class="dply-card overflow-hidden border-rose-200">
-                    <div class="border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-50 text-rose-700 ring-rose-200">
-                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                @if (($dns['status'] ?? null) === 'failed')
+                    <div class="border-b border-rose-200/80 bg-rose-50/60 px-3 py-2.5 sm:px-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex min-w-0 flex-1 items-start gap-2.5">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-700" aria-hidden="true" />
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('DNS') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS provisioning failed') }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                        {{ __('Common causes: the token doesn\'t own the zone in DigitalOcean, the zone hasn\'t been created on DO yet, or a transient API error. Verify in the DigitalOcean dashboard, then retry.') }}
-                                    </p>
-                                    <p class="mt-2 break-all font-mono text-xs text-rose-700">
-                                        {{ $dns['error'] ?? __('No error detail recorded.') }}
-                                    </p>
+                                    <p class="text-sm font-semibold text-brand-ink">{{ __('DNS provisioning failed') }}</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Check the zone/token in DigitalOcean, then retry.') }}</p>
+                                    <p class="mt-1 break-all font-mono text-[11px] text-rose-700">{{ $dns['error'] ?? __('No error detail recorded.') }}</p>
                                 </div>
                             </div>
                             <button
@@ -73,35 +68,30 @@
                                 wire:click="provisionDnsNow"
                                 wire:loading.attr="disabled"
                                 wire:target="provisionDnsNow"
-                                class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60 sm:self-auto"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
                             >
-                                <x-heroicon-m-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="provisionDnsNow" aria-hidden="true" />
+                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="provisionDnsNow" aria-hidden="true" />
                                 <span wire:loading.remove wire:target="provisionDnsNow">{{ __('Retry DNS') }}</span>
                                 <span wire:loading wire:target="provisionDnsNow">{{ __('Retrying…') }}</span>
                             </button>
                         </div>
                     </div>
-                </section>
-            @endif
+                @endif
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
+                {{-- Queue engine toggle --}}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Queue') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Process queue jobs in background ticks') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('When enabled, the same minute-cadence tick that drives Schedule also drains the queue. Future versions will let you define multiple named workers (command + concurrency + restart policy + live status).') }}
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Process queue jobs') }}</p>
+                        <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">
+                            {{ __('Minute-cadence tick drains the queue when enabled.') }}
+                            @if ($lastTickAt)
+                                <span class="text-brand-mist">·</span>
+                                {{ __('Last tick:') }}
+                                <span class="font-mono text-brand-moss">{{ \Illuminate\Support\Carbon::parse($lastTickAt)->diffForHumans() }}</span>
+                            @endif
                         </p>
-                        @if ($lastTickAt)
-                            <p class="mt-2 text-xs text-brand-moss">
-                                {{ __('Last tick:') }} <span class="font-mono">{{ \Illuminate\Support\Carbon::parse($lastTickAt)->diffForHumans() }}</span>
-                            </p>
-                        @endif
                     </div>
-                    <div class="flex shrink-0 flex-col items-end gap-3">
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <x-toggle-switch
                             wire:model.live="queue_worker_enabled"
                             :enabled="$queue_worker_enabled"
@@ -113,235 +103,225 @@
                             wire:click="tickNow"
                             wire:loading.attr="disabled"
                             wire:target="tickNow"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                             title="{{ __('Fire one queue ping immediately, without waiting for the next cron interval.') }}"
                         >
-                            <x-heroicon-o-bolt class="h-4 w-4" wire:loading.class="animate-pulse" wire:target="tickNow" />
+                            <x-heroicon-o-bolt class="h-3.5 w-3.5" wire:loading.class="animate-pulse" wire:target="tickNow" />
                             <span wire:loading.remove wire:target="tickNow">{{ __('Tick now') }}</span>
                             <span wire:loading wire:target="tickNow">{{ __('Ticking…') }}</span>
                         </button>
                     </div>
                 </div>
-            </section>
 
-            @php
-                $latestQueue = $queueHistory->first();
-            @endphp
-            @if ($latestQueue)
-                <section class="dply-card overflow-hidden">
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3 min-w-0">
-                            <x-icon-badge>
-                                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Output') }}</p>
-                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Latest output') }}</h2>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Most recent queue invocation — the function\'s response body, captured by the tick command. Refreshes every 15 seconds.') }}
-                                </p>
+                @if ($latestQueue)
+                    <div class="border-b border-brand-ink/10">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                            <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                                {{ __('Latest output') }}
+                            </h3>
+                            <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[11px] text-brand-moss">
+                                <span @class([
+                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                    'bg-emerald-100 text-emerald-900' => ($latestQueue['status'] ?? '') === 'ok',
+                                    'bg-rose-100 text-rose-900' => ($latestQueue['status'] ?? '') !== 'ok',
+                                ])>{{ $latestQueue['status'] ?? 'unknown' }}</span>
+                                @if (! empty($latestQueue['http_status']))
+                                    <span class="font-mono">HTTP {{ $latestQueue['http_status'] }}</span>
+                                @endif
+                                <span class="font-mono">{{ (int) ($latestQueue['duration_ms'] ?? 0) }}ms</span>
+                                <span title="{{ $latestQueue['at'] ?? '' }}">{{ \Illuminate\Support\Carbon::parse($latestQueue['at'])->diffForHumans() }}</span>
                             </div>
                         </div>
-                        <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs">
-                            <span @class([
-                                'inline-flex items-center rounded-full px-2 py-0.5 font-semibold uppercase tracking-[0.12em]',
-                                'bg-emerald-100 text-emerald-900' => ($latestQueue['status'] ?? '') === 'ok',
-                                'bg-rose-100 text-rose-900' => ($latestQueue['status'] ?? '') !== 'ok',
-                            ])>{{ $latestQueue['status'] ?? 'unknown' }}</span>
-                            @if (! empty($latestQueue['http_status']))
-                                <span class="font-mono text-brand-moss">HTTP {{ $latestQueue['http_status'] }}</span>
+                        <div class="px-3 py-2.5 sm:px-4">
+                            @if (! empty($latestQueue['error']))
+                                <div class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] text-rose-900">
+                                    <p class="font-semibold">{{ __('Error') }}</p>
+                                    <p class="mt-0.5 font-mono">{{ $latestQueue['error'] }}</p>
+                                </div>
                             @endif
-                            <span class="font-mono text-brand-moss">{{ (int) ($latestQueue['duration_ms'] ?? 0) }}ms</span>
-                            <span class="text-brand-moss" title="{{ $latestQueue['at'] ?? '' }}">{{ \Illuminate\Support\Carbon::parse($latestQueue['at'])->diffForHumans() }}</span>
+                            @php($body = trim((string) ($latestQueue['body_preview'] ?? '')))
+                            @if ($body !== '')
+                                <pre @class([
+                                    'max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100',
+                                    'mt-2' => ! empty($latestQueue['error']),
+                                ])>{{ $body }}</pre>
+                            @else
+                                <p @class([
+                                    'text-xs text-brand-moss',
+                                    'mt-2' => ! empty($latestQueue['error']),
+                                ])>{{ __('No response body captured.') }}</p>
+                            @endif
                         </div>
-                    </div>
-                    <div class="px-6 py-6 sm:px-7">
-                        @if (! empty($latestQueue['error']))
-                            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
-                                <p class="font-semibold">{{ __('Error') }}</p>
-                                <p class="mt-1 font-mono">{{ $latestQueue['error'] }}</p>
-                            </div>
-                        @endif
-                        @php($body = trim((string) ($latestQueue['body_preview'] ?? '')))
-                        @if ($body !== '')
-                            <pre class="@if (! empty($latestQueue['error'])) mt-4 @endif max-h-[28rem] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $body }}</pre>
-                        @else
-                            <p class="@if (! empty($latestQueue['error'])) mt-4 @endif text-xs text-brand-moss">{{ __('No response body captured.') }}</p>
-                        @endif
-                    </div>
-                </section>
-            @endif
-
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3 min-w-0">
-                        <x-icon-badge>
-                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Firing history') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Last 50 queue ticks. Newest first. Click a row to see its full output.') }}
-                            </p>
-                        </div>
-                    </div>
-                    <span class="shrink-0 text-xs text-brand-moss">{{ trans_choice('{0} no ticks yet|{1} :count tick recorded|[2,*] :count ticks recorded', $queueHistory->count(), ['count' => $queueHistory->count()]) }}</span>
-                </div>
-
-                <div class="px-6 py-6 sm:px-7">
-                @if ($queueHistory->isEmpty())
-                    <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
-                        @if ($queue_worker_enabled)
-                            {{ __('No ticks recorded yet. dply runs the tick command every minute — the first row should land within ~60 seconds.') }}
-                        @else
-                            {{ __('Workers are disabled. Enable above and dply starts ticking every minute; rows appear here as they fire.') }}
-                        @endif
-                    </div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                            <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
-                                <tr>
-                                    <th class="py-2 pr-3">{{ __('When') }}</th>
-                                    <th class="py-2 pr-3">{{ __('Status') }}</th>
-                                    <th class="py-2 pr-3">{{ __('HTTP') }}</th>
-                                    <th class="py-2 pr-3">{{ __('Duration') }}</th>
-                                    <th class="py-2">{{ __('Detail') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-brand-ink/10">
-                                @foreach ($queueHistory as $entry)
-                                    <tr
-                                        wire:key="tick-{{ $entry['at'] ?? $loop->index }}"
-                                        wire:click="showTick('{{ $entry['at'] ?? '' }}')"
-                                        class="cursor-pointer transition-colors hover:bg-brand-sand/40"
-                                        title="{{ __('Click to see full output') }}"
-                                    >
-                                        <td class="py-2 pr-3 text-xs text-brand-ink">
-                                            {{ \Illuminate\Support\Carbon::parse($entry['at'])->diffForHumans() }}
-                                        </td>
-                                        <td class="py-2 pr-3">
-                                            <span @class([
-                                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
-                                                'bg-emerald-100 text-emerald-900' => ($entry['status'] ?? '') === 'ok',
-                                                'bg-rose-100 text-rose-900' => ($entry['status'] ?? '') !== 'ok',
-                                            ])>{{ $entry['status'] ?? 'unknown' }}</span>
-                                        </td>
-                                        <td class="py-2 pr-3 font-mono text-xs text-brand-moss">
-                                            {{ $entry['http_status'] ?? '—' }}
-                                        </td>
-                                        <td class="py-2 pr-3 font-mono text-xs text-brand-moss">
-                                            {{ (int) ($entry['duration_ms'] ?? 0) }}ms
-                                        </td>
-                                        <td class="py-2 break-all font-mono text-[11px] text-brand-moss">
-                                            @if (! empty($entry['error']))
-                                                <span class="text-rose-700">{{ \Illuminate\Support\Str::limit($entry['error'], 120) }}</span>
-                                            @else
-                                                {{ \Illuminate\Support\Str::limit(trim((string) ($entry['body_preview'] ?? '')), 120) ?: '—' }}
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
                     </div>
                 @endif
-                </div>
-            </section>
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3 min-w-0">
-                        <x-icon-badge>
-                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workers') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Named workers') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Define the worker processes this app runs — command or function-ref, replicas, and restart policy. In v1 every enabled worker is driven by the single engine tick above; per-worker process isolation arrives in a later release.') }}
-                            </p>
+                {{-- Firing history --}}
+                <div class="border-b border-brand-ink/10">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-clock class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Firing history') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Last 50 queue ticks. Newest first. Click a row for full output.') }}">
+                            {{ __('Last 50 queue ticks · click a row for detail') }}
+                        </p>
+                        <span class="shrink-0 text-[11px] tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count tick|[2,*] :count ticks', $queueHistory->count(), ['count' => $queueHistory->count()]) }}</span>
+                    </div>
+
+                    @if ($queueHistory->isEmpty())
+                        <div class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
+                            @if ($queue_worker_enabled)
+                                {{ __('No ticks yet — the first row should land within ~60 seconds.') }}
+                            @else
+                                {{ __('Workers are disabled. Enable above to start minute-cadence ticks.') }}
+                            @endif
                         </div>
-                    </div>
-                    <button
-                        type="button"
-                        wire:click="newWorker"
-                        class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                        {{ __('Add worker') }}
-                    </button>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                                <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                    <tr>
+                                        <th class="px-3 py-1.5 pr-3 sm:px-4">{{ __('When') }}</th>
+                                        <th class="py-1.5 pr-3">{{ __('Status') }}</th>
+                                        <th class="py-1.5 pr-3">{{ __('HTTP') }}</th>
+                                        <th class="py-1.5 pr-3">{{ __('Duration') }}</th>
+                                        <th class="py-1.5 pr-3 sm:pr-4">{{ __('Detail') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-brand-ink/10">
+                                    @foreach ($queueHistory as $entry)
+                                        <tr
+                                            wire:key="tick-{{ $entry['at'] ?? $loop->index }}"
+                                            wire:click="showTick('{{ $entry['at'] ?? '' }}')"
+                                            class="cursor-pointer transition-colors hover:bg-brand-sand/40"
+                                            title="{{ __('Click to see full output') }}"
+                                        >
+                                            <td class="px-3 py-1.5 pr-3 text-xs text-brand-ink sm:px-4">
+                                                {{ \Illuminate\Support\Carbon::parse($entry['at'])->diffForHumans() }}
+                                            </td>
+                                            <td class="py-1.5 pr-3">
+                                                <span @class([
+                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                                    'bg-emerald-100 text-emerald-900' => ($entry['status'] ?? '') === 'ok',
+                                                    'bg-rose-100 text-rose-900' => ($entry['status'] ?? '') !== 'ok',
+                                                ])>{{ $entry['status'] ?? 'unknown' }}</span>
+                                            </td>
+                                            <td class="py-1.5 pr-3 font-mono text-xs text-brand-moss">
+                                                {{ $entry['http_status'] ?? '—' }}
+                                            </td>
+                                            <td class="py-1.5 pr-3 font-mono text-xs text-brand-moss">
+                                                {{ (int) ($entry['duration_ms'] ?? 0) }}ms
+                                            </td>
+                                            <td class="py-1.5 pr-3 break-all font-mono text-[11px] text-brand-moss sm:pr-4">
+                                                @if (! empty($entry['error']))
+                                                    <span class="text-rose-700">{{ \Illuminate\Support\Str::limit($entry['error'], 100) }}</span>
+                                                @else
+                                                    {{ \Illuminate\Support\Str::limit(trim((string) ($entry['body_preview'] ?? '')), 100) ?: '—' }}
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 </div>
 
-                @if (empty($workerRows))
-                    <div class="p-6 text-center text-sm text-brand-moss sm:p-8">
-                        {{ __('No workers defined yet. Add one to describe the command, replica count, and restart policy dply should run.') }}
+                {{-- Named workers --}}
+                <div>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-command-line class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Named workers') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Command, replicas, and restart policy. v1 shares the engine tick above.') }}">
+                            {{ __('Command · replicas · restart policy') }}
+                        </p>
+                        <button
+                            type="button"
+                            wire:click="newWorker"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            {{ __('Add worker') }}
+                        </button>
                     </div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                            <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
-                                <tr>
-                                    <th class="px-6 py-2.5">{{ __('Worker') }}</th>
-                                    <th class="px-3 py-2.5">{{ __('Command / function-ref') }}</th>
-                                    <th class="px-3 py-2.5">{{ __('Replicas') }}</th>
-                                    <th class="px-3 py-2.5">{{ __('Restart') }}</th>
-                                    <th class="px-3 py-2.5">{{ __('Status') }}</th>
-                                    <th class="px-6 py-2.5 text-right">{{ __('Actions') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-brand-ink/10">
-                                @foreach ($workerRows as $worker)
-                                    <tr wire:key="worker-{{ $worker['id'] }}">
-                                        <td class="px-6 py-3 font-medium text-brand-ink">{{ $worker['name'] }}</td>
-                                        <td class="px-3 py-3 break-all font-mono text-xs text-brand-moss">{{ $worker['command'] }}</td>
-                                        <td class="px-3 py-3 font-mono text-xs text-brand-moss">{{ $worker['concurrency'] }}</td>
-                                        <td class="px-3 py-3 text-xs text-brand-moss">{{ $worker['restart_policy'] }}</td>
-                                        <td class="px-3 py-3">
-                                            <span @class([
-                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-                                                'bg-emerald-100 text-emerald-900' => $worker['status'] === 'running',
-                                                'bg-rose-100 text-rose-900' => $worker['status'] === 'erroring',
-                                                'bg-sky-100 text-sky-900' => $worker['status'] === 'pending',
-                                                'bg-amber-100 text-amber-900' => $worker['status'] === 'idle',
-                                                'bg-slate-100 text-slate-700' => $worker['status'] === 'stopped',
-                                            ])>{{ $worker['status_label'] }}</span>
-                                        </td>
-                                        <td class="px-6 py-3">
-                                            <div class="flex items-center justify-end gap-3 text-xs font-semibold">
-                                                <button type="button" wire:click="toggleWorker('{{ $worker['id'] }}')" class="text-brand-ink hover:underline">
-                                                    {{ $worker['enabled'] ? __('Disable') : __('Enable') }}
-                                                </button>
-                                                <button type="button" wire:click="editWorker('{{ $worker['id'] }}')" class="text-brand-ink hover:underline">
-                                                    {{ __('Edit') }}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    wire:click="deleteWorker('{{ $worker['id'] }}')"
-                                                    wire:confirm="{{ __('Remove the worker ":name"?', ['name' => $worker['name']]) }}"
-                                                    class="text-rose-700 hover:underline"
-                                                >
-                                                    {{ __('Remove') }}
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </section>
 
-            <x-cli-snippet class="mt-6" :commands="[
-                ['label' => __('List workers'), 'command' => 'dply sites:workers '.$site->slug],
-                ['label' => __('Restart all'), 'command' => 'dply sites:workers:restart '.$site->slug],
-            ]" />
+                    @if (empty($workerRows))
+                        <div class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
+                            {{ __('No workers defined yet. Add one for command, replica count, and restart policy.') }}
+                        </div>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                                <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                    <tr>
+                                        <th class="px-3 py-1.5 sm:px-4">{{ __('Worker') }}</th>
+                                        <th class="px-2 py-1.5">{{ __('Command') }}</th>
+                                        <th class="px-2 py-1.5">{{ __('Replicas') }}</th>
+                                        <th class="px-2 py-1.5">{{ __('Restart') }}</th>
+                                        <th class="px-2 py-1.5">{{ __('Status') }}</th>
+                                        <th class="px-3 py-1.5 text-right sm:px-4">{{ __('Actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-brand-ink/10">
+                                    @foreach ($workerRows as $worker)
+                                        <tr wire:key="worker-{{ $worker['id'] }}">
+                                            <td class="px-3 py-2 font-medium text-brand-ink sm:px-4">{{ $worker['name'] }}</td>
+                                            <td class="px-2 py-2 break-all font-mono text-xs text-brand-moss">{{ $worker['command'] }}</td>
+                                            <td class="px-2 py-2 font-mono text-xs text-brand-moss">{{ $worker['concurrency'] }}</td>
+                                            <td class="px-2 py-2 text-xs text-brand-moss">{{ $worker['restart_policy'] }}</td>
+                                            <td class="px-2 py-2">
+                                                <span @class([
+                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                                    'bg-emerald-100 text-emerald-900' => $worker['status'] === 'running',
+                                                    'bg-rose-100 text-rose-900' => $worker['status'] === 'erroring',
+                                                    'bg-sky-100 text-sky-900' => $worker['status'] === 'pending',
+                                                    'bg-amber-100 text-amber-900' => $worker['status'] === 'idle',
+                                                    'bg-slate-100 text-slate-700' => $worker['status'] === 'stopped',
+                                                ])>{{ $worker['status_label'] }}</span>
+                                            </td>
+                                            <td class="px-3 py-2 sm:px-4">
+                                                <div class="flex items-center justify-end gap-2.5 text-xs font-semibold">
+                                                    <button type="button" wire:click="toggleWorker('{{ $worker['id'] }}')" class="text-brand-ink hover:underline">
+                                                        {{ $worker['enabled'] ? __('Disable') : __('Enable') }}
+                                                    </button>
+                                                    <button type="button" wire:click="editWorker('{{ $worker['id'] }}')" class="text-brand-ink hover:underline">
+                                                        {{ __('Edit') }}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        wire:click="openConfirmActionModal('deleteWorker', @js([(string) $worker['id']]), @js(__('Remove worker')), @js(__('Remove the worker “:name”? This only deletes the definition — it does not stop a running process by itself.', ['name' => $worker['name']])), @js(__('Remove')), true)"
+                                                        class="text-rose-700 hover:underline"
+                                                    >
+                                                        {{ __('Remove') }}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('List workers'), 'command' => 'dply sites:workers '.$site->slug],
+                        ['label' => __('Restart all'), 'command' => 'dply sites:workers:restart '.$site->slug],
+                    ]" />
+                </div>
+            </section>
         </main>
     </div>
 
     @include('livewire.sites.partials.tick-detail-modal')
+    @include('livewire.partials.confirm-action-modal')
 
     @if ($showWorkerForm)
         <div
@@ -352,13 +332,13 @@
             <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="cancelWorkerForm"></div>
 
             <div class="relative flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
-                <header class="flex items-start justify-between gap-4 border-b border-brand-ink/10 p-5">
-                    <div>
-                        <h3 class="text-base font-bold text-brand-ink">
+                <header class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-brand-ink">
                             {{ $editingWorkerId ? __('Edit worker') : __('Add worker') }}
                         </h3>
-                        <p class="mt-0.5 text-xs text-brand-moss">
-                            {{ __('A worker definition — the command, replica count, and restart policy dply records for this app.') }}
+                        <p class="mt-0.5 text-[11px] text-brand-moss">
+                            {{ __('Command, replica count, and restart policy for this app.') }}
                         </p>
                     </div>
                     <button
@@ -371,7 +351,7 @@
                     </button>
                 </header>
 
-                <form wire:submit="saveWorker" class="space-y-4 p-5">
+                <form wire:submit="saveWorker" class="space-y-3 px-4 py-3.5 sm:px-5">
                     <div>
                         <x-input-label for="workerName" :value="__('Name')" />
                         <x-text-input id="workerName" wire:model="workerName" class="mt-1 block w-full" placeholder="queue-default" />
@@ -380,11 +360,11 @@
 
                     <div>
                         <x-input-label for="workerCommand" :value="__('Command or function-ref')" />
-                        <x-text-input id="workerCommand" wire:model="workerCommand" class="mt-1 block w-full font-mono text-sm" placeholder="php artisan queue:work" />
+                        <x-text-input id="workerCommand" wire:model="workerCommand" class="mt-1 block w-full font-mono text-sm" :placeholder="$workerCommandPlaceholder" />
                         <x-input-error :messages="$errors->get('workerCommand')" class="mt-1" />
                     </div>
 
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="workerConcurrency" :value="__('Replicas / max concurrency')" />
                             <x-text-input id="workerConcurrency" type="number" min="1" max="50" wire:model="workerConcurrency" class="mt-1 block w-full" />
@@ -401,17 +381,17 @@
                         </div>
                     </div>
 
-                    <div class="flex justify-end gap-2 border-t border-brand-ink/10 pt-4">
+                    <div class="flex justify-end gap-2 border-t border-brand-ink/10 pt-3">
                         <button
                             type="button"
                             wire:click="cancelWorkerForm"
-                            class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40"
+                            class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                         >
                             {{ __('Cancel') }}
                         </button>
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90"
+                            class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
                         >
                             {{ $editingWorkerId ? __('Save changes') : __('Add worker') }}
                         </button>

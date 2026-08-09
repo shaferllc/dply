@@ -103,6 +103,7 @@
                                     \App\Models\Site::STATUS_ERROR,
                                     \App\Models\Site::STATUS_CONTAINER_FAILED,
                                     \App\Models\Site::STATUS_EDGE_FAILED,
+                                    \App\Models\Site::STATUS_FUNCTIONS_FAILED,
                                     \App\Models\Site::STATUS_SCAFFOLD_FAILED,
                                 ], true);
                             $siteStatusTone = $siteIsFailed

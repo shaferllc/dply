@@ -11,7 +11,7 @@
         icon="heroicon-o-clock"
         :title="$contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server')"
         :count="$schedulersTotal > 0 ? (string) $schedulersFiltered : null"
-        :note="__('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.')"
+        :note="__('Monitor tick health, run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.')"
         class="border-b border-brand-ink/10"
     >
         <x-slot:actions>
@@ -27,16 +27,16 @@
     </x-workspace-panel-head>
 
     @if ($contextSiteModel && ! ($scheduleSiteRouteLocked ?? false))
-        <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
+        <div class="flex flex-wrap items-center gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2 sm:px-4">
             <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Show') }}</span>
-            <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm" role="group" aria-label="{{ __('Scheduler list scope') }}">
+            <div class="inline-flex items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm" role="group" aria-label="{{ __('Scheduler list scope') }}">
                 <button type="button" wire:click="$set('schedulers_list_scope', 'site')" @class([
-                    'rounded-lg px-3 py-1 text-xs font-semibold transition',
+                    'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
                     'bg-brand-ink text-brand-cream shadow-sm' => $schedulers_list_scope === 'site',
                     'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $schedulers_list_scope !== 'site',
                 ])>{{ __('This site only') }}</button>
                 <button type="button" wire:click="$set('schedulers_list_scope', 'all')" @class([
-                    'rounded-lg px-3 py-1 text-xs font-semibold transition',
+                    'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
                     'bg-brand-ink text-brand-cream shadow-sm' => $schedulers_list_scope === 'all',
                     'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $schedulers_list_scope !== 'all',
                 ])>{{ __('All schedulers on server') }}</button>
@@ -45,23 +45,28 @@
     @endif
 
     @if (empty($cards))
-        <div class="px-6 py-12 text-center sm:px-7">
-            <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                <x-heroicon-o-calendar-days class="h-6 w-6" aria-hidden="true" />
+        {{-- One-line empty: head already carries Enable — the old py-12 tile was the tallest block on an empty page. --}}
+        <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-3 py-5 text-center sm:px-4">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
             </span>
-            <p class="mt-4 text-sm font-semibold text-brand-ink">
-                @if ($contextSiteModel && $schedulers_list_scope === 'site')
-                    {{ __('No scheduler for this site yet') }}
-                @else
-                    {{ __('No schedulers yet') }}
-                @endif
-            </p>
-            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                {{ __('Enable monitoring to wrap schedule:run in a heartbeat script and track tick health.') }}
+            <p class="text-xs text-brand-moss">
+                <span class="font-semibold text-brand-ink">
+                    @if ($contextSiteModel && $schedulers_list_scope === 'site')
+                        {{ __('No scheduler for this site yet.') }}
+                    @else
+                        {{ __('No schedulers yet.') }}
+                    @endif
+                </span>
+                {{ __('Enable monitoring to wrap the scheduler command and track tick health.') }}
             </p>
             @if ($sites->isNotEmpty())
-                <button type="button" wire:click="openEnableSchedulerModal" class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <button
+                    type="button"
+                    wire:click="openEnableSchedulerModal"
+                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Enable scheduler') }}
                 </button>
             @endif
@@ -89,25 +94,25 @@
                         ])
                         aria-hidden="true"
                     ></span>
-                    <div class="min-w-0 flex-1 py-4 pl-5 pr-4 sm:py-5 sm:pl-6 sm:pr-6">
-                        <div class="flex flex-wrap items-center gap-2">
+                    <div class="min-w-0 flex-1 py-2.5 pl-4 pr-3 sm:py-3 sm:pl-5 sm:pr-4">
+                        <div class="flex flex-wrap items-center gap-1.5">
                             @if (! $siteDedicatedContext || $schedulers_list_scope === 'all')
                                 <p class="text-sm font-semibold text-brand-ink">{{ $site->name }}</p>
                             @endif
                             @if ($cardData['kind'])
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['kind'] }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['kind'] }}</span>
                             @endif
                             @if ($cardData['health'] !== null)
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['classes'] }}">{{ $chip['label'] }}</span>
+                                <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['classes'] }}">{{ $chip['label'] }}</span>
                             @endif
                         </div>
 
                         @if ($state === 'no_scheduler')
-                            <p class="mt-1 text-xs text-brand-mist italic">{{ __('No scheduler enabled.') }}</p>
+                            <p class="mt-0.5 text-[11px] text-brand-mist italic">{{ __('No scheduler enabled.') }}</p>
                         @elseif ($state === 'detected_unmonitored')
-                            <p class="mt-1 text-xs text-amber-900">{{ __('Detected in crontab but not monitored — enable monitoring to wrap it.') }}</p>
+                            <p class="mt-0.5 text-[11px] text-amber-900">{{ __('Detected in crontab but not monitored — enable monitoring to wrap it.') }}</p>
                         @else
-                            <p class="mt-1 text-xs text-brand-moss">
+                            <p class="mt-0.5 text-[11px] text-brand-moss">
                                 <span class="font-mono">{{ $cardData['cron_expression'] }}</span>
                                 @if ($cronDesc = cron_describe($cardData['cron_expression']))
                                     · <span class="text-brand-moss/80">{{ $cronDesc }}</span>
@@ -122,7 +127,7 @@
                         @endif
 
                         @if ($isEditing && $heartbeatId !== null)
-                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                 <input
                                     type="text"
                                     wire:model="editing_cadence.{{ $heartbeatId }}"
@@ -132,12 +137,12 @@
                                     placeholder="* * * * *"
                                 />
                                 <x-secondary-button size="sm" type="button" wire:click="saveCadence('{{ $heartbeatId }}')">{{ __('Save') }}</x-secondary-button>
-                                <button type="button" wire:click="cancelEditCadence('{{ $heartbeatId }}')" class="text-xs text-brand-moss hover:underline">{{ __('Cancel') }}</button>
+                                <button type="button" wire:click="cancelEditCadence('{{ $heartbeatId }}')" class="text-[11px] text-brand-moss hover:underline">{{ __('Cancel') }}</button>
                             </div>
                         @endif
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap items-center gap-1 border-t border-brand-ink/5 bg-brand-sand/10 px-2 py-3 sm:border-l sm:border-t-0 sm:px-3">
+                    <div class="flex shrink-0 flex-wrap items-center gap-0.5 border-t border-brand-ink/5 bg-brand-sand/10 px-2 py-2 sm:border-l sm:border-t-0 sm:px-2.5">
                         @if ($state === 'tracked' || $state === 'paused')
                             <button
                                 type="button"
@@ -145,10 +150,10 @@
                                 wire:loading.attr="disabled"
                                 wire:target="runNow('{{ $heartbeatId }}')"
                                 @disabled($runInFlight || $isPaused)
-                                class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
+                                class="rounded-md p-1.5 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
                                 title="{{ $isPaused ? __('Resume first') : __('Run now') }}"
                             >
-                                <x-heroicon-o-play class="h-5 w-5" wire:loading.remove wire:target="runNow('{{ $heartbeatId }}')" />
+                                <x-heroicon-o-play class="h-4 w-4" wire:loading.remove wire:target="runNow('{{ $heartbeatId }}')" />
                                 <x-spinner wire:loading wire:target="runNow('{{ $heartbeatId }}')" size="sm" />
                             </button>
                             <button
@@ -156,14 +161,14 @@
                                 wire:click="togglePause('{{ $heartbeatId }}')"
                                 wire:loading.attr="disabled"
                                 wire:target="togglePause('{{ $heartbeatId }}')"
-                                class="rounded-lg p-2 text-amber-800 hover:bg-amber-50"
+                                class="rounded-md p-1.5 text-amber-800 hover:bg-amber-50"
                                 title="{{ $isPaused ? __('Resume') : __('Pause') }}"
                             >
                                 <span wire:loading.remove wire:target="togglePause('{{ $heartbeatId }}')">
                                     @if ($isPaused)
-                                        <x-heroicon-o-play class="h-5 w-5" />
+                                        <x-heroicon-o-play class="h-4 w-4" />
                                     @else
-                                        <x-heroicon-o-pause class="h-5 w-5" />
+                                        <x-heroicon-o-pause class="h-4 w-4" />
                                     @endif
                                 </span>
                                 <x-spinner wire:loading wire:target="togglePause('{{ $heartbeatId }}')" variant="amber" size="sm" />
@@ -171,34 +176,34 @@
                             <button
                                 type="button"
                                 wire:click="startEditCadence('{{ $heartbeatId }}')"
-                                class="rounded-lg p-2 text-brand-ink hover:bg-white"
+                                class="rounded-md p-1.5 text-brand-ink hover:bg-white"
                                 title="{{ __('Edit cadence') }}"
                             >
-                                <x-heroicon-o-pencil-square class="h-5 w-5" />
+                                <x-heroicon-o-pencil-square class="h-4 w-4" />
                             </button>
                             <button
                                 type="button"
                                 wire:click="openDisableMonitoringModal('{{ $heartbeatId }}')"
-                                class="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                                class="rounded-md p-1.5 text-red-600 hover:bg-red-50"
                                 title="{{ __('Stop monitoring') }}"
                             >
-                                <x-heroicon-o-eye-slash class="h-5 w-5" />
+                                <x-heroicon-o-eye-slash class="h-4 w-4" />
                             </button>
                         @elseif ($state === 'detected_unmonitored' || $state === 'no_scheduler')
                             <button
                                 type="button"
                                 wire:click="openEnableSchedulerModal"
-                                class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50"
+                                class="rounded-md p-1.5 text-brand-forest hover:bg-emerald-50"
                                 title="{{ __('Enable scheduler') }}"
                             >
-                                <x-heroicon-o-plus-circle class="h-5 w-5" />
+                                <x-heroicon-o-plus-circle class="h-4 w-4" />
                             </button>
                         @endif
                     </div>
                 </li>
             @endforeach
         </ul>
-        <p class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 text-xs text-brand-moss sm:px-7">
+        <p class="border-t border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-[11px] text-brand-moss sm:px-4">
             {{ __('Stop monitoring keeps the cron entry on the server but removes heartbeat tracking. Pause disables the cron line until you resume.') }}
         </p>
     @endif

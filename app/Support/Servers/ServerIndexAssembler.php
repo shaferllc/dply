@@ -172,6 +172,7 @@ final class ServerIndexAssembler
                     Site::STATUS_ERROR,
                     Site::STATUS_CONTAINER_FAILED,
                     Site::STATUS_EDGE_FAILED,
+                    Site::STATUS_FUNCTIONS_FAILED,
                     Site::STATUS_SCAFFOLD_FAILED,
                 ], true),
             'is_ready' => $site->isReadyForTraffic(),

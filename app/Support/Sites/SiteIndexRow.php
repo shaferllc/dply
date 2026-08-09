@@ -125,6 +125,7 @@ final readonly class SiteIndexRow
                 Site::STATUS_ERROR,
                 Site::STATUS_CONTAINER_FAILED,
                 Site::STATUS_EDGE_FAILED,
+                Site::STATUS_FUNCTIONS_FAILED,
                 Site::STATUS_SCAFFOLD_FAILED,
             ], true);
         $isReady = array_key_exists('is_ready_for_traffic', $row)

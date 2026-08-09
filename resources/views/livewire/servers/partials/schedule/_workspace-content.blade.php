@@ -37,8 +37,8 @@
     $hasStale = ($scheduleStats['attention'] ?? 0) > 0;
     $siteDedicatedContext = $siteDedicatedContext ?? ($contextSiteModel !== null && ($scheduleSiteRouteLocked ?? false));
     $scheduleDescription = $siteDedicatedContext
-        ? __('Framework schedulers for this site (schedule:run tick health, cadence, run-now).')
-        : __('Framework schedulers running on this server. Tracks tick health for each scheduler; nudges you when one stops firing.');
+        ? __('Framework schedulers for this site — tick health, cadence, and run-now.')
+        : __('Framework schedulers on this server — tick health per site; nudges when one stops firing.');
     $scheduleTabContext = compact(
         'server',
         'cards',
@@ -121,32 +121,38 @@
     ]" />
 
     @if ($opsReady)
-        {{-- Console banner for scheduler actions (enable, pause, run-now, cadence save) --}}
-        <div wire:loading.block wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-            <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
+        {{-- Console banner: hidden until there's something to show (avoids an empty ~30px band). --}}
+        @php
+            $scheduleBannerVisible = $scheduler_run_busy || $panel_event_message !== '';
+        @endphp
+        <div
+            @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4', 'hidden' => ! $scheduleBannerVisible])
+            wire:loading.class.remove="hidden"
+            wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow"
+        >
+            <div wire:loading.block wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow">
+                <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
+            </div>
+            @if ($scheduler_run_busy)
+                <div wire:poll.1s="pollSchedulerRun">
+                    <x-workspace-console-banner
+                        :status="$panel_event_status"
+                        :message="$panel_event_message ?: __('Run now queued…')"
+                        :output="$panel_event_lines"
+                        :busy="true"
+                    />
+                </div>
+            @elseif ($panel_event_message !== '')
+                <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun">
+                    <x-workspace-console-banner
+                        :status="$panel_event_status"
+                        :message="$panel_event_message"
+                        :output="$panel_event_lines"
+                        dismiss-action="dismissPanelBanner"
+                    />
+                </div>
+            @endif
         </div>
-        @if ($panel_event_message !== '')
-            <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                <x-workspace-console-banner
-                    :status="$panel_event_status"
-                    :message="$panel_event_message"
-                    :output="$panel_event_lines"
-                    dismiss-action="dismissPanelBanner"
-                />
-            </div>
-        @endif
-
-        {{-- Run-now live streaming — poll the job's cached output until it finishes --}}
-        @if ($scheduler_run_busy)
-            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6" wire:poll.1s="pollSchedulerRun">
-                <x-workspace-console-banner
-                    :status="$panel_event_status"
-                    :message="$panel_event_message ?: __('Run now queued…')"
-                    :output="$panel_event_lines"
-                    :busy="true"
-                />
-            </div>
-        @endif
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll bare class="!mb-0 w-full">
@@ -221,17 +227,35 @@
             @include('livewire.servers.partials.schedule._enable-modal-body', $scheduleTabContext)
         </x-modal>
     @else
-        <div class="px-5 py-6 sm:px-6">
+        <div class="px-3 py-4 sm:px-4">
             @include('livewire.servers.partials.workspace-ops-not-ready')
         </div>
     @endif
 
     @if ($contextSiteModel)
-        <div class="border-t border-brand-ink/10 px-5 py-2.5 sm:px-6">
-            <x-cli-snippet :commands="[
+        @php
+            $scheduleCliCommands = [
                 ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
-                ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\''],
-            ]" />
+            ];
+            if ($enableTargetSite?->isLaravelFrameworkDetected()) {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a schedule:run cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\'',
+                ];
+            } elseif ($enableTargetSite?->isRailsFrameworkDetected()) {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a whenever cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'bundle exec whenever --update-crontab\'',
+                ];
+            } else {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a scheduler cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'<command>\'',
+                ];
+            }
+        @endphp
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
+            <x-cli-snippet :commands="$scheduleCliCommands" />
         </div>
     @endif
 </section>

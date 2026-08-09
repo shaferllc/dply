@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Server;
@@ -37,6 +38,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Workers extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     /** Restart policies a worker definition may declare. */
