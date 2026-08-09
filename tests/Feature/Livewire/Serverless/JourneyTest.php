@@ -2,16 +2,16 @@
 
 namespace Tests\Feature\Livewire\Serverless\JourneyTest;
 
-use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
-use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
-use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
+use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
+use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -199,4 +199,51 @@ test('rejects a site that is not on the given host', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessJourney::class, ['server' => $server, 'site' => $otherSite])
         ->assertStatus(404);
+});
+
+test('deletes the failed run the journey is showing', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+        siteStatus: Site::STATUS_FUNCTIONS_FAILED,
+    );
+    $failed = SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_FAILED,
+        'log_output' => 'HTTP 401 The supplied authentication is invalid',
+        'started_at' => now(),
+        'finished_at' => now(),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Delete failed run')
+        ->call('openDeleteDeploymentModal')
+        ->assertSet('confirmingDeleteDeployment', true)
+        ->call('deleteFailedDeployment')
+        ->assertSet('confirmingDeleteDeployment', false);
+
+    expect(SiteDeployment::query()->find($failed->id))->toBeNull();
+});
+
+test('will not delete a running deploy from the journey', function () {
+    [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_READY, serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']]);
+    $running = SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_RUNNING,
+        'started_at' => now(),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertDontSee('Delete failed run')
+        ->call('deleteFailedDeployment');
+
+    expect(SiteDeployment::query()->find($running->id))->not->toBeNull();
 });

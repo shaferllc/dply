@@ -136,3 +136,40 @@ test('managed env is authoritative over the repo env', function () {
     $this->assertStringContainsString('MANAGED=1', $built);
     $this->assertStringNotContainsString('FROM_REPO', $built);
 });
+
+test('it injects the queue wake url alongside the ingest url', function () {
+    config(['dply.public_app_url' => 'dply.tunnel.example']);
+    $site = Site::factory()->create(['env_file_content' => null]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $this->assertStringContainsString(
+        'DPLY_QUEUE_WAKE_URL=https://dply.tunnel.example/hooks/functions/'.$site->id.'/queue/wake',
+        (string) $site->fresh()->env_file_content,
+    );
+});
+
+test('it skips the queue wake url when no public url is configured', function () {
+    // Same reachability rule as ingest — a function on DigitalOcean cannot
+    // ping a local address, so the handler gets no URL and skips cleanly.
+    config(['dply.public_app_url' => null]);
+    $site = Site::factory()->create(['env_file_content' => null]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $this->assertStringNotContainsString('DPLY_QUEUE_WAKE_URL=', (string) $site->fresh()->env_file_content);
+});
+
+test('the wake url matches the route the wake controller is registered on', function () {
+    // Guards against the injected URL and the actual route drifting apart —
+    // a mismatch would silently cost every app its low-latency queue path.
+    config(['dply.public_app_url' => 'dply.tunnel.example']);
+    $site = Site::factory()->create(['env_file_content' => null]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $expected = route('hooks.functions.queue.wake', ['site' => $site->id]);
+    $path = (string) parse_url($expected, PHP_URL_PATH);
+
+    $this->assertStringContainsString('DPLY_QUEUE_WAKE_URL=https://dply.tunnel.example'.$path, (string) $site->fresh()->env_file_content);
+});

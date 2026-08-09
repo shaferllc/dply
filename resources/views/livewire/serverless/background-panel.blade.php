@@ -1,66 +1,176 @@
+@php
+    $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
+@endphp
+
 <div class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduler & queue worker') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('DigitalOcean Functions has no long-running process, so dply invokes this function every minute to run the Laravel scheduler (schedule:run) and drain queued jobs (queue:work).') }}
-            </p>
-        </div>
-        <span @class([
-            'ml-auto shrink-0 inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold',
-            'bg-brand-forest/15 text-brand-forest' => $enabled,
-            'bg-brand-ink/5 text-brand-moss' => ! $enabled,
-        ])>
-            {{ $enabled ? __('On') : __('Off') }}
-        </span>
-    </div>
+    <x-workspace-panel-head
+        dense
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-clock"
+        :title="__('Scheduler & queue')"
+        :count="$enabled ? __('on') : __('off')"
+        :note="__('A function has no long-running process. dply runs the Laravel scheduler on a one-minute cron, and drains queued jobs with concurrent invocations as work arrives.')"
+    />
 
-    <div class="px-6 py-6 sm:px-7 space-y-4">
-    @if ($enabled)
-        <div class="rounded-xl border border-brand-forest/20 bg-brand-forest/10 px-4 py-3 text-sm text-brand-forest">
-            {{ __('Running every minute. For queued jobs, set QUEUE_CONNECTION=database (or redis) in the Environment panel and migrate the jobs table.') }}
-        </div>
-    @endif
-
-    @unless ($deployed)
-        <section class="dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy the function first') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Ticks are skipped until the function has an invocation URL.') }}</p>
-                    </div>
-                </div>
+    <div class="space-y-3 px-3 py-3 sm:px-4">
+        @unless ($deployed)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {{ __('Deploy the function first — background work is skipped until it has an invocation URL.') }}
             </div>
-        </section>
-    @endunless
+        @endunless
 
-    <button type="button" wire:click="toggle" wire:loading.attr="disabled"
-            class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
-        {{ $enabled ? __('Disable background processing') : __('Enable background processing') }}
-    </button>
-
-    <div class="border-t border-brand-ink/10 pt-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Keep warm') }}</p>
-                <p class="mt-0.5 text-sm text-brand-moss">
-                    {{ __('Ping the function every minute so a request rarely hits a cold start. Not needed when background processing is on — that already keeps it warm.') }}
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Background processing') }}</p>
+                <p class="mt-0.5 text-xs text-brand-moss">
+                    {{ __('Runs schedule:run every minute and drains queued jobs. Set QUEUE_CONNECTION to database or redis in the Environment panel.') }}
                 </p>
             </div>
-            <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled"
-                    class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40 disabled:opacity-70">
-                {{ $keepWarm ? __('Disable keep-warm') : __('Enable keep-warm') }}
+            <button type="button" wire:click="toggle" wire:loading.attr="disabled" class="{{ $btnOutline }} shrink-0">
+                {{ $enabled ? __('Disable') : __('Enable') }}
+            </button>
+        </div>
+
+        {{-- Concurrency — the throughput dial. Only meaningful while queue
+             processing is on, so it stays hidden until then. --}}
+        @if ($queueEnabled)
+            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div class="min-w-0">
+                        <label for="max_concurrency" class="block text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">
+                            {{ __('Queue concurrency') }}
+                        </label>
+                        <p class="mt-0.5 max-w-xl text-xs text-brand-moss">
+                            {{ __('How many queue drains may run against this function at once. Higher clears a backlog faster; each concurrent drain is a billed invocation. dply scales up to this only while there is a backlog, and back to zero when the queue empties.') }}
+                        </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                        <input
+                            id="max_concurrency"
+                            type="number"
+                            min="1"
+                            max="{{ $maxConcurrencyCeiling }}"
+                            step="1"
+                            wire:model="max_concurrency"
+                            class="w-20 rounded-lg border-brand-ink/15 py-1 text-sm font-mono shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                        />
+                        <button type="button" wire:click="saveConcurrency" wire:loading.attr="disabled" wire:target="saveConcurrency" class="{{ $btnOutline }}">
+                            <span wire:loading.remove wire:target="saveConcurrency">{{ __('Save') }}</span>
+                            <span wire:loading wire:target="saveConcurrency">{{ __('Saving…') }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                @error('max_concurrency')
+                    <p class="mt-1 text-2xs font-medium text-rose-700">{{ $message }}</p>
+                @enderror
+
+                <p class="mt-1.5 text-2xs text-brand-mist">
+                    {{ trans_choice(
+                        '{0}No drains running right now.|{1}:count drain running right now.|[2,*]:count drains running right now.',
+                        $activeSlots,
+                        ['count' => $activeSlots],
+                    ) }}
+                    {{ __('Ceiling :max.', ['max' => $maxConcurrencyCeiling]) }}
+                </p>
+            </div>
+        @endif
+
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-3">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Keep warm') }}</p>
+                <p class="mt-0.5 text-xs text-brand-moss">
+                    {{ __('Ping the function every minute so requests rarely hit a cold start. Unnecessary while background processing is on — that already keeps it warm.') }}
+                </p>
+            </div>
+            <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" class="{{ $btnOutline }} shrink-0">
+                {{ $keepWarm ? __('Disable') : __('Enable') }}
             </button>
         </div>
     </div>
-    </div>
+
+    {{-- Failed jobs. A function has no CLI, so `queue:failed` can never be
+         run against it — these are mirrored out of the function by the
+         handler as they fail, and re-queued from here. --}}
+    <x-workspace-panel-head
+        dense
+        class="border-y border-brand-ink/10"
+        icon="heroicon-o-exclamation-triangle"
+        :tone="$this->failedJobCount > 0 ? 'danger' : null"
+        :title="__('Failed jobs')"
+        :count="$this->failedJobCount > 0 ? $this->failedJobCount : null"
+        :note="__('Reported by the function as they fail. Retrying re-queues the job in the app and starts a drain immediately.')"
+    >
+        @if ($this->failedJobCount > 0)
+            <x-slot:actions>
+                <button type="button" wire:click="retryFailedJobs" wire:loading.attr="disabled" wire:target="retryFailedJobs" class="{{ $btnOutline }}">
+                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="retryFailedJobs" aria-hidden="true" />
+                    {{ __('Retry all') }}
+                </button>
+                <button type="button" wire:click="clearFailedJobs" wire:loading.attr="disabled" class="{{ $btnOutline }} text-rose-700 ring-rose-200 hover:bg-rose-50">
+                    <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Clear') }}
+                </button>
+            </x-slot:actions>
+        @endif
+    </x-workspace-panel-head>
+
+    @if ($this->failedJobs->isEmpty())
+        <div class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
+            {{ __('No failed jobs recorded.') }}
+        </div>
+    @else
+        <ol class="divide-y divide-brand-ink/10">
+            @foreach ($this->failedJobs as $job)
+                <li wire:key="failed-{{ $job->id }}" class="group px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
+                    <div class="flex items-start gap-2.5">
+                        <span @class([
+                            'mt-1 flex h-2 w-2 shrink-0 rounded-full ring-4',
+                            'bg-brand-mist ring-brand-sand/50' => $job->wasRetried(),
+                            'bg-rose-500 ring-rose-100' => ! $job->wasRetried(),
+                        ])></span>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $job->job_class }}">{{ $job->shortJobClass() }}</span>
+                                @if ($job->queue)
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $job->queue }}</span>
+                                @endif
+                                @if ($job->wasRetried())
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('re-queued') }}</span>
+                                @endif
+                                @if ($job->failed_at)
+                                    <span class="ml-auto whitespace-nowrap text-2xs text-brand-mist" title="{{ $job->failed_at->toIso8601String() }}">{{ $job->failed_at->diffForHumans() }}</span>
+                                @endif
+                            </div>
+
+                            <p class="mt-0.5 truncate font-mono text-2xs text-rose-700" title="{{ \Illuminate\Support\Str::limit((string) $job->exception_excerpt, 1500) }}">{{ $job->headline() }}</p>
+
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                @if ($job->uuid && ! $job->wasRetried())
+                                    <button type="button" wire:click="retryFailedJobs('{{ $job->uuid }}')" wire:loading.attr="disabled"
+                                            class="inline-flex items-center gap-1 text-2xs font-semibold text-brand-forest hover:text-brand-sage">
+                                        <x-heroicon-m-arrow-path class="h-3 w-3" aria-hidden="true" />
+                                        {{ __('Retry') }}
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="dismissFailedJob('{{ $job->id }}')" wire:loading.attr="disabled"
+                                        class="inline-flex items-center gap-1 text-2xs font-semibold text-brand-mist hover:text-rose-700">
+                                    <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
+                                    {{ __('Dismiss') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            @endforeach
+        </ol>
+
+        @if ($this->failedJobCount > $this->failedJobs->count())
+            <div class="border-t border-brand-ink/10 px-3 py-2 text-2xs text-brand-mist sm:px-4">
+                {{ __('Showing the :shown most recent of :total.', ['shown' => $this->failedJobs->count(), 'total' => $this->failedJobCount]) }}
+            </div>
+        @endif
+    @endif
 </div>

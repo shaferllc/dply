@@ -7,8 +7,8 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 // Unqualified, this resolves to App\Modules\Serverless\Jobs\RunSiteDeploymentJob
 // which does not exist — a fatal on dispatch. No test covers this path.
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -52,25 +52,15 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
 
         $meta = $server->meta;
 
-        // Already provisioned — skip the API call, just (re)deploy functions.
-        if (! empty($meta['digitalocean_functions']['api_host'] ?? null)) {
-            // A functions namespace has no SSH setup phase — make sure the
-            // host reads as fully ready so the workspace navigation shows.
-            if ($server->status !== Server::STATUS_READY || $server->setup_status !== Server::SETUP_STATUS_DONE) {
-                $server->update([
-                    'status' => Server::STATUS_READY,
-                    'setup_status' => Server::SETUP_STATUS_DONE,
-                ]);
-            }
-            $this->deployConfiguredFunctions($server);
-
-            return;
-        }
-
         // Managed mode: dply runs the function on its OWN, pre-provisioned
         // DigitalOcean Functions namespace. There's no per-host namespace to
         // create and no customer credential — just stamp the shared platform
         // OpenWhisk credentials and mark the host ready.
+        //
+        // Checked BEFORE the already-provisioned short-circuit on purpose:
+        // config is the source of truth for a managed host, so a rotated
+        // platform key has to overwrite the stamp. Short-circuiting first
+        // pinned the old key forever and every deploy 401'd.
         if (! empty($meta['serverless_managed'] ?? null)) {
             $platform = ServerlessPlatformContext::fromConfig();
             if (! $platform->configured()) {
@@ -87,6 +77,23 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
                 'setup_status' => Server::SETUP_STATUS_DONE,
             ]);
 
+            $this->deployConfiguredFunctions($server);
+
+            return;
+        }
+
+        // BYO namespace, already provisioned — skip the API call, just
+        // (re)deploy functions. The customer's own key lives on the host and
+        // config has nothing newer to offer, so the stamp stands.
+        if (! empty($meta['digitalocean_functions']['api_host'] ?? null)) {
+            // A functions namespace has no SSH setup phase — make sure the
+            // host reads as fully ready so the workspace navigation shows.
+            if ($server->status !== Server::STATUS_READY || $server->setup_status !== Server::SETUP_STATUS_DONE) {
+                $server->update([
+                    'status' => Server::STATUS_READY,
+                    'setup_status' => Server::SETUP_STATUS_DONE,
+                ]);
+            }
             $this->deployConfiguredFunctions($server);
 
             return;

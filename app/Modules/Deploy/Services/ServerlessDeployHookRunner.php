@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Services\Sites\DeployHookRunner;
 use App\Services\Sites\DeployHookScriptExpander;
+use App\Support\DeployLogSanitizer;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -74,7 +75,9 @@ final class ServerlessDeployHookRunner
         $process->setTimeout($timeout);
         $process->run();
 
-        $output = trim($process->getOutput()."\n".$process->getErrorOutput());
+        // Operator hook scripts are arbitrary shell — scrub colour codes and
+        // progress redraws here so they never reach the deploy log.
+        $output = trim(DeployLogSanitizer::sanitize($process->getOutput()."\n".$process->getErrorOutput()));
         $header = '--- hook '.$phase.' #'.$hookId.' ---';
 
         if (! $process->isSuccessful()) {

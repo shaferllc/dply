@@ -136,6 +136,15 @@
                                 <span wire:loading.remove wire:target="retryDeploy">{{ __('Retry deploy') }}</span>
                                 <span wire:loading wire:target="retryDeploy">{{ __('Retrying…') }}</span>
                             </button>
+
+                            {{-- Discard the failed run itself, so a function that
+                                 failed on its first deploy isn't stuck showing a
+                                 red journey forever. --}}
+                            <button type="button" wire:click="openDeleteDeploymentModal" wire:loading.attr="disabled" wire:target="openDeleteDeploymentModal"
+                                    class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-70">
+                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Delete failed run') }}
+                            </button>
                         @endif
 
                         @if ($live)
@@ -431,6 +440,31 @@
                     <button type="button" wire:click="cancelDeploy" wire:loading.attr="disabled"
                             class="inline-flex items-center rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-70">
                         {{ __('Cancel deploy') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Delete-failed-run confirmation — same in-app modal shape as cancel --}}
+    @if ($confirmingDeleteDeployment)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="serverless-delete-deploy-title">
+            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDeleteDeploymentModal"></div>
+            <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-xl">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
+                    <h3 id="serverless-delete-deploy-title" class="text-base font-semibold text-brand-ink">{{ __('Delete this failed run?') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ __('The run and its log are removed from history. The function itself is untouched — nothing is undeployed.') }}
+                    </p>
+                </div>
+                <div class="flex justify-end gap-2 px-5 py-4">
+                    <button type="button" wire:click="closeDeleteDeploymentModal"
+                            class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/40">
+                        {{ __('Keep it') }}
+                    </button>
+                    <button type="button" wire:click="deleteFailedDeployment" wire:loading.attr="disabled"
+                            class="inline-flex items-center rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-70">
+                        {{ __('Delete run') }}
                     </button>
                 </div>
             </div>

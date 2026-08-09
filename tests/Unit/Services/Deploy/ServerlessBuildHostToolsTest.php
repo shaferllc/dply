@@ -129,3 +129,38 @@ test('ensureComposer returns an existing binary without reinstalling', function 
         File::delete($fake);
     }
 });
+
+test('build env suppresses colour so deploy logs stay plain text', function () {
+    $env = (new ServerlessBuildHostTools)->processEnv();
+
+    expect($env['NO_COLOR'])->toBe('1');
+    expect($env['TERM'])->toBe('dumb');
+    expect($env['COMPOSER_NO_INTERACTION'])->toBe('1');
+});
+
+test('prepared shell command exports the no-colour env before the real command', function () {
+    $wrapped = (new ServerlessBuildHostTools)->prepareShellCommand('composer install --no-dev');
+
+    expect($wrapped)->toContain('export NO_COLOR=1;');
+    expect($wrapped)->toContain('export TERM=dumb;');
+    // The exports have to precede the command, or the tool it configures has
+    // already decided to colour its output.
+    expect(strpos($wrapped, 'export NO_COLOR=1;'))->toBeLessThan(strpos($wrapped, 'composer install --no-dev'));
+});
+
+test('a real composer run through the prepared command produces no escape codes', function () {
+    $tools = new ServerlessBuildHostTools;
+    if ($tools->findComposer() === null) {
+        $this->markTestSkipped('composer is not available on this machine');
+    }
+
+    $process = Process::fromShellCommandline(
+        $tools->prepareShellCommand('composer --version'),
+        sys_get_temp_dir(),
+        $tools->processEnv(),
+    );
+    $process->setTimeout(60);
+    $process->run();
+
+    expect($process->getOutput())->not->toContain("\e");
+});

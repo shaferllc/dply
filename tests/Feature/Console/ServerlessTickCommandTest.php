@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console\ServerlessTickCommandTest;
 
-use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Serverless\Jobs\ServerlessQueueSlotJob;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -51,16 +53,23 @@ function fakeActivation(): void
     ]);
 }
 test('it ticks enabled active functions via the authenticated api', function () {
+    Bus::fake();
     fakeActivation();
 
     $site = functionSite(Site::STATUS_FUNCTIONS_ACTIVE, ['background_enabled' => true]);
 
     $this->artisan('serverless:tick')->assertSuccessful();
 
-    // One schedule + one queue tick, both recorded as source=tick rows.
-    expect(FunctionInvocation::query()->where('site_id', $site->id)->count())->toBe(2);
+    // The scheduler still needs a real one-minute cron edge, so the tick
+    // invokes it directly and records one source=tick row.
+    expect(FunctionInvocation::query()->where('site_id', $site->id)->count())->toBe(1);
     expect(FunctionInvocation::query()->where('site_id', $site->id)->where('task', 'schedule')->count())->toBe(1);
-    expect(FunctionInvocation::query()->where('site_id', $site->id)->where('task', 'queue')->count())->toBe(1);
+
+    // Queue work is no longer driven from this cron. The tick only wakes the
+    // pump, which owns concurrency and re-invocation from there — so no
+    // `queue` invocation is recorded here.
+    expect(FunctionInvocation::query()->where('site_id', $site->id)->where('task', 'queue')->count())->toBe(0);
+    Bus::assertDispatched(ServerlessQueueSlotJob::class);
 
     Http::assertSent(fn ($request): bool => str_contains($request->url(), '/actions/laravel-demo')
         && data_get($request->data(), '__ow_headers.x-dply-run') === 'schedule'

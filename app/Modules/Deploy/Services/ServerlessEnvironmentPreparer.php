@@ -73,6 +73,19 @@ class ServerlessEnvironmentPreparer
             }
         }
 
+        // Queue-pump wake. The handler pings this the moment the app queues a
+        // job, so the pump starts draining within a round-trip instead of
+        // waiting for the next one-minute safety-net tick. Authenticated with
+        // the command secret injected above — no second secret to manage.
+        // Same public-reachability rule as log ingest: no URL in dev, and the
+        // handler skips the ping cleanly.
+        if ($isLaravel) {
+            $wakeUrl = $this->queueWakeUrl($site);
+            if ($wakeUrl !== '') {
+                $managed = $this->setEnvKey($managed, 'DPLY_QUEUE_WAKE_URL', $wakeUrl);
+            }
+        }
+
         // Persist so the value is stable and editable in the Environment panel.
         if ($managed !== $original) {
             $site->forceFill(['env_file_content' => $managed])->save();
@@ -93,7 +106,7 @@ class ServerlessEnvironmentPreparer
      * — existing keys are replaced in place, new ones appended. Used to wire
      * a provisioned database's connection into the function.
      *
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      */
     public function mergeKeys(Site $site, array $values): void
     {
@@ -163,6 +176,24 @@ class ServerlessEnvironmentPreparer
         }
 
         return rtrim($public, '/').'/hooks/functions/'.$site->id.'/log';
+    }
+
+    /**
+     * The URL the deployed function pings when it queues a job, so dply's
+     * pump can start draining immediately. Empty (and therefore skipped)
+     * under the same conditions as {@see logIngestUrl()} — a function on
+     * DigitalOcean cannot reach a local *.test address.
+     */
+    private function queueWakeUrl(Site $site): string
+    {
+        $ingest = $this->logIngestUrl($site);
+
+        if ($ingest === '') {
+            return '';
+        }
+
+        // Same host and reachability rules as ingest, different endpoint.
+        return substr($ingest, 0, -strlen('/log')).'/queue/wake';
     }
 
     /**

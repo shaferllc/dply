@@ -32,6 +32,7 @@ use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -508,6 +509,162 @@ class DeploymentsList extends Component
         $this->statusFilter = '';
         $this->triggerFilter = '';
         $this->resetPage();
+    }
+
+    /**
+     * Ask before dropping a deploy record — history is the audit trail, so
+     * removal is deliberate rather than a stray click on a hover control.
+     */
+    public function confirmDeleteDeployment(string $deploymentId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $deployment = $this->deletableDeployment($deploymentId);
+        if ($deployment === null) {
+            return;
+        }
+
+        $details = [
+            ['label' => (string) __('Deployment'), 'value' => (string) $deployment->id, 'mono' => true],
+            ['label' => (string) __('Status'), 'value' => (string) $deployment->status],
+        ];
+        if ($deployment->started_at) {
+            $details[] = ['label' => (string) __('Started'), 'value' => $deployment->started_at->toDayDateTimeString()];
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteDeployment',
+            arguments: [$deployment->id],
+            title: __('Delete this deployment?'),
+            message: __('The run and its log are removed from history. Nothing that was deployed is touched — the live release stays exactly as it is.'),
+            confirmLabel: __('Delete run'),
+            destructive: true,
+            details: $details,
+        );
+    }
+
+    /**
+     * Delete a single finished deploy record. The ephemeral-credential row
+     * cascades with it; releases and the live deploy are untouched.
+     */
+    public function deleteDeployment(string $deploymentId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $deployment = $this->deletableDeployment($deploymentId);
+        if ($deployment === null) {
+            return;
+        }
+
+        $deployment->delete();
+
+        $this->resetPage();
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+        $this->toastSuccess(__('Deployment deleted.'));
+    }
+
+    /**
+     * Ask before clearing every failed run at once — the "history is all red
+     * and I've fixed the cause" broom.
+     */
+    public function confirmDeleteFailedDeployments(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $count = $this->failedDeploymentsQuery()->count();
+        if ($count === 0) {
+            $this->toastError(__('There are no failed deployments to delete.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteFailedDeployments',
+            title: __('Delete all failed deployments?'),
+            message: trans_choice(
+                '{1}:count failed run and its log are removed from history. Successful runs, releases, and anything currently live are untouched.'
+                .'|[2,*]:count failed runs and their logs are removed from history. Successful runs, releases, and anything currently live are untouched.',
+                $count,
+                ['count' => $count],
+            ),
+            confirmLabel: trans_choice('{1}Delete :count run|[2,*]Delete :count runs', $count, ['count' => $count]),
+            destructive: true,
+        );
+    }
+
+    public function deleteFailedDeployments(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        // Chunked per-model delete so cascades / model events fire per row,
+        // rather than one mass DELETE that skips them.
+        $deleted = 0;
+        $this->failedDeploymentsQuery()
+            ->orderBy('id')
+            ->chunkById(200, function (Collection $rows) use (&$deleted): void {
+                foreach ($rows as $row) {
+                    $row->delete();
+                    $deleted++;
+                }
+            });
+
+        $this->resetPage();
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+        $this->toastSuccess(trans_choice(
+            '{1}:count failed deployment deleted.|[2,*]:count failed deployments deleted.',
+            $deleted,
+            ['count' => $deleted],
+        ));
+    }
+
+    /**
+     * How many failed runs this site is carrying — drives the bulk-delete
+     * control's visibility and label.
+     */
+    #[Computed]
+    public function failedDeploymentCount(): int
+    {
+        return $this->failedDeploymentsQuery()->count();
+    }
+
+    /**
+     * Failed runs for this site — the bulk-delete target. `skipped` is left
+     * alone: a billing- or window-blocked run records a decision, not a
+     * failure, and operators go looking for those.
+     *
+     * @return Builder<SiteDeployment>
+     */
+    private function failedDeploymentsQuery(): Builder
+    {
+        return SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', SiteDeployment::STATUS_FAILED);
+    }
+
+    /**
+     * Resolve a deploy row that belongs to this site and is safe to remove.
+     * A running deploy is off-limits — deleting the row the pipeline is still
+     * writing to would strand the worker; cancel it first.
+     */
+    private function deletableDeployment(string $deploymentId): ?SiteDeployment
+    {
+        $deployment = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($deploymentId);
+
+        if ($deployment === null) {
+            $this->toastError(__('That deployment no longer exists.'));
+
+            return null;
+        }
+
+        if ($deployment->status === SiteDeployment::STATUS_RUNNING) {
+            $this->toastError(__('That deploy is still running. Cancel it first, then delete the run.'));
+
+            return null;
+        }
+
+        return $deployment;
     }
 
     /**

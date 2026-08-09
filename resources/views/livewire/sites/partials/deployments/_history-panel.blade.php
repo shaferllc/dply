@@ -38,6 +38,18 @@
                 {{ __('Clear') }}
             </button>
         @endif
+
+        @if ($this->failedDeploymentCount > 0)
+            <button
+                type="button"
+                wire:click="confirmDeleteFailedDeployments"
+                wire:loading.attr="disabled"
+                class="{{ $btnOutline }} ml-auto text-rose-700 ring-rose-200 hover:bg-rose-50"
+            >
+                <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ trans_choice('{1}Delete :count failed run|[2,*]Delete :count failed runs', $this->failedDeploymentCount, ['count' => $this->failedDeploymentCount]) }}
+            </button>
+        @endif
     </div>
 
     @if ($deployments->isEmpty())
@@ -65,7 +77,7 @@
                             ? $deployment->started_at->diffInSeconds($deployment->finished_at).'s'
                             : null);
                 @endphp
-                <li class="group relative transition-colors hover:bg-brand-sand/15">
+                <li wire:key="deployment-{{ $deployment->id }}" class="group relative transition-colors hover:bg-brand-sand/15">
                     <a
                         href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment]) }}"
                         wire:navigate
@@ -164,6 +176,21 @@
                                         <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                     </a>
                                 @endif
+
+                                {{-- A running deploy has no delete control: the pipeline is
+                                     still writing to the row. Cancel it, then delete. --}}
+                                @unless ($isRunning)
+                                    <button
+                                        type="button"
+                                        wire:click="confirmDeleteDeployment('{{ $deployment->id }}')"
+                                        wire:loading.attr="disabled"
+                                        class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-mist opacity-0 transition-opacity hover:text-rose-700 focus:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+                                        aria-label="{{ __('Delete deployment :id', ['id' => $deployment->id]) }}"
+                                    >
+                                        <x-heroicon-m-trash class="h-3 w-3" aria-hidden="true" />
+                                        {{ __('Delete') }}
+                                    </button>
+                                @endunless
                             </div>
                         </div>
 

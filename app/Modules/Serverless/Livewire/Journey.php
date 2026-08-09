@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Livewire;
 
-use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -44,6 +44,9 @@ class Journey extends Component
 
     /** Whether the cancel-deploy confirmation modal is open. */
     public bool $confirmingCancel = false;
+
+    /** Whether the delete-failed-run confirmation modal is open. */
+    public bool $confirmingDeleteDeployment = false;
 
     /**
      * Rendered as a panel inside another page (the Deployments tab) rather
@@ -157,6 +160,50 @@ class Journey extends Component
 
         $progress->requestCancel($site, $deployment->id);
         $this->toastSuccess(__('Cancelling the deploy — it will stop at the next step.'));
+    }
+
+    public function openDeleteDeploymentModal(): void
+    {
+        $this->confirmingDeleteDeployment = true;
+    }
+
+    public function closeDeleteDeploymentModal(): void
+    {
+        $this->confirmingDeleteDeployment = false;
+    }
+
+    /**
+     * Discard the failed run this page is showing. Deploy history is a record,
+     * not a lock — a function whose first deploy failed would otherwise show a
+     * red journey forever, with no way to clear it short of deleting the
+     * function. Only a finished, failed run can go: a running deploy is still
+     * being written to by the worker (cancel it first), and a successful run is
+     * the provenance of what is currently live.
+     */
+    public function deleteFailedDeployment(): void
+    {
+        $this->confirmingDeleteDeployment = false;
+
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        $deployment = $this->latestDeployment();
+        if ($deployment === null || $deployment->status !== SiteDeployment::STATUS_FAILED) {
+            $this->toastError(__('There is no failed deploy to delete.'));
+
+            return;
+        }
+
+        // The page bridges "triggered but not yet re-read" by pinning the id it
+        // deployed from. Deleting that row must clear the pin, or every poll
+        // keeps waiting on a deployment that no longer exists.
+        if ($this->sinceDeploymentId === $deployment->id) {
+            $this->sinceDeploymentId = null;
+        }
+
+        $deployment->delete();
+
+        $this->toastSuccess(__('Failed run deleted.'));
     }
 
     public function render(): View

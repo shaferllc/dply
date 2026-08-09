@@ -6,6 +6,7 @@ namespace App\Modules\Deploy\Services;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Support\DeployLogSanitizer;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -290,7 +291,7 @@ class DigitalOceanFunctionsArtifactBuilder
      * successful deploy so serverless-artifacts/<site> stops growing by one
      * zip per deploy. Best-effort: returns the count removed, never throws.
      *
-     * @param  array<string, mixed> $keepPaths
+     * @param  array<string, mixed>  $keepPaths
      */
     public function pruneArtifactsExcept(Site $site, array $keepPaths): int
     {
@@ -353,7 +354,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<string, mixed>  $command
      */
     private function run(array $command, string $workingDirectory): string
     {
@@ -362,10 +363,10 @@ class DigitalOceanFunctionsArtifactBuilder
         $process->run();
 
         if (! $process->isSuccessful()) {
-            throw new \RuntimeException(trim($process->getErrorOutput()."\n".$process->getOutput()));
+            throw new \RuntimeException($this->plain($process->getErrorOutput()."\n".$process->getOutput()));
         }
 
-        return trim($process->getOutput());
+        return $this->plain($process->getOutput());
     }
 
     private function runShell(string $command, string $workingDirectory): string
@@ -380,10 +381,20 @@ class DigitalOceanFunctionsArtifactBuilder
         $process->run();
 
         if (! $process->isSuccessful()) {
-            throw new \RuntimeException(trim($process->getErrorOutput()."\n".$process->getOutput()));
+            throw new \RuntimeException($this->plain($process->getErrorOutput()."\n".$process->getOutput()));
         }
 
-        return trim($process->getOutput());
+        return $this->plain($process->getOutput());
+    }
+
+    /**
+     * Build tools colour their output and animate progress with carriage
+     * returns. Scrub that at the capture point so the control characters never
+     * reach the deploy log, the Copy button, or a failure email.
+     */
+    private function plain(string $output): string
+    {
+        return trim(DeployLogSanitizer::sanitize($output));
     }
 
     /** Paths never worth shipping in a serverless action artifact. */
@@ -417,7 +428,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  array<string, mixed> $patterns
+     * @param  array<string, mixed>  $patterns
      */
     private function isExcluded(string $localName, array $patterns): bool
     {
@@ -441,7 +452,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  array<string, mixed> $excludePatterns
+     * @param  array<string, mixed>  $excludePatterns
      */
     private function zipPath(string $sourcePath, string $artifactPath, array $excludePatterns = []): void
     {

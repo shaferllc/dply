@@ -109,3 +109,41 @@ test('legacy byo deploying url redirects to serverless journey', function () {
         ->get(route('serverless.journey.legacy', ['server' => $server, 'site' => $site]))
         ->assertRedirect(ServerlessWorkspaceUrl::journey($site));
 });
+
+test('serverless runtime page renders the compact execution profile', function () {
+    [$user, , $site] = makeServerlessFunctionSite(['meta' => [
+        'runtime_profile' => 'digitalocean_functions_web',
+        'serverless' => [
+            'runtime' => 'php:8.4',
+            'entrypoint' => 'main',
+            'package' => 'default',
+            'action_name' => 'laravel-demo',
+            'last_revision_id' => '0.0.1',
+            'last_deployed_at' => now()->subMinutes(6)->toIso8601String(),
+            'action_url' => 'https://faas-nyc1.doserverless.co/api/v1/web/fn-test/default/laravel-demo',
+        ],
+    ]]);
+
+    $this->actingAs($user)
+        ->get(route('serverless.show', ['site' => $site, 'section' => 'runtime']))
+        ->assertOk()
+        ->assertSee('Execution profile')
+        ->assertSee('php:8.4')
+        ->assertSee('laravel-demo')
+        ->assertSee('Invocation URL')
+        ->assertSee('Resource limits')
+        ->assertSee('Cold starts');
+});
+
+test('serverless schedule page renders compact and drops the coming-next teaser', function () {
+    [$user, , $site] = makeServerlessFunctionSite();
+
+    $this->actingAs($user)
+        ->get(route('serverless.schedule', ['site' => $site]))
+        ->assertOk()
+        ->assertSee('Run the scheduler every minute')
+        ->assertSee('Firing history')
+        // The v1 stand-in teaser is gone — it described work that isn't shipping here.
+        ->assertDontSee('Coming next')
+        ->assertDontSee('Multiple cron rules per app');
+});

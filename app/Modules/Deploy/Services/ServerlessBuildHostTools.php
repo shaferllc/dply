@@ -45,9 +45,17 @@ final class ServerlessBuildHostTools
 
         // Queue workers (systemd) often have no HOME — Composer refuses to run
         // without HOME or COMPOSER_HOME. Export both before install + install.
+        //
+        // NO_COLOR / TERM=dumb keep build tools from painting the deploy log
+        // with ANSI escapes and progress-bar redraws. The log is read in a
+        // browser, where those render as literal `[39m` noise; the exports stop
+        // it at the source rather than scrubbing it back out afterwards.
         return '{ '
             .'export HOME='.$homeExport.'; '
             .'export COMPOSER_HOME='.$composerHomeExport.'; '
+            .'export NO_COLOR=1; '
+            .'export TERM=dumb; '
+            .'export COMPOSER_NO_INTERACTION=1; '
             .'export PATH='.$binDirExport.':"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; '
             .'command -v composer >/dev/null 2>&1 || { '
             .'echo "[dply] composer not found on Serverless build host — installing…"; '
@@ -172,6 +180,13 @@ final class ServerlessBuildHostTools
         $env['HOME'] = $home;
         $env['COMPOSER_HOME'] = $composerHome;
         $env['PATH'] = dirname($this->findPhp()).PATH_SEPARATOR.$this->enrichedPath($home);
+
+        // Deploy logs are read in a browser, not a terminal: colour codes show
+        // up as literal `[39m` and progress bars arrive as hundreds of redraws.
+        // Composer, npm, and pip all honour these.
+        $env['NO_COLOR'] = '1';
+        $env['TERM'] = 'dumb';
+        $env['COMPOSER_NO_INTERACTION'] = '1';
 
         return $env;
     }

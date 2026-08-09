@@ -6,6 +6,7 @@ namespace App\Models\Concerns\Site;
 
 use App\Livewire\Sites\Settings;
 use App\Models\Site;
+use App\Support\GitCloneUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -162,12 +163,21 @@ trait ResolvesSiteUrls
 
     /**
      * Git remote URL for source-control API browsing (BYO git_repository_url or Edge source.repo).
+     *
+     * Always a URL, never the bare `owner/name` shorthand. Serverless Create
+     * persists the shorthand into git_repository_url (see {@see GitCloneUrl}),
+     * which the clone path expands but every reader here does not: the commits
+     * list, README, branches, file browser, and commitWebUrl() all run the
+     * value through a URL parser, so shorthand read as "no repository
+     * configured" on a site that plainly had one. Normalizing at the accessor
+     * fixes all of them at once, and matches what the Edge branch below was
+     * already doing inline.
      */
     public function sourceControlRepositoryUrl(): ?string
     {
         $direct = trim((string) $this->git_repository_url);
         if ($direct !== '') {
-            return $direct;
+            return GitCloneUrl::normalize($direct);
         }
 
         if (! $this->usesEdgeRuntime()) {
@@ -180,11 +190,7 @@ trait ResolvesSiteUrls
             return null;
         }
 
-        if (str_contains($repo, '://')) {
-            return $repo;
-        }
-
-        return 'https://github.com/'.$repo.'.git';
+        return GitCloneUrl::normalize($repo);
     }
 
     /**

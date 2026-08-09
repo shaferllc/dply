@@ -21,180 +21,169 @@
         || (int) ($deployedLimits['timeout'] ?? 0) !== $savedLimits['timeout']
         || (int) ($deployedLimits['concurrency'] ?? 0) !== $savedLimits['concurrency']
     );
+
+    // Read-only facts about the deployed action. Flat rows in one bordered grid
+    // rather than six free-floating cards — six values is a spec sheet, not six
+    // things worth a card each.
+    $facts = [
+        ['label' => __('Runtime'), 'value' => $runtimeKind !== '' ? $runtimeKind : __('Auto-detected on deploy'), 'mono' => $runtimeKind !== ''],
+        ['label' => __('Entrypoint'), 'value' => $entrypoint !== '' ? $entrypoint : '—', 'mono' => true],
+        ['label' => __('Package'), 'value' => $package, 'mono' => true],
+        ['label' => __('Action name'), 'value' => $actionName !== '' ? $actionName : '—', 'mono' => true],
+        ['label' => __('Revision'), 'value' => $revision !== '' ? $revision : __('Not deployed'), 'mono' => $revision !== ''],
+        [
+            'label' => __('Last deployed'),
+            'value' => $lastDeployedAt ? \Illuminate\Support\Carbon::parse($lastDeployedAt)->diffForHumans() : '—',
+            'mono' => false,
+            'title' => $lastDeployedAt,
+        ],
+    ];
 @endphp
 
 <div class="min-w-0">
     {{-- 1. Execution profile — what the function is and how it's invoked. --}}
     <section class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
-            </div>
-            <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
-                {{ __('Repository') }} →
-            </a>
-        </div>
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-bolt"
+            :title="__('Execution profile')"
+            :note="__('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.')"
+        >
+            <x-slot:actions>
+                <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site]) }}" wire:navigate class="dply-btn dply-btn-xs dply-btn-outline">
+                    {{ __('Repository') }}
+                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </a>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-        <div class="px-6 py-6 sm:px-7 space-y-5">
-        <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Runtime') }}</dt>
-                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $runtimeKind !== '' ? $runtimeKind : __('Auto-detected on deploy') }}</dd>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Entrypoint') }}</dt>
-                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $entrypoint !== '' ? $entrypoint : '—' }}</dd>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Package') }}</dt>
-                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $package }}</dd>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Action name') }}</dt>
-                <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $actionName !== '' ? $actionName : '—' }}</dd>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Current revision') }}</dt>
-                <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $revision !== '' ? $revision : __('Not deployed') }}</dd>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Last deployed') }}</dt>
-                <dd class="mt-2 text-sm text-brand-ink">
-                    @if ($lastDeployedAt)
-                        <span title="{{ $lastDeployedAt }}">{{ \Illuminate\Support\Carbon::parse($lastDeployedAt)->diffForHumans() }}</span>
-                    @else
-                        —
-                    @endif
-                </dd>
-            </div>
-        </dl>
+        <div class="px-3 py-3 sm:px-4">
+            <dl class="grid grid-cols-1 overflow-hidden rounded-lg border border-brand-ink/10 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($facts as $fact)
+                    <div class="min-w-0 border-b border-r border-brand-ink/10 bg-brand-sand/20 px-3 py-2 last:border-b-0">
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $fact['label'] }}</dt>
+                        <dd @class(['mt-0.5 truncate text-xs text-brand-ink', 'font-mono' => $fact['mono']])
+                            @isset($fact['title']) title="{{ $fact['title'] }}" @endisset
+                        >{{ $fact['value'] }}</dd>
+                    </div>
+                @endforeach
+            </dl>
 
-        @if ($invocationUrl !== '')
-            <div x-data="{ copied: false }" class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Invocation URL') }}</dt>
-                <div class="mt-2 flex items-center gap-2">
+            @if ($invocationUrl !== '')
+                <div x-data="{ copied: false }" class="mt-2 flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
+                    <span class="shrink-0 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Invocation URL') }}</span>
                     <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink" title="{{ $invocationUrl }}">{{ $invocationUrl }}</span>
+                    <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
                     <button type="button"
                         class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink"
                         title="{{ __('Copy URL') }}"
                         @click="navigator.clipboard.writeText(@js($invocationUrl)); copied = true; setTimeout(() => copied = false, 2000)"
                     >
-                        <x-heroicon-o-clipboard class="h-4 w-4" />
+                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
                     </button>
                     <a href="{{ $invocationUrl }}" target="_blank" rel="noreferrer" title="{{ __('Open') }}" class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink">
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
                     </a>
-                    <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
                 </div>
-            </div>
-        @endif
+            @endif
         </div>
     </section>
 
     {{-- 2. Resource limits — the editable control surface. --}}
     <form wire:submit="saveServerlessRuntime" class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Limits') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('How much the app gets per request. These are pushed to the action on the next deploy.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-adjustments-horizontal"
+            :title="__('Resource limits')"
+            :note="__('How much the app gets per request. These are pushed to the action on the next deploy.')"
+        />
 
-        <div class="px-6 py-6 sm:px-7 space-y-6">
-        @if ($pendingRedeploy)
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                <p>{{ __('Saved limits differ from what is live (:mem MB · :to · concurrency :cc). Redeploy to apply them.', [
-                    'mem' => $deployedLimits['memory'] ?? '—',
-                    'to' => isset($deployedLimits['timeout']) ? number_format(((int) $deployedLimits['timeout']) / 1000, 1).'s' : '—',
-                    'cc' => $deployedLimits['concurrency'] ?? '—',
-                ]) }}</p>
-                <button type="button" wire:click="redeployServerlessFunction" wire:loading.attr="disabled" wire:target="redeployServerlessFunction"
-                    class="shrink-0 rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-ink/90 disabled:opacity-50">
-                    <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Redeploy now') }}</span>
-                    <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting…') }}</span>
-                </button>
-            </div>
-        @endif
+        <div class="space-y-3 px-3 py-3 sm:px-4">
+            @if ($pendingRedeploy)
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <p>{{ __('Saved limits differ from what is live (:mem MB · :to · concurrency :cc). Redeploy to apply them.', [
+                        'mem' => $deployedLimits['memory'] ?? '—',
+                        'to' => isset($deployedLimits['timeout']) ? number_format(((int) $deployedLimits['timeout']) / 1000, 1).'s' : '—',
+                        'cc' => $deployedLimits['concurrency'] ?? '—',
+                    ]) }}</p>
+                    <button type="button" wire:click="redeployServerlessFunction" wire:loading.attr="disabled" wire:target="redeployServerlessFunction"
+                        class="shrink-0 rounded-lg bg-brand-ink px-2.5 py-1 text-2xs font-semibold text-white hover:bg-brand-ink/90 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Redeploy now') }}</span>
+                        <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting…') }}</span>
+                    </button>
+                </div>
+            @endif
 
-        <div class="grid gap-5 sm:grid-cols-3">
-            <div>
-                <x-input-label for="serverless_memory" :value="__('Memory')" />
-                <select id="serverless_memory" wire:model="serverless_memory" class="mt-1 block w-full rounded-xl border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
-                    @foreach (\App\Models\Site::SERVERLESS_MEMORY_OPTIONS_MB as $mb)
-                        <option value="{{ $mb }}">{{ $mb }} MB</option>
-                    @endforeach
-                </select>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('RAM ceiling per invocation. CPU scales with memory.') }}</p>
-                <x-input-error :messages="$errors->get('serverless_memory')" class="mt-1" />
+            <div class="grid gap-3 sm:grid-cols-3">
+                <div>
+                    <x-input-label for="serverless_memory" :value="__('Memory')" />
+                    <select id="serverless_memory" wire:model="serverless_memory" class="mt-1 block w-full rounded-lg border-brand-ink/15 py-1.5 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                        @foreach (\App\Models\Site::SERVERLESS_MEMORY_OPTIONS_MB as $mb)
+                            <option value="{{ $mb }}">{{ $mb }} MB</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-2xs text-brand-moss">{{ __('RAM ceiling per invocation. CPU scales with memory.') }}</p>
+                    <x-input-error :messages="$errors->get('serverless_memory')" class="mt-1" />
+                </div>
+
+                <div>
+                    <x-input-label for="serverless_timeout_ms" :value="__('Timeout (ms)')" />
+                    <x-text-input id="serverless_timeout_ms" type="number" wire:model="serverless_timeout_ms" class="mt-1 block w-full font-mono text-sm"
+                        min="{{ \App\Models\Site::SERVERLESS_MIN_TIMEOUT_MS }}" max="{{ \App\Models\Site::SERVERLESS_MAX_TIMEOUT_MS }}" step="1000" />
+                    <p class="mt-1 text-2xs text-brand-moss">{{ __('Hard cap before the invocation is killed. Max :max ms (15 min).', ['max' => number_format(\App\Models\Site::SERVERLESS_MAX_TIMEOUT_MS)]) }}</p>
+                    <x-input-error :messages="$errors->get('serverless_timeout_ms')" class="mt-1" />
+                </div>
+
+                <div>
+                    <x-input-label for="serverless_concurrency" :value="__('Concurrency')" />
+                    <x-text-input id="serverless_concurrency" type="number" wire:model="serverless_concurrency" class="mt-1 block w-full font-mono text-sm"
+                        min="1" max="{{ \App\Models\Site::SERVERLESS_MAX_CONCURRENCY }}" step="1" />
+                    <p class="mt-1 text-2xs text-brand-moss">{{ __('Requests one container handles at once before another is spun up.') }}</p>
+                    <x-input-error :messages="$errors->get('serverless_concurrency')" class="mt-1" />
+                </div>
             </div>
 
-            <div>
-                <x-input-label for="serverless_timeout_ms" :value="__('Timeout (ms)')" />
-                <x-text-input id="serverless_timeout_ms" type="number" wire:model="serverless_timeout_ms" class="mt-1 block w-full font-mono text-sm"
-                    min="{{ \App\Models\Site::SERVERLESS_MIN_TIMEOUT_MS }}" max="{{ \App\Models\Site::SERVERLESS_MAX_TIMEOUT_MS }}" step="1000" />
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Hard cap before the invocation is killed. Max :max ms (15 min).', ['max' => number_format(\App\Models\Site::SERVERLESS_MAX_TIMEOUT_MS)]) }}</p>
-                <x-input-error :messages="$errors->get('serverless_timeout_ms')" class="mt-1" />
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-3">
+                <p class="text-2xs text-brand-moss">
+                    @if ($neverDeployed)
+                        {{ __('Saved limits apply on the first deploy.') }}
+                    @else
+                        {{ __('Saving stores the limits — they take effect on the next deploy.') }}
+                    @endif
+                </p>
+                <x-primary-button type="submit">
+                    <span wire:loading.remove wire:target="saveServerlessRuntime">{{ __('Save limits') }}</span>
+                    <span wire:loading wire:target="saveServerlessRuntime">{{ __('Saving…') }}</span>
+                </x-primary-button>
             </div>
-
-            <div>
-                <x-input-label for="serverless_concurrency" :value="__('Concurrency')" />
-                <x-text-input id="serverless_concurrency" type="number" wire:model="serverless_concurrency" class="mt-1 block w-full font-mono text-sm"
-                    min="1" max="{{ \App\Models\Site::SERVERLESS_MAX_CONCURRENCY }}" step="1" />
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Requests one container handles at once before another is spun up.') }}</p>
-                <x-input-error :messages="$errors->get('serverless_concurrency')" class="mt-1" />
-            </div>
-        </div>
-
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-4">
-            <p class="text-xs text-brand-moss">
-                @if ($neverDeployed)
-                    {{ __('Saved limits apply on the first deploy.') }}
-                @else
-                    {{ __('Saving stores the limits — they take effect on the next deploy.') }}
-                @endif
-            </p>
-            <x-primary-button type="submit">
-                <span wire:loading.remove wire:target="saveServerlessRuntime">{{ __('Save limits') }}</span>
-                <span wire:loading wire:target="saveServerlessRuntime">{{ __('Saving…') }}</span>
-            </x-primary-button>
-        </div>
         </div>
     </form>
 
-    {{-- 3. Cold starts — keep-warm is owned by the Workers tab; surface its state here. --}}
+    {{-- 3. Cold starts — keep-warm is owned by the Workers tab; surface its state
+         here. Header-only section: the state IS the note, so there's no body. --}}
     <section class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Latency') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Keep-warm is currently') }}
-                    <span class="font-semibold {{ $keepWarm ? 'text-brand-forest' : 'text-brand-ink' }}">{{ $keepWarm ? __('on') : __('off') }}</span>.
-                    {{ $keepWarm
-                        ? __('A scheduled ping holds a container warm to cut cold-start latency.')
-                        : __('The first request after idle pays the framework cold-start cost.') }}
-                </p>
-            </div>
-            <a href="{{ route('sites.workers', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
-                {{ __('Workers') }} →
-            </a>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-clock"
+            :title="__('Cold starts')"
+            :count="$keepWarm ? __('keep-warm on') : __('keep-warm off')"
+            :note="$keepWarm
+                ? __('A scheduled ping holds a container warm to cut cold-start latency.')
+                : __('The first request after idle pays the framework cold-start cost.')"
+        >
+            <x-slot:actions>
+                <a href="{{ route('sites.workers', ['server' => $server, 'site' => $site]) }}" wire:navigate class="dply-btn dply-btn-xs dply-btn-outline">
+                    {{ __('Workers') }}
+                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </a>
+            </x-slot:actions>
+        </x-workspace-panel-head>
     </section>
 
     {{-- 4. CLI parity --}}
-    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
         <x-cli-snippet :commands="[
             ['label' => __('Deploy / redeploy the app'), 'command' => 'dply sites:deploy '.$site->slug],
         ]" />

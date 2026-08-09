@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Support\Facades\Http;
 
 final class DigitalOceanFunctionsActionDeployer
@@ -84,6 +85,58 @@ final class DigitalOceanFunctionsActionDeployer
     }
 
     /**
+     * OpenWhisk credentials for the host.
+     *
+     * For a dply-managed host the platform namespace in config IS the source of
+     * truth — `server.meta.digitalocean_functions` is only a stamped copy made
+     * when the host was provisioned. Reading the stamp would keep deploying with
+     * a key that was rotated out from under it (OpenWhisk answers 401 "The
+     * supplied authentication is invalid" and every redeploy repeats it, because
+     * ProvisionServerlessHostJob short-circuits on an already-present api_host).
+     * Prefer config, fall back to the stamp, and re-stamp when they diverge.
+     *
+     * @return array<string, string>
+     */
+    private function resolveHostCredentials(Server $server): array
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $stamped = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
+
+        if (empty($meta['serverless_managed'] ?? null)) {
+            return $stamped;
+        }
+
+        $platform = ServerlessPlatformContext::fromConfig();
+        if (! $platform->configured()) {
+            return $stamped;
+        }
+
+        $live = $platform->openWhiskCredentials();
+        if ($live !== $stamped) {
+            $meta['digitalocean_functions'] = $live;
+            $server->forceFill(['meta' => $meta])->save();
+        }
+
+        return $live;
+    }
+
+    /**
+     * OpenWhisk rejects a bad `uuid:secret` with a bare 401 that names nothing.
+     * Say which namespace and host were used, and where the key comes from, so
+     * the fix is obvious instead of a guess.
+     */
+    private function authFailureMessage(string $apiHost, string $namespace, Server $server): string
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+
+        $source = ! empty($meta['serverless_managed'] ?? null)
+            ? 'This is a dply-managed host, so the key comes from DPLY_SERVERLESS_DO_ACCESS_KEY — rotate/refresh it in the environment and redeploy.'
+            : 'The key is stored on the host as meta.digitalocean_functions.access_key — re-save the namespace credentials on the host and redeploy.';
+
+        return 'OpenWhisk rejected the credentials for namespace '.$namespace.' at '.$apiHost.'. '.$source;
+    }
+
+    /**
      * Upload an artifact zip to the OpenWhisk action and record the result.
      * Shared by a fresh deploy and a rollback.
      *
@@ -92,9 +145,9 @@ final class DigitalOceanFunctionsActionDeployer
     private function pushArtifact(Site $site, string $artifactPath, string $buildOutput): array
     {
         $server = $site->server;
-        $serverMeta = is_array($server->meta) ? $server->meta : [];
-        $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
         $siteMeta = is_array($site->meta) ? $site->meta : [];
+
+        $hostConfig = $this->resolveHostCredentials($server);
 
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));
@@ -158,6 +211,13 @@ final class DigitalOceanFunctionsActionDeployer
                     'concurrency' => $limits['concurrency'],
                 ],
             ]);
+
+        if ($response->status() === 401 || $response->status() === 403) {
+            throw new \RuntimeException(
+                'DigitalOcean Functions deploy failed: HTTP '.$response->status().' — '
+                .$this->authFailureMessage($apiHost, $namespace, $server)
+            );
+        }
 
         if (! $response->successful()) {
             throw new \RuntimeException('DigitalOcean Functions deploy failed: HTTP '.$response->status().' '.$response->body());
@@ -250,8 +310,7 @@ final class DigitalOceanFunctionsActionDeployer
             return;
         }
 
-        $serverMeta = is_array($server->meta) ? $server->meta : [];
-        $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
+        $hostConfig = $this->resolveHostCredentials($server);
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
 
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');

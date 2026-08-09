@@ -6,6 +6,7 @@ namespace App\Modules\Serverless\Console;
 
 use App\Models\Site;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
+use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -29,7 +30,7 @@ class ServerlessTickCommand extends Command
 
     protected $description = 'Run the Laravel scheduler and queue worker on background-enabled serverless functions.';
 
-    public function handle(InvokeFunctionTick $tick): int
+    public function handle(InvokeFunctionTick $tick, ServerlessQueuePump $pump): int
     {
         $sites = Site::query()
             ->where('status', Site::STATUS_FUNCTIONS_ACTIVE)
@@ -45,9 +46,28 @@ class ServerlessTickCommand extends Command
                 continue;
             }
 
-            // A background function needs scheduler + queue work; those ticks
-            // also keep it warm, so keep-warm-only is the fallback.
-            $tasks = $background ? ['schedule', 'queue'] : ['keep-warm'];
+            // Queue work belongs to the pump now, not to this cron. The pump
+            // is woken by the app itself (the first-party package pings on
+            // JobQueued), so the cron's only remaining job for queues is to
+            // be a safety net: an app without the package, or one whose ping
+            // was lost, still drains — at the old one-minute latency rather
+            // than not at all. wake() is ceiling-bounded and a no-op when
+            // slots are already busy, so this cannot pile up.
+            if ($background) {
+                try {
+                    $pump->wake($site);
+                } catch (Throwable $e) {
+                    Log::warning('serverless.tick.failed', [
+                        'site_id' => $site->id,
+                        'task' => 'queue-wake',
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // The scheduler still needs a real one-minute cron edge, and a
+            // keep-warm-only function still needs its warming request.
+            $tasks = $background ? ['schedule'] : ['keep-warm'];
 
             foreach ($tasks as $task) {
                 try {

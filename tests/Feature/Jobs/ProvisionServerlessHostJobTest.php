@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Jobs\ProvisionServerlessHostJobTest;
 
-use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -163,4 +163,59 @@ test('marks host errored when the api call fails', function () {
     expect($server->status)->toBe(Server::STATUS_ERROR);
     $this->assertArrayNotHasKey('digitalocean_functions', $server->meta);
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
+});
+
+test('managed host re-stamps a rotated platform key over the old one', function () {
+    Bus::fake();
+    Http::fake();
+    config([
+        'serverless.managed.api_host' => 'https://faas-nyc1.doserverless.co',
+        'serverless.managed.namespace' => 'fn-dply-shared',
+        'serverless.managed.access_key' => 'uuid:rotated-secret',
+    ]);
+
+    // Already provisioned with the PREVIOUS key. Config is the source of truth
+    // for a managed host, so the stale stamp must be overwritten — leaving it
+    // in place is what made every deploy 401 after a key rotation.
+    $server = makeHost([
+        'serverless_managed' => true,
+        'digitalocean_functions' => [
+            'api_host' => 'https://faas-nyc1.doserverless.co',
+            'namespace' => 'fn-dply-shared',
+            'access_key' => 'uuid:stale-secret',
+        ],
+    ]);
+    $server->update(['provider_credential_id' => null]);
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    Http::assertNothingSent();
+    $server->refresh();
+    expect($server->meta['digitalocean_functions']['access_key'])->toBe('uuid:rotated-secret');
+    Bus::assertDispatched(RunSiteDeploymentJob::class);
+});
+
+test('byo host keeps its own stamped key', function () {
+    Bus::fake();
+    Http::fake();
+    config([
+        'serverless.managed.api_host' => 'https://faas-nyc1.doserverless.co',
+        'serverless.managed.namespace' => 'fn-dply-shared',
+        'serverless.managed.access_key' => 'uuid:platform-secret',
+    ]);
+
+    // Not managed — the customer's own namespace credentials stand.
+    $server = makeHost([
+        'digitalocean_functions' => [
+            'api_host' => 'https://faas-nyc1.doserverless.co',
+            'namespace' => 'fn-customer',
+            'access_key' => 'uuid:customer-secret',
+        ],
+    ]);
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    $server->refresh();
+    expect($server->meta['digitalocean_functions']['access_key'])->toBe('uuid:customer-secret');
+    expect($server->meta['digitalocean_functions']['namespace'])->toBe('fn-customer');
 });
