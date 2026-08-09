@@ -15,75 +15,71 @@
         }
     @endphp
 
-    <div class="px-5 py-5 sm:px-6" wire:key="metrics-chart-{{ $metricsRange }}">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent usage') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Per-metric history across the selected window. Filled band shows the min/max for each bucket; line is the average.') }}
-                </p>
-                @if ($chartFrom && $chartTo)
-                    <p class="mt-2 text-xs tabular-nums text-brand-mist">
-                        {{ $chartFrom->timezone($chartTimezone)->format('M j H:i') }}
-                        —
-                        {{ $chartTo->timezone($chartTimezone)->format('M j H:i') }}
-                        <span class="text-brand-moss">·</span>
-                        {{ trans_choice(':count sample|:count samples', $rangeSampleCount, ['count' => $rangeSampleCount]) }}
-                    </p>
-                @endif
-            </div>
+    <div wire:key="metrics-chart-{{ $metricsRange }}">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-chart-bar"
+            :title="__('Recent usage')"
+            :note="$chartFrom && $chartTo
+                ? ($chartFrom->timezone($chartTimezone)->format('M j H:i').' — '.$chartTo->timezone($chartTimezone)->format('M j H:i').' · '.trans_choice(':count sample|:count samples', $rangeSampleCount, ['count' => $rangeSampleCount]))
+                : __('Per-metric history across the selected window.')"
+        >
+            <x-slot:actions>
+                {{-- Segmented time-range selector with localStorage persistence
+                     keyed per server so each box remembers its last view. --}}
+                <div
+                    x-data="{
+                        range: @js($metricsRange),
+                        storageKey: @js('dply.metrics-range:'.$server->id),
+                        init() {
+                            try {
+                                const saved = window.localStorage?.getItem(this.storageKey);
+                                if (saved && saved !== this.range && @js($metricsRangeOptions).includes(saved)) {
+                                    this.range = saved;
+                                    this.$wire.setMetricsRange(saved);
+                                }
+                            } catch (e) { /* ignore */ }
+                        },
+                        pick(r) {
+                            this.range = r;
+                            try { window.localStorage?.setItem(this.storageKey, r); } catch (e) { /* ignore */ }
+                            this.$wire.setMetricsRange(r);
+                        },
+                    }"
+                    x-init="init()"
+                    class="inline-flex h-6 shrink-0 items-center gap-0.5 rounded-md border border-brand-ink/10 bg-white p-0.5 shadow-sm"
+                    role="group"
+                    aria-label="{{ __('Time range') }}"
+                >
+                    @foreach ($metricsRangeOptions as $opt)
+                        <button
+                            type="button"
+                            @click="pick(@js($opt))"
+                            :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
+                            class="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors"
+                        >
+                            {{ $rangeLabels[$opt] ?? $opt }}
+                        </button>
+                    @endforeach
+                </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-            {{-- Segmented time-range selector with localStorage persistence
-                 keyed per server so each box remembers its last view. --}}
-            <div
-                x-data="{
-                    range: @js($metricsRange),
-                    storageKey: @js('dply.metrics-range:'.$server->id),
-                    init() {
-                        try {
-                            const saved = window.localStorage?.getItem(this.storageKey);
-                            if (saved && saved !== this.range && @js($metricsRangeOptions).includes(saved)) {
-                                this.range = saved;
-                                this.$wire.setMetricsRange(saved);
-                            }
-                        } catch (e) { /* ignore */ }
-                    },
-                    pick(r) {
-                        this.range = r;
-                        try { window.localStorage?.setItem(this.storageKey, r); } catch (e) { /* ignore */ }
-                        this.$wire.setMetricsRange(r);
-                    },
-                }"
-                x-init="init()"
-                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1 shadow-sm"
-                role="group"
-                aria-label="{{ __('Time range') }}"
-            >
-                @foreach ($metricsRangeOptions as $opt)
-                    <button
-                        type="button"
-                        @click="pick(@js($opt))"
-                        :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
-                        class="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors"
-                    >
-                        {{ $rangeLabels[$opt] ?? $opt }}
-                    </button>
-                @endforeach
-            </div>
-        </div>
+        <div class="px-3 py-2.5 sm:px-4">
 
         @if ($rangeSampleCount === 0)
             <x-empty-state
-                class="mt-6"
+                class="mt-3"
                 borderless
                 icon="heroicon-o-chart-bar"
                 :title="__('No history in this range yet')"
                 :description="__('Once the monitor agent reports samples, these panels populate automatically — try a wider window like 24H or 7D.')"
             />
         @else
-            <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {{-- CPU --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-cpu-chip class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['cpu']) }}" aria-hidden="true" />
@@ -112,7 +108,7 @@
                 </section>
 
                 {{-- Memory --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-circle-stack class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['mem']) }}" aria-hidden="true" />
@@ -143,7 +139,7 @@
                 </section>
 
                 {{-- Disk --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['disk']) }}" aria-hidden="true" />
@@ -174,7 +170,7 @@
                 </section>
 
                 {{-- Load --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-chart-bar class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['load']) }}" aria-hidden="true" />
@@ -202,7 +198,7 @@
                 </section>
 
                 {{-- Network: lg:col-span-2 row, two overlaid lines (rx/tx) --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-signal class="h-5 w-5 shrink-0 text-sky-600" aria-hidden="true" />
@@ -261,7 +257,7 @@
                     $hasIoData = ($ioReadSeries !== [] || $ioWriteSeries !== []) || $ioReadBps !== null || $ioWriteBps !== null;
                 @endphp
                 @if ($hasIoData)
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-arrows-up-down class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
@@ -306,7 +302,7 @@
                     $disks = is_array($latestPayload['disks'] ?? null) ? $latestPayload['disks'] : [];
                 @endphp
                 @if (! empty($disks) && count($disks) > 1)
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
@@ -348,7 +344,7 @@
                     $topMem = is_array($latestPayload['top_mem'] ?? null) ? $latestPayload['top_mem'] : [];
                 @endphp
                 @if (! empty($topCpu) || ! empty($topMem))
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-list-bullet class="h-5 w-5 shrink-0 text-brand-forest" aria-hidden="true" />
@@ -392,5 +388,6 @@
                 @endif
             </div>
         @endif
+        </div>
     </div>
 @endif

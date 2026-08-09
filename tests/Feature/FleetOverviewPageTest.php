@@ -23,6 +23,9 @@ test('fleet index renders the overview intro page', function () {
     $response->assertOk()
         ->assertSee('Fleet ops')
         ->assertSee('What is the fleet?')
+        // Peer product nav (Sites / Servers / Projects / Fleet / …).
+        ->assertSee(__('Fleet'))
+        ->assertSee(route('fleet.index'), false)
         // Section directory links into each fleet surface.
         ->assertSee(route('fleet.health'), false)
         ->assertSee(route('fleet.blast-radius'), false)

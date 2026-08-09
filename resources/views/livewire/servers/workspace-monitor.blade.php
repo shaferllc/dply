@@ -31,96 +31,60 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-200">
-                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Metrics') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Live usage, history charts, alert routing, and agent diagnostics for this server.') }}
-                        </p>
-                    </div>
-                </div>
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-chart-bar"
+            :title="__('Metrics')"
+            :note="__('Live usage, history, alert routing, and agent diagnostics.')"
+        >
+            <x-slot:actions>
                 @if ($opsReady && $pyOk)
-                    <span @class(['inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1', $statusChipClasses])>
+                    <span @class(['inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold ring-1', $statusChipClasses])>
                         <x-dynamic-component :component="$statusChipIcon" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ $statusChipLabel }}
                     </span>
                 @endif
-            </div>
-        </div>
+                @if ($server->workspace)
+                    @feature('surface.projects')
+                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Project operations') }}">
+                            <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Operations') }}
+                        </a>
+                    @endfeature
+                @endif
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-        @if ($server->workspace)
-            @feature('surface.projects')
-                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
-                            <p class="mt-0.5 text-sm text-brand-moss">
-                                {{ __('Metrics here are server-specific. Open project operations for grouped health and runbooks.') }}
-                            </p>
-                        </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
-                            <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Project operations') }}
-                            </a>
-                            <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Project overview') }}
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            @endfeature
-        @endif
 
         @if (! $opsReady)
-            <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-800 ring-1 ring-amber-200">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before metrics can be collected.') }}</p>
-                    </div>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                tone="amber"
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-clock"
+                :title="__('Waiting on provisioning')"
+                :note="__('Provisioning and SSH must be ready before metrics can be collected.')"
+            />
         @elseif ($metrics_error)
-            <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
-                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Metrics error') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Could not load metrics') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $metrics_error }}</p>
-                    </div>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                tone="danger"
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-exclamation-triangle"
+                :title="__('Could not load metrics')"
+                :note="$metrics_error"
+            />
         @elseif (! $pyOk)
-            <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Monitor') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install monitor on this server') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Dply provisions the metrics agent over SSH so this page can stream usage data.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="px-5 py-5 sm:px-6">
-                <ul class="space-y-2.5 text-sm text-brand-ink">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-arrow-down-tray"
+                :title="__('Install monitor on this server')"
+                :note="__('Dply provisions the metrics agent over SSH so this page can stream usage data.')"
+            />
+            <div class="px-3 py-2.5 sm:px-4">
+                <ul class="space-y-1.5 text-xs text-brand-ink">
                     <li class="flex items-start gap-2.5">
                         <x-heroicon-o-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                         <span>{{ __('Installs Python and the metrics agent over SSH') }}</span>
@@ -136,7 +100,7 @@
                 </ul>
 
                 @if ($probePending)
-                    <div class="mt-6 rounded-xl border border-sky-200/80 bg-sky-50/70 p-4">
+                    <div class="mt-3 rounded-lg border border-sky-200/80 bg-sky-50/70 p-4">
                         <p class="text-sm font-medium text-sky-950">{{ __('SSH check queued — running in the background.') }}</p>
                         <p class="mt-1 text-xs text-sky-900/80">{{ __('You can leave this page; open Metrics again to see the result.') }}</p>
                     </div>
@@ -146,7 +110,7 @@
                             ? explode("\n", (string) $m['monitoring_probe_error'])
                             : [];
                     @endphp
-                    <div class="mt-6 space-y-3">
+                    <div class="mt-3 space-y-2">
                         <x-workspace-console-banner
                             status="failed"
                             :message="__('SSH check failed — install is blocked until Dply can reach the server')"
@@ -165,7 +129,7 @@
                         </div>
                     </div>
                 @elseif ($isDeployer)
-                    <div class="mt-6 rounded-xl border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-950">
+                    <div class="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-950">
                         {{ __('Your role cannot run installs. Ask an admin to open this Metrics page or Services and use “Install Python for monitoring”, then Recheck.') }}
                         <div class="mt-3">
                             <x-secondary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="!py-2">{{ __('Recheck status') }}</x-secondary-button>
@@ -210,7 +174,7 @@
                         }
                         $installBannerSubtitle = implode(' · ', array_filter($installBannerSubtitleParts));
                     @endphp
-                    <div class="mt-6">
+                    <div class="mt-3">
                         <x-workspace-console-banner
                             :status="$installBannerStatus"
                             :message="$installBannerMessage"
@@ -223,7 +187,7 @@
                         />
                     </div>
                 @else
-                    <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
                         <x-primary-button
                             size="sm"
                             type="button"
@@ -289,7 +253,7 @@
                 </x-server-workspace-tablist>
             </div>
 
-            <div wire:loading.block wire:target="setMonitorWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+            <div wire:loading.block wire:target="setMonitorWorkspaceTab" class="px-3 py-4 sm:px-4" aria-busy="true">
                 <span class="sr-only">{{ __('Loading…') }}</span>
                 <div class="space-y-3" aria-hidden="true">
                     <div class="flex items-start gap-3">

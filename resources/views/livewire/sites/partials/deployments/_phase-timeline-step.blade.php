@@ -16,7 +16,10 @@
     $stepFailed = ! ($step['ok'] ?? false) && ! ($step['skipped'] ?? false) && ! $stepPending && ! $stepRunning;
     $hasOutput = trim((string) ($step['output'] ?? '')) !== '';
     $statusToken = $stepFailed ? 'failed' : ($stepRunning ? 'running' : ($stepPending ? 'pending' : 'ok'));
-    $autoOpen = $stepRunning || $stepFailed;
+    // Detail page "Step output" toggle opens every console that has content.
+    $forceShowOutput = (bool) ($showOutput ?? false);
+    $autoOpen = $stepRunning || $stepFailed || ($forceShowOutput && $hasOutput);
+    $outputKey = $forceShowOutput ? 'out' : 'hid';
 @endphp
 
 <li>
@@ -46,7 +49,7 @@
         @endif
     </div>
     @if ($hasOutput || $stepRunning)
-        <div wire:key="{{ $stepKeyBase }}-{{ $statusToken }}" x-data="{ open: @js($autoOpen) }" class="mt-1 pl-[26px]">
+        <div wire:key="{{ $stepKeyBase }}-{{ $statusToken }}-{{ $outputKey }}" x-data="{ open: @js($autoOpen) }" class="mt-1 pl-[26px]">
             <button type="button" x-on:click="open = ! open"
                 class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : ($stepRunning ? 'text-amber-700' : 'text-brand-moss') }} hover:underline">
                 <span class="font-mono" x-text="open ? '▾' : '▸'"></span>

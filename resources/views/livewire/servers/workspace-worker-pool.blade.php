@@ -4,25 +4,21 @@
     :title="__('Worker Pool')"
     :description="__('Clone this worker and scale background capacity. The pool keeps one primary (scheduler owner); the rest are queue-worker replicas.')"
     :context-site="null"
+    hide-hero
 >
     @if (! $pool)
         {{-- No pool yet: offer to create one from this worker. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scaling') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a worker pool') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Turn this worker into the primary of a pool. You can then scale to N workers — each clone replays this server\'s sites and joins the same queue.') }}
-                    </p>
-                </div>
-            </div>
+        <section class="dply-card min-w-0 overflow-hidden p-0">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-server-stack"
+                :title="__('Create a worker pool')"
+                :note="__('Turn this worker into the primary of a pool, then scale to N queue-worker replicas.')"
+            />
 
             @if ($server->isWorkerHost())
-                <form wire:submit="createPool" class="space-y-5 px-6 py-6 sm:px-7">
+                <form wire:submit="createPool" class="space-y-3 px-3 py-3 sm:px-4">
                     <div>
                         <x-input-label for="pool_name" :value="__('Pool name')" />
                         <x-text-input id="pool_name" wire:model="pool_name" class="mt-2 block w-full text-sm" />
@@ -32,7 +28,7 @@
                     </div>
                 </form>
             @else
-                <div class="px-6 py-6 sm:px-7">
+                <div class="px-3 py-3 sm:px-4">
                     <p class="text-sm text-brand-moss">{{ __('This server is not a worker host, so it cannot start a worker pool. Worker pools are for servers with the worker role (queue_worker profile).') }}</p>
                 </div>
             @endif
@@ -97,53 +93,47 @@
             };
         @endphp
 
-        {{-- Pool status — at-a-glance health, capacity, autoscale and spread.
-             Re-renders on the console partial's poll while a scale is active. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $pool->name }}</p>
-                    <div class="mt-1 flex items-center gap-2">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Pool status') }}</h2>
-                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
-                            @if ($effectiveStatus === 'scaling')
-                                <span class="inline-flex h-4 w-4"><x-spinner variant="forest" size="sm" /></span>
-                            @endif
-                            {{ $statusMeta['label'] }}
-                        </span>
-                    </div>
-                    @if ($statusMeta['blurb'])
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $statusMeta['blurb'] }}</p>
-                    @endif
-                </div>
-                <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
-                    <p>{{ __('Updated :ago', ['ago' => $pool->updated_at?->diffForHumans() ?? '—']) }}</p>
-                    @if ($scaleRun)
-                        <p class="text-brand-forest">{{ __('Live scaling run below ↓') }}</p>
-                    @endif
-                    <div class="flex items-center gap-2">
-                        <button
-                            type="button"
-                            wire:click="reconcileNow"
-                            wire:loading.attr="disabled"
-                            wire:target="reconcileNow"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                            title="{{ __('Re-run the reconciler to advance stuck members and re-check pending deploys.') }}"
-                        >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" />
-                            {{ __('Reconcile now') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="openConfirmActionModal('tearDownPool', [], @js(__('Tear down pool')), @js(__('This drains and DESTROYS all :n replica(s). :primary stays as a standalone worker. This cannot be undone.', ['n' => max(0, $members->count() - 1), 'primary' => $pool->primaryServer?->name ?? $server->name])), @js(__('Tear down pool')), true)"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition-colors hover:bg-rose-50"
-                        >
-                            <x-heroicon-o-trash class="h-4 w-4" />
-                            {{ __('Tear down pool') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <section class="dply-card min-w-0 overflow-hidden p-0">
+        {{-- Pool status — dense identity + capacity tiles + tabs (merged chrome). --}}
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-server-stack"
+                :title="__('Worker pool')"
+                :count="$pool->name"
+                :note="$statusMeta['blurb'] ?: __('Scale queue workers; one primary owns the scheduler.')"
+            >
+                <x-slot:actions>
+                    <span class="inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
+                        @if ($effectiveStatus === 'scaling')
+                            <span class="inline-flex h-3.5 w-3.5"><x-spinner variant="forest" size="sm" /></span>
+                        @endif
+                        {{ $statusMeta['label'] }}
+                    </span>
+                    <span class="hidden text-[10px] text-brand-mist sm:inline">{{ __('Updated :ago', ['ago' => $pool->updated_at?->diffForHumans() ?? '—']) }}</span>
+                    <button
+                        type="button"
+                        wire:click="reconcileNow"
+                        wire:loading.attr="disabled"
+                        wire:target="reconcileNow"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        title="{{ __('Re-run the reconciler to advance stuck members and re-check pending deploys.') }}"
+                    >
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                        {{ __('Reconcile') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="openConfirmActionModal('tearDownPool', [], @js(__('Tear down pool')), @js(__('This drains and DESTROYS all :n replica(s). :primary stays as a standalone worker. This cannot be undone.', ['n' => max(0, $members->count() - 1), 'primary' => $pool->primaryServer?->name ?? $server->name])), @js(__('Tear down pool')), true)"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                    >
+                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        {{ __('Tear down') }}
+                    </button>
+                </x-slot:actions>
+            </x-workspace-panel-head>
+
+            <div class="border-b border-brand-ink/10">
 
             {{-- Capacity tiles --}}
             <dl class="grid grid-cols-2 gap-px bg-brand-ink/5 sm:grid-cols-3 lg:grid-cols-6">
@@ -158,15 +148,15 @@
                     ];
                 @endphp
                 @foreach ($tiles as $t)
-                    <div class="bg-white px-4 py-4">
-                        <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
-                        <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $t['v'] }}</dd>
+                    <div class="bg-white px-3 py-2">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
+                        <dd class="mt-0.5 text-base font-semibold tabular-nums text-brand-ink">{{ $t['v'] }}</dd>
                     </div>
                 @endforeach
             </dl>
 
             {{-- Secondary facts --}}
-            <div class="grid grid-cols-1 gap-x-8 gap-y-2 px-6 py-4 text-sm sm:grid-cols-2 sm:px-7">
+            <div class="grid grid-cols-1 gap-x-6 gap-y-0.5 px-3 py-2 text-xs sm:grid-cols-2 sm:px-4">
                 <p class="text-brand-moss">
                     <span class="font-medium text-brand-ink">{{ __('Primary') }}:</span>
                     {{ $pool->primaryServer?->name ?? '—' }}
@@ -199,8 +189,7 @@
                     @endif
                 </p>
             </div>
-        </section>
-
+            </div>
 
         {{-- Live scaling console — the reconciler streams provision / replay /
              deploy / drain progress here while the pool converges. --}}
@@ -210,7 +199,8 @@
         ])
 
         {{-- Tabs --}}
-        <x-server-workspace-tablist :aria-label="__('Worker pool sections')" class="mt-6">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+        <x-server-workspace-tablist :aria-label="__('Worker pool sections')" scroll bare class="!mb-0">
             <x-server-workspace-tab :active="$tab === 'overview'" wire:click="setTab('overview')">
                 {{ __('Overview') }}
             </x-server-workspace-tab>
@@ -225,33 +215,29 @@
                 {{ __('Traffic & Redis') }}
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
+        </div>
 
         @if ($tab === 'overview')
         {{-- Poll the whole component every 15s so pool status, capacity and
              member health stay fresh without a manual reload. --}}
         <div wire:poll.15s></div>
         {{-- Scale control --}}
-        <section class="dply-card mt-6 overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-arrows-pointing-out class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $pool->name }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scale workers') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Desired :desired · active :active · healthy :healthy · max :max · status :status', [
-                            'desired' => $pool->desired_count,
-                            'active' => $active,
-                            'healthy' => $healthy,
-                            'max' => $pool->max_size,
-                            'status' => $pool->status,
-                        ]) }}
-                    </p>
-                </div>
-            </div>
+        <section class="border-b border-brand-ink/10">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-arrows-pointing-out"
+                :title="__('Scale workers')"
+                :note="__('Desired :desired · active :active · healthy :healthy · max :max · status :status', [
+                    'desired' => $pool->desired_count,
+                    'active' => $active,
+                    'healthy' => $healthy,
+                    'max' => $pool->max_size,
+                    'status' => $pool->status,
+                ])"
+            />
 
-            <form wire:submit="scale" class="flex flex-wrap items-end gap-4 px-6 py-6 sm:px-7">
+            <form wire:submit="scale" class="flex flex-wrap items-end gap-4 px-3 py-3 sm:px-4">
                 <div>
                     <x-input-label for="desired_count" :value="__('Desired worker count (incl. primary)')" />
                     <x-text-input id="desired_count" type="number" min="1" :max="$pool->max_size" wire:model="desired_count" class="mt-2 block w-32 text-sm" />
@@ -276,23 +262,15 @@
         </section>
 
         {{-- Autoscaling --}}
-        <section class="dply-card mt-6 overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Autoscaling') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scale by queue backlog') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('When enabled, dply checks the queue backlog every 5 minutes and sets the desired worker count to backlog ÷ jobs-per-worker, clamped to your min/max.') }}
-                        @if (! empty($pool->meta['autoscale']['last_backlog']))
-                            {{ __('Last backlog: :n.', ['n' => $pool->meta['autoscale']['last_backlog']]) }}
-                        @endif
-                    </p>
-                </div>
-            </div>
-            <form wire:submit="saveAutoscale" class="space-y-4 px-6 py-6 sm:px-7">
+        <section class="border-b border-brand-ink/10">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-chart-bar"
+                :title="__('Autoscaling')"
+                :note="__('Scale by queue backlog every 5 minutes (backlog ÷ jobs-per-worker, clamped to min/max).')"
+            />
+            <form wire:submit="saveAutoscale" class="space-y-4 px-3 py-3 sm:px-4">
                 <label class="flex items-center gap-3">
                     <input type="checkbox" wire:model="as_enabled" class="h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/30" />
                     <span class="text-sm font-medium text-brand-ink">{{ __('Enable autoscaling') }}</span>
@@ -321,17 +299,22 @@
              + this clone's IP allowlisted. dply does not open these automatically. --}}
         @php $plan = $this->exposurePlan(); @endphp
         @if (! empty($plan))
-            <section class="dply-card mt-6 overflow-hidden border border-amber-200">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-4 sm:px-7">
-                    <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-amber-900">{{ __('Cross-region backend exposure') }}</h2>
-                        <p class="mt-1 text-sm text-amber-800">{{ __('These workers reach private services over the public network. dply can bind each backend (password-gated) and allowlist only these worker IPs at the firewall.') }}</p>
-                    </div>
-                    <button type="button" wire:click="openConfirmActionModal('applyExposure', [], @js(__('Expose & allowlist backends')), @js(__('Bind these backends (password-gated) and allowlist the worker IPs at the firewall now?')), @js(__('Expose & allowlist')), false)" class="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">{{ __('Expose & allowlist now') }}</button>
-                </div>
+            <section class="border-b border-amber-200/80 bg-amber-50/40">
+                <x-workspace-panel-head
+                    dense
+                    tone="amber"
+                    class="border-b border-amber-200/80"
+                    icon="heroicon-o-shield-exclamation"
+                    :title="__('Cross-region backend exposure')"
+                    :note="__('Bind backends (password-gated) and allowlist worker IPs at the firewall.')"
+                >
+                    <x-slot:actions>
+                        <button type="button" wire:click="openConfirmActionModal('applyExposure', [], @js(__('Expose & allowlist backends')), @js(__('Bind these backends (password-gated) and allowlist the worker IPs at the firewall now?')), @js(__('Expose & allowlist')), false)" class="inline-flex h-6 items-center rounded-md bg-amber-600 px-2 text-[11px] font-semibold text-white hover:bg-amber-700">{{ __('Expose & allowlist') }}</button>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
                 @php $exposure = $pool->meta['exposure'] ?? null; @endphp
                 @if ($exposure)
-                    <div class="border-b border-amber-100 bg-amber-50/50 px-6 py-3 text-xs sm:px-7">
+                    <div class="border-b border-amber-100 bg-amber-50/50 px-3 py-2 text-xs sm:px-4">
                         @foreach (($exposure['applied'] ?? []) as $line)
                             <p class="text-emerald-800">✓ {{ $line }}</p>
                         @endforeach
@@ -342,7 +325,7 @@
                 @endif
                 <div class="divide-y divide-amber-100">
                     @foreach ($plan as $e)
-                        <div class="px-6 py-3 text-sm sm:px-7">
+                        <div class="px-3 py-2 text-sm sm:px-4">
                             <span class="font-medium text-brand-ink">{{ $e['server_name'] ?? $e['server_id'] }}</span>
                             <span class="text-brand-moss">
                                 — {{ __('expose') }} {{ implode(', ', array_map(fn ($k) => $k, $e['keys'] ?? [])) }}
@@ -357,20 +340,15 @@
         @endif
 
         {{-- Add a worker in another region/provider (Phase 2). --}}
-        <section class="dply-card mt-6 overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cross-region') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a worker in another region') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Provision one replica in a different region (same provider). Its env is rewritten to reach your backends over their public address — you\'ll then need to expose + allowlist those backends (shown above once it\'s ready).') }}
-                    </p>
-                </div>
-            </div>
-            <form wire:submit="addCrossRegion" class="space-y-4 px-6 py-6 sm:px-7">
+        <section class="border-b border-brand-ink/10">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-globe-alt"
+                :title="__('Add a worker in another region')"
+                :note="__('Provision a replica in another region; expose + allowlist backends after it is ready.')"
+            />
+            <form wire:submit="addCrossRegion" class="space-y-4 px-3 py-3 sm:px-4">
                 <div class="flex flex-wrap gap-4">
                     <div>
                         <x-input-label for="cr_provider" :value="__('Provider')" />
@@ -433,10 +411,15 @@
         @if ($tab === 'members')
         <div wire:poll.15s></div>
         {{-- Members --}}
-        <section class="dply-card overflow-hidden mt-6">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Members') }}</h2>
-            </div>
+        <section class="border-b border-brand-ink/10">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-server-stack"
+                :title="__('Members')"
+                :count="$members->count()"
+                :note="__('Primary owns the scheduler; replicas run queue workers.')"
+            />
             <div class="divide-y divide-brand-ink/10">
                 @foreach ($members as $member)
                     @php
@@ -445,7 +428,7 @@
                         $pendingDeploys = is_array($member->meta['pool']['pending_deploys'] ?? null) ? count($member->meta['pool']['pending_deploys']) : 0;
                         $crossRegion = (bool) ($member->meta['cross_region'] ?? false);
                     @endphp
-                    <div class="flex flex-wrap items-start justify-between gap-3 px-6 py-4 sm:px-7">
+                    <div class="flex flex-wrap items-start justify-between gap-2 px-3 py-2 sm:px-4">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $isReady ? 'bg-emerald-500' : 'bg-amber-400' }}" title="{{ $isReady ? __('Server ready') : __('Server not ready') }}"></span>
@@ -491,7 +474,7 @@
             </div>
         </section>
 
-        <p class="mt-4 text-xs text-brand-moss">
+        <p class="border-b border-brand-ink/10 px-3 py-2 text-[11px] text-brand-moss sm:px-4">
             {{ __('Same-region workers join this server\'s private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
         </p>
         @endif {{-- /members --}}
@@ -544,15 +527,15 @@
              snapshot on a throttle so the tiles, workload and Live jobs stay
              current without a manual Refresh. Real-time Reverb events still take
              precedence in the Live jobs feed when they arrive. --}}
-        <div class="mt-6 space-y-6" wire:poll.10s="pollHorizon">
+        <div class="space-y-0" wire:poll.10s="pollHorizon">
             @unless ($hzInstalled)
-                <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+                <div class="flex items-start gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
                     <span>{{ __('Horizon isn\'t installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
                 </div>
             @endunless
             @if ($hzInstalled && ! empty($hzDrift))
-                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
                     <div class="flex items-center gap-2 font-semibold text-amber-800">
                         <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
                         {{ __('Running config differs from saved') }}
@@ -565,67 +548,59 @@
                     </ul>
                 </div>
             @endif
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Horizon') }}</p>
-                        <div class="mt-0.5 flex items-center gap-2">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Queue dashboard') }}</h2>
-                            @if ($hzStatus)
-                                <span @class([
-                                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1',
-                                    'bg-emerald-50 text-emerald-700 ring-emerald-200' => $hzStatus === 'running',
-                                    'bg-amber-50 text-amber-700 ring-amber-200' => $hzStatus === 'paused',
-                                    'bg-rose-50 text-rose-700 ring-rose-200' => ! in_array($hzStatus, ['running', 'paused'], true),
-                                ])>{{ $hzStatus }}</span>
-                            @endif
-                        </div>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app\'s Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
-                        @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
-                        <p class="mt-1.5 text-xs text-brand-moss">
-                            <span class="font-medium text-brand-ink">{{ __('Queues watched:') }}</span>
-                            @foreach ($watchedQueues as $q)
-                                <code class="ml-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[11px]">{{ $q }}</code>
-                            @endforeach
-                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply\'s own queues (dply / dply-control)') }}</span>
-                        </p>
-                    </div>
-                    <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
-                        <span>{{ $hzAt ? __('collected :ago', ['ago' => $hzAt->diffForHumans()]) : __('no data yet') }}</span>
-                        @if ($hzError)
-                            <span class="inline-flex max-w-xs items-center gap-1 text-right font-medium text-rose-600" title="{{ $hzError }}">
-                                <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
-                                {{ __('last refresh failed :ago', ['ago' => $hzAttemptAt?->diffForHumans() ?? __('just now')]) }}
-                            </span>
-                        @elseif ($hzAttemptAt && (! $hzAt || $hzAttemptAt->gt($hzAt)))
-                            <span class="text-amber-700">{{ __('refresh ran :ago — no change', ['ago' => $hzAttemptAt->diffForHumans()]) }}</span>
+            <section class="border-b border-brand-ink/10">
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-queue-list"
+                    :title="__('Horizon')"
+                    :note="$hzAt ? __('collected :ago', ['ago' => $hzAt->diffForHumans()]) : __('Live metrics over SSH — Refresh to pull.')"
+                >
+                    <x-slot:actions>
+                        @if ($hzStatus)
+                            <span @class([
+                                'inline-flex h-6 items-center rounded-full px-2 text-[11px] font-semibold uppercase tracking-wide ring-1',
+                                'bg-emerald-50 text-emerald-700 ring-emerald-200' => $hzStatus === 'running',
+                                'bg-amber-50 text-amber-700 ring-amber-200' => $hzStatus === 'paused',
+                                'bg-rose-50 text-rose-700 ring-rose-200' => ! in_array($hzStatus, ['running', 'paused'], true),
+                            ])>{{ $hzStatus }}</span>
                         @endif
-                        <div class="flex flex-wrap items-center justify-end gap-2">
-                            <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Control Horizon on every member.') }}">
-                                <button type="button" wire:click="controlPoolHorizon('horizon:pause')" class="px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Pause') }}</button>
-                                <button type="button" wire:click="controlPoolHorizon('horizon:continue')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Resume') }}</button>
-                                <button type="button" wire:click="controlPoolHorizon('horizon:terminate')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
-                                <button type="button" wire:click="controlPoolHorizon('horizon:snapshot')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Snapshot') }}</button>
-                            </div>
-                            <button type="button" wire:click="runHorizonTestJobs" wire:loading.attr="disabled" wire:target="runHorizonTestJobs"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-60"
-                                title="{{ __('Dispatch 5 throwaway test jobs onto the queue, then re-pull the snapshot to confirm Horizon picked them up.') }}">
-                                <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="runHorizonTestJobs" />
-                                <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
-                                {{ __('Test jobs') }}
-                            </button>
-                            <button type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="refreshHorizon" />
-                                <span wire:loading wire:target="refreshHorizon" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
-                                {{ __('Refresh Horizon') }}
-                            </button>
+                        <div class="inline-flex h-6 overflow-hidden rounded-md border border-brand-ink/15" title="{{ __('Control Horizon on every member.') }}">
+                            <button type="button" wire:click="controlPoolHorizon('horizon:pause')" class="px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Pause') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:continue')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Resume') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:terminate')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:snapshot')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Snapshot') }}</button>
                         </div>
-                    </div>
+                        <button type="button" wire:click="runHorizonTestJobs" wire:loading.attr="disabled" wire:target="runHorizonTestJobs"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                            title="{{ __('Dispatch 5 throwaway test jobs onto the queue, then re-pull the snapshot to confirm Horizon picked them up.') }}">
+                            <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runHorizonTestJobs" />
+                            <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>
+                            {{ __('Test') }}
+                        </button>
+                        <button type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon"
+                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refreshHorizon" />
+                            <span wire:loading wire:target="refreshHorizon" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                            {{ __('Refresh') }}
+                        </button>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
+                @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
+                <p class="border-b border-brand-ink/10 px-3 py-1.5 text-[11px] text-brand-moss sm:px-4">
+                    <span class="font-medium text-brand-ink">{{ __('Queues:') }}</span>
+                    @foreach ($watchedQueues as $q)
+                        <code class="ml-1 rounded bg-brand-sand/60 px-1 py-0.5 font-mono text-[10px]">{{ $q }}</code>
+                    @endforeach
+                    @if ($hzError)
+                        <span class="ml-2 font-medium text-rose-600" title="{{ $hzError }}">{{ __('last refresh failed') }}</span>
+                    @endif
+                </p>
+
                 </div>
 
                 @if ($hz === [])
-                    <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">{{ __('No Horizon data yet — click “Refresh Horizon”. (Requires laravel/horizon on the app and a running worker.)') }}</div>
+                    <div class="px-3 py-5 text-center text-sm text-brand-moss sm:px-4">{{ __('No Horizon data yet — click “Refresh Horizon”. (Requires laravel/horizon on the app and a running worker.)') }}</div>
                 @else
                     <dl class="grid grid-cols-2 gap-px bg-brand-ink/5 sm:grid-cols-3 lg:grid-cols-6">
                         @php
@@ -639,9 +614,9 @@
                             ];
                         @endphp
                         @foreach ($hzTiles as $t)
-                            <div class="bg-white px-4 py-4">
+                            <div class="bg-white px-3 py-2.5">
                                 <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
-                                <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ is_numeric($t['v']) ? number_format((float) $t['v']) : $t['v'] }}</dd>
+                                <dd class="mt-1 text-lg font-semibold tabular-nums text-brand-ink">{{ is_numeric($t['v']) ? number_format((float) $t['v']) : $t['v'] }}</dd>
                             </div>
                         @endforeach
                     </dl>
@@ -653,8 +628,8 @@
                  recent/pending jobs from the Horizon snapshot pulled over SSH, so
                  the feed fills in whenever Horizon has activity. --}}
             @php $liveFeed = $this->liveJobsFeed(); @endphp
-            <section class="dply-card overflow-hidden" x-data="{ open: true }">
-                <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+            <section class="border-b border-brand-ink/10" x-data="{ open: true }">
+                <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-left sm:px-4">
                     <div class="flex items-center gap-2">
                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <span class="relative flex h-2 w-2" title="{{ __('Live') }}">
@@ -667,12 +642,12 @@
                 </button>
                 <div x-show="open" x-collapse>
                 @if (empty($liveFeed))
-                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… recent and in-flight jobs appear here as Horizon picks them up.') }}</div>
+                    <div class="px-3 py-3 text-sm text-brand-moss sm:px-4">{{ __('Waiting for job activity… recent and in-flight jobs appear here as Horizon picks them up.') }}</div>
                 @else
                     <div class="divide-y divide-brand-ink/5">
                         @foreach ($liveFeed as $i => $j)
                             @php $liveAge = ! empty($j['received_at']) ? max(0, now()->timestamp - (int) $j['received_at']) : null; @endphp
-                            <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
+                            <div class="flex flex-wrap items-center gap-2 px-3 py-1.5 sm:px-4" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
                                 <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
                                 <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] }}</span>
                                 <span @class([
@@ -706,27 +681,22 @@
                  down the other. Uses saveProcessManager() (PM only) when changed
                  standalone; saveHorizonConfig() bundles it with Horizon tuning. --}}
             @if ($pool)
-            <section class="dply-card overflow-hidden">
-                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-cog-8-tooth class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Process manager') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Worker daemon backend') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Choose how dply manages long-running workers on each member. Switching tears down the current backend and re-provisions under the new one.') }}
-                        </p>
-                    </div>
-                </div>
-                <form wire:submit="saveProcessManager" class="space-y-5 px-6 py-5 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-cog-8-tooth"
+                    :title="__('Process manager')"
+                    :note="__('systemd or Supervisor — switching re-provisions every member.')"
+                />
+                <form wire:submit="saveProcessManager" class="space-y-3 px-3 py-3 sm:px-4">
                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         @foreach ([
                             ['v' => 'systemd',    'icon' => 'server-stack',    'label' => __('systemd'),    'desc' => __('One unit per worker. Restart=always, journald logs. Default.')],
                             ['v' => 'supervisor', 'icon' => 'rectangle-stack', 'label' => __('Supervisor'), 'desc' => __('supervisord [program] groups. Installs supervisor if not present.')],
                         ] as $pm)
                             <label @class([
-                                'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
+                                'flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition-colors',
                                 'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-sage/30' => $hz_process_manager === $pm['v'],
                                 'border-brand-ink/10 hover:border-brand-ink/20' => $hz_process_manager !== $pm['v'],
                             ])>
@@ -753,20 +723,20 @@
                  each member's .env and restarts the workers. Auto-defaulted.
                  Horizon-only: a queue:work member is configured via its unit. --}}
             @if ($hzInstalled)
-            <section class="dply-card overflow-hidden" x-data="{ open: false }">
-                <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+            <section class="border-b border-brand-ink/10" x-data="{ open: false }">
+                <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-left sm:px-4">
                     <div>
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Configuration') }}</h3>
                         <p class="mt-0.5 text-xs text-brand-moss">{{ __('Queues, processes, balance, memory, timeout and tries — applied to every worker over SSH.') }}</p>
                     </div>
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
-                <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
+                <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-3 px-3 py-3 sm:px-4">
                     {{-- Auto-detect: SSH to a member, introspect the app's real queues +
                          box spec, and offer a one-click suggestion. Advisory only —
                          nothing is pushed until the operator hits Save & apply below. --}}
                     @if ($hzDetecting)
-                        <div wire:poll.3s="checkHorizonDetection" class="flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+                        <div wire:poll.3s="checkHorizonDetection" class="flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                             <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 animate-spin text-brand-mist" />
                             <span>{{ __('Detecting the app\'s queues over SSH — this takes a few seconds.') }}</span>
                         </div>
@@ -776,7 +746,7 @@
                             $detSource = ($hzDetection['source'] ?? null) === 'package' ? __('package introspection') : __('code scan');
                             $detDiffers = $detQueues !== implode(', ', \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues']);
                         @endphp
-                        <div class="rounded-xl border border-brand-forest/25 bg-brand-forest/5 px-4 py-3">
+                        <div class="rounded-lg border border-brand-forest/25 bg-brand-forest/5 px-4 py-3">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p class="text-xs font-semibold text-brand-ink">
@@ -868,8 +838,8 @@
 
             {{-- Per-queue workload --}}
             @if ($hzInstalled && ! empty($hz['workload']))
-                <section class="dply-card overflow-hidden" x-data="{ open: true }">
-                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+                <section class="border-b border-brand-ink/10" x-data="{ open: true }">
+                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-left sm:px-4">
                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Queues') }}</h3>
                     </button>
@@ -877,7 +847,7 @@
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-brand-ink/10 text-left text-[11px] uppercase tracking-wide text-brand-mist">
-                                <th class="px-6 py-2 sm:px-7">{{ __('Queue') }}</th>
+                                <th class="px-3 py-1.5 sm:px-4">{{ __('Queue') }}</th>
                                 <th class="px-3 py-2">{{ __('Length') }}</th>
                                 <th class="px-3 py-2">{{ __('Wait') }}</th>
                                 <th class="px-3 py-2">{{ __('Processes') }}</th>
@@ -897,7 +867,7 @@
                                     $spLast = $spN ? $series[$spN - 1] : null;
                                 @endphp
                                 <tr>
-                                    <td class="px-6 py-2 font-mono text-brand-ink sm:px-7">{{ $w['name'] ?? '?' }}</td>
+                                    <td class="px-3 py-1.5 font-mono text-brand-ink sm:px-4">{{ $w['name'] ?? '?' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $w['length'] ?? '—' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ isset($w['wait']) ? $w['wait'].'s' : '—' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $w['processes'] ?? '—' }}</td>
@@ -938,8 +908,8 @@
                 };
             @endphp
             @foreach ($jobLists as $list)
-                <section class="dply-card overflow-hidden" x-data="{ open: true }">
-                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+                <section class="border-b border-brand-ink/10" x-data="{ open: true }">
+                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-left sm:px-4">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                             <h3 class="text-sm font-semibold text-brand-ink">{{ $list['title'] }}</h3>
@@ -948,11 +918,11 @@
                     </button>
                     <div x-show="open" x-collapse>
                     @if (empty($hz[$list['key']]))
-                        <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ $list['empty'] }}</div>
+                        <div class="px-3 py-3 text-sm text-brand-moss sm:px-4">{{ $list['empty'] }}</div>
                     @else
                         <div class="divide-y divide-brand-ink/5">
                             @foreach ($hz[$list['key']] as $j)
-                                <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7">
+                                <div class="flex flex-wrap items-center gap-2 px-3 py-1.5 sm:px-4">
                                     <span class="text-sm font-medium text-brand-ink">{{ $j['name'] ?? 'job' }}</span>
                                     <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] ?? '?' }}</span>
                                     @if (! empty($j['status']))
@@ -970,8 +940,8 @@
             @endforeach
 
             {{-- Recent failed jobs --}}
-            <section class="dply-card overflow-hidden" x-data="{ open: true }">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+            <section class="border-b border-brand-ink/10" x-data="{ open: true }">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                     <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-left">
                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Recent failed jobs') }}</h3>
@@ -988,11 +958,11 @@
                 </div>
                 <div x-show="open" x-collapse>
                 @if (empty($hz['failed_jobs']))
-                    <div class="px-6 py-6 text-sm text-brand-moss sm:px-7">{{ __('No recent failed jobs. 🎉') }}</div>
+                    <div class="px-3 py-3 text-sm text-brand-moss sm:px-4">{{ __('No recent failed jobs. 🎉') }}</div>
                 @else
                     <div class="divide-y divide-brand-ink/5">
                         @foreach ($hz['failed_jobs'] as $fj)
-                            <div class="px-6 py-3 sm:px-7" x-data="{ open: false }">
+                            <div class="px-3 py-2 sm:px-4" x-data="{ open: false }">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="text-sm font-semibold text-brand-ink">{{ $fj['name'] ?? 'job' }}</span>
                                     <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $fj['queue'] ?? '?' }}</span>
@@ -1036,38 +1006,38 @@
         @if ($tab === 'traffic')
         {{-- Traffic & Redis — per-member host/worker/Redis stats collected over
              SSH by CollectWorkerPoolStatsJob, plus pool-wide queue backlog. --}}
-        <div wire:poll.8s class="mt-6 space-y-6">
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Traffic & Redis') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Live worker stats') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Host load, worker processes and Redis throughput for every member, collected over SSH. Workers share the same queue backend, so Redis figures reflect the whole pool.') }}
-                        </p>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2">
+        <div wire:poll.8s class="space-y-0">
+            <section class="border-b border-brand-ink/10">
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-chart-bar"
+                    :title="__('Traffic & Redis')"
+                    :note="__('Host load, worker processes, and Redis throughput per member.')"
+                >
+                    <x-slot:actions>
                         <button type="button" wire:click="ensureWorkers" wire:loading.attr="disabled" wire:target="ensureWorkers"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
+                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
                             title="{{ __('Define the queue daemon (Horizon if installed, else queue:work) on every member and start it via systemd.') }}">
-                            <x-heroicon-o-bolt class="h-4 w-4" wire:loading.remove wire:target="ensureWorkers" />
-                            <span wire:loading wire:target="ensureWorkers" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
-                            {{ __('Ensure workers everywhere') }}
+                            <x-heroicon-o-bolt class="h-3.5 w-3.5" wire:loading.remove wire:target="ensureWorkers" />
+                            <span wire:loading wire:target="ensureWorkers" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                            {{ __('Ensure workers') }}
                         </button>
                         <button type="button" wire:click="runTestJobs" wire:loading.attr="disabled" wire:target="runTestJobs"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             title="{{ __('Dispatch 5 throwaway jobs onto the queue and confirm the workers process them.') }}">
-                            <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="runTestJobs" />
-                            <span wire:loading wire:target="runTestJobs" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                            {{ __('Run test jobs') }}
+                            <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runTestJobs" />
+                            <span wire:loading wire:target="runTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            {{ __('Test jobs') }}
                         </button>
                         <button type="button" wire:click="collectStats" wire:loading.attr="disabled" wire:target="collectStats"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="collectStats" />
-                            <span wire:loading wire:target="collectStats" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                            {{ __('Refresh stats') }}
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="collectStats" />
+                            <span wire:loading wire:target="collectStats" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            {{ __('Refresh') }}
                         </button>
-                    </div>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
                 </div>
                 <div class="grid grid-cols-2 gap-px bg-brand-ink/5 sm:grid-cols-4">
                     @php
@@ -1088,9 +1058,9 @@
                         ];
                     @endphp
                     @foreach ($poolTiles as $t)
-                        <div class="bg-white px-4 py-4">
+                        <div class="bg-white px-3 py-2.5">
                             <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
-                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $t['v'] }}</dd>
+                            <dd class="mt-1 text-lg font-semibold tabular-nums text-brand-ink">{{ $t['v'] }}</dd>
                         </div>
                     @endforeach
                 </div>
@@ -1114,8 +1084,8 @@
                     $redisUp = ($st['redis_ping'] ?? '') === 'PONG';
                     $collectedAt = ! empty($st['collected_at']) ? \Illuminate\Support\Carbon::parse($st['collected_at']) : null;
                 @endphp
-                <section class="dply-card overflow-hidden">
-                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-white px-6 py-3 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-white px-3 py-2 sm:px-4">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex h-2 w-2 rounded-full {{ $member->isReady() ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
                             <span class="text-sm font-semibold text-brand-ink">{{ $member->name }}</span>
@@ -1142,9 +1112,9 @@
                         <span class="text-xs text-brand-moss">{{ $collectedAt ? __('collected :ago', ['ago' => $collectedAt->diffForHumans()]) : __('no data yet') }}</span>
                     </div>
                     @if ($st === [])
-                        <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('No stats collected yet — click “Refresh stats”.') }}</div>
+                        <div class="px-3 py-3 text-sm text-brand-moss sm:px-4">{{ __('No stats collected yet — click “Refresh stats”.') }}</div>
                     @else
-                        <dl class="grid grid-cols-2 gap-x-6 gap-y-3 px-6 py-5 text-sm sm:grid-cols-3 lg:grid-cols-4 sm:px-7">
+                        <dl class="grid grid-cols-2 gap-x-6 gap-y-3 px-3 py-3 text-sm sm:grid-cols-3 lg:grid-cols-4 sm:px-4">
                             @php
                                 $facts = [
                                     __('Load (1/5/15m)') => $st['load'] ?? '—',
@@ -1177,6 +1147,7 @@
             @endforeach
         </div>
         @endif {{-- /traffic --}}
+        </section>
     @endif
 
     @include('livewire.partials.confirm-action-modal')

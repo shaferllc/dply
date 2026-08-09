@@ -273,12 +273,21 @@
                                                     {{ __('Projects') }}
                                                 </x-dropdown-link>
                                             @endfeature
-                                            <x-coming-soon-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
-                                                <x-slot name="icon">
-                                                    <x-heroicon-o-archive-box class="{{ $hi }}" />
-                                                </x-slot>
-                                                {{ __('Backups') }}
-                                            </x-coming-soon-dropdown-link>
+                                            @feature('workspace.backups')
+                                                <x-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Backups') }}
+                                                </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Backups') }}
+                                                </x-coming-soon-dropdown-link>
+                                            @endfeature
                                             @if (production_data_mirror_available())
                                                 <x-dropdown-link
                                                     :href="production_data_mirror_entry_url()"
@@ -597,12 +606,21 @@
                         {{ __('Projects') }}
                     </x-responsive-nav-link>
                 @endfeature
-                <x-coming-soon-responsive-nav-link :href="route('backups.databases')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-archive-box class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Backups') }}
-                </x-coming-soon-responsive-nav-link>
+                @feature('workspace.backups')
+                    <x-responsive-nav-link :href="route('backups.databases')" :active="request()->routeIs('backups.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-archive-box class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Backups') }}
+                    </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link :href="route('backups.databases')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-archive-box class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Backups') }}
+                    </x-coming-soon-responsive-nav-link>
+                @endfeature
                 @if (production_data_mirror_available())
                     <x-responsive-nav-link :href="production_data_mirror_entry_url()" :active="request()->routeIs('live.*')">
                         <x-slot name="icon">

@@ -28,6 +28,9 @@
     }
     $isRunningOverall = $deployment->status === 'running';
     $pct = $phaseTotal > 0 ? (int) round(($phaseDone / $phaseTotal) * 100) : 0;
+    // Deployment detail's "Step output" toggle — expand every phase and open
+    // per-step consoles. Deploy hub leaves this unset/false.
+    $forceShowOutput = (bool) ($showOutput ?? false);
 @endphp
 
 {{-- Progress meter — a single glance at how far the pipeline has gotten and
@@ -119,9 +122,15 @@
             $hasSteps = $phase['steps'] !== [];
             // Collapse finished/upcoming phases; keep the running or failed one
             // open so a long success run reads as a short rail of phase headers.
-            $phaseAutoOpen = in_array($st, ['running', 'failed'], true);
+            // "Step output" on the detail page forces every phase open.
+            $phaseAutoOpen = $forceShowOutput || in_array($st, ['running', 'failed'], true);
+            $phaseKey = (string) ($phase['key'] ?? $loop->index);
         @endphp
-        <li class="relative pl-10" @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif>
+        <li
+            class="relative pl-10"
+            wire:key="phase-{{ $phaseKey }}-{{ $forceShowOutput ? 'out' : 'hid' }}"
+            @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif
+        >
             {{-- Rail segment beneath this node, tinted by this phase's outcome so
                  the line reads as "done" (green) up to the active node, then fades
                  to gray for what's still ahead. Hidden on the last phase. --}}

@@ -18,6 +18,7 @@
             ['route' => 'sites.index', 'match' => 'sites.index', 'label' => __('Sites'), 'icon' => 'globe-alt'],
             ['route' => 'servers.index', 'match' => 'servers.index', 'label' => __('Servers'), 'icon' => 'server'],
             ['route' => 'projects.index', 'match' => 'projects.*', 'label' => __('Projects'), 'icon' => 'folder'],
+            ['route' => 'fleet.index', 'match' => 'fleet.*', 'label' => __('Fleet'), 'icon' => 'rectangle-stack', 'feature' => 'surface.fleet'],
             ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt'],
             ['route' => 'cloud.index', 'match' => 'cloud.*', 'label' => __('Cloud'), 'icon' => 'cloud'],
             ['route' => 'serverless.index', 'match' => 'serverless.*', 'label' => __('Serverless'), 'icon' => 'cpu-chip'],
@@ -30,9 +31,10 @@
             @foreach ($items as $item)
                 @php
                     $routeExists = \Illuminate\Support\Facades\Route::has($item['route']);
+                    $featureOk = empty($item['feature']) || feature($item['feature']);
                     $active = $routeExists && request()->routeIs($item['match']);
                 @endphp
-                @if ($routeExists)
+                @if ($routeExists && $featureOk)
                     <a
                         href="{{ route($item['route']) }}"
                         wire:navigate

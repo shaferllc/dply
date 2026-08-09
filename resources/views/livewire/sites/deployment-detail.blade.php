@@ -52,9 +52,19 @@
                                 {{ __('Logs') }}
                             </button>
                         @endif
-                        <button type="button" wire:click="toggleOutput" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
+                        <button
+                            type="button"
+                            wire:click="toggleOutput"
+                            aria-pressed="{{ $showOutput ? 'true' : 'false' }}"
+                            title="{{ $showOutput ? __('Collapse per-step output') : __('Expand phases and show per-step output') }}"
+                            @class([
+                                'inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition',
+                                'border border-brand-ink bg-brand-ink text-brand-cream' => $showOutput,
+                                'border border-brand-ink/15 bg-white/80 text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800' => ! $showOutput,
+                            ])
+                        >
                             @if ($showOutput)
-                                <x-heroicon-m-eye-slash class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                                <x-heroicon-m-eye-slash class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Hide output') }}
                             @else
                                 <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
@@ -125,8 +135,13 @@
                         {{ __('No phase results recorded for this deployment.') }}
                     </div>
                 @else
-                    <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4">
-                        @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment, 'dbFix' => $dbFix ?? null])
+                    <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4" wire:key="deploy-timeline-{{ $showOutput ? 'out' : 'hid' }}">
+                        @include('livewire.sites.partials.deployments._phase-timeline', [
+                            'timelinePhases' => $timelinePhases,
+                            'deployment' => $deployment,
+                            'dbFix' => $dbFix ?? null,
+                            'showOutput' => $showOutput,
+                        ])
                     </div>
                 @endif
 
