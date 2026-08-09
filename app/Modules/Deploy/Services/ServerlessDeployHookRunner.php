@@ -29,7 +29,10 @@ final class ServerlessDeployHookRunner
         SiteDeployHook::PHASE_AFTER_ACTIVATE => 'After deploy',
     ];
 
-    public function __construct(private readonly DeployHookScriptExpander $expander) {}
+    public function __construct(
+        private readonly DeployHookScriptExpander $expander,
+        private readonly ServerlessBuildHostTools $buildHostTools,
+    ) {}
 
     /**
      * Run every hook configured for the phase, in sort order, returning the
@@ -65,7 +68,13 @@ final class ServerlessDeployHookRunner
 
     private function runScript(string $script, string $cwd, int $timeout, string $phase, string $hookId): string
     {
-        $process = Process::fromShellCommandline($script, $cwd);
+        $prepared = $script;
+        if ($this->buildHostTools->commandNeedsComposer($prepared)) {
+            $composer = $this->buildHostTools->ensureComposer();
+            $prepared = $this->buildHostTools->withComposerBinary($prepared, $composer['path']);
+        }
+
+        $process = Process::fromShellCommandline($prepared, $cwd, $this->buildHostTools->processEnv());
         $process->setTimeout($timeout);
         $process->run();
 

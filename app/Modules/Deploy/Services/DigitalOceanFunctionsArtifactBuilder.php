@@ -28,6 +28,7 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessEnvironmentPreparer $environmentPreparer,
         private readonly ServerlessDeployHookRunner $hookRunner,
+        private readonly ServerlessBuildHostTools $buildHostTools,
     ) {}
 
     /**
@@ -369,7 +370,21 @@ class DigitalOceanFunctionsArtifactBuilder
 
     private function runShell(string $command, string $workingDirectory): string
     {
-        $process = Process::fromShellCommandline($command, $workingDirectory);
+        $prepared = $command;
+        $prefixLog = '';
+
+        // Control-plane workers often lack Composer on PATH even when PHP is
+        // present — detect + install (storage/app/bin or /usr/local/bin) and
+        // rewrite the command to the absolute binary.
+        if ($this->buildHostTools->commandNeedsComposer($prepared)) {
+            $composer = $this->buildHostTools->ensureComposer();
+            if ($composer['installed']) {
+                $prefixLog = 'Installed Composer on Serverless build host: '.$composer['path']."\n";
+            }
+            $prepared = $this->buildHostTools->withComposerBinary($prepared, $composer['path']);
+        }
+
+        $process = Process::fromShellCommandline($prepared, $workingDirectory, $this->buildHostTools->processEnv());
         $process->setTimeout(1800);
         $process->run();
 
@@ -377,7 +392,7 @@ class DigitalOceanFunctionsArtifactBuilder
             throw new \RuntimeException(trim($process->getErrorOutput()."\n".$process->getOutput()));
         }
 
-        return trim($process->getOutput());
+        return trim($prefixLog.$process->getOutput());
     }
 
     /** Paths never worth shipping in a serverless action artifact. */

@@ -324,6 +324,14 @@ class Journey extends Component
             ? max(0, (int) round($deployment->started_at->diffInMilliseconds($deployment->finished_at)))
             : null;
 
+        $failedStep = collect($deploySteps)->first(fn (array $step): bool => $step['state'] === 'failed');
+        $errorSummary = $this->errorSummary(
+            (string) ($deployment?->log_output ?? ''),
+            is_array($failedStep) ? $failedStep : null,
+        );
+
+        $repoLabel = $this->repositoryLabel((string) ($site->git_repository_url ?? ''));
+
         return view('livewire.serverless.journey', [
             'server' => $server,
             'site' => $site,
@@ -347,7 +355,70 @@ class Journey extends Component
             'facts' => $facts,
             'deployDuration' => $this->formatDuration($deployDurationMs),
             'deployStartedAt' => $deployment?->started_at,
+            'errorSummary' => $errorSummary,
+            'repoLabel' => $repoLabel,
+            'failedStepLabel' => is_array($failedStep) ? (string) ($failedStep['label'] ?? '') : '',
         ]);
+    }
+
+    /**
+     * Short owner/repo (or basename) for the header — full URL stays on hover.
+     */
+    private function repositoryLabel(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        if (preg_match('~(?:github\.com|gitlab\.com|bitbucket\.org)[:/](.+?)(?:\.git)?$~i', $url, $matches) === 1) {
+            return rtrim($matches[1], '/');
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (is_string($path) && $path !== '' && $path !== '/') {
+            return ltrim($path, '/');
+        }
+
+        return $url;
+    }
+
+    /**
+     * Pull a one-line reason for the failure banner (failed sub-step + last
+     * meaningful log line). Keeps the full transcript in the log panel.
+     *
+     * @param  array{label?: string, detail?: string}|null  $failedStep
+     */
+    private function errorSummary(string $log, ?array $failedStep): string
+    {
+        $parts = [];
+        if (is_array($failedStep) && ($failedStep['label'] ?? '') !== '') {
+            $label = (string) $failedStep['label'];
+            $detail = trim((string) ($failedStep['detail'] ?? ''));
+            $parts[] = $detail !== '' ? $label.': '.$detail : $label;
+        }
+
+        $lines = preg_split('/\R/', $log) ?: [];
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = trim((string) $lines[$i]);
+            if ($line === '' || str_starts_with($line, '---') || str_starts_with($line, 'Detected ')) {
+                continue;
+            }
+            // Prefer shell / composer style errors over long dumps.
+            if (preg_match('/^(sh:|composer |error:|fatal:|Installing |\\[dply\\])/i', $line) === 1
+                || str_contains(strtolower($line), 'not found')
+                || str_contains(strtolower($line), 'failed')) {
+                $parts[] = $line;
+                break;
+            }
+            // Fallback: last non-empty line.
+            $parts[] = $line;
+            break;
+        }
+
+        $parts = array_values(array_unique(array_filter($parts)));
+
+        return implode(' — ', array_slice($parts, 0, 2));
     }
 
     private function stringOrNull(mixed $value): ?string

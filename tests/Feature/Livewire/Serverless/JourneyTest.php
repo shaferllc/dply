@@ -165,7 +165,7 @@ test('failed first deploy shows deploy failed not stopped', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
         ->assertSee('Deploy failed')
-        ->assertSee('This app is not live')
+        ->assertSee('Repository preflight failed')
         ->assertDontSee('Deploy stopped');
 });
 
