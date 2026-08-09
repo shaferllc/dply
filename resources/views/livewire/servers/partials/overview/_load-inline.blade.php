@@ -28,22 +28,22 @@
     $metricStat = function (string $label, ?float $pct) use ($metricTone): string {
         $val = $pct === null ? '—' : number_format($pct, 0).'%';
 
-        return '<span class="inline-flex items-baseline gap-1">'
-            .'<span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">'.e($label).'</span>'
-            .'<span class="font-mono font-semibold '.$metricTone($pct).'">'.e($val).'</span>'
+        return '<span class="inline-flex items-baseline gap-0.5">'
+            .'<span class="text-xxs font-semibold uppercase tracking-[0.12em] text-brand-mist">'.e($label).'</span>'
+            .'<span class="font-mono text-xxs font-semibold leading-none tabular-nums '.$metricTone($pct).'">'.e($val).'</span>'
             .'</span>';
     };
 @endphp
-<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
+<div class="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xxs leading-none text-brand-moss">
     @if ($metricHasAny)
         {!! $metricStat(__('CPU'), $metricCpu) !!}
         {!! $metricStat(__('MEM'), $metricMem) !!}
         {!! $metricStat(__('DISK'), $metricDisk) !!}
         @if ($metricLoad1m !== null)
             <span class="text-brand-mist">·</span>
-            <span class="inline-flex items-baseline gap-1">
-                <span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">{{ __('Load') }}</span>
-                <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
+            <span class="inline-flex items-baseline gap-0.5">
+                <span class="font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Load') }}</span>
+                <span class="font-mono font-semibold tabular-nums text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
             </span>
         @endif
     @else
@@ -52,8 +52,8 @@
     @if ($metricStale)
         <span class="font-semibold uppercase tracking-wide text-amber-700">{{ __('Stale') }}</span>
     @endif
-    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center gap-1 font-semibold text-brand-forest transition hover:text-brand-sage hover:underline">
+    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center gap-0.5 font-semibold text-brand-forest transition hover:text-brand-sage hover:underline">
         {{ __('Monitor') }}
-        <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+        <x-heroicon-m-arrow-up-right class="h-2.5 w-2.5 shrink-0" aria-hidden="true" />
     </a>
 </div>

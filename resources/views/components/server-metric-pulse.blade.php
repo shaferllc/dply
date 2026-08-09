@@ -38,17 +38,17 @@
 @else
     <div {{ $attributes->class(['inline-flex items-center gap-1.5 font-mono tabular-nums', $stale ? 'opacity-60' : '']) }}
          title="{{ $sampleAge !== null ? __('Sampled :ago', ['ago' => $snapshot->captured_at->diffForHumans()]) : '' }}">
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($cpu) }}">
-            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('CPU') }}</span>
-            <span>{{ $cpu !== null ? number_format($cpu, 0).'%' : '—' }}</span>
+        <span class="inline-flex items-baseline gap-0.5 rounded px-1 py-0.5 text-xxs font-semibold leading-none {{ $statusColor($cpu) }}">
+            <span class="font-bold uppercase tracking-wider opacity-60">{{ __('CPU') }}</span>
+            <span class="tabular-nums">{{ $cpu !== null ? number_format($cpu, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($mem) }}">
-            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('MEM') }}</span>
-            <span>{{ $mem !== null ? number_format($mem, 0).'%' : '—' }}</span>
+        <span class="inline-flex items-baseline gap-0.5 rounded px-1 py-0.5 text-xxs font-semibold leading-none {{ $statusColor($mem) }}">
+            <span class="font-bold uppercase tracking-wider opacity-60">{{ __('MEM') }}</span>
+            <span class="tabular-nums">{{ $mem !== null ? number_format($mem, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($disk) }}">
-            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('DISK') }}</span>
-            <span>{{ $disk !== null ? number_format($disk, 0).'%' : '—' }}</span>
+        <span class="inline-flex items-baseline gap-0.5 rounded px-1 py-0.5 text-xxs font-semibold leading-none {{ $statusColor($disk) }}">
+            <span class="font-bold uppercase tracking-wider opacity-60">{{ __('DISK') }}</span>
+            <span class="tabular-nums">{{ $disk !== null ? number_format($disk, 0).'%' : '—' }}</span>
         </span>
     </div>
 @endif
