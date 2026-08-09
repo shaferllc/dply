@@ -404,12 +404,13 @@ class Index extends Component
             return null;
         }
 
-        // Edge apps are backed by placeholder host rows, not machines. They have
-        // their own surface at /edge (where they already appear); counting them
-        // here inflated "8 servers" and rendered them as fleet entries with a
-        // stuck "Provisioning…" label and a metrics row that never fills in.
+        // Edge apps and serverless function namespaces are backed by placeholder
+        // host rows, not machines. They have their own surfaces at /edge and
+        // /serverless; counting them here inflated the fleet and rendered
+        // "Provisioning…" / empty-metrics rows that never apply.
         $query = Server::query()
             ->withoutEdgeHosts()
+            ->withoutServerlessHosts()
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));

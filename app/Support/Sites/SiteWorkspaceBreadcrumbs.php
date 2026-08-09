@@ -6,10 +6,11 @@ namespace App\Support\Sites;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\SiteSettingsHeader;
 
 /**
- * Breadcrumb items for BYO / Edge site workspace sub-pages.
+ * Breadcrumb items for BYO / Edge / Serverless site workspace sub-pages.
  */
 final class SiteWorkspaceBreadcrumbs
 {
@@ -24,6 +25,10 @@ final class SiteWorkspaceBreadcrumbs
     ): array {
         if ($site->usesEdgeRuntime()) {
             return self::edgeItems($server, $site, $currentLabel, $currentIcon);
+        }
+
+        if ($site->usesFunctionsRuntime()) {
+            return self::serverlessItems($site, $currentLabel, $currentIcon);
         }
 
         $items = [
@@ -90,6 +95,31 @@ final class SiteWorkspaceBreadcrumbs
         ];
 
         return $items;
+    }
+
+    /**
+     * @return list<array{label: string, href?: string|null, icon?: string|null}>
+     */
+    private static function serverlessItems(
+        Site $site,
+        string $currentLabel,
+        ?string $currentIcon,
+    ): array {
+        return [
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'],
+            [
+                'label' => $site->name,
+                'href' => ServerlessWorkspaceUrl::show($site),
+                'icon' => 'bolt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
+            ],
+            [
+                'label' => $currentLabel,
+                'icon' => $currentIcon ?? 'map-pin',
+            ],
+        ];
     }
 
     public static function iconKeyFromSection(string $section, Site $site, Server $server): string

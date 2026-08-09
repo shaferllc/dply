@@ -238,6 +238,14 @@ final class SiteShowViewData
         } elseif ($site->usesEdgeRuntime()) {
             $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
             $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
+        } elseif ($site->usesFunctionsRuntime()) {
+            $siteHeaderBreadcrumbs[] = ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $site->name,
+                'icon' => 'bolt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
+            ];
         } else {
             $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
             // Project omitted — see SiteWorkspaceBreadcrumbs.

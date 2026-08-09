@@ -42,7 +42,7 @@ final readonly class ServerlessIndexRow
         }
 
         $journeyHref = $site->server_id
-            ? route('serverless.journey', ['server' => $site->server_id, 'site' => $site->id])
+            ? ServerlessWorkspaceUrl::journey($site)
             : null;
         // Never-live / failed first deploy → manage opens the journey (same
         // destination SiteWorkspaceController redirects sites.show to).
@@ -50,7 +50,7 @@ final readonly class ServerlessIndexRow
         if ($site->server_id) {
             $manageHref = (! $isLive && $site->last_deploy_at === null && $journeyHref !== null)
                 ? $journeyHref
-                : route('sites.show', ['server' => $site->server_id, 'site' => $site->id]);
+                : ServerlessWorkspaceUrl::show($site);
         }
 
         $repo = trim((string) ($site->git_repository_url ?? ''));

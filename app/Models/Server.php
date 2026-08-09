@@ -893,6 +893,25 @@ class Server extends Model
     }
 
     /**
+     * Query-side counterpart to {@see isServerlessHost()}: drop DO Functions /
+     * AWS Lambda namespace rows from the Servers inventory.
+     *
+     * Those hosts exist so function Sites can share the workspace URL shape, but
+     * they are not machines — they belong on `/serverless`, not `/servers`.
+     * Same null-host_kind leg as {@see scopeWithoutEdgeHosts()}.
+     */
+    public function scopeWithoutServerlessHosts(EloquentBuilder $query): EloquentBuilder
+    {
+        return $query->where(function (EloquentBuilder $q): void {
+            $q->whereNull('meta->host_kind')
+                ->orWhereNotIn('meta->host_kind', [
+                    self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+                    self::HOST_KIND_AWS_LAMBDA,
+                ]);
+        });
+    }
+
+    /**
      * Logical hosts for dply-managed products — never spec-tiered as BYO VMs.
      */
     public function isManagedProductHost(): bool

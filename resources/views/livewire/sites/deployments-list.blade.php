@@ -1,11 +1,11 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <x-breadcrumb-trail
-        :items="$settingsBreadcrumbs"
-        :site="$site"
-        doc-contextual
-        :contextual-doc-slug="$contextualDocSlug ?? null"
-        class="mb-6"
-    />
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Deployments'),
+        'currentIcon' => 'rocket-launch',
+        'contextualDocSlug' => $contextualDocSlug ?? null,
+    ])
 
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
@@ -45,9 +45,8 @@
             @endif
 
             @if ($site->server?->isDigitalOceanFunctionsHost())
-                {{-- Serverless deploy hub: the journey component owns redeploy +
-                     live watching, deploy-hooks is its own card below. The
-                     tabbed VM UI doesn't apply here. --}}
+                {{-- Serverless deploy hub: journey + hooks as hairline strips
+                     inside this card (no nested dply-card). --}}
                 <livewire:serverless.journey
                     :server="$server"
                     :site="$site"
@@ -115,7 +114,7 @@
                 @include('livewire.sites.partials.deployments._history-panel')
             @endif
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
+            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
                 <x-cli-snippet :command="'dply sites:deployments '.$site->slug" />
             </div>
             </main>

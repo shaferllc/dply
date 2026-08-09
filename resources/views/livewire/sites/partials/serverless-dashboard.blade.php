@@ -133,7 +133,7 @@
                 <span wire:loading.remove wire:target="redeployServerlessFunction">{{ $isFailed ? __('Retry deploy') : __('Deploy function') }}</span>
                 <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
             </button>
-            <a href="{{ route('serverless.journey', ['server' => $server, 'site' => $site]) }}"
+            <a href="{{ \App\Support\Serverless\ServerlessWorkspaceUrl::journey($site) }}"
                class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
                 {{ __('Deploy journey') }}
             </a>

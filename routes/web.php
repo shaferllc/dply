@@ -30,6 +30,7 @@ use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
+use App\Http\Controllers\ServerlessWorkspaceController;
 use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
@@ -114,7 +115,7 @@ use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
 use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
-use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepScan as ServerCreateStepScan;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
@@ -580,7 +581,44 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
         Route::livewire('serverless/glue', ServerlessGlue::class)->name('serverless.glue');
         Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
-        Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
+
+        // Product-line workspace URLs — site-centric, not under /servers.
+        // Literal leaves are registered before the `{section?}` catch-all.
+        Route::get('serverless/{site}/deploying', [ServerlessWorkspaceController::class, 'journey'])
+            ->name('serverless.journey');
+        Route::get('serverless/{site}/proxy-routing', [ServerlessWorkspaceController::class, 'routing'])
+            ->name('serverless.routing');
+        Route::get('serverless/{site}/deployments/{deployment}', [ServerlessWorkspaceController::class, 'deploymentShow'])
+            ->name('serverless.deployments.show');
+        Route::get('serverless/{site}/deployments', [ServerlessWorkspaceController::class, 'deployments'])
+            ->name('serverless.deployments');
+        Route::get('serverless/{site}/repository', [ServerlessWorkspaceController::class, 'repository'])
+            ->name('serverless.repository');
+        Route::get('serverless/{site}/resources', [ServerlessWorkspaceController::class, 'resources'])
+            ->name('serverless.resources');
+        Route::get('serverless/{site}/schedule', [ServerlessWorkspaceController::class, 'schedule'])
+            ->name('serverless.schedule');
+        Route::get('serverless/{site}/workers', [ServerlessWorkspaceController::class, 'workers'])
+            ->name('serverless.workers');
+        Route::get('serverless/{site}/environment', [ServerlessWorkspaceController::class, 'environment'])
+            ->name('serverless.environment');
+        Route::get('serverless/{site}/monitor', [ServerlessWorkspaceController::class, 'monitor'])
+            ->name('serverless.monitor');
+        Route::get('serverless/{site}/errors', [ServerlessWorkspaceController::class, 'errors'])
+            ->name('serverless.errors');
+        Route::get('serverless/{site}/logs', [ServerlessWorkspaceController::class, 'logs'])
+            ->name('serverless.logs');
+        Route::get('serverless/{site}/{section?}', [ServerlessWorkspaceController::class, 'show'])
+            ->where('section', '[a-z0-9-]+')
+            ->defaults('section', 'general')
+            ->name('serverless.show');
+
+        // Legacy BYO deploy-journey bookmark → product URL.
+        Route::get('servers/{server}/sites/{site}/deploying', function (Server $server, Site $site) {
+            abort_unless($site->server_id === $server->id, 404);
+
+            return redirect()->to(ServerlessWorkspaceUrl::journey($site));
+        })->name('serverless.journey.legacy');
     });
     Route::livewire('imports/parity', ImportParity::class)->name('imports.parity');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
@@ -656,13 +694,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
                     ], true)
                     && $function->last_deploy_at === null
                 ) {
-                    return redirect()->route('serverless.journey', [
-                        'server' => $server,
-                        'site' => $function,
-                    ]);
+                    return redirect()->to(ServerlessWorkspaceUrl::journey($function));
                 }
 
-                return redirect()->route('sites.show', ['server' => $server, 'site' => $function]);
+                return redirect()->to(ServerlessWorkspaceUrl::show($function));
             }
         }
 

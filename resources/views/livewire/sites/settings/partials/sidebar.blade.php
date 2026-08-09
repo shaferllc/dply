@@ -45,11 +45,25 @@
     @persist('site-sidebar-'.$site->id)
     <div class="{{ $card }}">
         <div class="ws-hide-collapsed border-b border-brand-ink/10 p-4 sm:p-5">
-            <a href="{{ route('servers.sites', $server) }}" wire:navigate
-                class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
-                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Back to sites') }}
-            </a>
+            @if ($site->usesEdgeRuntime())
+                <a href="{{ route('edge.index') }}" wire:navigate
+                    class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Back to Edge sites') }}
+                </a>
+            @elseif ($site->usesFunctionsRuntime())
+                <a href="{{ route('serverless.index') }}" wire:navigate
+                    class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Back to Serverless') }}
+                </a>
+            @else
+                <a href="{{ route('servers.sites', $server) }}" wire:navigate
+                    class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Back to sites') }}
+                </a>
+            @endif
             <div class="flex items-start gap-3">
                 {{-- Avatar + pencil opens the logo edit menu in place (nested
                      LogoMenu component, so it works from every workspace page). --}}
@@ -220,13 +234,25 @@
                                 'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
                                 default => ['server' => $server, 'site' => $site],
                             };
-                            $href = route($item['route'], $routeArgs + ($item['route_query'] ?? []));
+                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
+                                $item['route'],
+                                $site,
+                                $routeArgs + ($item['route_query'] ?? []),
+                            ) ?? route($item['route'], $routeArgs + ($item['route_query'] ?? []));
                         } else {
-                            $href = route('sites.show', array_merge([
+                            $sectionQuery = array_merge(
+                                $item['id'] === 'routing' ? ['tab' => $routingTab] : [],
+                                $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : [],
+                            );
+                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
+                                'sites.show',
+                                $site,
+                                ['section' => $item['id']] + $sectionQuery,
+                            ) ?? route('sites.show', array_merge([
                                 'server' => $server,
                                 'site' => $site,
                                 'section' => $item['id'],
-                            ], $item['id'] === 'routing' ? ['tab' => $routingTab] : [], $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : []));
+                            ], $sectionQuery));
                         }
                     @endphp
                     <a
@@ -291,6 +317,15 @@
                 >
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
                     {{ __('Back to Edge sites') }}
+                </a>
+            @elseif ($site->usesFunctionsRuntime())
+                <a
+                    href="{{ route('serverless.index') }}"
+                    wire:navigate
+                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
+                    {{ __('Back to Serverless') }}
                 </a>
             @else
                 <a

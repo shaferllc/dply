@@ -3,11 +3,12 @@
 @php $schedules = $site->deploymentSchedules; @endphp
 
 <x-workspace-panel-head
+    dense
     class="border-b border-brand-ink/10"
     icon="heroicon-o-calendar-days"
     :title="__('Recurring deploys')"
     :count="trans_choice('{0} no schedules|{1} :count schedule|[2,*] :count schedules', $schedules->count(), ['count' => $schedules->count()])"
-    :note="__('Deploy the current branch automatically on a cron cadence. Runs on the dply scheduler — no server crontab needed. To delay a single deploy instead, use “Deploy later” on the Deploy tab.')"
+    :note="__('Cron-cadence deploys on the dply scheduler. For a one-off delay, use “Deploy later” on the Deploy tab.')"
 >
     @unless ($show_add_schedule_form)
         <x-slot:actions>
@@ -23,11 +24,11 @@
     @endunless
 </x-workspace-panel-head>
 
-<div class="border-b border-brand-ink/10 bg-white px-5 py-4 sm:px-6">
+<div class="border-b border-brand-ink/10 bg-white px-3 py-2.5 sm:px-4">
     @if ($schedules->isNotEmpty())
-        <ul class="space-y-2">
+        <ul class="space-y-1.5">
             @foreach ($schedules as $schedule)
-                <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 transition-colors hover:border-brand-ink/15">
+                <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-2 transition-colors hover:border-brand-ink/15">
                     <div class="flex min-w-0 items-center gap-2.5">
                         <span @class([
                             'h-2 w-2 shrink-0 rounded-full',
@@ -62,17 +63,17 @@
             @endforeach
         </ul>
     @elseif (! $show_add_schedule_form)
-        <p class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-3 text-xs text-brand-mist">
+        <p class="mt-2 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-[11px] text-brand-mist">
             {{ __('No schedules yet — add one to deploy this branch on a recurring cadence.') }}
         </p>
     @endif
 
     @if ($show_add_schedule_form)
-        <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
-            <div class="grid gap-3 sm:grid-cols-2">
+        <div class="mt-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 p-3">
+            <div class="grid gap-2 sm:grid-cols-2">
                 <div>
                     <x-input-label for="new_schedule_preset" :value="__('Cadence')" />
-                    <select id="new_schedule_preset" wire:model.live="new_schedule_preset" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
+                    <select id="new_schedule_preset" wire:model.live="new_schedule_preset" class="mt-0.5 block w-full rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
                         @foreach ($this->scheduleCronPresets() as $key => $preset)
                             <option value="{{ $key }}">{{ $preset['label'] }}</option>
                         @endforeach
@@ -80,17 +81,17 @@
                 </div>
                 <div>
                     <x-input-label for="new_schedule_cron" :value="__('Cron expression')" />
-                    <x-text-input id="new_schedule_cron" wire:model="new_schedule_cron" class="mt-1 block w-full font-mono text-sm" placeholder="0 3 * * *" :disabled="$new_schedule_preset !== 'custom'" />
+                    <x-text-input id="new_schedule_cron" wire:model="new_schedule_cron" class="mt-0.5 block w-full font-mono text-xs" placeholder="0 3 * * *" :disabled="$new_schedule_preset !== 'custom'" />
                     <x-input-error :messages="$errors->get('new_schedule_cron')" class="mt-1" />
                 </div>
             </div>
-            <label class="mt-3 flex items-center gap-2 text-sm text-brand-ink">
-                <input type="checkbox" wire:model="new_schedule_notify" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+            <label class="mt-2 flex items-center gap-2 text-xs text-brand-ink">
+                <input type="checkbox" wire:model="new_schedule_notify" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                 {{ __('Notify me if a scheduled deploy fails') }}
             </label>
-            <div class="mt-3 flex items-center gap-2">
-                <button type="button" wire:click="addDeploymentSchedule" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
-                    <x-heroicon-o-check class="h-4 w-4" />
+            <div class="mt-2 flex items-center gap-2">
+                <button type="button" wire:click="addDeploymentSchedule" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
+                    <x-heroicon-o-check class="h-3.5 w-3.5" />
                     {{ __('Add schedule') }}
                 </button>
                 <button type="button" wire:click="closeAddScheduleForm" class="text-xs font-semibold text-brand-moss transition-colors hover:text-brand-ink">{{ __('Cancel') }}</button>

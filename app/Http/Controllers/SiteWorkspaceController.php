@@ -8,10 +8,9 @@ use App\Livewire\Sites\EdgeSettings;
 use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Livewire\RendersLivewirePage;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Support\Facades\Gate;
-use Livewire\Features\SupportPageComponents\PageComponentConfig;
-use Livewire\Features\SupportPageComponents\SupportPageComponents;
-use Livewire\Livewire;
 
 class SiteWorkspaceController
 {
@@ -32,10 +31,7 @@ class SiteWorkspaceController
             ], true)
             && $site->last_deploy_at === null
         ) {
-            return redirect()->route('serverless.journey', [
-                'server' => $server,
-                'site' => $site,
-            ]);
+            return redirect()->to(ServerlessWorkspaceUrl::journey($site));
         }
 
         // Choose-app flow: a site without an application installed must pick
@@ -90,6 +86,16 @@ class SiteWorkspaceController
         }
 
         if ($section === 'dns') {
+            $target = ServerlessWorkspaceUrl::forSitesRoute('sites.show', $site, [
+                'section' => 'routing',
+                'tab' => 'dns',
+                ...request()->query(),
+            ]);
+
+            if ($target !== null) {
+                return redirect()->to($target);
+            }
+
             return redirect()->route('sites.show', [
                 'server' => $server,
                 'site' => $site,
@@ -101,30 +107,10 @@ class SiteWorkspaceController
 
         $component = $site->usesEdgeRuntime() ? EdgeSettings::class : Settings::class;
 
-        $params = [
+        return RendersLivewirePage::render($component, [
             'server' => $server,
             'site' => $site,
             'section' => $section,
-        ];
-
-        $html = null;
-
-        $layoutConfig = SupportPageComponents::interceptTheRenderOfTheComponentAndRetreiveTheLayoutConfiguration(
-            function () use (&$html, $component, $params): void {
-                $html = Livewire::mount($component, $params);
-            },
-        );
-
-        $layoutConfig = $layoutConfig ?: new PageComponentConfig;
-
-        $layoutConfig->normalizeViewNameAndParamsForBladeComponents();
-
-        $response = response(SupportPageComponents::renderContentsIntoLayout($html, $layoutConfig));
-
-        if (is_callable($layoutConfig->response)) {
-            call_user_func($layoutConfig->response, $response);
-        }
-
-        return $response;
+        ]);
     }
 }

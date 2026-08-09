@@ -14,13 +14,13 @@
     />
 
     @if ($releases === null || $releases->isEmpty())
-        <p class="px-5 py-5 text-center text-[11px] text-brand-moss sm:px-6">
+        <p class="px-3 py-4 text-center text-[11px] text-brand-moss sm:px-4">
             {{ __('No releases on disk yet. Run a deploy with the atomic strategy and it will appear here.') }}
         </p>
     @else
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($releases as $rel)
-                <li class="flex items-center justify-between gap-2.5 px-5 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-6" wire:key="release-{{ $rel->id }}">
+                <li class="flex items-center justify-between gap-2.5 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4" wire:key="release-{{ $rel->id }}">
                     <div class="min-w-0">
                         <p class="flex flex-wrap items-center gap-1.5 font-mono text-xs text-brand-ink">
                             {{ $rel->folder }}
@@ -63,7 +63,7 @@
         </ul>
 
         @if ($releases->hasPages())
-            <div class="border-t border-brand-ink/10 bg-white px-5 py-2 sm:px-6">
+            <div class="border-t border-brand-ink/10 bg-white px-3 py-2 sm:px-4">
                 {{ $releases->links() }}
             </div>
         @endif
@@ -72,7 +72,7 @@
 
 <x-modal name="release-info" maxWidth="lg" overlayClass="bg-brand-ink/40" focusable>
     @php $info = $releaseInfo; @endphp
-    <div class="relative border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+    <div class="relative border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
         <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release details') }}</p>
         <h2 class="mt-1 flex flex-wrap items-center gap-2 font-mono text-lg font-semibold text-brand-ink">
             {{ $info['folder'] ?? '—' }}
@@ -93,7 +93,7 @@
     </div>
 
     @if ($info)
-        <div class="space-y-4 px-5 py-4 sm:px-6">
+        <div class="space-y-3 px-3 py-2.5 sm:px-4">
             @php
                 $facts = [
                     ['label' => __('Folder'), 'value' => $info['folder'], 'class' => 'truncate font-mono text-xs text-brand-ink'],
@@ -147,7 +147,7 @@
         </div>
     @endif
 
-    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
         <div class="flex flex-wrap items-center gap-3">
             @if ($info && ($info['deployment_id'] ?? null))
                 <a

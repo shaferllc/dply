@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -15,6 +16,7 @@ test('serverless host overview redirects to the function workspace', function ()
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $user->id,
@@ -35,13 +37,14 @@ test('serverless host overview redirects to the function workspace', function ()
     // server overview must bounce to the function workspace.
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
-        ->assertRedirect(route('sites.show', ['server' => $server, 'site' => $function]));
+        ->assertRedirect(ServerlessWorkspaceUrl::show($function));
 });
 
 test('never-live serverless host overview redirects to the deploy journey', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $user->id,
@@ -59,5 +62,5 @@ test('never-live serverless host overview redirects to the deploy journey', func
 
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
-        ->assertRedirect(route('serverless.journey', ['server' => $server, 'site' => $function]));
+        ->assertRedirect(ServerlessWorkspaceUrl::journey($function));
 });

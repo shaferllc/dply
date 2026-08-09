@@ -80,7 +80,7 @@ test('deploy redeploy button dispatches a deployment and redirects to the journe
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->call('redeployServerlessFunction')
-        ->assertRedirect(route('serverless.journey', ['server' => $server, 'site' => $site]));
+        ->assertRedirect(\App\Support\Serverless\ServerlessWorkspaceUrl::journey($site));
 
     Bus::assertDispatched(RunSiteDeploymentJob::class);
 });

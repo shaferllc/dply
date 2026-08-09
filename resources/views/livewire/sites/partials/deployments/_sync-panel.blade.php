@@ -5,10 +5,11 @@
 
 <section class="border-b border-brand-ink/10">
     <x-workspace-panel-head
+        dense
         class="border-b border-brand-ink/10"
         icon="heroicon-o-arrows-right-left"
         :title="__('Sync deploy')"
-        :note="__('Select the sites to ship in one go — typically this site and its worker(s) sharing the same repository. Each is deployed in parallel, exactly like its own Deploy button.')"
+        :note="__('Select sites to ship together — typically this site and workers on the same repo. Each deploys in parallel.')"
     >
         <x-slot:actions>
         @can('update', $site)
@@ -28,16 +29,16 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    <div class="px-5 py-4 sm:px-6">
+    <div class="px-3 py-2.5 sm:px-4">
         @if ($candidates->count() <= 1)
-            <p class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
+            <p class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-cream/30 px-3 py-2 text-xs text-brand-moss">
                 {{ __('No related sites found to deploy with this one. Sites are matched by shared Git repository (or the same server when no repo is set).') }}
             </p>
         @else
-            <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
+            <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
                 @foreach ($candidates as $candidate)
                     <li>
-                        <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/30">
+                        <label class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors hover:bg-brand-sand/30">
                             <input
                                 type="checkbox"
                                 wire:model.live="syncSelectedSiteIds"

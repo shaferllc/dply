@@ -31,10 +31,10 @@ trait ManagesSiteSettingsView
 
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
 
-        $this->redirect(route('serverless.journey', [
-            'server' => $this->server,
-            'site' => $this->site,
-        ]), navigate: true);
+        $this->redirect(
+            \App\Support\Serverless\ServerlessWorkspaceUrl::journey($this->site),
+            navigate: true,
+        );
     }
 
     /**

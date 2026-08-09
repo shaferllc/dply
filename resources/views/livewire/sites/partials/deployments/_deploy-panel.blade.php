@@ -72,7 +72,7 @@
 
     <section class="border-b border-brand-ink/10">
         {{-- Ship / deploy is the hero strip — immediately under the tab rail. --}}
-        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
             <div class="min-w-0 flex-1 basis-72">
                 <div class="flex items-center gap-2">
                     <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -145,7 +145,7 @@
         </div>
 
         @if ($this->deployLockInfo ?? null)
-            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-200/80 bg-amber-50/80 px-5 py-2 text-xs text-amber-950 sm:px-6">
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-950 sm:px-4">
                 <p class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                     <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden="true" />
                     <strong class="font-semibold">{{ __('Deployment in progress') }}</strong>
@@ -164,7 +164,7 @@
 
         @if ($this->pendingScheduledDeploy)
             @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/80 bg-amber-50/70 px-5 py-2 sm:px-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/80 bg-amber-50/70 px-3 py-1.5 sm:px-4">
                 <p class="flex items-center gap-2 text-xs text-amber-900">
                     <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0 text-amber-700" />
                     <span>
@@ -180,7 +180,7 @@
         @endif
 
         <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/[0.06] text-sm sm:grid-cols-4">
-            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
+            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Deployed commit') }}
@@ -203,7 +203,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
+            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-signal class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Status') }}
@@ -231,7 +231,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
+            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Duration') }}
@@ -246,7 +246,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
+            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Trigger') }}
@@ -260,7 +260,7 @@
         @endif
 
         @if ($canResumeDeploy)
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200/80 bg-sky-50/50 px-5 py-2.5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200/80 bg-sky-50/50 px-3 py-2 sm:px-4">
                 <div class="min-w-0 flex-1">
                     <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-sky-700" aria-hidden="true" />
@@ -291,7 +291,7 @@
         @endif
 
         @if ($blockedEnv !== [])
-            <div class="border-b border-rose-200/80 bg-rose-50/50 px-5 py-3 sm:px-6">
+            <div class="border-b border-rose-200/80 bg-rose-50/50 px-3 py-2.5 sm:px-4">
                 <div class="flex items-start gap-2.5">
                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-700" aria-hidden="true" />
                     <div class="min-w-0 flex-1">
@@ -381,7 +381,7 @@
             </div>
 
             <x-modal name="deploy-missing-env-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
-                <div class="relative border-b border-brand-ink/10 px-6 py-5">
+                <div class="relative border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('Required variables') }}</p>
                     <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add the missing variables') }}</h2>
                     <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
@@ -427,7 +427,7 @@
                         @endforeach
                     </form>
                 </div>
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-3 py-2.5 sm:px-4">
                     <button type="button" wire:click="setTab('environment')" class="mr-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                         {{ __('Edit all variables') }}
@@ -442,19 +442,19 @@
         @endif
 
         @if ($pipelineSuggestions !== [] || $pipelineDismissedCount > 0)
-            <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 text-xs text-brand-moss sm:px-6">
+            <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 text-xs text-brand-moss sm:px-4">
                 <x-spinner size="sm" />
                 <span>{{ __('Starting pipeline scan…') }}</span>
             </div>
 
             <div wire:loading.remove wire:target="optimizePipeline" class="border-b border-brand-ink/10">
                 @if ($watchedConsoleRunId)
-                    <div class="flex items-center justify-center gap-2 bg-brand-sand/15 px-5 py-3 text-xs text-brand-moss sm:px-6">
+                    <div class="flex items-center justify-center gap-2 bg-brand-sand/15 px-3 py-2.5 text-xs text-brand-moss sm:px-4">
                         <x-spinner size="sm" />
                         <span>{{ __('Scanning the repo for pipeline steps…') }}</span>
                     </div>
                 @else
-                    <div class="bg-brand-sand/10 px-5 py-3 sm:px-6">
+                    <div class="bg-brand-sand/10 px-3 py-2.5 sm:px-4">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                             <div class="min-w-0">
                                 <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
@@ -546,7 +546,7 @@
             </div>
         @endif
 
-        <div class="px-5 py-4 sm:px-6">
+        <div class="px-3 py-2.5 sm:px-4">
             {{-- While a deploy request is in flight, clear the previous run's
                  timeline right away and show a starting placeholder. The deploy
                  runs synchronously, so this state holds for the whole request
@@ -624,7 +624,7 @@
     {{-- Deployed-commit detail modal (opened from the summary badge). --}}
     @if ($deployedDeployment)
         <x-modal name="deployed-commit" maxWidth="lg" overlayClass="bg-brand-ink/30" focusable>
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
                 <x-icon-badge>
                     <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -678,7 +678,7 @@
                 </dl>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
                 <div class="flex flex-wrap items-center gap-3">
                     @if ($commitWebUrl)
                         <a href="{{ $commitWebUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">

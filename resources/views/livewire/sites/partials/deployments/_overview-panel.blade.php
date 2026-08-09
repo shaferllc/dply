@@ -17,6 +17,7 @@
 <div>
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head
+            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-chart-bar"
             :title="__('Last :days days', ['days' => $m['window_days']])"
@@ -24,42 +25,42 @@
         />
 
         <dl class="grid grid-cols-2 gap-px bg-brand-ink/10 sm:grid-cols-4">
-            <div class="bg-white px-5 py-4 sm:px-6">
+            <div class="bg-white px-3 py-2.5 sm:px-4">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploys') }}</dt>
-                <dd class="mt-2 flex items-baseline gap-2">
-                    <span class="font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $m['total'] }}</span>
+                <dd class="mt-1 flex items-baseline gap-2">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $m['total'] }}</span>
                     <span class="text-[11px] text-brand-moss">{{ __(':window-day total', ['window' => $m['window_days']]) }}</span>
                 </dd>
             </div>
-            <div class="bg-white px-5 py-4 sm:px-6">
+            <div class="bg-white px-3 py-2.5 sm:px-4">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Success rate') }}</dt>
-                <dd class="mt-2 flex items-baseline gap-2">
+                <dd class="mt-1 flex items-baseline gap-2">
                     @if ($m['success_rate'] !== null)
                         <span @class([
-                            'font-mono text-2xl font-semibold tabular-nums',
+                            'font-mono text-xl font-semibold tabular-nums',
                             'text-emerald-700' => $m['success_rate'] >= 90,
                             'text-amber-700' => $m['success_rate'] >= 60 && $m['success_rate'] < 90,
                             'text-rose-700' => $m['success_rate'] < 60,
                         ])>{{ $m['success_rate'] }}%</span>
                         <span class="text-[11px] text-brand-moss">{{ $m['success_count'] }} / {{ $m['success_count'] + $m['failed_count'] }}</span>
                     @else
-                        <span class="font-mono text-2xl font-semibold tabular-nums text-brand-mist">—</span>
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-mist">—</span>
                     @endif
                 </dd>
             </div>
-            <div class="bg-white px-5 py-4 sm:px-6">
+            <div class="bg-white px-3 py-2.5 sm:px-4">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Median duration') }}</dt>
-                <dd class="mt-2 flex items-baseline gap-2">
+                <dd class="mt-1 flex items-baseline gap-2">
                     @if ($m['median_duration_ms'] !== null)
-                        <span class="font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format($m['median_duration_ms'] / 1000, 1) }}<span class="text-base text-brand-moss">s</span></span>
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ number_format($m['median_duration_ms'] / 1000, 1) }}<span class="text-sm text-brand-moss">s</span></span>
                     @else
-                        <span class="font-mono text-2xl font-semibold tabular-nums text-brand-mist">—</span>
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-mist">—</span>
                     @endif
                 </dd>
             </div>
-            <div class="bg-white px-5 py-4 sm:px-6">
+            <div class="bg-white px-3 py-2.5 sm:px-4">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Top failure phase') }}</dt>
-                <dd class="mt-2">
+                <dd class="mt-1">
                     @if ($m['top_failure_phase'])
                         <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-inset ring-rose-200">{{ $m['top_failure_phase'] }}</span>
                     @elseif ($m['failed_count'] === 0 && $m['total'] > 0)
@@ -71,12 +72,12 @@
             </div>
         </dl>
 
-        <div class="border-t border-brand-ink/10 bg-white px-5 py-4 sm:px-6">
+        <div class="border-t border-brand-ink/10 bg-white px-3 py-2.5 sm:px-4">
             <div class="flex items-baseline justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploys per day') }}</p>
                 <p class="text-[11px] text-brand-mist">{{ __('peak :n', ['n' => $maxDaily]) }}</p>
             </div>
-            <div class="mt-3 flex h-24 items-end gap-px overflow-hidden rounded-lg bg-brand-sand/30 px-1 py-1">
+            <div class="mt-2 flex h-16 items-end gap-px overflow-hidden rounded-lg bg-brand-sand/30 px-1 py-1">
                 @foreach ($m['daily'] as $day)
                     @php
                         $heightPct = $maxDaily > 0 ? round(($day['total'] / $maxDaily) * 100) : 0;

@@ -206,6 +206,26 @@ class EdgeTemplateRegistry
     }
 
     /**
+     * Shortlist shown inline on Edge create (Connect Git). Prefer
+     * standalone public repos — skip monorepo tree paths that need a
+     * {@code repo_root} before detection can succeed.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function featuredForCreate(): array
+    {
+        $featured = [];
+        foreach (['keel-workers', 'eleventy-portfolio', 'nextjs-docs', 'hono-api-starter'] as $slug) {
+            $template = self::find($slug);
+            if ($template !== null) {
+                $featured[] = $template;
+            }
+        }
+
+        return $featured;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function find(string $slug): ?array

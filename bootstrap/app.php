@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureProductionDataMirror;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
+use App\Http\Middleware\RedirectServerlessByoWorkspace;
 use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
@@ -96,6 +97,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Short-circuits for non-server routes via an `instanceof` check,
             // so the cost is one route-binding lookup per web request.
             EnsureServerServiceInstalled::class,
+            // Function Sites still resolve under /servers/…/sites/… for
+            // Livewire mounts, but the address bar must stay on /serverless/{site}.
+            RedirectServerlessByoWorkspace::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

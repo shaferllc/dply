@@ -85,12 +85,12 @@ class WorkspaceOverview extends Component
                     && $function->last_deploy_at === null
                 ) {
                     return $this->redirect(
-                        route('serverless.journey', ['server' => $server, 'site' => $function]),
+                        \App\Support\Serverless\ServerlessWorkspaceUrl::journey($function),
                     );
                 }
 
                 return $this->redirect(
-                    route('sites.show', ['server' => $server, 'site' => $function]),
+                    \App\Support\Serverless\ServerlessWorkspaceUrl::show($function),
                 );
             }
         }

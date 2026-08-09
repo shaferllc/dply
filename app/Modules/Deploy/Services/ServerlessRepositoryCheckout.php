@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services;
 use App\Models\User;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Support\GitCloneUrl;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 
@@ -115,12 +116,14 @@ final class ServerlessRepositoryCheckout
 
     private function cloneUrl(string $repositoryUrl, int|string|null $userId, ?string $sourceControlAccountId): string
     {
+        // Expand bare "owner/name" shorthand (serverless demos) before any
+        // auth rewrite — authenticatedCloneUrl only injects credentials into
+        // already-URL-shaped remotes.
+        $repositoryUrl = GitCloneUrl::normalize($repositoryUrl);
+
         $accountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
         if ($accountId === '' || $userId === null) {
-            // No connected account — clone anonymously. A repo stored as the
-            // bare "owner/name" shorthand (e.g. the serverless demos) is not
-            // a valid clone target, so expand it to a GitHub HTTPS URL.
-            return $this->normalizeRepositoryUrl($repositoryUrl);
+            return $repositoryUrl;
         }
 
         $user = User::query()->find($userId);
@@ -134,26 +137,6 @@ final class ServerlessRepositoryCheckout
         }
 
         return $this->repositoryBrowser->authenticatedCloneUrl($identity, $repositoryUrl);
-    }
-
-    /**
-     * Turn a bare "owner/name" repo shorthand into a clone-able GitHub HTTPS
-     * URL. Anything already URL-shaped (https / git / ssh / scp) or a local
-     * filesystem path is returned untouched.
-     */
-    private function normalizeRepositoryUrl(string $repositoryUrl): string
-    {
-        $repositoryUrl = trim($repositoryUrl);
-
-        if (preg_match('#^(https?://|git://|ssh://|git@)#i', $repositoryUrl) === 1) {
-            return $repositoryUrl;
-        }
-
-        if (preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repositoryUrl) === 1) {
-            return 'https://github.com/'.$repositoryUrl.'.git';
-        }
-
-        return $repositoryUrl;
     }
 
     /**

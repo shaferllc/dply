@@ -98,13 +98,17 @@ test('never-live failed serverless site workspace redirects to the deploy journe
 
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site]))
-        ->assertRedirect(route('serverless.journey', ['server' => $server, 'site' => $site]));
+        ->assertRedirect(\App\Support\Serverless\ServerlessWorkspaceUrl::journey($site));
 });
 
-test('live serverless site workspace stays on sites.show', function () {
+test('live serverless site workspace redirects byo url to serverless product url', function () {
     [$user, $server, $site] = makeServerlessSite(Site::STATUS_FUNCTIONS_ACTIVE, now()->subHour());
 
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site]))
+        ->assertRedirect(\App\Support\Serverless\ServerlessWorkspaceUrl::show($site));
+
+    $this->actingAs($user)
+        ->get(\App\Support\Serverless\ServerlessWorkspaceUrl::show($site))
         ->assertOk();
 });

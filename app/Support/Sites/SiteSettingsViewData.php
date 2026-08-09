@@ -17,6 +17,7 @@ use App\Modules\Billing\Services\EdgeSiteTrafficAnalytics;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
 use App\Support\Deployment\DeploymentContract;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Support\Collection;
@@ -665,6 +666,29 @@ final class SiteSettingsViewData
                 'icon' => 'globe-alt',
                 'avatar' => $site->name ?: (string) $site->id,
                 'avatar_image' => $site->logoUrl(),
+            ];
+
+            if ($section !== 'general') {
+                $items[] = [
+                    'label' => $sectionHeader['title'],
+                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
+                ];
+            }
+
+            return $items;
+        }
+
+        if ($site->usesFunctionsRuntime()) {
+            $items = [
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'],
+                [
+                    'label' => $site->name,
+                    'href' => $section === 'general' ? null : ServerlessWorkspaceUrl::show($site),
+                    'icon' => 'bolt',
+                    'avatar' => $site->name ?: (string) $site->id,
+                    'avatar_image' => $site->logoUrl(),
+                ],
             ];
 
             if ($section !== 'general') {

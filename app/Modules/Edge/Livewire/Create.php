@@ -180,17 +180,29 @@ class Create extends Component
             return;
         }
 
-        $template = EdgeTemplateRegistry::find('eleventy-portfolio')
-            ?? EdgeTemplateRegistry::find('static-html');
+        $this->loadExampleApp('eleventy-portfolio');
+    }
+
+    /**
+     * Prefill from a curated public Edge template (Keel, Eleventy, …).
+     * Always available — these repos are public, so no Git token is required.
+     */
+    public function loadExampleApp(string $slug): void
+    {
+        $slug = trim($slug);
+        $template = $slug !== '' ? EdgeTemplateRegistry::find($slug) : null;
+        if ($template === null && $slug === 'eleventy-portfolio') {
+            $template = EdgeTemplateRegistry::find('static-html');
+        }
         if ($template === null) {
-            $this->toastError(__('No sample template is registered.'));
+            $this->toastError(__('That example app is no longer available.'));
 
             return;
         }
 
         $repo = EdgeCreateForm::normalizeRepo((string) ($template['clone_repo'] ?? $template['repo'] ?? ''));
         if ($repo === '') {
-            $this->toastError(__('Sample template is missing a repository.'));
+            $this->toastError(__('Example app is missing a repository.'));
 
             return;
         }
@@ -199,7 +211,7 @@ class Create extends Component
         $this->repository_selection = '';
         $this->repo = $repo;
         $this->branch = (string) ($template['branch'] ?? 'main');
-        $this->form->name = 'sample-edge-app';
+        $this->form->name = $this->exampleAppName($template, $repo);
         $this->form->ref_kind = 'branch';
         $this->form->delivery_mode = 'managed';
         $this->form->spa_fallback = true;
@@ -220,14 +232,38 @@ class Create extends Component
             ? $runtimeMode
             : 'static';
 
+        // Mark runtime when the template pins hybrid/SSR so detection
+        // doesn't quietly flip Keel (etc.) back to static.
+        if ($this->form->runtime_mode !== 'static') {
+            $this->runtimeModeTouched = true;
+        }
+
         $preset = EdgeFrameworkPresetRegistry::byDetectionPlan([
             'framework' => (string) ($template['framework'] ?? ''),
         ]);
         $this->form->build_command = $preset->buildCommand;
         $this->form->output_dir = $preset->outputDir !== '' ? $preset->outputDir : 'dist';
 
-        $this->toastSuccess(__('Loaded sample: :name', ['name' => (string) ($template['name'] ?? $repo)]));
+        $this->toastSuccess(__('Loaded example: :name', ['name' => (string) ($template['name'] ?? $repo)]));
         $this->detectFromRepository();
+    }
+
+    /**
+     * @param  array<string, mixed>  $template
+     */
+    private function exampleAppName(array $template, string $repo): string
+    {
+        $slug = trim((string) ($template['slug'] ?? ''));
+        if ($slug !== '') {
+            return $slug;
+        }
+
+        $name = trim((string) ($template['name'] ?? ''));
+        if ($name !== '') {
+            return \Illuminate\Support\Str::slug($name);
+        }
+
+        return $this->extractRepoNameForApp($repo) ?: 'edge-app';
     }
 
     private function localSampleAppAvailable(): bool
@@ -364,6 +400,7 @@ class Create extends Component
         return view('livewire.edge.create', [
             'fakeEdgeActive' => FakeEdgeProvision::enabled(),
             'localSampleAppAvailable' => $this->localSampleAppAvailable(),
+            'exampleApps' => EdgeTemplateRegistry::featuredForCreate(),
             'edgeFee' => app(ManagedProductCostEstimator::class)->edgeFee(),
             'edgeSsrFee' => app(ManagedProductCostEstimator::class)->edgeSsrFee(),
             'edgePlatformFee' => app(ManagedProductCostEstimator::class)->edgeFeeForRuntimeMode((string) $this->form->runtime_mode),

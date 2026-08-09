@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
@@ -18,6 +19,7 @@ use Livewire\Component;
  */
 class DeployHooks extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public string $siteId = '';
@@ -65,6 +67,26 @@ class DeployHooks extends Component
 
         $this->reset('newScript', 'newOrder', 'formOpen');
         $this->toastSuccess(__('Deploy hook added.'));
+    }
+
+    public function confirmDeleteHook(string $id): void
+    {
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        $hook = SiteDeployHook::query()
+            ->where('site_id', $site->id)
+            ->whereKey($id)
+            ->firstOrFail();
+
+        $this->openConfirmActionModal(
+            'deleteHook',
+            [$hook->id],
+            __('Remove deploy hook'),
+            __('Remove this custom build step? It will no longer run on the next deploy.'),
+            __('Remove hook'),
+            true,
+        );
     }
 
     public function deleteHook(string $id): void

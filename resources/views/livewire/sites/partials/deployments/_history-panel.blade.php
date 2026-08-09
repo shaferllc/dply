@@ -13,7 +13,7 @@
         :note="__('Status, trigger, commit, and phase outcome for each run.')"
     />
 
-    <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-5 py-2 sm:px-6">
+    <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-3 py-2 sm:px-4">
         <div class="min-w-[7.5rem]">
             <label for="status_filter" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
             <select id="status_filter" wire:model.live="statusFilter" class="{{ $selectCls }} w-full">
@@ -41,7 +41,7 @@
     </div>
 
     @if ($deployments->isEmpty())
-        <div class="px-5 py-5 text-center text-[11px] text-brand-moss sm:px-6">
+        <div class="px-3 py-4 text-center text-[11px] text-brand-moss sm:px-4">
             @if ($statusFilter !== '' || $triggerFilter !== '')
                 {{ __('No deployments match the current filters.') }}
             @else
@@ -73,7 +73,7 @@
                         aria-label="{{ __('View deployment :id', ['id' => $deployment->id]) }}"
                     ></a>
 
-                    <div class="flex items-start gap-2.5 px-5 py-2.5 sm:gap-3 sm:px-6">
+                    <div class="flex items-start gap-2.5 px-3 py-2 sm:gap-3 sm:px-4">
                         {{-- Status dot on the rail --}}
                         <span @class([
                             'mt-1 flex h-2 w-2 shrink-0 rounded-full ring-4',
@@ -174,7 +174,7 @@
         </ol>
 
         @if ($deployments->hasPages())
-            <div class="border-t border-brand-ink/10 bg-white px-5 py-2 sm:px-6">
+            <div class="border-t border-brand-ink/10 bg-white px-3 py-2 sm:px-4">
                 {{ $deployments->links() }}
             </div>
         @endif

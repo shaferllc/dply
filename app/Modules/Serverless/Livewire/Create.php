@@ -320,7 +320,10 @@ class Create extends Component
 
         $this->toastSuccess(__('Serverless app created — deploying now.'));
 
-        return $this->redirect(route('serverless.journey', [$site->server_id, $site->id]), navigate: true);
+        return $this->redirect(
+            \App\Support\Serverless\ServerlessWorkspaceUrl::journey($site),
+            navigate: true,
+        );
     }
 
     /**

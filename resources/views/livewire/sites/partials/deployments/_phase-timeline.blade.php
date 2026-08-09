@@ -32,7 +32,7 @@
 
 {{-- Progress meter — a single glance at how far the pipeline has gotten and
      what it's doing right now, above the detailed rail. --}}
-<div class="mb-4 flex items-center gap-3">
+<div class="mb-3 flex items-center gap-3">
     <div class="relative h-1.5 flex-1 overflow-hidden rounded-full bg-brand-ink/[0.07]">
         <div @class([
             'h-full rounded-full transition-[width] duration-500 ease-out',
@@ -87,7 +87,7 @@
             $calloutBody = '…'.mb_substr($calloutBody, -1600);
         }
     @endphp
-    <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+    <div class="mb-3 rounded-lg border border-rose-200 bg-rose-50/60 p-2.5">
         <div class="flex items-start gap-2">
             <x-heroicon-m-x-circle class="mt-0.5 h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
             <div class="min-w-0">
@@ -101,7 +101,7 @@
                     @endif
                 </p>
                 @if ($calloutBody !== '')
-                    <pre class="mt-2 max-h-44 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $calloutBody }}</pre>
+                    <pre class="mt-1.5 max-h-36 overflow-auto rounded-md bg-brand-ink p-2 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $calloutBody }}</pre>
                 @else
                     <p class="mt-1 text-[11px] text-rose-700/90">{{ __('No output was captured. Trigger the deploy again, or open the full deploy log.') }}</p>
                 @endif
@@ -121,13 +121,13 @@
             // open so a long success run reads as a short rail of phase headers.
             $phaseAutoOpen = in_array($st, ['running', 'failed'], true);
         @endphp
-        <li class="relative pl-12" @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif>
+        <li class="relative pl-10" @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif>
             {{-- Rail segment beneath this node, tinted by this phase's outcome so
                  the line reads as "done" (green) up to the active node, then fades
                  to gray for what's still ahead. Hidden on the last phase. --}}
             @unless ($loop->last)
                 <span aria-hidden="true" @class([
-                    'absolute left-[15px] top-8 bottom-0 w-0.5 -translate-x-1/2 rounded-full',
+                    'absolute left-[11px] top-7 bottom-0 w-0.5 -translate-x-1/2 rounded-full',
                     'bg-emerald-400/70' => $st === 'success',
                     'bg-rose-400/70' => $st === 'failed',
                     'bg-gradient-to-b from-amber-400 to-brand-ink/10' => $st === 'running',
@@ -135,28 +135,28 @@
                 ])></span>
             @endunless
 
-            <div class="flex min-h-8 flex-col justify-center pb-5">
+            <div class="flex min-h-7 flex-col justify-center pb-3.5">
                 {{-- Phase node --}}
                 <span @class([
-                    'absolute left-0 top-0 flex h-[30px] w-[30px] items-center justify-center rounded-full text-[11px] font-bold shadow-sm',
+                    'absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold shadow-sm',
                     'bg-emerald-500 text-white' => $st === 'success',
                     'bg-rose-500 text-white' => $st === 'failed',
-                    'bg-amber-400 text-white ring-4 ring-amber-200/60' => $st === 'running',
+                    'bg-amber-400 text-white ring-2 ring-amber-200/70' => $st === 'running',
                     'bg-brand-sand/70 text-brand-moss ring-1 ring-inset ring-brand-ink/10' => $st === 'skipped',
                     'bg-white text-brand-mist ring-1 ring-inset ring-brand-ink/15' => $st === 'pending',
                 ])>
                     @switch ($st)
                         @case('success')
-                            <x-heroicon-m-check class="h-4 w-4" aria-hidden="true" />
+                            <x-heroicon-m-check class="h-3.5 w-3.5" aria-hidden="true" />
                             @break
                         @case('failed')
-                            <x-heroicon-m-x-mark class="h-4 w-4" aria-hidden="true" />
+                            <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
                             @break
                         @case('running')
-                            <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                             @break
                         @case('skipped')
-                            <x-heroicon-m-minus class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-m-minus class="h-3 w-3" aria-hidden="true" />
                             @break
                         @default
                             {{ $loop->iteration }}
@@ -169,7 +169,7 @@
                     'w-full cursor-pointer select-none' => $hasSteps,
                 ])>
                     <span @class([
-                        'text-sm font-semibold',
+                        'text-[13px] font-semibold',
                         'text-brand-ink' => $st !== 'pending' && $st !== 'skipped',
                         'text-brand-mist' => $st === 'pending' || $st === 'skipped',
                     ])>{{ $phase['label'] }}</span>
@@ -196,7 +196,7 @@
 
                 {{-- Steps (collapsible) --}}
                 @if ($hasSteps)
-                    <ul x-show="open" x-cloak class="mt-2 space-y-1.5">
+                    <ul x-show="open" x-cloak class="mt-1.5 space-y-1">
                         @foreach ($phase['steps'] as $step)
                             @include('livewire.sites.partials.deployments._phase-timeline-step', [
                                 'step' => $step,
@@ -211,7 +211,7 @@
                      the latest, still-failed deploy and the failure matched the
                      database-connection remediation. --}}
                 @if (($dbFix ?? null) && $st === 'failed')
-                    <div class="mt-3">
+                    <div class="mt-2">
                         @livewire('sites.deploy-database-fix', [
                             'server' => $dbFix['server'],
                             'site' => $dbFix['site'],
@@ -225,20 +225,20 @@
 </ol>
 
 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
-    <div class="mt-4 space-y-2 rounded-xl border border-rose-200 bg-rose-50/50 p-3">
-        <p class="font-mono text-xs font-semibold text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
+    <div class="mt-3 space-y-1.5 rounded-lg border border-rose-200 bg-rose-50/50 p-2.5">
+        <p class="font-mono text-[11px] font-semibold text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
         {{-- A deploy can fail BETWEEN recorded phases (e.g. a thrown exception that
              never becomes a pipeline step), leaving the timeline with nothing to
              expand. Surface the captured failure reason from the log. --}}
         @php($failLog = trim((string) $deployment->log_output))
         @if ($failLog !== '')
             @php($failTail = mb_strlen($failLog) > 4000 ? '…'.mb_substr($failLog, -4000) : $failLog)
-            <pre class="max-h-60 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+            <pre class="max-h-52 overflow-auto rounded-md bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
         @else
             {{-- No output was captured (e.g. the worker was restarted mid-deploy,
                  so the job's catch/failed handlers never ran). Don't leave the
                  failure reasonless — always say *something*. --}}
-            <p class="text-xs text-rose-700/90">{{ __('Deploy failed before any output was captured — the worker may have been restarted mid-deploy. Trigger the deploy again.') }}</p>
+            <p class="text-[11px] text-rose-700/90">{{ __('Deploy failed before any output was captured — the worker may have been restarted mid-deploy. Trigger the deploy again.') }}</p>
         @endif
     </div>
 @endif

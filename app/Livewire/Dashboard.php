@@ -18,7 +18,12 @@ class Dashboard extends Component
     public function render(OrganizationInsightsMetricsService $insightsMetrics): View
     {
         $user = auth()->user();
-        $serverQuery = $user->servers()->latest();
+        // Edge / serverless placeholder hosts are product-line inventory, not
+        // the BYO Servers fleet — keep the dashboard card aligned with /servers.
+        $serverQuery = $user->servers()
+            ->withoutEdgeHosts()
+            ->withoutServerlessHosts()
+            ->latest();
         $servers = (clone $serverQuery)->withCount('sites')->take(5)->get();
         $serverCount = (clone $serverQuery)->count();
         $org = $user->currentOrganization();

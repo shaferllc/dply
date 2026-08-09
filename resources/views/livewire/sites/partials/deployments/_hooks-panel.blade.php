@@ -5,7 +5,7 @@
             wire:key="deployments-hooks-{{ $site->id }}"
         />
     @else
-        <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
+        <div class="px-3 py-4 text-center text-[11px] text-brand-moss sm:px-4">
             {{ __('Deploy hooks are only available on DigitalOcean Functions hosts.') }}
         </div>
     @endif

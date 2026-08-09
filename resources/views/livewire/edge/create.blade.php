@@ -103,6 +103,46 @@
                             </div>
                         </div>
                         <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
+                            @if ($exampleApps !== [])
+                                <div data-testid="edge-example-apps" class="rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-3.5 py-3 dark:border-brand-gold/20 dark:bg-brand-gold/5">
+                                    <div class="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Or start from an example') }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Public starters — no Git token needed. Keel is our house Node framework.') }}</p>
+                                        </div>
+                                        <a href="{{ route('edge.templates') }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest underline-offset-2 hover:underline dark:text-brand-sage">
+                                            {{ __('Browse all templates') }} →
+                                        </a>
+                                    </div>
+                                    <div class="mt-2.5 flex flex-wrap gap-2">
+                                        @foreach ($exampleApps as $example)
+                                            @php
+                                                $exampleSlug = (string) ($example['slug'] ?? '');
+                                                $exampleName = (string) ($example['name'] ?? $exampleSlug);
+                                                $exampleFramework = (string) ($example['framework'] ?? '');
+                                                $isKeel = $exampleFramework === 'keel' || $exampleSlug === 'keel-workers';
+                                            @endphp
+                                            <button
+                                                type="button"
+                                                wire:click="loadExampleApp('{{ $exampleSlug }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadExampleApp"
+                                                data-testid="edge-example-{{ $exampleSlug }}"
+                                                title="{{ (string) ($example['description'] ?? $exampleName) }}"
+                                                @class([
+                                                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60',
+                                                    'bg-brand-ink text-brand-cream hover:bg-brand-forest' => $isKeel,
+                                                    'border border-brand-ink/15 bg-white text-brand-ink shadow-sm hover:bg-brand-sand/40 dark:border-brand-mist/25 dark:bg-zinc-800/60 dark:hover:bg-zinc-700' => ! $isKeel,
+                                                ])
+                                            >
+                                                <span wire:loading.remove wire:target="loadExampleApp">{{ $exampleName }}</span>
+                                                <span wire:loading wire:target="loadExampleApp">{{ __('Loading…') }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+
                             <div class="flex flex-wrap items-center gap-3">
                                 @if ($linkedSourceControlAccounts !== [])
                                     <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-1 text-xs dark:border-brand-mist/20 dark:bg-zinc-800/60">
