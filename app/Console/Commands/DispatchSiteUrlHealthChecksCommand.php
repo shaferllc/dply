@@ -28,7 +28,7 @@ class DispatchSiteUrlHealthChecksCommand extends Command
             ->whereIn('status', Site::webserverActiveStatuses(), 'and', false)
             ->whereHas('domains')
             ->pluck('id')
-            ->each(function (int $id) use (&$count): void {
+            ->each(function (string $id) use (&$count): void {
                 CheckSiteUrlHealthJob::dispatch($id);
                 $count++;
             });

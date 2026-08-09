@@ -44,8 +44,6 @@
                 </div>
             @endif
 
-            <x-ops-copilot-callout :site="$site" />
-
             @if ($site->server?->isDigitalOceanFunctionsHost())
                 {{-- Serverless deploy hub: the journey component owns redeploy +
                      live watching, deploy-hooks is its own card below. The

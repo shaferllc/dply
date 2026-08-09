@@ -14,7 +14,7 @@ class CheckSiteUrlHealthJob implements ShouldQueue
     public int $timeout = 20;
 
     public function __construct(
-        public int $siteId
+        public string $siteId
     ) {}
 
     public function handle(): void

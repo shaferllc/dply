@@ -48,252 +48,7 @@
     @if ($watchedConsoleRunId)
         <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
     @endif
-    {{-- The recognized-failure card used to sit HERE at the top, duplicating the
-         error that's already shown in context at the bottom of the panel (the
-         failed phase + raw output in the timeline). It now renders ONCE, down by
-         the timeline, so the failure + its fix live in a single place. --}}
-
-    {{-- Resume-from-phase: the deploy failed AFTER staging a release but BEFORE
-         cutover (a build step or a migration broke), so the prior release is
-         still live and the staged release is intact on disk. Offer to re-run
-         from the failed phase — reusing the clone (and, past build, the built
-         vendor/) — instead of a full deploy from scratch. Atomic only. --}}
-    @if ($latest && $latest->status === 'failed' && $site->isAtomicDeploys() && $latest->isResumable() && method_exists($this, 'confirmResumeDeployment'))
-        @php $resumePhase = $latest->resumeStartPhase(); @endphp
-        <div class="mb-6 overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/60">
-            <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
-                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 ring-1 ring-sky-600/20">
-                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Resume available') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Retry from the :phase phase', ['phase' => $resumePhase]) }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        @if ($resumePhase === 'restart')
-                            {{ __('The new release is already live — only a post-cutover step (the post-deploy command or a worker restart) failed. Resume re-runs just that tail: no re-clone, re-build, re-migrate, or symlink flip.') }}
-                        @elseif ($resumePhase === 'release')
-                            {{ __('The build succeeded but a release step failed before cutover. Resume re-uses that build and re-runs the release phase onward — the previous release stays live until it passes. Note: this re-runs migrations.') }}
-                        @else
-                            {{ __('A build step failed before cutover. Resume re-uses the existing checkout and re-runs from the build phase — the previous release stays live until the new build passes.') }}
-                        @endif
-                    </p>
-                    <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            wire:click="confirmResumeDeployment('{{ $latest->id }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="confirmResumeDeployment('{{ $latest->id }}')"
-                            @disabled($deployInProgress)
-                            class="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
-                        >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Resume from :phase', ['phase' => $resumePhase]) }}
-                        </button>
-                        <span class="text-[11px] text-brand-mist">{{ __('Or use Deploy above for a clean full run.') }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if ($this->deployLockInfo ?? null)
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <div class="flex flex-wrap items-center gap-2">
-                <x-heroicon-m-bolt class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                <strong class="font-semibold">{{ __('Deployment in progress') }}</strong>
-                @if (! empty($this->deployLockInfo['deployment_id']))
-                    <span class="font-mono text-xs text-amber-800">#{{ $this->deployLockInfo['deployment_id'] }}</span>
-                @endif
-            </div>
-            <p class="mt-1 text-amber-800">{{ __('Queued deploys may appear as skipped until this run finishes.') }}</p>
-            <button
-                type="button"
-                wire:click="openConfirmActionModal('releaseDeployLock', [], @js(__('Clear deploy lock')), @js(__('Force-clear the deploy lock? Only if no worker is actually deploying.')), @js(__('Clear lock')), true)"
-                class="mt-2 text-xs font-semibold text-amber-900 underline hover:text-amber-700"
-            >{{ __('Clear lock') }}</button>
-        </div>
-    @endif
-
-    {{-- Deploy blocked on missing env. The deploy job's preflight reads the
-         live .env and stops early when a required (no-default) variable is
-         absent, recording the offenders here. Prompt the operator to fill them
-         inline rather than letting the build succeed and the app 500. --}}
-    @if ($blockedEnv !== [])
-        <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-            <div class="flex items-start gap-3">
-                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-700" aria-hidden="true" />
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-rose-900">
-                        {{ trans_choice('{1} Deploy needs :count environment variable|[2,*] Deploy needs :count environment variables', count($blockedEnv), ['count' => count($blockedEnv)]) }}
-                    </p>
-                    <p class="mt-1 text-sm leading-relaxed text-rose-800">{{ __('The last deploy stopped because the app requires these and they aren\'t set. Add them, then deploy again.') }}</p>
-                    <div class="mt-2.5 flex flex-wrap gap-1.5">
-                        @foreach (array_slice($blockedEnv, 0, 24) as $entry)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200">
-                                {{ $entry['key'] }}
-                                <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
-                                    <x-heroicon-o-x-mark class="h-3 w-3" />
-                                </button>
-                            </span>
-                        @endforeach
-                        @if (count($blockedEnv) > 24)
-                            <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">{{ __('+:count more', ['count' => count($blockedEnv) - 24]) }}</span>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            {{-- Single action bar: fix-it actions on the left, sync / bypass on
-                 the right. Wraps cleanly instead of a floating centered column. --}}
-            @php
-                $envAutofillable = \App\Support\Sites\DomainDerivedEnvDefaults::resolve(
-                    $site,
-                    array_map(static fn ($e) => (string) $e['key'], $blockedEnv),
-                );
-            @endphp
-            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-rose-200/70 pt-3">
-                @if ($envAutofillable !== [])
-                    <button
-                        type="button"
-                        wire:click="autofillBlockedEnvFromDomain"
-                        wire:loading.attr="disabled"
-                        wire:target="autofillBlockedEnvFromDomain"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800 disabled:opacity-60"
-                        title="{{ __('Fill :keys from this site\'s domain and push.', ['keys' => implode(', ', array_keys($envAutofillable))]) }}"
-                    >
-                        <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="autofillBlockedEnvFromDomain" />
-                        <span wire:loading wire:target="autofillBlockedEnvFromDomain" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
-                        {{ trans_choice('{1} Auto-fix from domain|[2,*] Auto-fix :count from domain', count($envAutofillable), ['count' => count($envAutofillable)]) }}
-                    </button>
-                @endif
-                <button
-                    type="button"
-                    wire:click="openBlockedEnvModal"
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors',
-                        'bg-rose-700 text-white hover:bg-rose-800' => $envAutofillable === [],
-                        'border border-rose-300 bg-white text-rose-900 hover:bg-rose-100' => $envAutofillable !== [],
-                    ])
-                >
-                    <x-heroicon-o-plus class="h-4 w-4" />
-                    {{ __('Add variables') }}
-                </button>
-                <button
-                    type="button"
-                    wire:click="setTab('environment')"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm transition-colors hover:bg-rose-100"
-                >
-                    <x-heroicon-o-pencil-square class="h-4 w-4" />
-                    {{ __('Edit all variables') }}
-                </button>
-
-                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-                    <button
-                        type="button"
-                        wire:click="recheckBlockedEnv"
-                        wire:loading.attr="disabled"
-                        wire:target="recheckBlockedEnv"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
-                        title="{{ __('Re-read the server .env and clear this if the variables are actually set — no deploy needed.') }}"
-                    >
-                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="recheckBlockedEnv" />
-                        <span wire:loading wire:target="recheckBlockedEnv" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                        {{ __('Re-check') }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="viewServerEnv"
-                        wire:loading.attr="disabled"
-                        wire:target="viewServerEnv"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
-                        title="{{ __('See which variables are set on the server right now — read-only, nothing is overwritten.') }}"
-                    >
-                        <x-heroicon-o-eye class="h-4 w-4" wire:loading.remove wire:target="viewServerEnv" />
-                        <span wire:loading wire:target="viewServerEnv" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                        {{ __('View server .env') }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="confirmDeployIgnoringEnvGate"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
-                        title="{{ __('Ignore the required-env check and deploy anyway.') }}"
-                    >
-                        <x-heroicon-o-rocket-launch class="h-4 w-4" />
-                        {{ __('Deploy anyway') }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="confirmIgnoreMissingEnv"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
-                        title="{{ __('Stop blocking deploys on missing required variables.') }}"
-                    >
-                        <x-heroicon-o-no-symbol class="h-4 w-4" />
-                        {{ __('Ignore all') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <x-modal name="deploy-missing-env-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
-            <div class="relative border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('Required variables') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add the missing variables') }}</h2>
-                <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
-                    {{ __('The deploy needs these to run. Fill in the ones you have — blanks are skipped. They\'re saved to the Environment section and pushed to the server.') }}
-                </p>
-                <button
-                    type="button"
-                    x-on:click="$dispatch('close')"
-                    class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                    aria-label="{{ __('Close') }}"
-                >
-                    <x-heroicon-o-x-mark class="h-5 w-5" />
-                </button>
-            </div>
-            <div class="max-h-[60vh] overflow-y-auto px-6 py-6">
-                <form wire:submit="addBlockedEnvVars" id="deploy-missing-env-form" class="space-y-3">
-                    @foreach ($blockedEnv as $entry)
-                        <div wire:key="blocked-env-{{ md5($entry['key']) }}">
-                            <label class="block font-mono text-xs font-semibold text-brand-ink" for="blocked_env_{{ md5($entry['key']) }}">{{ $entry['key'] }}</label>
-                            <input
-                                id="blocked_env_{{ md5($entry['key']) }}"
-                                wire:model="blocked_env_values.{{ $entry['key'] }}"
-                                autocomplete="off"
-                                spellcheck="false"
-                                class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                                placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
-                            />
-                            <div class="mt-1 flex items-center gap-3">
-                                @if ($entry['key'] === 'APP_KEY')
-                                    <button type="button" wire:click="generateBlockedAppKey" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
-                                        <x-heroicon-o-sparkles class="h-3 w-3" />
-                                        {{ __('Generate a key') }}
-                                    </button>
-                                @elseif (\App\Support\Sites\DomainDerivedEnvDefaults::isDerivable($entry['key']))
-                                    <button type="button" wire:click="fillBlockedEnvFromDomain('{{ $entry['key'] }}')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
-                                        <x-heroicon-o-sparkles class="h-3 w-3" />
-                                        {{ __('Fill from domain') }}
-                                    </button>
-                                @endif
-                                <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-[11px] font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>
-                            </div>
-                        </div>
-                    @endforeach
-                </form>
-            </div>
-            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
-                <button type="button" wire:click="setTab('environment')" class="mr-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                    <x-heroicon-o-pencil-square class="h-4 w-4" />
-                    {{ __('Edit all variables') }}
-                </button>
-                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
-                <x-primary-button type="submit" form="deploy-missing-env-form" wire:loading.attr="disabled" wire:target="addBlockedEnvVars">
-                    <span wire:loading.remove wire:target="addBlockedEnvVars">{{ __('Add variables') }}</span>
-                    <span wire:loading wire:target="addBlockedEnvVars">{{ __('Adding…') }}</span>
-                </x-primary-button>
-            </div>
-        </x-modal>
-    @endif
+    {{-- Recognized-failure remediation renders once with the timeline below. --}}
 
     {{-- Verify Octane is actually installed AND serving this site before the
          advisor is allowed to suggest `octane:reload`. Deferred so it never
@@ -303,135 +58,27 @@
         <div wire:init="ensureOctaneVerificationProbe" class="hidden" aria-hidden="true"></div>
     @endif
 
-    {{-- Pipeline suggestions — proactively flag missing-but-needed deploy
-         steps (e.g. installs JS deps but never builds them → the live site
-         500s on a missing Vite manifest) with one-click "Add to pipeline". --}}
     @php
         $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : [];
         $pipelineDismissedCount = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::dismissedCount($site) : 0;
         $canAutofixPipeline = method_exists($this, 'addSuggestedPipelineStep');
+        $canResumeDeploy = $latest
+            && $latest->status === 'failed'
+            && $site->isAtomicDeploys()
+            && $latest->isResumable()
+            && method_exists($this, 'confirmResumeDeployment');
+        $resumePhase = $canResumeDeploy ? $latest->resumeStartPhase() : null;
     @endphp
-    @if ($pipelineSuggestions !== [] || $pipelineDismissedCount > 0)
-        {{-- While the optimizePipeline Livewire request is in flight, swap the
-             card for a starting placeholder so old suggestions don't flash. --}}
-        <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-8 text-sm text-indigo-700">
-            <x-spinner size="sm" />
-            <span>{{ __('Starting pipeline scan…') }}</span>
-        </div>
-
-        <div wire:loading.remove wire:target="optimizePipeline">
-        @if ($watchedConsoleRunId)
-            {{-- Scan job is running on the worker; the hidden poll div above
-                 calls resolveWatchedConsoleAction every 3 s and re-renders. --}}
-            <div class="flex items-center justify-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-8 text-sm text-indigo-700">
-                <x-spinner size="sm" />
-                <span>{{ __('Scanning the repo for pipeline steps…') }}</span>
-            </div>
-        @else
-        <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
-            <div class="flex items-start gap-3">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                    <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-start justify-between gap-2">
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Pipeline check') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-indigo-950">
-                                @if ($pipelineSuggestions !== [])
-                                    {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
-                                @else
-                                    {{ __('No open suggestions') }}
-                                @endif
-                            </h3>
-                        </div>
-                        @if ($pipelineSuggestions !== [] && method_exists($this, 'optimizePipeline'))
-                            <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
-                                <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="optimizePipeline" />
-                                <span wire:loading wire:target="optimizePipeline" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                                <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
-                                <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
-                            </button>
-                        @endif
-                    </div>
-
-                    @if ($pipelineSuggestions !== [])
-                        <p class="mt-1 text-sm text-indigo-900/80">{{ __('Add a fix to drop the step into your pipeline, or Optimize to scan the repo and add everything at once — so a deploy doesn\'t succeed while the site breaks. Dismiss anything you don\'t want.') }}</p>
-                        <ul class="mt-3 space-y-2">
-                            @foreach ($pipelineSuggestions as $sug)
-                                <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200/70 bg-white/70 px-3 py-2">
-                                    <div class="min-w-0 flex-1">
-                                        <p class="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-brand-ink">
-                                            {{ $sug['label'] }}
-                                            @if ($sug['priority'] === 'high')
-                                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">{{ __('recommended') }}</span>
-                                            @endif
-                                            <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $sug['phase'] }}</span>
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $sug['reason'] }}@if ($sug['command']) <span class="font-mono text-brand-ink/70">· {{ $sug['command'] }}</span>@endif</p>
-                                    </div>
-                                    @if ($canAutofixPipeline)
-                                        <div class="flex shrink-0 items-center gap-1.5">
-                                            <button
-                                                type="button"
-                                                wire:click="addSuggestedPipelineStep(@js($sug['key']))"
-                                                wire:loading.attr="disabled"
-                                                wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
-                                                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
-                                                title="{{ __('Add this step to the deploy pipeline.') }}"
-                                            >
-                                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
-                                                {{ __('Add fix') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="dismissPipelineSuggestion(@js($sug['key']))"
-                                                wire:loading.attr="disabled"
-                                                wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
-                                                class="inline-flex items-center justify-center rounded-lg border border-transparent p-1.5 text-brand-mist transition-colors hover:border-indigo-200 hover:bg-white hover:text-brand-moss disabled:opacity-60"
-                                                title="{{ __('Dismiss this suggestion') }}"
-                                                aria-label="{{ __('Dismiss :label', ['label' => $sug['label']]) }}"
-                                            >
-                                                <x-heroicon-o-x-mark class="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p class="mt-1 text-sm text-indigo-900/80">{{ __('Every detected suggestion has been dismissed. Your pipeline still deploys — restore them if you want another look.') }}</p>
-                    @endif
-
-                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                        @if ($pipelineSuggestions !== [])
-                            <button type="button" wire:click="setTab('pipeline')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline">
-                                <x-heroicon-o-pencil-square class="h-3 w-3" />
-                                {{ __('Edit the full pipeline') }}
-                            </button>
-                        @endif
-                        @if ($pipelineDismissedCount > 0 && method_exists($this, 'restorePipelineSuggestions'))
-                            <button type="button" wire:click="restorePipelineSuggestions" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-moss hover:text-brand-ink hover:underline">
-                                <x-heroicon-o-arrow-uturn-left class="h-3 w-3" />
-                                {{ trans_choice('{1} Restore 1 dismissed|[2,*] Restore :count dismissed', $pipelineDismissedCount, ['count' => $pipelineDismissedCount]) }}
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-        @endif
-        </div>
-    @endif
 
     <section class="border-b border-brand-ink/10">
-        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+        {{-- Ship / deploy is the hero strip — immediately under the tab rail. --}}
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
             <div class="min-w-0 flex-1 basis-72">
                 <div class="flex items-center gap-2">
                     <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ship the current branch') }}</h2>
                 </div>
-                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                <p class="mt-0.5 max-w-3xl text-xs leading-relaxed text-brand-moss">
                     @if ($latest)
                         @if ($isRunning)
                             {{ __('A deploy is currently running. Watch the phase timeline below.') }}
@@ -497,34 +144,48 @@
             </div>
         </div>
 
-        {{-- Pending delayed deploy banner. --}}
+        @if ($this->deployLockInfo ?? null)
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-200/80 bg-amber-50/80 px-5 py-2 text-xs text-amber-950 sm:px-6">
+                <p class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden="true" />
+                    <strong class="font-semibold">{{ __('Deployment in progress') }}</strong>
+                    @if (! empty($this->deployLockInfo['deployment_id']))
+                        <span class="font-mono text-[11px] text-amber-800">#{{ $this->deployLockInfo['deployment_id'] }}</span>
+                    @endif
+                    <span class="text-amber-800/90">{{ __('Queued deploys may appear as skipped until this finishes.') }}</span>
+                </p>
+                <button
+                    type="button"
+                    wire:click="openConfirmActionModal('releaseDeployLock', [], @js(__('Clear deploy lock')), @js(__('Force-clear the deploy lock? Only if no worker is actually deploying.')), @js(__('Clear lock')), true)"
+                    class="shrink-0 text-xs font-semibold text-amber-900 underline decoration-amber-700/40 underline-offset-2 hover:text-amber-700"
+                >{{ __('Clear lock') }}</button>
+            </div>
+        @endif
+
         @if ($this->pendingScheduledDeploy)
             @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2.5 sm:px-6">
-                <p class="flex items-center gap-2 text-sm text-amber-900">
-                    <x-heroicon-o-clock class="h-4 w-4 shrink-0 text-amber-700" />
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/80 bg-amber-50/70 px-5 py-2 sm:px-6">
+                <p class="flex items-center gap-2 text-xs text-amber-900">
+                    <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0 text-amber-700" />
                     <span>
                         {{ __('Deploy scheduled :rel', ['rel' => $pendingSchedule->run_at->diffForHumans()]) }}
                         <span class="text-amber-700/80" title="{{ $pendingSchedule->run_at->toDayDateTimeString() }}">· {{ $pendingSchedule->run_at->isoFormat('MMM D, h:mm A') }}</span>
                     </span>
                 </p>
                 <button type="button" wire:click="cancelScheduledDeploy" wire:loading.attr="disabled" wire:target="cancelScheduledDeploy" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline">
-                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
                     {{ __('Cancel') }}
                 </button>
             </div>
         @endif
 
-        {{-- Summary stats — hairline-divided cells (gap-px over a tinted track)
-             so the four read as one continuous strip rather than four boxes,
-             echoing the connected feel of the phase rail below. --}}
         <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/[0.06] text-sm sm:grid-cols-4">
-            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
+            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Deployed commit') }}
                 </dt>
-                <dd class="mt-1.5 truncate">
+                <dd class="mt-1 truncate">
                     @if ($shortSha)
                         <button
                             type="button"
@@ -542,12 +203,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
+            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-signal class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Status') }}
                 </dt>
-                <dd class="mt-1.5">
+                <dd class="mt-1">
                     @if ($latest)
                         <span @class([
                             'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
@@ -570,12 +231,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
+            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Duration') }}
                 </dt>
-                <dd class="mt-1.5 font-mono text-xs tabular-nums text-brand-ink">
+                <dd class="mt-1 font-mono text-xs tabular-nums text-brand-ink">
                     @if ($totalDurationMs > 0)
                         {{ number_format($totalDurationMs / 1000, 1) }}s
                     @elseif ($latest?->started_at && $latest?->finished_at)
@@ -585,25 +246,312 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
+            <div class="min-w-0 bg-white px-5 py-2 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Trigger') }}
                 </dt>
-                <dd class="mt-1.5 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
+                <dd class="mt-1 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
             </div>
         </dl>
 
-        {{-- Recurring cron schedules moved to their own Schedule tab — sharing
-             this panel with the header's one-off "Deploy later" control meant two
-             different things both labelled Schedule sat inches apart. --}}
+        @if ($latest && $latest->status === 'failed')
+            <x-ops-copilot-callout :site="$site" strip :show="true" />
+        @endif
 
-        <div class="px-6 py-6 sm:px-8">
+        @if ($canResumeDeploy)
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200/80 bg-sky-50/50 px-5 py-2.5 sm:px-6">
+                <div class="min-w-0 flex-1">
+                    <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-sky-700" aria-hidden="true" />
+                        <span class="font-semibold text-brand-ink">{{ __('Resume from :phase', ['phase' => $resumePhase]) }}</span>
+                        <span class="text-brand-moss">
+                            @if ($resumePhase === 'restart')
+                                {{ __('Re-run the post-cutover tail only — release stays live.') }}
+                            @elseif ($resumePhase === 'release')
+                                {{ __('Reuse the build and re-run release onward. Re-runs migrations.') }}
+                            @else
+                                {{ __('Reuse the checkout and re-run from build. Prior release stays live.') }}
+                            @endif
+                        </span>
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="confirmResumeDeployment('{{ $latest->id }}')"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmResumeDeployment('{{ $latest->id }}')"
+                    @disabled($deployInProgress)
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
+                >
+                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Resume') }}
+                </button>
+            </div>
+        @endif
+
+        @if ($blockedEnv !== [])
+            <div class="border-b border-rose-200/80 bg-rose-50/50 px-5 py-3 sm:px-6">
+                <div class="flex items-start gap-2.5">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-700" aria-hidden="true" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold text-rose-900">
+                            {{ trans_choice('{1} Deploy needs :count environment variable|[2,*] Deploy needs :count environment variables', count($blockedEnv), ['count' => count($blockedEnv)]) }}
+                        </p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-rose-800/90">{{ __('The last deploy stopped because required variables aren’t set. Add them, then deploy again.') }}</p>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            @foreach (array_slice($blockedEnv, 0, 24) as $entry)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200">
+                                    {{ $entry['key'] }}
+                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
+                                        <x-heroicon-o-x-mark class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            @endforeach
+                            @if (count($blockedEnv) > 24)
+                                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">{{ __('+:count more', ['count' => count($blockedEnv) - 24]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @php
+                    $envAutofillable = \App\Support\Sites\DomainDerivedEnvDefaults::resolve(
+                        $site,
+                        array_map(static fn ($e) => (string) $e['key'], $blockedEnv),
+                    );
+                @endphp
+                <div class="mt-2.5 flex flex-wrap items-center gap-2 border-t border-rose-200/60 pt-2.5">
+                    @if ($envAutofillable !== [])
+                        <button
+                            type="button"
+                            wire:click="autofillBlockedEnvFromDomain"
+                            wire:loading.attr="disabled"
+                            wire:target="autofillBlockedEnvFromDomain"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800 disabled:opacity-60"
+                            title="{{ __('Fill :keys from this site\'s domain and push.', ['keys' => implode(', ', array_keys($envAutofillable))]) }}"
+                        >
+                            <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="autofillBlockedEnvFromDomain" />
+                            <span wire:loading wire:target="autofillBlockedEnvFromDomain" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                            {{ trans_choice('{1} Auto-fix from domain|[2,*] Auto-fix :count from domain', count($envAutofillable), ['count' => count($envAutofillable)]) }}
+                        </button>
+                    @endif
+                    <button
+                        type="button"
+                        wire:click="openBlockedEnvModal"
+                        @class([
+                            'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm transition-colors',
+                            'bg-rose-700 text-white hover:bg-rose-800' => $envAutofillable === [],
+                            'border border-rose-300 bg-white text-rose-900 hover:bg-rose-100' => $envAutofillable !== [],
+                        ])
+                    >
+                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        {{ __('Add variables') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="setTab('environment')"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-900 shadow-sm transition-colors hover:bg-rose-100"
+                    >
+                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                        {{ __('Edit all') }}
+                    </button>
+
+                    <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                        <button type="button" wire:click="recheckBlockedEnv" wire:loading.attr="disabled" wire:target="recheckBlockedEnv" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:opacity-60" title="{{ __('Re-read the server .env and clear this if the variables are actually set — no deploy needed.') }}">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="recheckBlockedEnv" />
+                            <span wire:loading wire:target="recheckBlockedEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            {{ __('Re-check') }}
+                        </button>
+                        <button type="button" wire:click="viewServerEnv" wire:loading.attr="disabled" wire:target="viewServerEnv" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:opacity-60" title="{{ __('See which variables are set on the server right now — read-only, nothing is overwritten.') }}">
+                            <x-heroicon-o-eye class="h-3.5 w-3.5" wire:loading.remove wire:target="viewServerEnv" />
+                            <span wire:loading wire:target="viewServerEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            {{ __('View .env') }}
+                        </button>
+                        <button type="button" wire:click="confirmDeployIgnoringEnvGate" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100" title="{{ __('Ignore the required-env check and deploy anyway.') }}">
+                            <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" />
+                            {{ __('Deploy anyway') }}
+                        </button>
+                        <button type="button" wire:click="confirmIgnoreMissingEnv" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100" title="{{ __('Stop blocking deploys on missing required variables.') }}">
+                            <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                            {{ __('Ignore all') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <x-modal name="deploy-missing-env-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+                <div class="relative border-b border-brand-ink/10 px-6 py-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('Required variables') }}</p>
+                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add the missing variables') }}</h2>
+                    <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
+                        {{ __('The deploy needs these to run. Fill in the ones you have — blanks are skipped. They\'re saved to the Environment section and pushed to the server.') }}
+                    </p>
+                    <button
+                        type="button"
+                        x-on:click="$dispatch('close')"
+                        class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                        aria-label="{{ __('Close') }}"
+                    >
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto px-6 py-6">
+                    <form wire:submit="addBlockedEnvVars" id="deploy-missing-env-form" class="space-y-3">
+                        @foreach ($blockedEnv as $entry)
+                            <div wire:key="blocked-env-{{ md5($entry['key']) }}">
+                                <label class="block font-mono text-xs font-semibold text-brand-ink" for="blocked_env_{{ md5($entry['key']) }}">{{ $entry['key'] }}</label>
+                                <input
+                                    id="blocked_env_{{ md5($entry['key']) }}"
+                                    wire:model="blocked_env_values.{{ $entry['key'] }}"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                    class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
+                                    placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
+                                />
+                                <div class="mt-1 flex items-center gap-3">
+                                    @if ($entry['key'] === 'APP_KEY')
+                                        <button type="button" wire:click="generateBlockedAppKey" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
+                                            <x-heroicon-o-sparkles class="h-3 w-3" />
+                                            {{ __('Generate a key') }}
+                                        </button>
+                                    @elseif (\App\Support\Sites\DomainDerivedEnvDefaults::isDerivable($entry['key']))
+                                        <button type="button" wire:click="fillBlockedEnvFromDomain('{{ $entry['key'] }}')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
+                                            <x-heroicon-o-sparkles class="h-3 w-3" />
+                                            {{ __('Fill from domain') }}
+                                        </button>
+                                    @endif
+                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-[11px] font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </form>
+                </div>
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                    <button type="button" wire:click="setTab('environment')" class="mr-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                        {{ __('Edit all variables') }}
+                    </button>
+                    <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                    <x-primary-button type="submit" form="deploy-missing-env-form" wire:loading.attr="disabled" wire:target="addBlockedEnvVars">
+                        <span wire:loading.remove wire:target="addBlockedEnvVars">{{ __('Add variables') }}</span>
+                        <span wire:loading wire:target="addBlockedEnvVars">{{ __('Adding…') }}</span>
+                    </x-primary-button>
+                </div>
+            </x-modal>
+        @endif
+
+        @if ($pipelineSuggestions !== [] || $pipelineDismissedCount > 0)
+            <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 text-xs text-brand-moss sm:px-6">
+                <x-spinner size="sm" />
+                <span>{{ __('Starting pipeline scan…') }}</span>
+            </div>
+
+            <div wire:loading.remove wire:target="optimizePipeline" class="border-b border-brand-ink/10">
+                @if ($watchedConsoleRunId)
+                    <div class="flex items-center justify-center gap-2 bg-brand-sand/15 px-5 py-3 text-xs text-brand-moss sm:px-6">
+                        <x-spinner size="sm" />
+                        <span>{{ __('Scanning the repo for pipeline steps…') }}</span>
+                    </div>
+                @else
+                    <div class="bg-brand-sand/10 px-5 py-3 sm:px-6">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                                    <x-heroicon-o-sparkles class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
+                                    {{ __('Pipeline check') }}
+                                </p>
+                                <p class="mt-0.5 text-xs font-semibold text-brand-ink">
+                                    @if ($pipelineSuggestions !== [])
+                                        {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
+                                    @else
+                                        {{ __('No open suggestions') }}
+                                    @endif
+                                </p>
+                            </div>
+                            @if ($pipelineSuggestions !== [] && method_exists($this, 'optimizePipeline'))
+                                <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
+                                    <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
+                                    <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                                    <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
+                                    <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
+                                </button>
+                            @endif
+                        </div>
+
+                        @if ($pipelineSuggestions !== [])
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Add a fix into your pipeline, or Optimize to scan the repo — so a deploy doesn’t succeed while the site breaks.') }}</p>
+                            <ul class="mt-2 divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10 bg-white">
+                                @foreach ($pipelineSuggestions as $sug)
+                                    <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-brand-ink">
+                                                {{ $sug['label'] }}
+                                                @if ($sug['priority'] === 'high')
+                                                    <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">{{ __('recommended') }}</span>
+                                                @endif
+                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $sug['phase'] }}</span>
+                                            </p>
+                                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ $sug['reason'] }}@if ($sug['command']) <span class="font-mono text-brand-ink/70">· {{ $sug['command'] }}</span>@endif</p>
+                                        </div>
+                                        @if ($canAutofixPipeline)
+                                            <div class="flex shrink-0 items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    wire:click="addSuggestedPipelineStep(@js($sug['key']))"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
+                                                    title="{{ __('Add this step to the deploy pipeline.') }}"
+                                                >
+                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                                                    {{ __('Add fix') }}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    wire:click="dismissPipelineSuggestion(@js($sug['key']))"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
+                                                    class="inline-flex items-center justify-center rounded-lg border border-transparent p-1.5 text-brand-mist transition-colors hover:border-brand-ink/10 hover:bg-brand-sand/40 hover:text-brand-moss disabled:opacity-60"
+                                                    title="{{ __('Dismiss this suggestion') }}"
+                                                    aria-label="{{ __('Dismiss :label', ['label' => $sug['label']]) }}"
+                                                >
+                                                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Every detected suggestion has been dismissed. Restore them if you want another look.') }}</p>
+                        @endif
+
+                        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                            @if ($pipelineSuggestions !== [])
+                                <button type="button" wire:click="setTab('pipeline')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                    <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                    {{ __('Edit the full pipeline') }}
+                                </button>
+                            @endif
+                            @if ($pipelineDismissedCount > 0 && method_exists($this, 'restorePipelineSuggestions'))
+                                <button type="button" wire:click="restorePipelineSuggestions" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-moss hover:text-brand-ink hover:underline">
+                                    <x-heroicon-o-arrow-uturn-left class="h-3 w-3" />
+                                    {{ trans_choice('{1} Restore 1 dismissed|[2,*] Restore :count dismissed', $pipelineDismissedCount, ['count' => $pipelineDismissedCount]) }}
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @endif
+
+        <div class="px-5 py-4 sm:px-6">
             {{-- While a deploy request is in flight, clear the previous run's
                  timeline right away and show a starting placeholder. The deploy
                  runs synchronously, so this state holds for the whole request
                  instead of flashing for a frame. --}}
-            <div wire:loading.flex wire:target="deployNow,queueDeploy" class="hidden items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-sm text-brand-moss">
+            <div wire:loading.flex wire:target="deployNow,queueDeploy" class="hidden items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-sm text-brand-moss">
                 <x-spinner size="sm" />
                 <span>{{ __('Starting deploy — clearing the previous run…') }}</span>
             </div>
@@ -614,12 +562,12 @@
                      phase yet — show a starting placeholder instead of the
                      previous run's timeline. Flips to the live timeline below
                      once the worker creates the running deployment record. --}}
-                <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-sm text-brand-moss">
+                <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-sm text-brand-moss">
                     <x-spinner size="sm" />
                     <span>{{ __('Deploy queued — starting on a worker…') }}</span>
                 </div>
             @elseif ($latest === null)
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-center text-sm text-brand-moss">
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center text-sm text-brand-moss">
                     {{ __('No phase timeline yet — your first deploy will appear here.') }}
                 </div>
             @else
