@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Livewire;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Modules\Cloud\Services\DigitalOceanService;
@@ -27,6 +28,7 @@ use Livewire\Component;
  */
 class DnsPanel extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public string $siteId = '';

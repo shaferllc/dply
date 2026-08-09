@@ -3,7 +3,7 @@
 
     // Nested sections inside the merged Schedule card — not second page cards.
     $card = 'border-b border-brand-ink/10';
-    $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
+    $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-1.5 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
 
     $chipForHealth = static function (?string $health): array {
         return match ($health) {
@@ -82,9 +82,11 @@
     />
 
     @php
-        $glanceNote = $contextSiteModel && $schedulers_list_scope === 'site'
-            ? __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name])
-            : __('Counts across every monitored framework scheduler on this server.');
+        $glanceNote = match (true) {
+            $siteDedicatedContext && $contextSiteModel => __('Counts for this site’s framework schedulers.'),
+            $contextSiteModel && $schedulers_list_scope === 'site' => __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name]),
+            default => __('Counts across every monitored framework scheduler on this server.'),
+        };
     @endphp
 
     {{-- Dense head + stat strip, same treatment as the Workers snapshot and the

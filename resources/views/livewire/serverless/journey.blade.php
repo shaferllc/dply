@@ -1,6 +1,10 @@
+@php
+    $pad = 'px-3 py-2.5 sm:px-4';
+    $padTight = 'px-3 py-2 sm:px-4';
+@endphp
 <div @if ($shouldPoll) wire:poll.3s @endif>
-    {{-- Match Serverless create/index + other provision journeys: max-w-7xl.
-         Embedded on Deployments keeps the same full-width chrome without page padding. --}}
+    {{-- Standalone journey keeps page chrome; embedded on Deployments is a hairline
+         strip inside the parent card (no nested dply-card). --}}
     <div @class([
         'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8' => ! $embedded,
         'min-w-0' => $embedded,
@@ -14,26 +18,33 @@
         @endunless
 
         <section @class([
-            'dply-card min-w-0 overflow-hidden p-0',
-            'mt-4' => ! $embedded,
+            'min-w-0',
+            'dply-card overflow-hidden p-0 mt-4' => ! $embedded,
         ])>
-            {{-- Sand identity header — progress + status --}}
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            {{-- Progress / status strip --}}
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 {{ $pad }}">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="flex min-w-0 items-start gap-2.5">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy journey') }}</p>
-                            <h1 class="mt-0.5 text-lg font-semibold tracking-tight text-brand-ink">{{ $title }}</h1>
-                            <p class="mt-0.5 truncate text-sm text-brand-moss">
+                            @unless ($embedded)
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy journey') }}</p>
+                            @endunless
+                            <h2 @class([
+                                'font-semibold tracking-tight text-brand-ink',
+                                'text-base' => ! $embedded,
+                                'text-sm' => $embedded,
+                                'mt-0.5' => ! $embedded,
+                            ])>{{ $title }}</h2>
+                            <p class="mt-0.5 truncate text-[11px] text-brand-moss">
                                 <span class="font-mono">{{ $site->git_repository_url }}</span>@if ($site->git_branch)<span class="text-brand-moss/60"> · {{ $site->git_branch }}</span>@endif
                             </p>
                         </div>
                     </div>
                     <span @class([
-                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
                         'bg-brand-forest/15 text-brand-forest ring-brand-forest/20' => $live,
                         'bg-rose-100 text-rose-800 ring-rose-200' => $failed,
                         'bg-sky-100 text-sky-800 ring-sky-200' => ! $live && ! $failed,
@@ -50,12 +61,12 @@
                     </span>
                 </div>
 
-                <div class="mt-3">
-                    <div class="flex items-center justify-between text-xs font-medium text-brand-moss">
+                <div class="mt-2">
+                    <div class="flex items-center justify-between text-[11px] font-medium text-brand-moss">
                         <span>{{ $percent }}% {{ __('complete') }}</span>
                         <span class="tabular-nums">{{ $elapsedLabel }} {{ $elapsedHuman }}</span>
                     </div>
-                    <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-brand-ink/10">
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand-ink/10">
                         <div @class([
                             'h-full rounded-full transition-all duration-500',
                             'bg-brand-forest' => $live,
@@ -93,14 +104,14 @@
                 };
             @endphp
             @if ($banner)
-                <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                    <div class="flex items-center gap-3 rounded-xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-3.5 py-2.5">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ $banner['badge'] }}">
-                            <x-dynamic-component :component="$banner['icon']" class="h-5 w-5" />
+                <div class="border-b border-brand-ink/10 {{ $padTight }}">
+                    <div class="flex items-center gap-2.5 rounded-lg border {{ $banner['ring'] }} {{ $banner['wash'] }} px-2.5 py-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md {{ $banner['badge'] }}">
+                            <x-dynamic-component :component="$banner['icon']" class="h-4 w-4" />
                         </span>
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-brand-ink">{{ $banner['title'] }}</p>
-                            <p class="mt-0.5 text-xs text-brand-moss">{{ $banner['detail'] }}</p>
+                            <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ $banner['detail'] }}</p>
                         </div>
                     </div>
                 </div>
@@ -109,27 +120,27 @@
             {{-- Stage timeline --}}
             <ol class="divide-y divide-brand-ink/8">
                 @foreach ($stages as $stage)
-                    <li class="relative flex items-start gap-3 px-5 py-3 sm:px-6">
+                    <li class="relative flex items-start gap-2.5 {{ $padTight }}">
                         @unless ($loop->last)
-                            {{-- Center under the 28px status icon (px-5/sm:px-6 + half icon). --}}
+                            {{-- Center under the 24px status icon (px-3/sm:px-4 + half icon). --}}
                             <span aria-hidden="true" @class([
-                                'absolute left-[33px] top-9 bottom-0 w-0.5 sm:left-[37px]',
+                                'absolute left-[27px] top-8 bottom-0 w-0.5 sm:left-[31px]',
                                 'bg-brand-forest/35' => $stage['state'] === 'done',
                                 'bg-brand-ink/10' => $stage['state'] !== 'done',
                             ])></span>
                         @endunless
 
                         <span @class([
-                            'relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white',
+                            'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white',
                             'bg-brand-forest text-white' => $stage['state'] === 'done',
                             'bg-brand-gold text-brand-ink' => $stage['state'] === 'active',
                             'bg-rose-500 text-white' => $stage['state'] === 'failed',
                             'bg-brand-ink/5 text-brand-moss/50' => $stage['state'] === 'pending',
                         ])>
                             @if ($stage['state'] === 'done')
-                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                             @elseif ($stage['state'] === 'active')
-                                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                     <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z"/>
                                 </svg>
@@ -145,23 +156,23 @@
                                 'text-brand-ink' => $stage['state'] !== 'pending',
                                 'text-brand-moss/50' => $stage['state'] === 'pending',
                             ])>{{ $stage['label'] }}</p>
-                            <p class="mt-0.5 text-xs text-brand-moss">{{ $stage['detail'] }}</p>
+                            <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ $stage['detail'] }}</p>
 
                             @if ($stage['key'] === 'deploy' && count($deploySteps) > 0)
-                                <ul class="mt-2 space-y-1.5 rounded-lg bg-brand-ink/[0.03] px-2.5 py-2">
+                                <ul class="mt-1.5 space-y-1 rounded-lg bg-brand-ink/[0.03] px-2 py-1.5">
                                     @foreach ($deploySteps as $sub)
-                                        <li class="flex items-center gap-2 text-xs">
+                                        <li class="flex items-center gap-2 text-[11px]">
                                             <span @class([
-                                                'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                                                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
                                                 'bg-brand-forest text-white' => $sub['state'] === 'done',
                                                 'bg-brand-gold text-brand-ink' => $sub['state'] === 'active',
                                                 'bg-rose-500 text-white' => $sub['state'] === 'failed',
                                                 'bg-brand-ink/10 text-brand-moss/50' => $sub['state'] === 'pending',
                                             ])>
                                                 @if ($sub['state'] === 'done')
-                                                    <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+                                                    <svg class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                                                 @elseif ($sub['state'] === 'active')
-                                                    <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                    <svg class="h-2 w-2 animate-spin" viewBox="0 0 24 24" fill="none">
                                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                                         <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z"/>
                                                     </svg>
@@ -193,29 +204,29 @@
 
             {{-- Retry / cancel / next-step controls --}}
             @if ($namespaceState === 'failed' || $deployState === 'failed' || $live || $cancellable)
-                <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                <div class="flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 bg-brand-sand/15 {{ $padTight }}">
                     @if ($cancellable)
                         <button type="button" wire:click="openCancelModal"
-                                class="inline-flex items-center rounded-lg border border-rose-200 bg-white px-3.5 py-2 text-sm font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-50">
+                                class="inline-flex items-center rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-50">
                             {{ __('Cancel deploy') }}
                         </button>
                     @endif
 
                     @if ($namespaceState === 'failed')
                         <button type="button" wire:click="retryProvision" wire:loading.attr="disabled"
-                                class="inline-flex items-center rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                class="inline-flex items-center rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
                             {{ __('Retry provisioning') }}
                         </button>
                     @elseif ($deployState === 'failed')
                         <button type="button" wire:click="retryDeploy" wire:loading.attr="disabled"
-                                class="inline-flex items-center rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                class="inline-flex items-center rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
                             {{ __('Retry deploy') }}
                         </button>
                     @endif
 
                     @if ($live)
                         <button type="button" wire:click="redeploy" wire:loading.attr="disabled" wire:target="redeploy"
-                                class="inline-flex items-center rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                class="inline-flex items-center rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
                             <span wire:loading.remove wire:target="redeploy">{{ __('Redeploy') }}</span>
                             <span wire:loading wire:target="redeploy">{{ __('Starting…') }}</span>
                         </button>
@@ -223,41 +234,38 @@
 
                     @if ($live && $actionUrl)
                         <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
-                           class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                           class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
                             {{ __('Open app') }}
                         </a>
                     @endif
 
                     @unless ($embedded)
                         <a href="{{ route('sites.show', [$server->id, $site->id]) }}" wire:navigate
-                           class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                           class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
                             {{ __('Go to dashboard') }}
                         </a>
                     @endunless
                 </div>
             @endif
 
-            {{-- App details — same card width as progress + log --}}
+            {{-- App details --}}
             <div class="border-t border-brand-ink/10">
-                <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
+                <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 {{ $padTight }}">
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('App details') }}</h2>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('App details') }}</h3>
                     </div>
                     @if ($deployDuration !== '')
-                        <span class="ml-auto shrink-0 text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
+                        <span class="ml-auto shrink-0 text-[11px] text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
                     @endif
                 </div>
-                <div class="px-5 py-4 sm:px-6">
-                    <dl class="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+                <div class="{{ $pad }}">
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
                         @foreach ($facts as $fact)
                             <div class="min-w-0">
-                                <dt class="text-xs font-medium text-brand-moss/70">{{ $fact['label'] }}</dt>
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ $fact['label'] }}</dt>
                                 <dd @class([
-                                    'mt-0.5 break-all text-sm',
+                                    'mt-0.5 break-all text-xs',
                                     'font-mono' => $fact['mono'] ?? false,
                                     'text-brand-ink font-medium' => $fact['value'] !== null,
                                     'text-brand-moss/40' => $fact['value'] === null,
@@ -267,28 +275,28 @@
                     </dl>
 
                     @if ($actionUrl)
-                        <div class="mt-3 border-t border-brand-ink/10 pt-3">
-                            <dt class="text-xs font-medium text-brand-moss/70">{{ __('Invocation URL') }}</dt>
-                            <dd class="mt-1">
+                        <div class="mt-2 border-t border-brand-ink/10 pt-2">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Invocation URL') }}</dt>
+                            <dd class="mt-0.5">
                                 <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
-                                   class="break-all font-mono text-sm text-brand-forest hover:underline">{{ $actionUrl }}</a>
+                                   class="break-all font-mono text-xs text-brand-forest hover:underline">{{ $actionUrl }}</a>
                             </dd>
                         </div>
                     @endif
                 </div>
             </div>
 
-            {{-- Deploy log — full width of the outer card --}}
+            {{-- Deploy log --}}
             @if (trim($log) !== '')
                 <div class="border-t border-brand-ink/10">
-                    <div class="flex items-center justify-between gap-3 bg-brand-sand/15 px-5 py-2.5 sm:px-6">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy log') }}</p>
+                    <div class="flex items-center justify-between gap-3 bg-brand-sand/15 {{ $padTight }}">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy log') }}</p>
                         @if ($deployStartedAt)
-                            <p class="text-xs text-brand-moss/60">{{ __('Started') }} {{ $deployStartedAt->diffForHumans() }}</p>
+                            <p class="text-[11px] text-brand-moss/60">{{ __('Started') }} {{ $deployStartedAt->diffForHumans() }}</p>
                         @endif
                     </div>
-                    <div class="bg-brand-ink px-5 py-3 sm:px-6">
-                        <pre class="max-h-96 overflow-auto font-mono text-[11px] leading-relaxed text-brand-cream whitespace-pre-wrap break-all">{{ $log }}</pre>
+                    <div class="bg-brand-ink px-3 py-2.5 sm:px-4">
+                        <pre class="max-h-80 overflow-auto font-mono text-[11px] leading-relaxed text-brand-cream whitespace-pre-wrap break-all">{{ $log }}</pre>
                     </div>
                 </div>
             @endif
@@ -299,18 +307,18 @@
     @if ($confirmingCancel)
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCancelModal"></div>
-            <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div class="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
                 <h3 class="text-base font-bold text-brand-ink">{{ __('Cancel this deploy?') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss">
                     {{ __('The deploy stops at the next step boundary — it cannot interrupt a step already in flight. Completed steps are not rolled back, and you can retry afterwards.') }}
                 </p>
-                <div class="mt-6 flex justify-end gap-3">
+                <div class="mt-5 flex justify-end gap-2">
                     <button type="button" wire:click="closeCancelModal"
-                            class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                            class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
                         {{ __('Keep deploying') }}
                     </button>
                     <button type="button" wire:click="cancelDeploy" wire:loading.attr="disabled"
-                            class="inline-flex items-center rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-70">
+                            class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-70">
                         {{ __('Cancel deploy') }}
                     </button>
                 </div>

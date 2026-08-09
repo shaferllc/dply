@@ -39,36 +39,34 @@
         ? trim($runtimeLabel.' '.$runtimeVersion)
         : __('Not set');
 
-    // Shared density classes — every panel on this tab uses the same compact
-    // header / body / footer rhythm so the overview stays scannable in one or
-    // two screens instead of five.
-    $panelHead = 'flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6';
-    $panelBody = 'px-5 py-4 sm:px-6';
-    $panelFoot = 'flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6';
-    $panelIcon = 'h-4 w-4 shrink-0 text-brand-sage';
-    $panelTitle = 'text-sm font-semibold text-brand-ink';
-    $panelNote = 'mt-1 text-xs leading-relaxed text-brand-moss';
-    $pillBase = 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1';
-    $btnBase = 'inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50 disabled:opacity-50';
+    $panelBody = 'px-5 py-3 sm:px-6';
+    $panelFoot = 'flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4';
+    $pillBase = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1';
+    $btnBase = 'dply-btn dply-btn-xs dply-btn-outline';
     $linkBase = 'text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline';
+    $workersSchedulersNote = (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
+        ? __('Queue workers and Horizon run under Workers. Scheduled tasks use Cron or the Laravel tab.')
+        : ($site->isRailsFrameworkDetected()
+            ? __('Sidekiq and Solid Queue run under Workers. Optional systemd workers are on Services.')
+            : __('App servers: set start command and port above. Workers use systemd (Services) or Supervisor (Workers).'));
 @endphp
 
-{{-- 1. Runtime card — the page hero already explains this tab, so the panel
-     carries the facts (language, port, start command) and not a restatement. --}}
+{{-- Language & version --}}
 <section class="border-b border-brand-ink/10">
-    <div class="{{ $panelHead }}">
-        <div class="min-w-0">
-            <div class="flex items-center gap-2">
-                <x-heroicon-o-cube-transparent class="{{ $panelIcon }}" aria-hidden="true" />
-                <h2 class="{{ $panelTitle }}">{{ __('Language & version') }}</h2>
-            </div>
-            <p class="{{ $panelNote }}">{{ __('Per-language tuning lives on the PHP, Ruby, or Static tab when applicable.') }}</p>
-        </div>
-        <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 font-mono text-xs font-semibold {{ $runtimeDisplay === __('Not set') ? 'text-brand-moss' : 'text-brand-ink' }} ring-1 ring-brand-ink/10">{{ $runtimeDisplay }}</span>
-    </div>
+    <x-workspace-panel-head
+        dense
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-cube-transparent"
+        :title="__('Language & version')"
+        :note="__('Per-language tuning lives on the PHP, Ruby, or Static tab when applicable.')"
+    >
+        <x-slot:actions>
+            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold {{ $runtimeDisplay === __('Not set') ? 'text-brand-moss' : 'text-brand-ink' }} ring-1 ring-brand-ink/10">{{ $runtimeDisplay }}</span>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     @if ($site->internal_port || $site->start_command || $showAppPortEditor)
-        <div class="{{ $panelBody }} space-y-3">
+        <div class="{{ $panelBody }} space-y-2.5">
             @if ($site->internal_port || $site->start_command)
                 <dl class="grid gap-2 sm:grid-cols-2">
                     @if ($site->internal_port)
@@ -81,21 +79,21 @@
             @endif
 
             @if ($showAppPortEditor)
-                <form wire:submit="saveRuntimePreferences" class="flex flex-wrap items-end gap-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5">
+                <form wire:submit="saveRuntimePreferences" class="flex flex-wrap items-end gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
                     <div class="min-w-0">
                         <x-input-label for="runtime_app_port_input" :value="__('App listens on (localhost)')" class="!text-[11px]" />
                         <x-text-input id="runtime_app_port_input" type="number" wire:model="runtime_app_port" class="mt-1 block w-[8rem] font-mono text-sm" placeholder="3000" min="1" max="65535" />
                         <x-input-error :messages="$errors->get('runtime_app_port')" class="mt-1" />
                     </div>
                     <x-primary-button size="sm" type="submit">{{ __('Save') }}</x-primary-button>
-                    <p class="w-full text-xs text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('Reverse proxy target: Node, Rails/Puma, Python, or container app port on the host.') }}</p>
+                    <p class="w-full text-[11px] text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('Reverse proxy target: Node, Rails/Puma, Python, or container app port.') }}</p>
                 </form>
             @endif
         </div>
     @endif
 </section>
 
-{{-- 1b. Live runtime health (deferred via wire:init): FPM pool or app-server port --}}
+{{-- Live runtime health (deferred via wire:init): FPM pool or app-server port --}}
 @if ($site->runtimeHealthProbeKind() === 'fpm')
     @php
         $pool = $site->phpFpmPoolSettings();
@@ -108,17 +106,14 @@
         $phpTabUrl = route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php']);
     @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
-        <div class="{{ $panelHead }}">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-bolt class="{{ $panelIcon }}" aria-hidden="true" />
-                    <h2 class="{{ $panelTitle }}">{{ __('PHP-FPM pool') }}</h2>
-                </div>
-                <p class="{{ $panelNote }}">{{ __('This site’s dedicated FPM pool — live status and the request-handling limits behind it. Tune the numbers on the PHP tab.') }}</p>
-            </div>
-
-            {{-- Live status pill --}}
-            <div class="shrink-0">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-bolt"
+            :title="__('PHP-FPM pool')"
+            :note="__('Live status and request-handling limits. Tune numbers on the PHP tab.')"
+        >
+            <x-slot:actions>
                 @if (! $runtimeHealthLoaded)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <x-spinner variant="forest" class="h-3 w-3" />
@@ -127,7 +122,7 @@
                 @elseif ($runtimeHealth === null)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
-                        {{ __('Status unavailable') }}
+                        {{ __('Unavailable') }}
                     </span>
                 @elseif ($runtimeHealth['running'])
                     <span class="{{ $pillBase }} bg-emerald-50 text-emerald-700 ring-emerald-200">
@@ -140,21 +135,20 @@
                         {{ __('Not running') }}
                     </span>
                 @endif
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <div class="{{ $panelBody }} space-y-2">
-            {{-- Live worker utilisation --}}
-            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2.5">
+            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Workers') }}</p>
                     @if (! $runtimeHealthLoaded)
                         <span class="flex items-center gap-1.5 text-xs text-brand-moss">
                             <x-spinner variant="forest" class="h-3 w-3 shrink-0" />
-                            {{ __('Reading live worker count from the server…') }}
+                            {{ __('Reading…') }}
                         </span>
                     @elseif ($runtimeHealth === null)
-                        <span class="text-xs text-brand-moss">{{ __('Couldn’t read the pool from the server just now.') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('Couldn’t read the pool just now.') }}</span>
                     @else
                         <span class="text-xs text-brand-moss">
                             <span class="font-mono text-sm font-semibold tabular-nums text-brand-ink">{{ $fpmWorkers }}</span>
@@ -171,12 +165,11 @@
                         <p class="mt-1.5 text-[11px] font-medium text-amber-700">{{ __('Near the worker ceiling (:pct%). Consider raising max children on the PHP tab.', ['pct' => $fpmPct]) }}</p>
                     @endif
                     @if (! $runtimeHealth['conf_present'])
-                        <p class="mt-1.5 text-[11px] font-medium text-amber-700">{{ __('Pool config not found on disk yet — it’s written on the next webserver apply.') }}</p>
+                        <p class="mt-1.5 text-[11px] font-medium text-amber-700">{{ __('Pool config not found on disk yet — written on the next webserver apply.') }}</p>
                     @endif
                 @endif
             </div>
 
-            {{-- Configured limits (from saved settings — no SSH) --}}
             <dl class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <x-fact-row :label="__('Process manager')" :value="$pmLabel" :mono="false" />
                 <x-fact-row :label="__('Max children')" :value="$pool['max_children']" />
@@ -187,46 +180,32 @@
         </div>
 
         <div class="{{ $panelFoot }}">
-            <div class="flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    wire:click="refreshRuntimeHealth"
-                    wire:loading.attr="disabled"
-                    wire:target="refreshRuntimeHealth"
-                    class="{{ $btnBase }}"
-                >
+            <div class="flex flex-wrap items-center gap-1.5">
+                <button type="button" wire:click="refreshRuntimeHealth" wire:loading.attr="disabled" wire:target="refreshRuntimeHealth" class="{{ $btnBase }}">
                     <x-spinner wire:loading wire:target="refreshRuntimeHealth" variant="forest" class="h-3 w-3" />
                     {{ __('Refresh') }}
                 </button>
                 @can('update', $site)
-                    <button
-                        type="button"
-                        wire:click="reloadFpmPool"
-                        wire:loading.attr="disabled"
-                        wire:target="reloadFpmPool"
-                        class="{{ $btnBase }}"
-                    >
+                    <button type="button" wire:click="reloadFpmPool" wire:loading.attr="disabled" wire:target="reloadFpmPool" class="{{ $btnBase }}">
                         <x-spinner wire:loading wire:target="reloadFpmPool" variant="forest" class="h-3 w-3" />
                         {{ __('Reload pool') }}
                     </button>
                 @endcan
             </div>
-            <a href="{{ $phpTabUrl }}" wire:navigate class="{{ $linkBase }}">{{ __('Tune pool on PHP tab') }} →</a>
+            <a href="{{ $phpTabUrl }}" wire:navigate class="{{ $linkBase }}">{{ __('Tune on PHP tab') }} →</a>
         </div>
     </section>
 @elseif ($site->runtimeHealthProbeKind() === 'port')
     @php $appPort = (int) $site->app_port; @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
-        <div class="{{ $panelHead }}">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-signal class="{{ $panelIcon }}" aria-hidden="true" />
-                    <h2 class="{{ $panelTitle }}">{{ __('App server — listening on port') }}</h2>
-                </div>
-                <p class="{{ $panelNote }}">{{ __('Whether your app process is accepting connections on its localhost port — the reverse-proxy target the webserver forwards to.') }}</p>
-            </div>
-
-            <div class="shrink-0">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-signal"
+            :title="__('App server port')"
+            :note="__('Whether the app process accepts connections on its localhost reverse-proxy target.')"
+        >
+            <x-slot:actions>
                 @if (! $runtimeHealthLoaded)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <x-spinner variant="forest" class="h-3 w-3" />
@@ -235,7 +214,7 @@
                 @elseif ($runtimeHealth === null)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
-                        {{ __('Status unavailable') }}
+                        {{ __('Unavailable') }}
                     </span>
                 @elseif (! empty($runtimeHealth['listening']))
                     <span class="{{ $pillBase }} bg-emerald-50 text-emerald-700 ring-emerald-200">
@@ -248,8 +227,8 @@
                         {{ __('Not listening') }}
                     </span>
                 @endif
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <div class="{{ $panelBody }}">
             <dl class="grid gap-2 sm:grid-cols-2">
@@ -268,18 +247,12 @@
             </dl>
 
             @if ($runtimeHealthLoaded && $runtimeHealth !== null && empty($runtimeHealth['listening']))
-                <p class="mt-2 text-[11px] leading-relaxed text-brand-moss">{{ __('Check the start command and that workers are running — see Workers (Supervisor) or Services (systemd) below. Confirm the app binds to 127.0.0.1 on this port.') }}</p>
+                <p class="mt-2 text-[11px] leading-relaxed text-brand-moss">{{ __('Check the start command and that workers are running — see Workers (Supervisor) or Services (systemd). Confirm the app binds to 127.0.0.1 on this port.') }}</p>
             @endif
         </div>
 
         <div class="{{ $panelFoot }}">
-            <button
-                type="button"
-                wire:click="refreshRuntimeHealth"
-                wire:loading.attr="disabled"
-                wire:target="refreshRuntimeHealth"
-                class="{{ $btnBase }}"
-            >
+            <button type="button" wire:click="refreshRuntimeHealth" wire:loading.attr="disabled" wire:target="refreshRuntimeHealth" class="{{ $btnBase }}">
                 <x-spinner wire:loading wire:target="refreshRuntimeHealth" variant="forest" class="h-3 w-3" />
                 {{ __('Re-check') }}
             </button>
@@ -287,7 +260,7 @@
     </section>
 @endif
 
-{{-- 1b-ii. OPcache (live, read from the FPM worker via wire:init) --}}
+{{-- OPcache --}}
 @if ($site->usesDedicatedPhpFpmPool())
     @php
         $oc = is_array($opcacheStatus) ? $opcacheStatus : null;
@@ -307,16 +280,14 @@
         }
     @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadOpcacheStatus">
-        <div class="{{ $panelHead }}">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-cpu-chip class="{{ $panelIcon }}" aria-hidden="true" />
-                    <h2 class="{{ $panelTitle }}">{{ __('OPcache') }}</h2>
-                </div>
-                <p class="{{ $panelNote }}">{{ __('Live bytecode cache for the FPM workers serving this site. Flush it to force a recompile after an out-of-band code change.') }}</p>
-            </div>
-
-            <div class="shrink-0">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-cpu-chip"
+            :title="__('OPcache')"
+            :note="__('Live bytecode cache for FPM workers. Flush after out-of-band code changes.')"
+        >
+            <x-slot:actions>
                 @if (! $opcacheStatusLoaded)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <x-spinner variant="forest" class="h-3 w-3" />
@@ -325,7 +296,7 @@
                 @elseif ($oc === null)
                     <span class="{{ $pillBase }} bg-white text-brand-moss ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
-                        {{ __('Status unavailable') }}
+                        {{ __('Unavailable') }}
                     </span>
                 @elseif ($ocEnabled)
                     <span class="{{ $pillBase }} {{ $ocPressure ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
@@ -338,14 +309,14 @@
                         {{ __('Disabled') }}
                     </span>
                 @endif
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <div class="{{ $panelBody }}">
             @if (! $opcacheStatusLoaded)
                 <p class="flex items-center gap-2 text-xs text-brand-moss">
                     <x-spinner variant="forest" class="h-3 w-3 shrink-0" />
-                    {{ __('Reading OPcache from the FPM worker…') }}
+                    {{ __('Reading OPcache…') }}
                 </p>
             @elseif ($oc === null)
                 <p class="text-xs text-brand-moss">{{ __('Couldn’t read OPcache from the server just now.') }}</p>
@@ -397,21 +368,14 @@
         </div>
 
         <div class="{{ $panelFoot }}">
-            <button
-                type="button"
-                wire:click="refreshOpcacheStatus"
-                wire:loading.attr="disabled"
-                wire:target="refreshOpcacheStatus"
-                class="{{ $btnBase }}"
-            >
+            <button type="button" wire:click="refreshOpcacheStatus" wire:loading.attr="disabled" wire:target="refreshOpcacheStatus" class="{{ $btnBase }}">
                 <x-spinner wire:loading wire:target="refreshOpcacheStatus" variant="forest" class="h-3 w-3" />
                 {{ __('Refresh') }}
             </button>
             @can('update', $site)
                 <button
                     type="button"
-                    wire:click="resetOpcache"
-                    wire:confirm="{{ __('Flush OPcache for this site? Workers recompile from disk on the next request.') }}"
+                    wire:click="openConfirmActionModal('resetOpcache', [], @js(__('Flush OPcache')), @js(__('Flush OPcache for this site? Workers recompile from disk on the next request.')), @js(__('Flush OPcache')), true)"
                     wire:loading.attr="disabled"
                     wire:target="resetOpcache"
                     class="{{ $btnBase }}"
@@ -424,13 +388,10 @@
     </section>
 @endif
 
-{{-- 1c. Effective PHP limits digest (all PHP sites — pure DB, no SSH) --}}
+{{-- Effective PHP limits --}}
 @if ($site->type === \App\Enums\SiteType::Php)
     @php
         $phpRuntime = is_array($site->meta['php_runtime'] ?? null) ? $site->meta['php_runtime'] : [];
-        // PHP's stock web-SAPI defaults — what's in effect when nothing is
-        // overridden for this site. Shown muted + tagged so an un-tuned limit
-        // still reports a real number instead of the word "Default".
         $phpExec = isset($phpRuntime['max_execution_time']) && $phpRuntime['max_execution_time'] !== '' ? $phpRuntime['max_execution_time'].'s' : null;
         $phpLimits = [
             ['label' => __('Memory limit'), 'value' => $phpRuntime['memory_limit'] ?? null, 'default' => '128M'],
@@ -443,16 +404,17 @@
         $phpTabUrl = route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php']);
     @endphp
     <section class="border-b border-brand-ink/10">
-        <div class="{{ $panelHead }}">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-adjustments-horizontal class="{{ $panelIcon }}" aria-hidden="true" />
-                    <h2 class="{{ $panelTitle }}">{{ __('Effective PHP limits') }}</h2>
-                </div>
-                <p class="{{ $panelNote }}">{{ __('A value tagged “default” is PHP’s built-in setting (nothing overridden here); plain values are your overrides.') }}</p>
-            </div>
-            <a href="{{ $phpTabUrl }}" wire:navigate class="shrink-0 {{ $linkBase }}">{{ __('Edit PHP limits') }} →</a>
-        </div>
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-adjustments-horizontal"
+            :title="__('Effective PHP limits')"
+            :note="__('“Default” = PHP built-in; plain values are your overrides.')"
+        >
+            <x-slot:actions>
+                <a href="{{ $phpTabUrl }}" wire:navigate class="{{ $linkBase }}">{{ __('Edit') }} →</a>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <div class="{{ $panelBody }}">
             <dl class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -470,23 +432,24 @@
     </section>
 @endif
 
-{{-- 1d. Recent errors tail (cheap DB read; full stream on the Errors tab) --}}
+{{-- Recent errors --}}
 @if (! empty($runtimeRecentErrors) && count($runtimeRecentErrors) > 0)
     <section class="border-b border-brand-ink/10">
-        <div class="{{ $panelHead }}">
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-exclamation-triangle class="{{ $panelIcon }}" aria-hidden="true" />
-                    <h2 class="{{ $panelTitle }}">{{ __('Recent errors') }}</h2>
-                </div>
-                <p class="{{ $panelNote }}">{{ __('The latest issues captured for this site. The full history and dismissals live on the Errors tab.') }}</p>
-            </div>
-            <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site]) }}" wire:navigate class="shrink-0 {{ $linkBase }}">{{ __('View all') }} →</a>
-        </div>
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-exclamation-triangle"
+            :title="__('Recent errors')"
+            :note="__('Latest issues for this site. Full history on the Errors tab.')"
+        >
+            <x-slot:actions>
+                <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('View all') }} →</a>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($runtimeRecentErrors as $event)
-                <li class="flex items-start gap-2.5 px-5 py-2.5 sm:px-6">
+                <li class="flex items-start gap-2.5 px-3 py-2 sm:px-4">
                     <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" aria-hidden="true"></span>
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
@@ -504,20 +467,21 @@
     </section>
 @endif
 
-{{-- 2. Detection panel --}}
+{{-- Repository detection --}}
 <section class="border-b border-brand-ink/10">
-    <div class="{{ $panelHead }}">
-        <div class="min-w-0">
-            <div class="flex items-center gap-2">
-                <x-heroicon-o-magnifying-glass-circle class="{{ $panelIcon }}" aria-hidden="true" />
-                <h2 class="{{ $panelTitle }}">{{ __('Repository detection') }}</h2>
-            </div>
-            <p class="{{ $panelNote }}">{{ __('What Dply inferred from your repository. Detection runs on deploy and container inspect.') }}</p>
-        </div>
+    <x-workspace-panel-head
+        dense
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-magnifying-glass-circle"
+        :title="__('Repository detection')"
+        :note="__('Inferred from your repository on deploy and container inspect.')"
+    >
         @if ($resolvedDetection && ! empty($resolvedDetection['confidence']))
-            <span class="{{ $pillBase }} shrink-0 bg-white text-brand-moss ring-brand-ink/10">{{ strtoupper((string) $resolvedDetection['confidence']) }}</span>
+            <x-slot:actions>
+                <span class="{{ $pillBase }} shrink-0 bg-white text-brand-moss ring-brand-ink/10">{{ strtoupper((string) $resolvedDetection['confidence']) }}</span>
+            </x-slot:actions>
         @endif
-    </div>
+    </x-workspace-panel-head>
 
     <div class="{{ $panelBody }}">
         @if ($resolvedDetection)
@@ -562,58 +526,52 @@
     </div>
 </section>
 
-{{-- Background processes callout --}}
+{{-- Workers & schedulers callout (links only — manage under Daemons / Cron) --}}
 @if ($site->type !== \App\Enums\SiteType::Static)
 <section class="border-b border-brand-ink/10">
-    <div class="{{ $panelHead }}">
-        <div class="min-w-0">
-            <div class="flex items-center gap-2">
-                <x-heroicon-o-arrow-path class="{{ $panelIcon }}" aria-hidden="true" />
-                <h2 class="{{ $panelTitle }}">{{ __('Workers & schedulers') }}</h2>
-            </div>
-            <p class="{{ $panelNote }}">
-                @if (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
-                    {{ __('Queue workers and Horizon run under Workers (Supervisor). Scheduled tasks use Cron or the Laravel tab.') }}
-                @elseif ($site->isRailsFrameworkDetected())
-                    {{ __('Sidekiq and Solid Queue run under Workers (Supervisor). Optional systemd workers are on the Services page.') }}
-                @else
-                    {{ __('App servers: set start command and port above. Workers can use systemd (Services) or Supervisor (Workers).') }}
+    <x-workspace-panel-head
+        dense
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-arrow-path"
+        :title="__('Workers & schedulers')"
+        :note="$workersSchedulersNote"
+    >
+        <x-slot:actions>
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Workers') }} →</a>
+                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Cron') }} →</a>
+                @if (\App\Models\Site::supportsSystemdServices($site, $server))
+                    <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Services') }} →</a>
                 @endif
-            </p>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Workers') }} →</a>
-            <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Cron jobs') }} →</a>
-            @if (\App\Models\Site::supportsSystemdServices($site, $server))
-                <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Services (systemd)') }} →</a>
-            @endif
-            @if ($site->isLaravelFrameworkDetected())
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Laravel') }} →</a>
-            @endif
-            @if ($site->isRailsFrameworkDetected())
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'rails-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Rails') }} →</a>
-            @endif
-        </div>
-    </div>
+                @if ($site->isLaravelFrameworkDetected())
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Laravel') }} →</a>
+                @endif
+                @if ($site->isRailsFrameworkDetected())
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'rails-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Rails') }} →</a>
+                @endif
+            </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 </section>
 @endif
 
-{{-- 4. Container lifecycle (Docker only) --}}
+{{-- Docker --}}
 @if ($site->usesDockerRuntime())
     @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
         <section class="border-b border-brand-ink/10">
-            <div class="{{ $panelHead }}">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <x-heroicon-o-cube class="{{ $panelIcon }}" aria-hidden="true" />
-                        <h2 class="{{ $panelTitle }}">{{ __('Docker discovery') }}</h2>
-                    </div>
-                    <p class="{{ $panelNote }}">{{ __('Saved from the live Docker runtime so hostname, IP, and container identity stay referenceable later.') }}</p>
-                </div>
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-cube"
+                :title="__('Docker discovery')"
+                :note="__('Saved from the live Docker runtime — hostname, IP, and container identity.')"
+            >
                 @if (! empty($dockerRuntimeDetails['collected_at']))
-                    <p class="shrink-0 font-mono text-[11px] text-brand-moss">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                    <x-slot:actions>
+                        <p class="font-mono text-[11px] text-brand-moss">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                    </x-slot:actions>
                 @endif
-            </div>
+            </x-workspace-panel-head>
 
             <div class="{{ $panelBody }} space-y-2">
                 <dl class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -629,11 +587,11 @@
                             <table class="min-w-full divide-y divide-brand-ink/10 text-left">
                                 <thead class="bg-brand-sand/40">
                                     <tr>
-                                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Name') }}</th>
-                                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Service') }}</th>
-                                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Hostname') }}</th>
-                                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('IP') }}</th>
-                                        <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('State') }}</th>
+                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Name') }}</th>
+                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Service') }}</th>
+                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Hostname') }}</th>
+                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('IP') }}</th>
+                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('State') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/10 bg-white">
@@ -657,23 +615,21 @@
 
     @if ($site->usesLocalDockerHostRuntime())
         <section class="border-b border-brand-ink/10">
-            <div class="{{ $panelHead }}">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <x-heroicon-o-arrows-pointing-out class="{{ $panelIcon }}" aria-hidden="true" />
-                        <h2 class="{{ $panelTitle }}">{{ __('Container lifecycle') }}</h2>
-                    </div>
-                    <p class="{{ $panelNote }}">{{ __('Lifecycle and inspection for the local container runtime behind this app. Output, logs, and historical operations live on the Logs tab.') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-arrows-pointing-out"
+                :title="__('Container lifecycle')"
+                :note="__('Lifecycle and inspection. Output and logs live on the Logs tab.')"
+            />
 
-            <div class="{{ $panelBody }} flex flex-wrap items-center gap-2">
-                <button type="button" wire:click="runRuntimeAction('rebuild')" class="rounded-lg bg-brand-ink px-3 py-1 text-xs font-semibold text-white hover:bg-brand-ink/90">{{ __('Rebuild') }}</button>
+            <div class="{{ $panelBody }} flex flex-wrap items-center gap-1.5">
+                <button type="button" wire:click="runRuntimeAction('rebuild')" class="rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-ink/90">{{ __('Rebuild') }}</button>
                 <button type="button" wire:click="runRuntimeAction('start')" class="{{ $btnBase }}">{{ __('Start') }}</button>
                 <button type="button" wire:click="runRuntimeAction('stop')" class="{{ $btnBase }}">{{ __('Stop') }}</button>
                 <button type="button" wire:click="runRuntimeAction('restart')" class="{{ $btnBase }}">{{ __('Restart') }}</button>
                 <span class="mx-1 h-4 w-px bg-brand-ink/10" aria-hidden="true"></span>
-                <button type="button" wire:click="runRuntimeAction('inspect')" class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100">{{ __('Refresh Docker details') }}</button>
+                <button type="button" wire:click="runRuntimeAction('inspect')" class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100">{{ __('Refresh Docker') }}</button>
                 <button type="button" wire:click="runRuntimeAction('status')" class="{{ $btnBase }}">{{ __('Status') }}</button>
             </div>
 
@@ -685,17 +641,17 @@
     @endif
 @endif
 
-{{-- 5. Working directory — one line, not a panel --}}
-<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2.5 sm:px-6">
-    <div class="flex shrink-0 items-center gap-2">
-        <x-heroicon-o-folder class="{{ $panelIcon }}" aria-hidden="true" />
+{{-- Working directory --}}
+<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+    <div class="flex shrink-0 items-center gap-1.5">
+        <x-heroicon-o-folder class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
         <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Working directory') }}</span>
     </div>
     <code class="min-w-0 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</code>
 </div>
 
-{{-- 6. CLI snippets --}}
-<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+{{-- CLI --}}
+<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
     <x-cli-snippet :commands="[
         ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=node --runtime-version=22'],
         ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],

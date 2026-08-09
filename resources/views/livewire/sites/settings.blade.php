@@ -100,6 +100,18 @@
                             @endif
 
                             <section class="dply-card min-w-0 overflow-hidden p-0">
+                                <x-workspace-panel-head
+                                    dense
+                                    class="border-b border-brand-ink/10"
+                                    :icon="$sectionHeader['icon']"
+                                    :title="$sectionHeader['title']"
+                                    :note="$sectionDescription"
+                                >
+                                    <x-slot:actions>
+                                        @include('livewire.sites.partials.header-role-badge')
+                                    </x-slot:actions>
+                                </x-workspace-panel-head>
+
                                 @include('livewire.sites.settings.partials.general-tab', ['generalTabSkipChooseApp' => true])
 
                                 @if ($generalRecentDeployments->isNotEmpty())
@@ -109,7 +121,7 @@
                                     ])
                                 @endif
 
-                                <div class="px-5 py-5 sm:px-6">
+                                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
                                     <x-cli-snippet :commands="[
                                         ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
                                         ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
@@ -39,6 +40,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class ServerlessRouting extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public Server $server;

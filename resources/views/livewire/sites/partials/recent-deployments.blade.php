@@ -1,18 +1,21 @@
 @php
     /** @var bool $asStrip When true, nest as a hairline strip inside a parent dply-card. */
     $asStrip = (bool) ($asStrip ?? false);
+    $rowPad = $asStrip ? 'px-3 py-2 sm:px-4' : 'px-5 py-2.5 sm:px-6';
+    $detailPad = $asStrip ? 'px-3 py-2.5 sm:px-4' : 'px-5 py-3 sm:px-6';
 @endphp
 <section @class([$asStrip ? 'border-b border-brand-ink/10' : 'dply-card overflow-hidden'])>
     <x-workspace-panel-head
+        :dense="$asStrip"
         class="border-b border-brand-ink/10"
         icon="heroicon-o-rocket-launch"
         :title="__('Recent deployments')"
-        :note="__('Per-phase build → swap → release → restart status. Expand a row for step detail.')"
+        :note="__('Per-phase build → swap → release → restart. Expand a row for step detail.')"
         :count="trans_choice('{1} 1 with phase data|[2,*] :count with phase data', $deployments->count(), ['count' => $deployments->count()])"
     >
         <x-slot:actions>
             <a href="{{ route('sites.deployments.index', ['server' => $site->server, 'site' => $site]) }}" wire:navigate
-                class="text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline">
+                class="text-[11px] font-semibold text-brand-forest hover:text-brand-sage hover:underline">
                 {{ __('View all →') }}
             </a>
         </x-slot:actions>
@@ -49,10 +52,10 @@
                      element within a summary" a11y warning) and is inconsistently
                      reachable by keyboard/AT. Positioned over the row's right edge. --}}
                 <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate
-                    class="absolute right-10 top-2.5 z-10 hidden shrink-0 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-mist hover:bg-brand-sand/70 hover:text-brand-moss sm:right-12 sm:inline-block"
+                    class="absolute right-10 top-2 z-10 hidden shrink-0 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-mist hover:bg-brand-sand/70 hover:text-brand-moss sm:right-12 sm:inline-block"
                     title="{{ __('Open deployment detail') }}">{{ \Illuminate\Support\Str::limit((string) $deployment->id, 12, '…') }}</a>
                 <details class="group">
-                    <summary class="flex cursor-pointer list-none items-center gap-2.5 px-5 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-6 [&::-webkit-details-marker]:hidden">
+                    <summary class="flex cursor-pointer list-none items-center gap-2 {{ $rowPad }} transition-colors hover:bg-brand-sand/15 [&::-webkit-details-marker]:hidden">
                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold {{ $dotClasses }} {{ $status === 'running' ? 'animate-pulse' : '' }}" aria-hidden="true">{{ $glyph }}</span>
 
                         <div class="min-w-0 flex-1">
@@ -74,7 +77,7 @@
                                     </span>
                                 @endif
                             </div>
-                            <div class="mt-1 flex flex-wrap gap-1">
+                            <div class="mt-0.5 flex flex-wrap gap-1">
                                 @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
                                     @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                         <span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] {{ $deployment->phaseOk($phase) ? 'bg-brand-sage/12 text-brand-forest' : 'bg-rose-50 text-rose-700' }}">
@@ -92,7 +95,7 @@
                         <x-heroicon-o-chevron-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-90" aria-hidden="true" />
                     </summary>
 
-                    <div class="space-y-2.5 border-t border-brand-ink/10 bg-brand-sand/10 px-5 py-3 sm:px-6">
+                    <div class="space-y-2 border-t border-brand-ink/10 bg-brand-sand/10 {{ $detailPad }}">
                         @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
                             @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                 <div>

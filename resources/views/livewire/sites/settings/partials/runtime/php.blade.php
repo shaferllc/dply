@@ -168,7 +168,7 @@
             class="border-b border-brand-ink/10"
             icon="heroicon-o-rectangle-stack"
             :title="__('PHP-FPM pool')"
-            :note="__('Dedicated process pool for this site — :socket', ['socket' => $site->phpFpmListenSocketPath()])"
+            :note="__('Dedicated process pool — tune process manager and request ceiling.')"
         >
             <x-slot:actions>
                 <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="savePhpFpmPool">
@@ -179,6 +179,7 @@
         </x-workspace-panel-head>
 
         <div class="{{ $panelBody }} space-y-3">
+            <p class="font-mono text-[11px] text-brand-moss">{{ $site->phpFpmListenSocketPath() }}</p>
             <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <x-input-label for="fpm_pm" value="Process manager" class="!text-xs" />
