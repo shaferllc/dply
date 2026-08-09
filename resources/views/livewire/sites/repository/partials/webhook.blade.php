@@ -131,10 +131,14 @@
                 </p>
             @endif
 
-            @include('livewire.sites.repository.partials.poll-log', [
-                'isPoll' => $connectionQuickDeploy && $isPoll,
-                'pollLog' => $pollLog,
-            ])
+            @if (($connectionQuickDeploy && $isPoll) || $pollLog !== [])
+                <div class="border-t border-brand-ink/10 pt-3">
+                    @include('livewire.sites.repository.partials.poll-log', [
+                        'isPoll' => $connectionQuickDeploy && $isPoll,
+                        'pollLog' => $pollLog,
+                    ])
+                </div>
+            @endif
 
             <details class="group rounded-lg border border-brand-ink/10 bg-white">
                 <summary class="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold text-brand-ink marker:content-none [&::-webkit-details-marker]:hidden">

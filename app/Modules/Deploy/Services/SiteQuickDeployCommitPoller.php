@@ -69,10 +69,18 @@ final class SiteQuickDeployCommitPoller
         $resolved = $this->resolveTipShaDetailed($site);
         $tip = $resolved['sha'];
         if ($tip === null || $tip === '') {
-            $message = $resolved['error'] !== null && $resolved['error'] !== ''
-                ? __('Git API error: :err', ['err' => Str::limit($resolved['error'], 120)])
-                : __('Could not resolve branch tip');
-            $this->recordCheck($site, tip: '', outcome: 'error', message: $message, skipReason: 'tip_unresolved');
+            $httpStatus = $resolved['http_status'] ?? null;
+            $errorKind = $this->errorKindFromResolved($resolved);
+            $message = $this->tipUnresolvedMessage($resolved);
+            $this->recordCheck(
+                $site,
+                tip: '',
+                outcome: 'error',
+                message: $message,
+                skipReason: 'tip_unresolved',
+                httpStatus: $httpStatus,
+                errorKind: $errorKind,
+            );
 
             return $this->result(true, false, null, 'tip_unresolved', 'error', $message);
         }
@@ -111,23 +119,23 @@ final class SiteQuickDeployCommitPoller
     }
 
     /**
-     * @return array{sha: string|null, error: string|null}
+     * @return array{sha: string|null, error: string|null, http_status: int|null}
      */
     public function resolveTipShaDetailed(Site $site): array
     {
         $provider = $this->detectProviderKind((string) ($site->git_repository_url ?? ''));
         if (! in_array($provider, ['github', 'gitlab', 'bitbucket'], true)) {
-            return ['sha' => null, 'error' => __('Unsupported Git provider')];
+            return ['sha' => null, 'error' => __('Unsupported Git provider'), 'http_status' => null];
         }
 
         $identity = $this->resolveIdentity($site, $provider);
         if ($identity === null) {
-            return ['sha' => null, 'error' => __('No linked source-control account')];
+            return ['sha' => null, 'error' => __('No linked source-control account'), 'http_status' => null];
         }
 
         $ref = GitRemoteRepositoryRef::parse((string) $site->git_repository_url, $provider);
         if ($ref === null) {
-            return ['sha' => null, 'error' => __('Could not parse repository URL')];
+            return ['sha' => null, 'error' => __('Could not parse repository URL'), 'http_status' => null];
         }
 
         $branch = trim((string) ($site->git_branch ?: 'main')) ?: 'main';
@@ -136,7 +144,7 @@ final class SiteQuickDeployCommitPoller
             'github' => $this->tipGithub($identity, $ref, $branch),
             'gitlab' => $this->tipGitlab($identity, $ref, $branch),
             'bitbucket' => $this->tipBitbucket($identity, $ref, $branch),
-            default => ['sha' => null, 'error' => __('Unsupported Git provider')],
+            default => ['sha' => null, 'error' => __('Unsupported Git provider'), 'http_status' => null],
         };
     }
 
@@ -160,6 +168,8 @@ final class SiteQuickDeployCommitPoller
         string $outcome,
         string $message,
         ?string $skipReason,
+        ?int $httpStatus = null,
+        ?string $errorKind = null,
     ): void {
         $at = now()->toIso8601String();
         $entry = [
@@ -168,6 +178,8 @@ final class SiteQuickDeployCommitPoller
             'sha_short' => $tip !== '' ? Str::substr($tip, 0, 7) : null,
             'outcome' => $outcome,
             'message' => $message,
+            'http_status' => $httpStatus,
+            'error_kind' => $errorKind,
         ];
 
         $existing = $site->repositoryMeta()['poll_log'] ?? [];
@@ -186,6 +198,46 @@ final class SiteQuickDeployCommitPoller
 
         $site->mergeRepositoryMeta($patch);
         $site->save();
+    }
+
+    /**
+     * @param  array{sha: string|null, error: string|null, http_status: int|null}  $resolved
+     */
+    private function tipUnresolvedMessage(array $resolved): string
+    {
+        $status = $resolved['http_status'] ?? null;
+        if (in_array($status, [401, 403], true)) {
+            return __('Source control denied access (HTTP :status)', ['status' => $status]);
+        }
+
+        $error = $resolved['error'] ?? null;
+        if (is_string($error) && $error !== '') {
+            if (str_contains(strtolower($error), 'no linked source-control')) {
+                return __('No linked source-control account');
+            }
+
+            return __('Git API error: :err', ['err' => Str::limit($error, 120)]);
+        }
+
+        return __('Could not resolve branch tip');
+    }
+
+    /**
+     * @param  array{sha: string|null, error: string|null, http_status: int|null}  $resolved
+     */
+    private function errorKindFromResolved(array $resolved): ?string
+    {
+        $status = $resolved['http_status'] ?? null;
+        if (in_array($status, [401, 403], true)) {
+            return 'auth';
+        }
+
+        $error = strtolower((string) ($resolved['error'] ?? ''));
+        if ($error !== '' && str_contains($error, 'no linked source-control')) {
+            return 'no_account';
+        }
+
+        return null;
     }
 
     private function resolveIdentity(Site $site, string $provider): ?GitIdentity
@@ -224,12 +276,12 @@ final class SiteQuickDeployCommitPoller
     }
 
     /**
-     * @return array{sha: string|null, error: string|null}
+     * @return array{sha: string|null, error: string|null, http_status: int|null}
      */
     private function tipGithub(GitIdentity $identity, GitRemoteRepositoryRef $ref, string $branch): array
     {
         if ($ref->owner === null || $ref->repo === null) {
-            return ['sha' => null, 'error' => __('Invalid GitHub repository path')];
+            return ['sha' => null, 'error' => __('Invalid GitHub repository path'), 'http_status' => null];
         }
 
         $response = Http::withHeaders([
@@ -245,24 +297,24 @@ final class SiteQuickDeployCommitPoller
             ]);
 
         if (! $response->successful()) {
-            return ['sha' => null, 'error' => 'HTTP '.$response->status()];
+            return ['sha' => null, 'error' => 'HTTP '.$response->status(), 'http_status' => $response->status()];
         }
 
         $sha = $response->json('0.sha');
 
         return is_string($sha) && $sha !== ''
-            ? ['sha' => $sha, 'error' => null]
-            : ['sha' => null, 'error' => __('Empty commit list')];
+            ? ['sha' => $sha, 'error' => null, 'http_status' => null]
+            : ['sha' => null, 'error' => __('Empty commit list'), 'http_status' => null];
     }
 
     /**
-     * @return array{sha: string|null, error: string|null}
+     * @return array{sha: string|null, error: string|null, http_status: int|null}
      */
     private function tipGitlab(GitIdentity $identity, GitRemoteRepositoryRef $ref, string $branch): array
     {
         $path = $ref->gitlabProjectPath;
         if ($path === null || $path === '') {
-            return ['sha' => null, 'error' => __('Invalid GitLab project path')];
+            return ['sha' => null, 'error' => __('Invalid GitLab project path'), 'http_status' => null];
         }
 
         $response = Http::withToken($identity->accessToken())
@@ -274,23 +326,23 @@ final class SiteQuickDeployCommitPoller
             ]);
 
         if (! $response->successful()) {
-            return ['sha' => null, 'error' => 'HTTP '.$response->status()];
+            return ['sha' => null, 'error' => 'HTTP '.$response->status(), 'http_status' => $response->status()];
         }
 
         $sha = $response->json('0.id');
 
         return is_string($sha) && $sha !== ''
-            ? ['sha' => $sha, 'error' => null]
-            : ['sha' => null, 'error' => __('Empty commit list')];
+            ? ['sha' => $sha, 'error' => null, 'http_status' => null]
+            : ['sha' => null, 'error' => __('Empty commit list'), 'http_status' => null];
     }
 
     /**
-     * @return array{sha: string|null, error: string|null}
+     * @return array{sha: string|null, error: string|null, http_status: int|null}
      */
     private function tipBitbucket(GitIdentity $identity, GitRemoteRepositoryRef $ref, string $branch): array
     {
         if ($ref->owner === null || $ref->repo === null) {
-            return ['sha' => null, 'error' => __('Invalid Bitbucket repository path')];
+            return ['sha' => null, 'error' => __('Invalid Bitbucket repository path'), 'http_status' => null];
         }
 
         $response = Http::withToken($identity->accessToken())
@@ -301,14 +353,14 @@ final class SiteQuickDeployCommitPoller
             ]);
 
         if (! $response->successful()) {
-            return ['sha' => null, 'error' => 'HTTP '.$response->status()];
+            return ['sha' => null, 'error' => 'HTTP '.$response->status(), 'http_status' => $response->status()];
         }
 
         $sha = $response->json('values.0.hash') ?? $response->json('hash');
 
         return is_string($sha) && $sha !== ''
-            ? ['sha' => $sha, 'error' => null]
-            : ['sha' => null, 'error' => __('Empty commit list')];
+            ? ['sha' => $sha, 'error' => null, 'http_status' => null]
+            : ['sha' => null, 'error' => __('Empty commit list'), 'http_status' => null];
     }
 
     private function detectProviderKind(string $url): string

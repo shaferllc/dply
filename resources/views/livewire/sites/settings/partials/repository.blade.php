@@ -298,7 +298,7 @@
             </div>
         </div>
         @if (($quick_deploy_enabled_ui && $qdIsPoll) || $pollLog !== [])
-            <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-8">
+            <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-8">
                 @include('livewire.sites.repository.partials.poll-log', [
                     'isPoll' => $quick_deploy_enabled_ui && $qdIsPoll,
                     'pollLog' => $pollLog,
