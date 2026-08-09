@@ -27,7 +27,7 @@
 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Dply cloud') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Dply cloud') }}</p>
             <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ __('Container deployment') }}</h2>
             <p class="mt-1 text-sm text-slate-600">
                 @if ($isSourceMode)
@@ -37,7 +37,7 @@
                 @endif
             </p>
         </div>
-        <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ $statusBadgeClass }}">
+        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] {{ $statusBadgeClass }}">
             {{ $statusLabel }}
         </span>
     </div>
@@ -54,27 +54,27 @@
 
     <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Backend') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Backend') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ $backendLabel }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Region') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Region') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ $site->container_region ?: '—' }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Port') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Port') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ $site->container_port ?: '—' }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Instances') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Instances') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ (int) ($containerMeta['instance_count'] ?? 1) }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Size') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Size') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">{{ ucfirst((string) ($containerMeta['size_tier'] ?? 'small')) }}</dd>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Live URL') }}</dt>
+            <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Live URL') }}</dt>
             <dd class="mt-1 text-sm font-medium text-slate-900">
                 @if ($liveUrl)
                     <a href="{{ $liveUrl }}" target="_blank" rel="noopener" class="break-all text-sky-700 hover:underline">{{ $liveUrl }}</a>
@@ -87,31 +87,31 @@
 
     @if ($isSourceMode)
         <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Source') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Source') }}</p>
             <dl class="mt-2 grid gap-3 sm:grid-cols-2">
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Repository') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Repository') }}</dt>
                     <dd class="mt-1 break-all font-mono text-xs text-slate-900">
                         <a href="https://github.com/{{ $sourceSpec['repo'] ?? '' }}" target="_blank" rel="noopener" class="text-sky-700 hover:underline">{{ $sourceSpec['repo'] ?? '—' }}</a>
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Branch') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Branch') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-slate-900">{{ $sourceSpec['branch'] ?? 'main' }}</dd>
                 </div>
                 @if (! empty($sourceSpec['dockerfile_path']))
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Dockerfile') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Dockerfile') }}</dt>
                         <dd class="mt-1 font-mono text-xs text-slate-900">{{ $sourceSpec['dockerfile_path'] }}</dd>
                     </div>
                 @endif
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Auto-deploy on push') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Auto-deploy on push') }}</dt>
                     <dd class="mt-1 text-xs">
                         @if (! array_key_exists('deploy_on_push', $sourceSpec) || $sourceSpec['deploy_on_push'])
-                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Enabled') }}</span>
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Enabled') }}</span>
                         @else
-                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">{{ __('Disabled') }}</span>
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-slate-700">{{ __('Disabled') }}</span>
                         @endif
                     </dd>
                 </div>
@@ -126,7 +126,7 @@
         </div>
     @else
         <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <label for="container_image_input" class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image reference') }}</label>
+            <label for="container_image_input" class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image reference') }}</label>
             <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input id="container_image_input" wire:model="container_image_input" type="text" class="block w-full rounded-md border-slate-300 font-mono text-sm shadow-sm" placeholder="ghcr.io/acme/api:v1.2.3" />
                 <button type="button" wire:click="redeployContainer" wire:loading.attr="disabled" wire:target="redeployContainer" class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
@@ -143,7 +143,7 @@
     @endphp
     @if (! $isSourceMode && count($imageHistory) > 1)
         <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image history') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Image history') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Click Roll back to redeploy a previous image tag. The current tag is highlighted.') }}</p>
             <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
                 @foreach ($imageHistory as $entry)
@@ -154,11 +154,11 @@
                         <div class="min-w-0">
                             <p class="break-all font-mono text-slate-900">{{ $entry['image'] ?? '—' }}</p>
                             @if (! empty($entry['deployed_at']))
-                                <p class="mt-0.5 text-[10px] text-slate-500">{{ __('Deployed :at', ['at' => $entry['deployed_at']]) }}</p>
+                                <p class="mt-0.5 text-2xs text-slate-500">{{ __('Deployed :at', ['at' => $entry['deployed_at']]) }}</p>
                             @endif
                         </div>
                         @if ($isCurrent)
-                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Current') }}</span>
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Current') }}</span>
                         @else
                             <button type="button" wire:click="rollbackContainerImage('{{ $entry['image'] }}')" wire:confirm="{{ __('Roll back to :img? The backend will redeploy with this tag.', ['img' => $entry['image']]) }}" class="text-xs font-medium text-sky-700 hover:text-sky-900">{{ __('Roll back') }}</button>
                         @endif
@@ -172,7 +172,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Environment variables') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Environment variables') }}</p>
                 <p class="mt-1 text-xs text-slate-500">{{ __('Edit and click Save & redeploy. The backend\'s spec is updated and a fresh roll is queued.') }}</p>
             </div>
             <button type="button" wire:click="saveContainerEnvAndRedeploy" wire:loading.attr="disabled" wire:target="saveContainerEnvAndRedeploy" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 disabled:opacity-50">
@@ -182,14 +182,14 @@
         </div>
         <div class="mt-3 grid gap-4 lg:grid-cols-2">
             <div>
-                <label for="container_env_file_input" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Runtime') }}</label>
-                <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Available at run-time only.') }}</p>
+                <label for="container_env_file_input" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Runtime') }}</label>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('Available at run-time only.') }}</p>
                 <textarea id="container_env_file_input" wire:model="container_env_file_input" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
                 <x-input-error :messages="$errors->get('container_env_file_input')" class="mt-2" />
             </div>
             <div>
-                <label for="container_build_env_file_input" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Build-time') }}</label>
-                <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Available during build, hidden at runtime. Use for private package tokens.') }}</p>
+                <label for="container_build_env_file_input" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Build-time') }}</label>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('Available during build, hidden at runtime. Use for private package tokens.') }}</p>
                 <textarea id="container_build_env_file_input" wire:model="container_build_env_file_input" rows="6" class="mt-2 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="NPM_TOKEN=ghp_xxx&#10;COMPOSER_AUTH={...}"></textarea>
                 <x-input-error :messages="$errors->get('container_build_env_file_input')" class="mt-2" />
             </div>
@@ -218,7 +218,7 @@
     @endphp
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Managed databases') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Managed databases') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Attach a managed database and dply injects its connection env vars (DB_* / REDIS_*) and redeploys. Detaching strips exactly those keys.') }}</p>
         </div>
 
@@ -281,7 +281,7 @@
     @endphp
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3" wire:key="workers-section">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Workers & scheduler') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Workers & scheduler') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Background processes that run alongside the web service — queue workers and the Laravel scheduler. They run the same code as the web process.') }}</p>
         </div>
 
@@ -297,9 +297,9 @@
                         <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm" wire:key="worker-{{ $worker->id }}">
                             <div class="min-w-0">
                                 <span class="font-medium text-slate-900 break-all">{{ $worker->name }}</span>
-                                <span class="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">{{ $worker->type }}</span>
-                                <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $workerStatusClass($worker->status) }}">{{ $worker->status }}</span>
-                                <p class="mt-0.5 font-mono text-[11px] text-slate-500 break-all">{{ $worker->effectiveCommand() }} · ×{{ $worker->effectiveInstanceCount() }} · {{ ucfirst((string) $worker->size) }}</p>
+                                <span class="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-slate-600">{{ $worker->type }}</span>
+                                <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $workerStatusClass($worker->status) }}">{{ $worker->status }}</span>
+                                <p class="mt-0.5 font-mono text-xs text-slate-500 break-all">{{ $worker->effectiveCommand() }} · ×{{ $worker->effectiveInstanceCount() }} · {{ ucfirst((string) $worker->size) }}</p>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
                                 @unless ($worker->isScheduler())
@@ -321,7 +321,7 @@
             @endif
 
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Add a queue worker') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Add a queue worker') }}</p>
                 <div class="flex flex-col gap-2 sm:flex-row">
                     <input type="text" wire:model="container_worker_command_input" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="php artisan queue:work" />
                     <select wire:model="container_worker_size_input" class="rounded-md border-slate-300 text-xs shadow-sm">
@@ -340,7 +340,7 @@
 
             <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Laravel scheduler') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Laravel scheduler') }}</p>
                     <p class="mt-0.5 text-xs text-slate-500">
                         @if ($scheduler)
                             {{ __('Enabled — running `php artisan schedule:work` on one instance.') }}
@@ -369,7 +369,7 @@
     @endphp
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4" wire:key="scaling-section">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Scaling & health') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Scaling & health') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('CPU-target autoscaling and an HTTP health check, pushed into the backend deployment spec.') }}</p>
         </div>
 
@@ -385,34 +385,34 @@
                     <input type="checkbox" wire:model.live="container_autoscaling_enabled" class="rounded border-slate-300 text-sky-700 shadow-sm" />
                     <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{{ __('Autoscaling') }}</span>
                 </label>
-                <p class="text-[11px] text-slate-500">{{ __('When on, the backend scales the web service between the min and max instance counts to hold the target CPU. The fixed instance count is superseded.') }}</p>
+                <p class="text-xs text-slate-500">{{ __('When on, the backend scales the web service between the min and max instance counts to hold the target CPU. The fixed instance count is superseded.') }}</p>
 
                 @if ($container_autoscaling_enabled)
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div>
-                            <label for="container_autoscaling_min" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Min instances') }}</label>
+                            <label for="container_autoscaling_min" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Min instances') }}</label>
                             <input id="container_autoscaling_min" type="number" min="1" wire:model="container_autoscaling_min" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_autoscaling_max" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Max instances') }}</label>
+                            <label for="container_autoscaling_max" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Max instances') }}</label>
                             <input id="container_autoscaling_max" type="number" min="1" wire:model="container_autoscaling_max" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_autoscaling_cpu" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Target CPU %') }}</label>
+                            <label for="container_autoscaling_cpu" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Target CPU %') }}</label>
                             <input id="container_autoscaling_cpu" type="number" min="1" max="100" wire:model="container_autoscaling_cpu" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                     </div>
-                    <div class="rounded-md bg-sky-50 p-2 text-[11px] text-sky-900">
+                    <div class="rounded-md bg-sky-50 p-2 text-xs text-sky-900">
                         {{ __('The manual instance count (currently :n) is superseded while autoscaling is on.', ['n' => (int) ($containerMeta['instance_count'] ?? 1)]) }}
                     </div>
                 @else
-                    <p class="text-[11px] text-slate-500">{{ __('Autoscaling is off — the site runs a fixed :n instance(s).', ['n' => (int) ($containerMeta['instance_count'] ?? 1)]) }}</p>
+                    <p class="text-xs text-slate-500">{{ __('Autoscaling is off — the site runs a fixed :n instance(s).', ['n' => (int) ($containerMeta['instance_count'] ?? 1)]) }}</p>
                 @endif
 
                 @if ($isAppRunner)
-                    <p class="rounded-md bg-amber-50 p-2 text-[11px] text-amber-900">{{ __('On AWS App Runner, autoscaling uses a concurrency-driven AutoScalingConfiguration (min/max size). The CPU target is recorded as intent only.') }}</p>
+                    <p class="rounded-md bg-amber-50 p-2 text-xs text-amber-900">{{ __('On AWS App Runner, autoscaling uses a concurrency-driven AutoScalingConfiguration (min/max size). The CPU target is recorded as intent only.') }}</p>
                     @if ($autoscalingNote)
-                        <p class="rounded-md bg-slate-100 p-2 text-[11px] text-slate-700 break-words">{{ $autoscalingNote }}</p>
+                        <p class="rounded-md bg-slate-100 p-2 text-xs text-slate-700 break-words">{{ $autoscalingNote }}</p>
                     @endif
                 @endif
 
@@ -428,41 +428,41 @@
                     <input type="checkbox" wire:model.live="container_health_check_enabled" class="rounded border-slate-300 text-sky-700 shadow-sm" />
                     <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{{ __('HTTP health check') }}</span>
                 </label>
-                <p class="text-[11px] text-slate-500">{{ __('The backend probes this path and only routes traffic to instances that respond healthy.') }}</p>
+                <p class="text-xs text-slate-500">{{ __('The backend probes this path and only routes traffic to instances that respond healthy.') }}</p>
 
                 @if ($container_health_check_enabled)
                     <div>
-                        <label for="container_health_check_path" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('HTTP path') }}</label>
+                        <label for="container_health_check_path" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('HTTP path') }}</label>
                         <input id="container_health_check_path" type="text" wire:model="container_health_check_path" class="mt-1 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="/health" />
                     </div>
                     <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
                         <div>
-                            <label for="container_health_check_initial_delay" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Initial delay (s)') }}</label>
+                            <label for="container_health_check_initial_delay" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Initial delay (s)') }}</label>
                             <input id="container_health_check_initial_delay" type="number" min="0" wire:model="container_health_check_initial_delay" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_health_check_period" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Period (s)') }}</label>
+                            <label for="container_health_check_period" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Period (s)') }}</label>
                             <input id="container_health_check_period" type="number" min="1" wire:model="container_health_check_period" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_health_check_timeout" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Timeout (s)') }}</label>
+                            <label for="container_health_check_timeout" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Timeout (s)') }}</label>
                             <input id="container_health_check_timeout" type="number" min="1" wire:model="container_health_check_timeout" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_health_check_success" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Success threshold') }}</label>
+                            <label for="container_health_check_success" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Success threshold') }}</label>
                             <input id="container_health_check_success" type="number" min="1" wire:model="container_health_check_success" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label for="container_health_check_failure" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Failure threshold') }}</label>
+                            <label for="container_health_check_failure" class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Failure threshold') }}</label>
                             <input id="container_health_check_failure" type="number" min="1" wire:model="container_health_check_failure" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
                         </div>
                     </div>
                 @else
-                    <p class="text-[11px] text-slate-500">{{ __('Health check is off — the backend uses its default readiness behaviour.') }}</p>
+                    <p class="text-xs text-slate-500">{{ __('Health check is off — the backend uses its default readiness behaviour.') }}</p>
                 @endif
 
                 @if ($isAppRunner)
-                    <p class="rounded-md bg-amber-50 p-2 text-[11px] text-amber-900">{{ __('On AWS App Runner the health check maps to the service HealthCheckConfiguration. App Runner has no "initial delay" — that field is ignored.') }}</p>
+                    <p class="rounded-md bg-amber-50 p-2 text-xs text-amber-900">{{ __('On AWS App Runner the health check maps to the service HealthCheckConfiguration. App Runner has no "initial delay" — that field is ignored.') }}</p>
                 @endif
 
                 <button type="button" wire:click="saveContainerHealthCheck" wire:loading.attr="disabled" wire:target="saveContainerHealthCheck" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
@@ -475,16 +475,16 @@
 
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
         <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('GitHub webhook') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('GitHub webhook') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Paste this URL + the site\'s webhook secret into your repository\'s GitHub webhook settings. dply will spawn previews on PR open / sync, tear them down on PR close, and redeploy on push to the source branch.') }}</p>
             <div class="mt-3 grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center">
-                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Payload URL') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Payload URL') }}</span>
                 <input type="text" readonly value="{{ $site->cloudGithubHookUrl() }}" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" onclick="this.select()" />
-                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Content type') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Content type') }}</span>
                 <code class="rounded bg-slate-100 px-2 py-1 text-xs">application/json</code>
-                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Secret') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Secret') }}</span>
                 <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'notifications']) }}" wire:navigate class="text-xs text-sky-700 hover:underline">{{ __('Open Settings → Webhooks to reveal & rotate the secret') }} →</a>
-                <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Events') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Events') }}</span>
                 <span class="text-xs text-slate-700">{{ __('"Pushes" + "Pull requests" (or "Send me everything").') }}</span>
             </div>
         </div>
@@ -496,10 +496,10 @@
             <div class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Preview deployments') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Preview deployments') }}</p>
                         <p class="mt-1 text-xs text-slate-500">{{ __('One preview per branch — typically driven by your CI on PR open / sync / close.') }}</p>
                     </div>
-                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-800">{{ $previews->count() }}</span>
+                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-indigo-800">{{ $previews->count() }}</span>
                 </div>
                 <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
                     @foreach ($previews as $preview)
@@ -519,7 +519,7 @@
                             <div class="min-w-0 flex-1">
                                 <p class="font-mono text-slate-900">
                                     @if ($previewPrNumber)
-                                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">PR #{{ $previewPrNumber }}</span>
+                                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-slate-700">PR #{{ $previewPrNumber }}</span>
                                     @endif
                                     {{ $previewBranch }}
                                 </p>
@@ -530,13 +530,13 @@
                                 @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $previewStatusClass }}">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $previewStatusClass }}">
                                     {{ str_replace('_', ' ', (string) $preview->status) }}
                                 </span>
                                 <button type="button"
                                     wire:click="tearDownContainerPreview('{{ $preview->id }}')"
                                     wire:confirm="{{ __('Tear down preview for branch :branch?', ['branch' => $previewBranch]) }}"
-                                    class="text-[11px] font-medium text-rose-700 hover:text-rose-900">
+                                    class="text-xs font-medium text-rose-700 hover:text-rose-900">
                                     {{ __('Tear down') }}
                                 </button>
                             </div>
@@ -574,14 +574,14 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4" wire:key="observability-section">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Observability') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Observability') }}</p>
                 <p class="mt-1 text-xs text-slate-500">{{ __('CPU, memory and restart metrics plus runtime logs, pulled live from the backend (cached ~60s).') }}</p>
             </div>
             <div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                 @foreach ($metricsWindows as $window)
                     <button type="button"
                             wire:click="setContainerMetricsWindow('{{ $window }}')"
-                            class="rounded-md px-2.5 py-1 text-[11px] font-semibold {{ $container_metrics_window === $window ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                            class="rounded-md px-2.5 py-1 text-xs font-semibold {{ $container_metrics_window === $window ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
                         {{ $window }}
                     </button>
                 @endforeach
@@ -662,7 +662,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="text-xs font-semibold text-slate-700">{{ __('Runtime logs') }}</p>
-                    <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Last 200 lines on demand, or live-tail new ones as they arrive.') }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500">{{ __('Last 200 lines on demand, or live-tail new ones as they arrive.') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     @php $logComponentChoices = $this->containerLogTailComponentChoices(); @endphp
@@ -697,9 +697,9 @@
             {{-- Live tail panel — only rendered while tailing or when buffer has lines --}}
             @if ($container_log_tail_active || ! empty($container_log_tail_lines))
                 <div class="mt-3">
-                    <pre class="max-h-72 overflow-auto rounded-lg border border-emerald-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-emerald-50">{{ $container_log_tail_lines !== [] ? implode("\n", $container_log_tail_lines) : __('Waiting for log lines…') }}</pre>
+                    <pre class="max-h-72 overflow-auto rounded-lg border border-emerald-200 bg-slate-900 p-3 font-mono text-xs leading-5 text-emerald-50">{{ $container_log_tail_lines !== [] ? implode("\n", $container_log_tail_lines) : __('Waiting for log lines…') }}</pre>
                     @if ($container_log_tail_active)
-                        <p class="mt-1 inline-flex items-center gap-1.5 text-[11px] text-emerald-700">
+                        <p class="mt-1 inline-flex items-center gap-1.5 text-xs text-emerald-700">
                             <span class="relative inline-flex h-1.5 w-1.5">
                                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
                                 <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -716,7 +716,7 @@
                 @endphp
                 <div class="mt-3">
                     @if ($runtimeLines !== [])
-                        <pre class="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-slate-100">{{ implode("\n", array_map('strval', $runtimeLines)) }}</pre>
+                        <pre class="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-xs leading-5 text-slate-100">{{ implode("\n", array_map('strval', $runtimeLines)) }}</pre>
                     @endif
                     @if (! $runtimeAvailable && ! empty($container_runtime_logs_result['note']))
                         <p class="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{{ $container_runtime_logs_result['note'] }}</p>
@@ -738,7 +738,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Latest deployment logs') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Latest deployment logs') }}</p>
                 <p class="mt-1 text-xs text-slate-500">{{ __('Fetches the most recent build / deploy log link from the backend on demand.') }}</p>
             </div>
             <button type="button" wire:click="fetchContainerLogs" wire:loading.attr="disabled" wire:target="fetchContainerLogs" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
@@ -753,7 +753,7 @@
                         {{ $container_logs_result['url'] }} →
                     </a>
                 @elseif (! empty($container_logs_result['content']))
-                    <pre class="max-h-64 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-slate-100">{{ $container_logs_result['content'] }}</pre>
+                    <pre class="max-h-64 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-xs leading-5 text-slate-100">{{ $container_logs_result['content'] }}</pre>
                 @elseif (! empty($container_logs_result['message']))
                     <p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{{ $container_logs_result['message'] }}</p>
                 @else
@@ -766,7 +766,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent deployments') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent deployments') }}</p>
                 <p class="mt-1 text-xs text-slate-500">{{ __('Live history pulled from the backend on demand.') }}</p>
             </div>
             <button type="button" wire:click="fetchContainerDeployments" wire:loading.attr="disabled" wire:target="fetchContainerDeployments" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
@@ -794,15 +794,15 @@
                             <div class="min-w-0 flex-1">
                                 @php $depId = (string) ($deployment['id'] ?? ''); @endphp
                                 @if ($depId !== '' && $site->container_backend === 'digitalocean_app_platform')
-                                    <a href="{{ route('sites.cloud.deploys.show', ['server' => $site->server, 'site' => $site, 'deploy' => $depId]) }}" wire:navigate class="font-mono text-[11px] text-sky-700 hover:underline">{{ substr($depId, 0, 12) }}</a>
+                                    <a href="{{ route('sites.cloud.deploys.show', ['server' => $site->server, 'site' => $site, 'deploy' => $depId]) }}" wire:navigate class="font-mono text-xs text-sky-700 hover:underline">{{ substr($depId, 0, 12) }}</a>
                                 @else
-                                    <p class="font-mono text-[11px] text-slate-900">{{ substr($depId ?: '—', 0, 12) }}</p>
+                                    <p class="font-mono text-xs text-slate-900">{{ substr($depId ?: '—', 0, 12) }}</p>
                                 @endif
                                 @if ($deployment['started_at'] ?? null)
-                                    <p class="mt-0.5 text-[10px] text-slate-500">{{ __('Started :at', ['at' => $deployment['started_at']]) }}{{ ($deployment['cause'] ?? null) ? ' · '.$deployment['cause'] : '' }}</p>
+                                    <p class="mt-0.5 text-2xs text-slate-500">{{ __('Started :at', ['at' => $deployment['started_at']]) }}{{ ($deployment['cause'] ?? null) ? ' · '.$deployment['cause'] : '' }}</p>
                                 @endif
                             </div>
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $depPhaseClass }}">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $depPhaseClass }}">
                                 {{ str_replace('_', ' ', $depPhase) }}
                             </span>
                         </li>
@@ -823,7 +823,7 @@
         <div class="rounded-xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between gap-3">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Operations') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Operations') }}</p>
                     <p class="mt-1 text-xs text-slate-500">{{ __('Manual deploy tasks for this app. Trigger from DigitalOcean\'s control panel — public API support for running individual MANUAL jobs is pending.') }}</p>
                 </div>
             </div>
@@ -842,7 +842,7 @@
                     <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
                         <div class="min-w-0 flex-1">
                             <p class="text-xs font-semibold text-slate-900">{{ $task->name }}</p>
-                            <p class="mt-0.5 truncate font-mono text-[10px] text-slate-500">{{ $task->command }}</p>
+                            <p class="mt-0.5 truncate font-mono text-2xs text-slate-500">{{ $task->command }}</p>
                             @if ($latestRun)
                                 @php
                                     $statusClass = match ($latestRun->status) {
@@ -852,7 +852,7 @@
                                         default => 'text-slate-500',
                                     };
                                 @endphp
-                                <p class="mt-1 text-[10px] {{ $statusClass }}">
+                                <p class="mt-1 text-2xs {{ $statusClass }}">
                                     {{ __('Last run:') }} {{ $latestRun->status }}
                                     @if ($latestRun->exit_code !== null) · {{ __('exit') }} {{ $latestRun->exit_code }} @endif
                                     @if ($latestRun->finished_at) · {{ $latestRun->finished_at->diffForHumans() }} @endif
@@ -860,7 +860,7 @@
                             @endif
                         </div>
                         @if ($consolePath)
-                            <a href="{{ $consolePath }}" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                            <a href="{{ $consolePath }}" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                                 <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                 {{ __('Run in DO') }}
                             </a>
@@ -876,7 +876,7 @@
     @endphp
     @if ($activity !== [])
         <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent activity') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Recent activity') }}</p>
             <ol class="mt-3 space-y-2">
                 @foreach (array_slice($activity, 0, 8) as $event)
                     <li class="flex items-start gap-3 text-xs">
@@ -895,7 +895,7 @@
                             @endif
                         </div>
                         @if ($event['at'])
-                            <span class="shrink-0 font-mono text-[10px] text-slate-500" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans(null, true) }}</span>
+                            <span class="shrink-0 font-mono text-2xs text-slate-500" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans(null, true) }}</span>
                         @endif
                     </li>
                 @endforeach
@@ -908,7 +908,7 @@
     @endphp
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Custom domains') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Custom domains') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Point your own hostnames at the backend\'s default ingress. Validation records (if any) appear after the attach completes.') }}</p>
         </div>
 
@@ -921,7 +921,7 @@
                             <button type="button" wire:click="detachContainerDomain('{{ $hostname }}')" wire:confirm="{{ __('Remove :host from this app?', ['host' => $hostname]) }}" class="text-xs font-medium text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
                         </div>
                         @if (! empty($info['validation_records']))
-                            <div class="mt-2 space-y-1 rounded-md bg-slate-50 p-2 text-[11px] text-slate-700">
+                            <div class="mt-2 space-y-1 rounded-md bg-slate-50 p-2 text-xs text-slate-700">
                                 <p class="font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('DNS validation records') }}</p>
                                 @foreach ($info['validation_records'] as $rec)
                                     <p class="font-mono break-all">{{ $rec['type'] }} <span class="text-slate-500">→</span> {{ $rec['name'] }} <span class="text-slate-500">⇒</span> {{ $rec['value'] }}</p>
@@ -946,7 +946,7 @@
 
     @if ($this->canManageContainerSite())
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Deploy webhook') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Deploy webhook') }}</p>
         <p class="text-xs text-slate-500">{{ __('POST to this URL from your CI to redeploy. Optional JSON body { "image": "ghcr.io/me/api:v2" } bumps the tag.') }}</p>
         <input type="text" readonly value="{{ $site->cloudRedeployHookUrl() }}" class="block w-full select-all rounded-md border-slate-300 bg-slate-50 font-mono text-xs text-slate-800 shadow-sm" onclick="this.select()" />
     </div>

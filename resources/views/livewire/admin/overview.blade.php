@@ -1,8 +1,8 @@
 @php
     $card = 'dply-card-compact';
     $mini = 'text-xs font-medium uppercase tracking-wide text-brand-mist';
-    $pillOk = 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800';
-    $pillBad = 'inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800';
+    $pillOk = 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800';
+    $pillBad = 'inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800';
 @endphp
 
 <div>

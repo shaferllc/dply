@@ -53,7 +53,7 @@
 
                 <div class="px-6 py-5">
                     <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-[11px] uppercase tracking-[0.16em] text-brand-mist">
+                        <span class="text-xs uppercase tracking-[0.16em] text-brand-mist">
                             {{ trans_choice('{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                         </span>
                         <div class="flex items-center gap-3 text-xs">

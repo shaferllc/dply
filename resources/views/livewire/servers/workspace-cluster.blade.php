@@ -73,7 +73,7 @@
             <section class="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 p-6 shadow-sm">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <span class="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
                             <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
                             {{ __('Provisioning') }}
                         </span>
@@ -138,7 +138,7 @@
             <section class="{{ $card }} p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
-                        <span class="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                             <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                             {{ __('Running') }}
                         </span>
@@ -160,19 +160,19 @@
                 </div>
                 <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Region') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Region') }}</dt>
                         <dd class="mt-1 font-mono text-brand-ink">{{ $region !== '' ? $region : '—' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Kubernetes version') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Kubernetes version') }}</dt>
                         <dd class="mt-1 font-mono text-brand-ink">{{ $version !== '' ? $version : '—' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Control plane') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Control plane') }}</dt>
                         <dd class="mt-1 text-brand-ink">{{ $ha ? __('Highly available') : __('Standard') }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default namespace') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default namespace') }}</dt>
                         <dd class="mt-1 font-mono text-brand-ink">{{ $namespace !== '' ? $namespace : 'default' }}</dd>
                     </div>
                 </dl>
@@ -195,7 +195,7 @@
             @else
                 <div class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                        <thead class="bg-brand-cream/40 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                        <thead class="bg-brand-cream/40 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                             <tr>
                                 <th class="px-4 py-2 text-left">{{ __('Pool') }}</th>
                                 <th class="px-4 py-2 text-left">{{ __('Droplet size') }}</th>
@@ -229,7 +229,7 @@
                                                             default => 'border-amber-300 bg-amber-50 text-amber-700',
                                                         };
                                                     @endphp
-                                                    <span class="inline-flex items-center rounded-full border {{ $badgeClass }} px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">{{ $state }}</span>
+                                                    <span class="inline-flex items-center rounded-full border {{ $badgeClass }} px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide">{{ $state }}</span>
                                                 @endforeach
                                             </div>
                                         @endif
@@ -250,7 +250,7 @@
                         <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Authenticates kubectl against this cluster. Treat it like a password — anyone with this file can manage workloads.') }}</p>
                     </div>
@@ -279,7 +279,7 @@
                         <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workloads') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workloads') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Container sites deployed to this cluster.') }}</p>
                     </div>

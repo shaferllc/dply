@@ -56,7 +56,7 @@
                     <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Resources') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Resources') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runtime resources') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Runtime resources that don\'t map to environment variables — the scheduler, queue workers, and publication. Databases, Redis, queue, cache, and storage appear inline with the variables above as managed rows.') }}
@@ -72,7 +72,7 @@
                         <p class="text-sm font-semibold text-brand-ink">
                             {{ $bindingTypeLabels[$binding->type] ?? str($binding->type)->replace('_', ' ')->title() }}
                             @if ($binding->required)
-                                <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Required') }}</span>
+                                <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Required') }}</span>
                             @endif
                         </p>
                         <p class="mt-1 text-xs text-brand-moss">
@@ -99,26 +99,26 @@
                         @endif
                     </div>
                     <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] {{ $bindingStatusBadge[$binding->status] ?? 'bg-brand-sand/40 text-brand-moss' }}">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] {{ $bindingStatusBadge[$binding->status] ?? 'bg-brand-sand/40 text-brand-moss' }}">
                             {{ $binding->status }}
                         </span>
                         @if ($binding->bindingId)
-                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $binding->bindingId), @js($binding->type))" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $binding->bindingId), @js($binding->type))" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-x-mark class="h-4 w-4" />
                                 {{ __('Detach') }}
                             </button>
                         @elseif ($binding->manageable)
                             @if ($binding->type === 'database')
-                                <button type="button" wire:click="openBindingModal('database', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <button type="button" wire:click="openBindingModal('database', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-link class="h-4 w-4" />
                                     {{ __('Attach existing') }}
                                 </button>
-                                <button type="button" wire:click="openBindingModal('database', 'provision')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                <button type="button" wire:click="openBindingModal('database', 'provision')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
                                     <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Provision new') }}
                                 </button>
                             @else
-                                <button type="button" wire:click="openBindingModal('{{ $binding->type }}', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <button type="button" wire:click="openBindingModal('{{ $binding->type }}', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-link class="h-4 w-4" />
                                     {{ __('Configure') }}
                                 </button>
@@ -160,17 +160,17 @@
             <div class="space-y-5 px-6 py-6">
                 {{-- Status / reachability summary --}}
                 <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $bi['status'] }}</span>
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $bi['status'] }}</span>
                     @if ($bi['provider'])
-                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200/70">{{ $bi['provider'] }}</span>
+                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 ring-1 ring-inset ring-sky-200/70">{{ $bi['provider'] }}</span>
                     @endif
                     @if ($bi['reachable'] === true)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
                     @elseif ($bi['reachable'] === false)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $bi['reachable_detail'] }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $bi['reachable_detail'] }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
                     @endif
                     @if ($bi['private_network'])
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold text-brand-moss"><x-heroicon-o-globe-alt class="h-3 w-3" />{{ __('Private network') }}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-xs font-semibold text-brand-moss"><x-heroicon-o-globe-alt class="h-3 w-3" />{{ __('Private network') }}</span>
                     @endif
                 </div>
 
@@ -183,7 +183,7 @@
 
                 {{-- Injected variables --}}
                 <div>
-                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Injected at deploy') }} · {{ trans_choice('{1} :count variable|[2,*] :count variables', count($bi['vars']), ['count' => count($bi['vars'])]) }}</p>
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Injected at deploy') }} · {{ trans_choice('{1} :count variable|[2,*] :count variables', count($bi['vars']), ['count' => count($bi['vars'])]) }}</p>
                     @if ($bi['vars'] === [])
                         <p class="text-xs text-brand-moss">{{ __('This binding injects no environment variables.') }}</p>
                     @else
@@ -204,7 +204,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy and can be overridden per-key in the variables list.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy and can be overridden per-key in the variables list.') }}</p>
                     @endif
                 </div>
             </div>
@@ -425,7 +425,7 @@
                             </div>
                             <div>
                                 <p class="mb-1.5 text-xs text-brand-moss">{{ __('Injects DB_READ_HOST (+ DB_READ_PORT, DB_READ_USERNAME, DB_READ_PASSWORD when they differ) and DB_STICKY=true. Wire up the split in config/database.php:') }}</p>
-                                <pre class="overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $dbReadWriteSnippet }}</pre>
+                                <pre class="overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $dbReadWriteSnippet }}</pre>
                             </div>
                         @endif
                     </div>
@@ -1229,7 +1229,7 @@
                         <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: Redis-family services on this server (loopback) and on private-network peers (private IP). Each option shows how many other apps already use it — sharing one instance means a shared keyspace, so set a prefix to isolate this app. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy.') }}</p>
                         @if ($existingCacheService !== null && in_array($existingCacheService->engine, ['redis', 'valkey'], true))
                             <div class="mt-3 border-t border-brand-ink/10 pt-3">
-                                <p class="text-[11px] text-brand-mist">{{ __('Want a different engine?') }}</p>
+                                <p class="text-xs text-brand-mist">{{ __('Want a different engine?') }}</p>
                                 <div class="mt-1.5 flex flex-wrap gap-2">
                                     @foreach (['redis', 'valkey'] as $altEngine)
                                         @if ($altEngine !== $existingCacheService->engine && ($altEngine === 'redis' || $valkeyAvailable))
@@ -1308,7 +1308,7 @@
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                             <p class="font-semibold">{{ __('One-time app change required') }}</p>
                             <p class="mt-1">{{ __('dply injects MAIL_MAILER and every mailer\'s credentials, but the chain order must be defined in your app\'s config/mail.php. Add (or merge) this:') }}</p>
-                            <pre class="mt-2 overflow-x-auto rounded-md bg-white/70 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $this->mailFailoverSnippet($mailProvider, $bindingForm['legs'] ?? []) }}</pre>
+                            <pre class="mt-2 overflow-x-auto rounded-md bg-white/70 p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $this->mailFailoverSnippet($mailProvider, $bindingForm['legs'] ?? []) }}</pre>
                         </div>
                         <p class="text-xs text-brand-moss">{{ __('Sets MAIL_MAILER=:t and injects each mailer\'s credentials + the from-address at deploy. A chain can include at most one SMTP mailer.', ['t' => $mailProvider]) }}</p>
                     @elseif ($mailProvider !== 'log')
@@ -1417,7 +1417,7 @@
                                     @foreach ($bcTiers as $slug => $tier)
                                         <button type="button" wire:click="$set('bindingForm.tier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $bcTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
                                             <div class="text-sm font-semibold text-brand-ink">{{ $tier['label'] }}</div>
-                                            <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tier['max_connections']) }} {{ __('connections') }}</div>
+                                            <div class="mt-0.5 text-xs text-brand-moss">{{ number_format($tier['max_connections']) }} {{ __('connections') }}</div>
                                             <div class="mt-1 text-xs font-semibold text-brand-forest">${{ number_format($tier['price_cents'] / 100, 2) }}/{{ __('mo') }}</div>
                                         </button>
                                     @endforeach
@@ -1521,7 +1521,7 @@
 
                     <details class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                         <summary class="cursor-pointer text-xs font-semibold text-brand-ink">{{ __('Using a pre-Laravel 11 app? config/broadcasting.php snippet') }}</summary>
-                        <pre class="mt-2 overflow-x-auto rounded bg-brand-ink/90 p-3 text-[11px] leading-relaxed text-brand-cream"><code>'pusher' => [
+                        <pre class="mt-2 overflow-x-auto rounded bg-brand-ink/90 p-3 text-xs leading-relaxed text-brand-cream"><code>'pusher' => [
     'driver' => 'pusher',
     'key' => env('PUSHER_APP_KEY'),
     'secret' => env('PUSHER_APP_SECRET'),
@@ -1535,7 +1535,7 @@
         'useTLS' => true,
     ],
 ],</code></pre>
-                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Laravel 11+ already ships these host/port/scheme options — no change needed.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Laravel 11+ already ships these host/port/scheme options — no change needed.') }}</p>
                     </details>
                 </div>
             @else

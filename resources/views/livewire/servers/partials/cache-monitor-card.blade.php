@@ -30,7 +30,7 @@
             <button
                 type="button"
                 wire:click="clearMonitorOutput"
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Clear') }}
@@ -48,7 +48,7 @@
 
     @if (! $running)
         <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[11px] text-brand-mist">{{ __('Window') }}</span>
+            <span class="text-xs text-brand-mist">{{ __('Window') }}</span>
             @foreach ([5, 10, 30] as $opt)
                 <button
                     type="button"
@@ -77,7 +77,7 @@
             <button
                 type="button"
                 wire:click="clearMonitorOutput"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-100"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-900 hover:bg-sky-100"
                 title="{{ __('Stop watching this run. The window itself auto-completes server-side.') }}"
             >
                 <x-heroicon-o-stop-circle class="h-3 w-3" />
@@ -96,17 +96,17 @@
             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No window active') }}</p>
             <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                 {{ __('Pick a window duration above —') }}
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">5s</span>,
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">10s</span>,
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">5s</span>,
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">10s</span>,
                 {{ __('or') }}
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">30s</span>
-                {{ __('— to tail') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">redis-cli MONITOR</code> {{ __('for that bounded window. Auto-stops when the window ends; safe but adds CPU pressure on a busy engine.') }}
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">30s</span>
+                {{ __('— to tail') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">redis-cli MONITOR</code> {{ __('for that bounded window. Auto-stops when the window ends; safe but adds CPU pressure on a busy engine.') }}
             </p>
         </div>
     @endif
 
     @if ($payload !== null)
-        <div class="mt-4 max-h-96 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"
+        <div class="mt-4 max-h-96 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
              x-data x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">
             @if (empty($lines))
                 {{-- Dark-theme empty state: same shape as the REPL "no

@@ -20,7 +20,7 @@
                     <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clone') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clone') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What happens') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('You can clone this site to another server in your organization, or to the same server with a new domain. The job runs in the background; time depends on site size.') }}

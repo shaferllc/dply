@@ -72,24 +72,24 @@
             </div>
             <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $connectedProviders->count() }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('connected') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('connected') }}</span>
                     </dd>
                 </div>
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Credentials') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Credentials') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $credentials->count() }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $credentials->count()) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('saved|saved', $credentials->count()) }}</span>
                     </dd>
                 </div>
                 <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest/80">{{ __('Storage') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-forest/80">{{ __('Storage') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                        <span class="text-[11px] font-medium text-brand-forest">{{ __('Encrypted at rest') }}</span>
+                        <span class="text-xs font-medium text-brand-forest">{{ __('Encrypted at rest') }}</span>
                     </dd>
                 </div>
             </dl>
@@ -172,11 +172,11 @@
                      chip — gives quick read on how much of each family is
                      already wired up without scanning every card. --}}
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">
+                    <h3 class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">
                         <x-dynamic-component :component="$groupIcon" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
                         {{ $group['label'] }}
                     </h3>
-                    <span class="text-[10px] font-semibold tabular-nums text-brand-mist">
+                    <span class="text-2xs font-semibold tabular-nums text-brand-mist">
                         @if ($groupConnected > 0)
                             <span class="text-brand-forest">{{ $groupConnected }}</span><span class="text-brand-mist"> / {{ $groupAvailable }} {{ __('connected') }}</span>
                         @else
@@ -216,9 +216,9 @@
                                         <x-credentials-provider-icon :provider="$item['id']" class="h-5 w-5" />
                                     </span>
                                     @if ($isComing)
-                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                                     @elseif ($count > 0)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
                                             <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                                             {{ $count }}
                                         </span>
@@ -226,7 +226,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                                    <p class="mt-0.5 text-xs text-brand-moss">
                                         @if ($isComing)
                                             {{ __('Coming soon') }}
                                         @elseif ($count === 0)
@@ -244,7 +244,7 @@
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         @foreach ($sampleCaps as $cap)
                                             @php $chip = $capabilityDot($cap); @endphp
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                                 <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
                                                 {{ $chip['label'] }}
                                             </span>
@@ -256,7 +256,7 @@
                                      chip, semantically a span — the whole card IS the
                                      trigger so we don't nest <button>s. --}}
                                 @unless ($isComing)
-                                    <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
+                                    <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
                                         <span class="inline-flex items-center gap-1.5">
                                             @if ($count > 0)
                                                 <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />

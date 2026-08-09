@@ -135,7 +135,7 @@
                 <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div class="{{ $serversStatClass }}">
                         <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View servers') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <span class="flex min-w-0 items-center gap-1.5">
                                 <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Servers') }}</span>
@@ -144,12 +144,12 @@
                         </dt>
                         <dd class="mt-0.5 flex items-baseline gap-1.5">
                             <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $serverCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('in scope') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('in scope') }}</span>
                         </dd>
                     </div>
                     <div class="{{ $findingsStatClass }}">
                         <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('Review open findings') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <span class="flex min-w-0 items-center gap-1.5">
                                 <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Open findings') }}</span>
@@ -158,12 +158,12 @@
                         </dt>
                         <dd class="mt-0.5 flex items-baseline gap-1.5">
                             <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $openFindings }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('issue|issues', $openFindings) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('issue|issues', $openFindings) }}</span>
                         </dd>
                     </div>
                     <div class="group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40">
                         <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View fleet health') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <span class="flex min-w-0 items-center gap-1.5">
                                 <x-heroicon-o-heart class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Health') }}</span>
@@ -173,7 +173,7 @@
                         <dd class="mt-0.5 flex items-baseline gap-1.5">
                             <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</span>
                             @if ($avgHealthScore !== null)
-                                <span class="text-[11px] text-brand-moss">/ 100</span>
+                                <span class="text-xs text-brand-moss">/ 100</span>
                             @endif
                         </dd>
                     </div>
@@ -188,7 +188,7 @@
                                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
                                 <h2 class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</h2>
                                 <p class="mt-1 text-xs leading-relaxed text-rose-800">
                                     @if ($fleetAlert['failed_latest'] > 0)
@@ -221,7 +221,7 @@
                                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                 <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h2>
                                 <p class="mt-1 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.') }}</p>
                             </div>
@@ -256,7 +256,7 @@
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Platform') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Platform') }}</p>
                             <h2 id="dashboard-platform-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Operate from one place') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Jump straight into the surface you need — every workspace lives next to the next.') }}</p>
                         </div>
@@ -312,7 +312,7 @@
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shortcuts') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shortcuts') }}</p>
                             <h2 id="dashboard-shortcuts-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Keep the workspace ready') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Setup tasks that unblock provisioning, access, and team ops.') }}</p>
                         </div>
@@ -364,7 +364,7 @@
                                 <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
                                 <h2 id="dashboard-insights-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('What needs attention first') }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across your fleet plus the noisiest servers.') }}</p>
                             </div>
@@ -392,24 +392,24 @@
                             @endphp
                             <div class="grid gap-2 px-5 py-5 sm:grid-cols-3 sm:px-6">
                                 <div class="{{ $criticalClass }}">
-                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
+                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
                                     <dd class="mt-1 flex items-baseline gap-1.5">
                                         <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $criticalCount }}</span>
-                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
                                     </dd>
                                 </div>
                                 <div class="{{ $warningClass }}">
-                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Warning') }}</dt>
+                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Warning') }}</dt>
                                     <dd class="mt-1 flex items-baseline gap-1.5">
                                         <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $warningCount }}</span>
-                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
                                     </dd>
                                 </div>
                                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Info') }}</dt>
+                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Info') }}</dt>
                                     <dd class="mt-1 flex items-baseline gap-1.5">
                                         <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $infoCount }}</span>
-                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
                                     </dd>
                                 </div>
                             </div>
@@ -425,14 +425,14 @@
                                             >
                                                 <div class="min-w-0 flex-1">
                                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</p>
-                                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
                                                         <span class="inline-flex items-center gap-1">
                                                             <span class="font-mono tabular-nums text-brand-ink">{{ $row['open'] }}</span>
                                                             {{ trans_choice('open finding|open findings', $row['open']) }}
                                                         </span>
                                                         @if ($row['worst'])
                                                             <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                                            <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $row['worst'] }}</span>
+                                                            <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $row['worst'] }}</span>
                                                         @endif
                                                     </p>
                                                 </div>
@@ -479,12 +479,12 @@
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
                             <h2 id="dashboard-recent-servers-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Recent servers') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The five most recently added boxes in your workspace.') }}</p>
                         </div>
                         @if ($serverCount > 0)
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $serverCount }}</span>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $serverCount }}</span>
                         @endif
                     </div>
 
@@ -532,10 +532,10 @@
                                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                                 <span class="truncate text-sm font-semibold text-brand-ink">{{ $server->name }}</span>
                                                 @if ($status !== '')
-                                                    <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
+                                                    <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
                                                 @endif
                                             </div>
-                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                                 @if ($server->ip_address)
                                                     <span class="font-mono text-brand-moss">{{ $server->ip_address }}</span>
                                                 @endif
@@ -552,7 +552,7 @@
                                                     <span class="font-mono">{{ $server->size }}</span>
                                                 @endif
                                             </p>
-                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
                                                 <span class="inline-flex items-center gap-1">
                                                     <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
                                                     {{ $server->sites_count }} {{ trans_choice('site|sites', $server->sites_count) }}

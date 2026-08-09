@@ -1,5 +1,5 @@
 <div class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
-    <div class="shrink-0 border-b border-brand-ink/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
+    <div class="shrink-0 border-b border-brand-ink/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
 
     @if ($configCatalogLoading || ($opsReady && ! $configCatalogLoaded))
         <div class="flex min-h-0 flex-1 items-center justify-center gap-2 px-3 py-12 text-sm text-brand-moss">
@@ -14,7 +14,7 @@
         <div class="min-h-0 flex-1 overflow-y-auto">
             @foreach ($groupedConfigFiles as $groupKey => $group)
                 <div class="border-b border-brand-ink/5 last:border-b-0">
-                    <div class="sticky top-0 z-10 bg-brand-sand/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss backdrop-blur-sm">
+                    <div class="sticky top-0 z-10 bg-brand-sand/80 px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss backdrop-blur-sm">
                         {{ $group['label'] }}
                     </div>
                     <ul class="divide-y divide-brand-ink/5 text-sm">
@@ -65,18 +65,18 @@
                                                 <x-config-file-role-pill :label="$f['role_label']" :role="$f['role'] ?? null" />
                                             @endif
                                             @if ($isCached)
-                                                <span class="inline-flex shrink-0 items-center rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                                <span class="inline-flex shrink-0 items-center rounded bg-sky-50 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                                     {{ __('Cached') }}
                                                 </span>
                                             @endif
                                         </span>
-                                        <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
+                                        <span class="block truncate font-mono text-2xs text-brand-mist">{{ $f['path'] }}</span>
                                         @if (! empty($f['hint']))
-                                            <span class="mt-1 line-clamp-2 block text-[10px] leading-snug text-brand-moss">{{ $f['hint'] }}</span>
+                                            <span class="mt-1 line-clamp-2 block text-2xs leading-snug text-brand-moss">{{ $f['hint'] }}</span>
                                         @endif
                                     </span>
                                     @if (($f['size'] ?? 0) > 0)
-                                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">
+                                        <span class="shrink-0 font-mono text-2xs text-brand-mist">
                                             @if ($isLoading)
                                                 {{ __('loading…') }}
                                             @else

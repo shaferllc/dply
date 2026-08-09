@@ -82,7 +82,7 @@
                     <p class="mt-2.5 text-sm font-semibold text-brand-ink">{{ __('No schedules yet') }}</p>
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                         {{ __('Pick an engine, a cron expression, and a destination below to start automatic snapshots — e.g. ') }}
-                        <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">0 3 * * *</code>
+                        <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">0 3 * * *</code>
                         {{ __('for a nightly 3 AM run.') }}
                     </p>
                 </div>
@@ -93,15 +93,15 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-brand-ink">
                                     {{ $schedule->cacheService?->engine ? ucfirst($schedule->cacheService->engine) : '—' }}
-                                    <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[11px] text-brand-moss">{{ $schedule->cron_expression }}</span>
+                                    <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-xs text-brand-moss">{{ $schedule->cron_expression }}</span>
                                     @if ($cronDesc = $schedule->cronDescription())
-                                        <span class="ml-2 text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                        <span class="ml-2 text-xs text-brand-mist">{{ $cronDesc }}</span>
                                     @endif
                                     @if (! $schedule->is_active)
-                                        <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">{{ __('Paused') }}</span>
+                                        <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">{{ __('Paused') }}</span>
                                     @endif
                                 </p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">
+                                <p class="mt-0.5 text-xs text-brand-moss">
                                     {{ __('Destination: :name', ['name' => $schedule->backupConfiguration?->name ?? '—']) }}
                                     @if ($schedule->last_run_at)
                                         · {{ __('Last run :time', ['time' => $schedule->last_run_at->diffForHumans()]) }}
@@ -197,7 +197,7 @@
             @else
                 <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="bg-brand-sand/40 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/40 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-3 py-2">{{ __('Started') }}</th>
                                 <th class="px-3 py-2">{{ __('Engine') }}</th>
@@ -220,9 +220,9 @@
                                     <td class="px-3 py-2 text-brand-moss" title="{{ $snap->created_at?->toDateTimeString() }}">{{ $snap->created_at?->diffForHumans() }}</td>
                                     <td class="px-3 py-2 font-medium text-brand-ink">{{ ucfirst((string) $snap->cacheService?->engine) }}</td>
                                     <td class="px-3 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $snap->status }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $snap->status }}</span>
                                         @if ($snap->status === 'failed' && $snap->error_message)
-                                            <p class="mt-1 max-w-md truncate text-[11px] text-rose-700" title="{{ $snap->error_message }}">{{ $snap->error_message }}</p>
+                                            <p class="mt-1 max-w-md truncate text-xs text-rose-700" title="{{ $snap->error_message }}">{{ $snap->error_message }}</p>
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-ink">{{ $snap->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $snap->bytes) : '—' }}</td>

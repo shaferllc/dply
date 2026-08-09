@@ -20,17 +20,17 @@
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
                             @if ($journey['hasFailed'])
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
                                     <x-heroicon-s-x-mark class="h-3 w-3" />
                                     {{ __('Failed') }}
                                 </span>
                             @elseif ($journey['isDone'])
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                     <x-heroicon-s-check class="h-3 w-3" />
                                     {{ __('Live') }}
                                 </span>
                             @else
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                     <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
                                     {{ __('Building') }}
                                 </span>
@@ -83,9 +83,9 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="text-sm font-medium text-brand-ink">{{ $label }}</p>
                                     @if ($isCurrent && ! $journey['hasFailed'])
-                                        <span class="rounded-full bg-brand-sage/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Live') }}</span>
+                                        <span class="rounded-full bg-brand-sage/20 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Live') }}</span>
                                     @elseif ($isDone)
-                                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">{{ __('Done') }}</span>
+                                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800">{{ __('Done') }}</span>
                                     @endif
                                 </div>
 
@@ -102,7 +102,7 @@
                                          after it shows once" bug). Operators can still collapse
                                          manually if they want; we just don't reset it on poll. --}}
                                     <details class="group mt-3" open>
-                                        <summary class="flex cursor-pointer items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-ink">
+                                        <summary class="flex cursor-pointer items-center gap-2 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-ink">
                                             <x-heroicon-m-chevron-right class="h-3 w-3 transition-transform group-open:rotate-90" />
                                             {{ __('Output') }}
                                             @if ($isCurrent && ! $journey['hasFailed'])
@@ -134,7 +134,7 @@
                                             <button
                                                 type="button"
                                                 x-on:click="copy()"
-                                                class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold text-brand-sand/80 backdrop-blur hover:bg-white/10 hover:text-brand-cream"
+                                                class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-2xs font-semibold text-brand-sand/80 backdrop-blur hover:bg-white/10 hover:text-brand-cream"
                                                 :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy to clipboard') }}'"
                                             >
                                                 <x-heroicon-o-clipboard x-show="!copied" class="h-3 w-3" />
@@ -145,7 +145,7 @@
                                             <pre
                                                 x-ref="logPre"
                                                 x-on:scroll.throttle.100ms="onScroll"
-                                                class="max-h-[28rem] overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2 pr-20 font-mono text-[11px] leading-relaxed text-brand-cream whitespace-pre-wrap break-words"
+                                                class="max-h-[28rem] overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2 pr-20 font-mono text-xs leading-relaxed text-brand-cream whitespace-pre-wrap break-words"
                                             >{!! \App\Modules\Edge\Support\AnsiHtml::toHtml($stepLog) !!}</pre>
                                         </div>
                                     </details>

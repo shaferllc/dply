@@ -6,18 +6,29 @@ namespace App\Http\Controllers;
 
 use App\Support\Cli\CliPackageTarballBuilder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Throwable;
 
 class CliInstallController extends Controller
 {
-    public function installScript(): Response
+    /**
+     * Origin of the request that fetched install.sh / the tarball — not APP_URL.
+     * Local APP_URL often points at a host that isn't registered (e.g. dplyi.test)
+     * while operators curl a working Valet host (dply.test).
+     */
+    private function requestOrigin(Request $request): string
+    {
+        return rtrim($request->root(), '/');
+    }
+
+    public function installScript(Request $request): Response
     {
         $path = base_path('packages/dply-cli/install.sh');
         abort_unless(is_readable($path), 404);
 
         $contents = (string) file_get_contents($path);
-        $baseUrl = rtrim((string) config('app.url'), '/');
+        $baseUrl = $this->requestOrigin($request);
         $replacements = [
             '__DPLY_DEFAULT_BASE_URL__' => $baseUrl,
             '__DPLY_CLI_INSTALL_METHOD__' => (string) config('cli.install_method', 'tarball'),
@@ -32,7 +43,7 @@ class CliInstallController extends Controller
         ]);
     }
 
-    public function packageVersion(): JsonResponse
+    public function packageVersion(Request $request): JsonResponse
     {
         $packageJson = base_path('packages/dply-cli/package.json');
         abort_unless(is_readable($packageJson), 404);
@@ -40,18 +51,20 @@ class CliInstallController extends Controller
         /** @var array{version?: string, name?: string} $meta */
         $meta = json_decode((string) file_get_contents($packageJson), true, 512, JSON_THROW_ON_ERROR);
 
+        $origin = $this->requestOrigin($request);
+
         return response()->json([
             'name' => $meta['name'] ?? '@dply/cli',
             'version' => $meta['version'] ?? '0.0.0',
-            'install_url' => url('/cli/install.sh'),
-            'package_url' => url('/cli/dply-cli.tgz'),
+            'install_url' => $origin.'/cli/install.sh',
+            'package_url' => $origin.'/cli/dply-cli.tgz',
         ]);
     }
 
-    public function packageTarball(CliPackageTarballBuilder $builder): Response
+    public function packageTarball(Request $request, CliPackageTarballBuilder $builder): Response
     {
         try {
-            $contents = $builder->cachedContents();
+            $contents = $builder->cachedContents($this->requestOrigin($request));
         } catch (Throwable $e) {
             report($e);
 

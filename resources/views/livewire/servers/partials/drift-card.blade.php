@@ -13,7 +13,7 @@
         class="border-b border-brand-ink/10"
     >
         <x-slot:actions>
-            <button type="button" wire:click="runDriftAnalysis" wire:loading.attr="disabled" wire:target="runDriftAnalysis" class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" wire:click="runDriftAnalysis" wire:loading.attr="disabled" wire:target="runDriftAnalysis" class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">
                 <span wire:loading.remove wire:target="runDriftAnalysis">{{ __('Refresh drift') }}</span>
                 <span wire:loading wire:target="runDriftAnalysis" class="inline-flex items-center gap-1">
                     <x-spinner variant="forest" size="sm" />

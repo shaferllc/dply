@@ -41,31 +41,31 @@
         </div>
         <div class="grid gap-3 p-6 sm:grid-cols-2 sm:p-7 lg:grid-cols-3">
             <a href="{{ $databasesUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</p>
                 <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $engineHeadline }}</p>
-                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $engineMeta }}</p>
-                <p class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-sage opacity-0 transition group-hover:opacity-100">
+                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $engineMeta }}</p>
+                <p class="mt-2 inline-flex items-center gap-1 text-2xs font-semibold text-brand-sage opacity-0 transition group-hover:opacity-100">
                     {{ __('Open Database') }}
                     <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                 </p>
             </a>
 
             <a href="{{ $databasesUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Databases') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Databases') }}</p>
                 <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ number_format((int) $databaseTileData['database_count']) }}</p>
-                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ __('User databases on this host') }}</p>
+                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ __('User databases on this host') }}</p>
             </a>
 
             <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Health') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Health') }}</p>
                 <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $healthValue }}</p>
-                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $healthMeta }}</p>
+                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $healthMeta }}</p>
             </a>
 
             <a href="{{ $backupsUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Backups') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Backups') }}</p>
                 <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $backupHeadline }}</p>
-                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $backupMeta }}</p>
+                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $backupMeta }}</p>
             </a>
         </div>
     </section>

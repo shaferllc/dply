@@ -18,26 +18,26 @@
         ])
 
         <div class="mb-5 rounded-2xl border border-brand-ink/10 bg-white px-4 py-4 dark:bg-zinc-900/40 sm:px-5">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Visitor experience') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Visitor experience') }}</p>
             <ol class="mt-3 grid gap-3 sm:grid-cols-3">
                 <li class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('1 · Arrive') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1 · Arrive') }}</p>
                     <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Same Edge URL') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('They request a path you listed (or /* site-wide). No redirect to another domain.') }}</p>
                 </li>
                 <li class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('2 · Wait (if full)') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2 · Wait (if full)') }}</p>
                     <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('“You’re in line” page') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Edge HTML interstitial on that URL. Auto-refreshes every few seconds until admitted.') }}</p>
                 </li>
                 <li class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('3 · Enter') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3 · Enter') }}</p>
                     <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Your real page') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Admitted visitors get a cookie and see the normal site for the session length.') }}</p>
                 </li>
             </ol>
             <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-3">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('What they see while waiting') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('What they see while waiting') }}</p>
                 <div class="mt-2 rounded-lg border border-brand-ink/10 bg-[#f6f5ef] px-4 py-6 text-center text-brand-ink shadow-sm">
                     <p class="text-base font-semibold">{{ __('You’re in line') }}</p>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('This site is at capacity. We’ll refresh automatically.') }}</p>

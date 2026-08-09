@@ -17,7 +17,7 @@
 @else
     @if (! empty($preflight_results))
         <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 sm:px-4">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Preflight results') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Preflight results') }}</p>
             <ul class="mt-1.5 space-y-1">
                 @foreach ($preflight_results as $check)
                     @php
@@ -27,7 +27,7 @@
                             default => ['classes' => 'bg-red-50 text-red-800 ring-red-200', 'label' => __('fail')],
                         };
                     @endphp
-                    <li class="flex flex-wrap items-baseline gap-1.5 text-[11px]">
+                    <li class="flex flex-wrap items-baseline gap-1.5 text-xs">
                         <span class="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 font-semibold uppercase tracking-wide ring-1 {{ $statusChip['classes'] }}">{{ $statusChip['label'] }}</span>
                         <span class="font-mono text-brand-mist">{{ $check['key'] }}</span>
                         <span class="text-brand-moss">{{ $check['message'] }}</span>
@@ -90,7 +90,7 @@
                         class="{{ $input }} mt-1 font-mono text-xs"
                         placeholder="cd /var/www/app/current && ./bin/cron"
                     ></textarea>
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Bare shell command Dply wraps with dply-scheduler-tick. Include `cd` to the app directory if needed.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Bare shell command Dply wraps with dply-scheduler-tick. Include `cd` to the app directory if needed.') }}</p>
                 </div>
                 <div>
                     <x-input-label for="enable_cron_expression" value="{{ __('Cadence') }}" />
@@ -100,7 +100,7 @@
         @endif
 
         @if ($showLaravelSchedulerEnable)
-            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5 text-[11px] text-brand-moss">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5 text-xs text-brand-moss">
                 {{ __('Prefer a long-running daemon? ') }}<a href="{{ route('servers.workers', $server) }}?preset=laravel-schedule{{ $enableTargetSite ? '&site='.$enableTargetSite->id : '' }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('Add a schedule:work supervisor program') }}</a>{{ __(' instead.') }}
             </p>
         @endif

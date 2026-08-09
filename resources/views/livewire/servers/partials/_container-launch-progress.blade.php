@@ -13,7 +13,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0 flex-1 space-y-3">
                 <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-2 rounded-full border {{ $containerLaunch['is_failed'] ? 'border-rose-300' : 'border-sky-300' }} bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">
+                    <span class="inline-flex items-center gap-2 rounded-full border {{ $containerLaunch['is_failed'] ? 'border-rose-300' : 'border-sky-300' }} bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">
                         <span class="h-2 w-2 rounded-full {{ $containerLaunch['is_failed'] ? 'bg-rose-500' : 'bg-sky-500 animate-pulse' }}"></span>
                         {{ $containerLaunch['is_failed'] ? __('Container launch failed') : __('Container launch') }}
                     </span>
@@ -60,8 +60,8 @@
 
         @if (($containerLaunchTranscript ?? '') !== '')
             <div class="mt-6">
-                <p class="text-[11px] font-semibold uppercase tracking-wide {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">{{ __('Recent events') }}</p>
-                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border {{ $containerLaunch['is_failed'] ? 'border-rose-200' : 'border-sky-200' }} bg-white px-3 py-3 font-mono text-[11px] leading-5 text-brand-ink">{{ $containerLaunchTranscript }}</pre>
+                <p class="text-xs font-semibold uppercase tracking-wide {{ $containerLaunch['is_failed'] ? 'text-rose-700' : 'text-sky-700' }}">{{ __('Recent events') }}</p>
+                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border {{ $containerLaunch['is_failed'] ? 'border-rose-200' : 'border-sky-200' }} bg-white px-3 py-3 font-mono text-xs leading-5 text-brand-ink">{{ $containerLaunchTranscript }}</pre>
             </div>
         @endif
     </section>

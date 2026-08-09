@@ -38,12 +38,12 @@
             <span class="text-xs text-brand-moss">{{ __('upgradable') }}</span>
         </span>
         @if ($securityCount > 0)
-            <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800">
+            <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-red-800">
                 {{ trans_choice(':n security|:n security', $securityCount, ['n' => $securityCount]) }}
             </span>
         @endif
         @if ($reboot === true)
-            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
                 {{ __('Reboot pending') }}
             </span>
         @endif
@@ -64,7 +64,7 @@
                     <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Apt') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Apt') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each runs over SSH; output streams in the panel above. Long-running upgrades trigger a state refresh on completion.') }}</p>
                 </div>
@@ -108,7 +108,7 @@
                         <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Packages') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Packages') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($rows), ['count' => count($rows)]) }}
@@ -135,7 +135,7 @@
             <div class="px-6 py-6 sm:px-7">
             <div class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                    <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                    <thead class="sticky top-0 bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                         <tr>
                             <th class="px-3 py-2 font-semibold">{{ __('Package') }}</th>
                             <th class="px-3 py-2 font-semibold">{{ __('Current') }}</th>
@@ -152,7 +152,7 @@
                                 <td class="px-3 py-1.5 font-mono text-brand-ink">
                                     {{ $row['name'] }}
                                     @if ($row['is_security'])
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800">{{ __('Security') }}</span>
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-800">{{ __('Security') }}</span>
                                     @endif
                                 </td>
                                 <td class="px-3 py-1.5 font-mono text-brand-moss">{{ $row['current_version'] ?? '—' }}</td>
@@ -182,11 +182,11 @@
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-updates') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-updates') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-side automatic update flag (Debian/Ubuntu). The cadence preference below is recorded for future Dply scheduling.') }}</p>
             </div>
-            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $statusPill['classes'] }}">
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {{ $statusPill['classes'] }}">
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
                 {{ $statusPill['label'] }}
             </span>
@@ -194,7 +194,7 @@
 
         <div class="px-6 py-6 sm:px-7">
         @if (! empty($unattended['snippet']))
-            <pre class="mt-4 max-h-32 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $unattended['snippet'] }}</pre>
+            <pre class="mt-4 max-h-32 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $unattended['snippet'] }}</pre>
         @endif
 
         @if ($opsReady && ! $isDeployer)
@@ -247,7 +247,7 @@
                             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot is pending on this server') }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Likely required after kernel or libc updates. Plan a maintenance window before rebooting.') }}</p>
                         </div>

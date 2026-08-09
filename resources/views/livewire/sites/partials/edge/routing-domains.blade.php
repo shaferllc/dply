@@ -1,6 +1,6 @@
 {{-- Domains tab — default hostname + custom domains (hairline strips). --}}
 <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default hostname') }}</p>
+    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default hostname') }}</p>
     @if ($edgeLiveUrl)
         <p class="mt-1 font-mono text-sm text-brand-ink break-all">{{ $edgeLiveUrl }}</p>
     @else
@@ -11,8 +11,8 @@
 @if ($repoDomains !== [])
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <div class="flex items-baseline justify-between gap-2">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
-            <span class="font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+            <span class="font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
         </div>
         <ul class="mt-2 space-y-1 font-mono text-xs text-brand-ink">
             @foreach ($repoDomains as $host)
@@ -23,7 +23,7 @@
 @endif
 
 <section class="px-5 py-4 sm:px-6">
-    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Custom domains') }}</p>
+    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Custom domains') }}</p>
     <p class="mt-1 text-sm text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS.') }}</p>
 
     @if ($edgeAttachedDomains !== [])
@@ -62,19 +62,19 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="font-mono text-sm text-brand-ink">{{ $hostname }}</p>
-                                <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
                                 @if ($sslLabel && $sslBadge)
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $sslBadge }}">{{ $sslLabel }}</span>
+                                    <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $sslBadge }}">{{ $sslLabel }}</span>
                                 @endif
                             </div>
                             @if ($cnameTarget !== '')
                                 <div class="mt-2" x-data="{ copied: false }">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('CNAME target') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('CNAME target') }}</p>
                                     <div class="mt-1 flex flex-wrap items-center gap-2">
                                         <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink">{{ $cnameTarget }}</code>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                             @click="navigator.clipboard.writeText(@js($cnameTarget)); copied = true; setTimeout(() => copied = false, 2000)"
                                         >
                                             <x-heroicon-o-clipboard class="h-4 w-4" />
@@ -86,13 +86,13 @@
                             @endif
                             @if (is_array($ownership) && ($ownership['name'] ?? '') !== '' && ($ownership['value'] ?? '') !== '' && $sslStatus !== 'active')
                                 <div class="mt-2" x-data="{ copied: false }">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership :type record', ['type' => strtoupper((string) ($ownership['type'] ?? 'TXT'))]) }}</p>
-                                    <p class="mt-1 font-mono text-[11px] text-brand-moss break-all">{{ $ownership['name'] }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership :type record', ['type' => strtoupper((string) ($ownership['type'] ?? 'TXT'))]) }}</p>
+                                    <p class="mt-1 font-mono text-xs text-brand-moss break-all">{{ $ownership['name'] }}</p>
                                     <div class="mt-1 flex flex-wrap items-center gap-2">
                                         <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink break-all">{{ $ownership['value'] }}</code>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                             @click="navigator.clipboard.writeText(@js($ownership['value'])); copied = true; setTimeout(() => copied = false, 2000)"
                                         >
                                             <x-heroicon-o-clipboard class="h-4 w-4" />

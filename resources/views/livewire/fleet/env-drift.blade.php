@@ -66,7 +66,7 @@
                                     @foreach ($group['envs'] as $env)
                                         <th class="px-4 py-3 align-top">
                                             <div class="font-semibold normal-case tracking-normal text-brand-ink">{{ $env['site']->name }}</div>
-                                            <div class="mt-0.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-brand-moss">
+                                            <div class="mt-0.5 inline-flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wider text-brand-moss">
                                                 <span class="rounded bg-brand-ink/[0.06] px-1.5 py-0.5">{{ $env['surface'] }}</span>
                                                 <span>{{ $env['scope'] }}</span>
                                             </div>
@@ -82,7 +82,7 @@
                                         @foreach ($cells as $cell)
                                             @if ($cell['status'] === 'missing')
                                                 <td class="px-4 py-2 align-top">
-                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800 ring-1 ring-rose-200">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800 ring-1 ring-rose-200">
                                                         <span class="h-1 w-1 rounded-full bg-rose-500" aria-hidden="true"></span>
                                                         {{ __('missing') }}
                                                     </span>

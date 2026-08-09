@@ -5,7 +5,7 @@
             <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ __('IPs (and CIDR ranges) that see the full site while the coming-soon gate is on. Everyone else only sees the coming-soon page. Logged-in users always pass.') }}</p>
         </div>
         <span @class([
-            'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+            'shrink-0 rounded-full px-2.5 py-1 text-2xs font-bold uppercase tracking-wide',
             'bg-emerald-100 text-emerald-800' => $gateOn,
             'bg-brand-ink/[0.06] text-brand-moss' => ! $gateOn,
         ])>{{ $gateOn ? __('Gate active') : __('Gate off') }}</span>
@@ -58,7 +58,7 @@
                 </div>
                 <button type="button" wire:click="remove({{ $row->id }})"
                     wire:confirm="{{ __('Remove :ip from the allow-list?', ['ip' => $row->ip]) }}"
-                    class="shrink-0 rounded-md border border-brand-ink/10 px-2 py-1 text-[11px] font-semibold text-brand-rust hover:bg-brand-rust/5">
+                    class="shrink-0 rounded-md border border-brand-ink/10 px-2 py-1 text-xs font-semibold text-brand-rust hover:bg-brand-rust/5">
                     {{ __('Remove') }}
                 </button>
             </div>
@@ -70,7 +70,7 @@
     {{-- Env-provided (read-only) --}}
     @if (! empty($envIps))
         <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('From COMING_SOON_ALLOWED_IPS (env, read-only)') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('From COMING_SOON_ALLOWED_IPS (env, read-only)') }}</p>
             <p class="mt-1 font-mono text-xs text-brand-moss">{{ implode('  ·  ', $envIps) }}</p>
         </div>
     @endif

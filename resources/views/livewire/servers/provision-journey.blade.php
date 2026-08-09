@@ -236,31 +236,31 @@
                                 $journeyIsDone = $server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
                             @endphp
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provision journey') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Provision journey') }}</p>
                                 @if ($journeyHasFailed)
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
                                         <x-heroicon-s-x-mark class="h-3 w-3" />
                                         {{ __('Failed') }}
                                     </span>
                                 @elseif ($autoRetryPending)
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                                         <x-heroicon-o-arrow-path class="h-3 w-3" />
                                         {{ __('Retrying') }}
                                     </span>
                                 @elseif ($journeyIsDone)
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                         <x-heroicon-s-check class="h-3 w-3" />
                                         {{ __('Ready') }}
                                     </span>
                                 @endif
                                 @if ($totalCount > 0)
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Total steps completed across cloud + setup phases') }}">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Total steps completed across cloud + setup phases') }}">
                                         <x-heroicon-m-list-bullet class="h-3 w-3" />
                                         {{ __(':done / :total steps', ['done' => $completedCount, 'total' => $totalCount]) }}
                                     </span>
                                 @endif
                                 @if ($journeyElapsedHuman)
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ $journeyIsDone ? __('Total provision time') : __('Time elapsed since this server row was created') }}">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ $journeyIsDone ? __('Total provision time') : __('Time elapsed since this server row was created') }}">
                                         <x-heroicon-m-clock class="h-3 w-3" />
                                         {{ $journeyIsDone ? __('Took :elapsed', ['elapsed' => $journeyElapsedHuman]) : __('Elapsed :elapsed', ['elapsed' => $journeyElapsedHuman]) }}
                                     </span>
@@ -269,7 +269,7 @@
                                      wire:poll round-trip. Surfaces "the page IS auto-updating" so
                                      the operator doesn't think the journey is frozen between polls. --}}
                                 @if ($shouldPoll)
-                                    <span wire:loading.delay.shortest.flex wire:target="$refresh" class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                    <span wire:loading.delay.shortest.flex wire:target="$refresh" class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                         <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
                                         {{ __('Refreshing') }}
                                     </span>
@@ -452,7 +452,7 @@
                                                 @endphp
                                                 <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
                                                     <div class="flex items-start justify-between gap-3">
-                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                        <p class="text-xs font-semibold uppercase tracking-wide text-red-700">
                                                             {{ __('Reason') }}
                                                             @if ($failureReason['exit_code'] !== null)
                                                                 <span class="ml-1 font-normal normal-case text-red-600/80">· {{ __('exit code :code', ['code' => $failureReason['exit_code']]) }}</span>
@@ -462,7 +462,7 @@
                                                             type="button"
                                                             x-data="{ copied: false }"
                                                             x-on:click="navigator.clipboard.writeText(@js($reasonClipboard)); copied = true; setTimeout(() => copied = false, 1500)"
-                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
                                                         >
                                                             <span x-show="!copied">{{ __('Copy') }}</span>
                                                             <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
@@ -471,13 +471,13 @@
                                                     <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $failureReason['headline'] }}</p>
                                                     @if (count($failureReason['context']) > 1)
                                                         <details class="mt-2">
-                                                            <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-red-700">
                                                                 <span class="inline-flex items-center gap-1.5">
                                                                     <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
                                                                     {{ __('Last :n lines', ['n' => count($failureReason['context'])]) }}
                                                                 </span>
                                                             </summary>
-                                                            <pre class="mt-2 whitespace-pre-wrap break-all font-mono text-[11px] leading-5 text-red-900">{{ implode("\n", $failureReason['context']) }}</pre>
+                                                            <pre class="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-5 text-red-900">{{ implode("\n", $failureReason['context']) }}</pre>
                                                         </details>
                                                     @endif
                                                 </div>
@@ -493,14 +493,14 @@
                                                 @endphp
                                                 <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
                                                     <div class="flex items-start justify-between gap-3">
-                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                        <p class="text-xs font-semibold uppercase tracking-wide text-red-700">
                                                             {{ __('What the provider said') }}
                                                         </p>
                                                         <button
                                                             type="button"
                                                             x-data="{ copied: false }"
                                                             x-on:click="navigator.clipboard.writeText(@js($cloudReasonMessage)); copied = true; setTimeout(() => copied = false, 1500)"
-                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
                                                         >
                                                             <span x-show="!copied">{{ __('Copy') }}</span>
                                                             <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
@@ -535,7 +535,7 @@
                                                     @endif
                                                 </div>
                                                 @if ($rollbackSummary['triggered'])
-                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
                                                         <x-heroicon-m-check-circle class="h-4 w-4" />
                                                         {{ __('Restored') }}
                                                     </span>
@@ -560,15 +560,15 @@
                                                         @foreach ($rollbackSummary['restored'] as $path)
                                                             <li class="flex items-start gap-2">
                                                                 <x-heroicon-m-arrow-uturn-left class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                                                                <code class="break-all font-mono text-[11px]">/{{ $path }}</code>
-                                                                <span class="text-[10px] uppercase tracking-wide text-emerald-700">{{ __('restored') }}</span>
+                                                                <code class="break-all font-mono text-xs">/{{ $path }}</code>
+                                                                <span class="text-2xs uppercase tracking-wide text-emerald-700">{{ __('restored') }}</span>
                                                             </li>
                                                         @endforeach
                                                         @foreach ($rollbackSummary['removed'] as $path)
                                                             <li class="flex items-start gap-2">
                                                                 <x-heroicon-m-trash class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                                                                <code class="break-all font-mono text-[11px]">/{{ $path }}</code>
-                                                                <span class="text-[10px] uppercase tracking-wide text-amber-700">{{ __('removed') }}</span>
+                                                                <code class="break-all font-mono text-xs">/{{ $path }}</code>
+                                                                <span class="text-2xs uppercase tracking-wide text-amber-700">{{ __('removed') }}</span>
                                                             </li>
                                                         @endforeach
                                                     </ul>
@@ -621,7 +621,7 @@
                                                 <button
                                                     type="button"
                                                     x-on:click="open = !open"
-                                                    class="flex flex-1 items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-wider text-red-300"
+                                                    class="flex flex-1 items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wider text-red-300"
                                                 >
                                                     <span>{{ __('Captured step output') }}</span>
                                                     <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
@@ -629,7 +629,7 @@
                                                 <button
                                                     type="button"
                                                     x-on:click.stop="navigator.clipboard.writeText(@js($failedStep['output'])); copied = true; setTimeout(() => copied = false, 1500)"
-                                                    class="shrink-0 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:bg-slate-700/80"
+                                                    class="shrink-0 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-200 hover:bg-slate-700/80"
                                                 >
                                                     <span x-show="!copied">{{ __('Copy') }}</span>
                                                     <span x-show="copied" x-cloak class="text-emerald-300">{{ __('Copied') }}</span>
@@ -688,7 +688,7 @@
                                             <p class="mt-2 flex flex-wrap items-baseline gap-2 text-sm text-brand-ink">
                                                 <span>{{ $stallState['eta'] }}</span>
                                                 @if (! empty($stallState['eta_samples']))
-                                                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Computed from your previous server provisions for this org.') }}">
+                                                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ __('Computed from your previous server provisions for this org.') }}">
                                                         {{ trans_choice('from :count previous run|from :count previous runs', $stallState['eta_samples'], ['count' => $stallState['eta_samples']]) }}
                                                     </span>
                                                 @endif
@@ -724,20 +724,20 @@
                                             class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
-                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                                                     <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                                                     {{ __('Live step output') }}
                                                 </span>
                                                 <div class="flex items-center gap-2">
                                                     @if ($taskUpdatedAt)
-                                                        <p class="text-[11px] text-slate-500">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
+                                                        <p class="text-xs text-slate-500">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
                                                     @endif
                                                 </div>
                                             </summary>
                                             {{-- Copy lives just below the summary (not inside it): a summary
                                                  element is itself a button, so a nested control trips the a11y
                                                  warning. It stays within this details' Alpine scope, overlaying the bar. --}}
-                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                 <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
                                                 <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                             </button>
@@ -761,11 +761,11 @@
                                             class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
-                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                                                     <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                                                     {{ __('Show full task tail') }}
                                                 </span>
-                                                <span class="flex items-center gap-2 text-[11px] text-slate-500">
+                                                <span class="flex items-center gap-2 text-xs text-slate-500">
                                                     <span>
                                                         {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
                                                         @if ($taskUpdatedAt)
@@ -775,7 +775,7 @@
                                                 </span>
                                             </summary>
                                             {{-- Copy moved below the summary (out of the toggle button) — see note above. --}}
-                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                 <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
                                                 <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                             </button>
@@ -800,12 +800,12 @@
                                             class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
-                                                <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                                                     <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                                                     {{ __('Live task output (tail)') }}
                                                 </span>
                                                 <div class="flex items-center gap-2">
-                                                    <p class="text-[11px] text-slate-500">
+                                                    <p class="text-xs text-slate-500">
                                                         {{ __(':count lines', ['count' => $liveTaskOutputLineCount]) }}
                                                         @if ($taskUpdatedAt)
                                                             · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
@@ -814,7 +814,7 @@
                                                 </div>
                                             </summary>
                                             {{-- Copy moved below the summary (out of the toggle button) — see note above. --}}
-                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
                                                 <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
                                                 <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
                                             </button>
@@ -830,7 +830,7 @@
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output') }}</p>
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('No output received from the server yet. The bootstrap script may still be initialising or the webhook callback is unreachable from the target host.') }}</p>
                                             @if ($taskUpdatedAt)
-                                                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Last task update :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
+                                                <p class="mt-1 text-xs text-brand-mist">{{ __('Last task update :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
                                             @endif
                                         </div>
                                     @endif
@@ -900,7 +900,7 @@
                                                 <div class="flex items-center justify-between gap-3">
                                                     <p class="text-sm font-medium text-brand-ink">{{ $step['label'] }}</p>
                                                     @if ($stepEtaLabel)
-                                                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ trans_choice('Avg from :count previous run|Avg from :count previous runs', $stepEtaSamples, ['count' => $stepEtaSamples]) }}">
+                                                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink/80 ring-1 ring-brand-ink/10" title="{{ trans_choice('Avg from :count previous run|Avg from :count previous runs', $stepEtaSamples, ['count' => $stepEtaSamples]) }}">
                                                             {{ $stepEtaLabel }}
                                                         </span>
                                                     @endif
@@ -951,7 +951,7 @@
                                                 @if ($step['output'])
                                                     <details class="group mt-2 overflow-hidden rounded-lg border border-brand-ink/10 bg-slate-950 shadow-inner">
                                                         <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-3 py-2">
-                                                            <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                                            <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                                                                 <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                                                                 {{ __('Output') }}
                                                             </span>
@@ -1049,7 +1049,7 @@
                                     <button type="button"
                                         title="{{ __('Copy IP') }}"
                                         @click.prevent="navigator.clipboard.writeText(@js($server->ip_address)); copied = true; setTimeout(() => copied = false, 1500)"
-                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold text-brand-moss hover:bg-brand-sand/40">
                                         <span x-text="copied ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
                                     </button>
                                 @endif
@@ -1093,7 +1093,7 @@
                     <section class="{{ $card }} p-6" x-data="{ copied: null }">
                         <div class="flex items-baseline justify-between gap-2">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __('Setup diagnostics') }}</h3>
-                            <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Local env') }}</span>
+                            <span class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Local env') }}</span>
                         </div>
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('Structured entries are written to the app log with keys like server.provision.* — filter logs by server_id or grep server.provision.') }}
@@ -1106,7 +1106,7 @@
                                     <button type="button"
                                         title="{{ __('Copy') }}"
                                         @click.prevent="navigator.clipboard.writeText(@js((string) $server->id)); copied = 'server'; setTimeout(() => copied = null, 1500)"
-                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                        class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold text-brand-moss hover:bg-brand-sand/40">
                                         <span x-text="copied === 'server' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
                                     </button>
                                 </dd>
@@ -1119,7 +1119,7 @@
                                         <button type="button"
                                             title="{{ __('Copy') }}"
                                             @click.prevent="navigator.clipboard.writeText(@js((string) $tid)); copied = 'task'; setTimeout(() => copied = null, 1500)"
-                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold text-brand-moss hover:bg-brand-sand/40">
                                             <span x-text="copied === 'task' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
                                         </button>
                                     @else
@@ -1135,7 +1135,7 @@
                                         <button type="button"
                                             title="{{ __('Copy') }}"
                                             @click.prevent="navigator.clipboard.writeText(@js((string) $rid)); copied = 'run'; setTimeout(() => copied = null, 1500)"
-                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">
+                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold text-brand-moss hover:bg-brand-sand/40">
                                             <span x-text="copied === 'run' ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
                                         </button>
                                     @else
@@ -1363,7 +1363,7 @@
 
                         @if ($run->summary)
                             <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Summary') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Summary') }}</p>
                                 <p class="mt-1 text-sm leading-6 text-brand-ink">{{ $run->summary }}</p>
                             </div>
                         @endif
@@ -1383,7 +1383,7 @@
                                                 <p class="mt-1 text-sm {{ $check['status'] === 'ok' ? 'text-brand-moss' : 'text-red-800' }}">{{ $check['detail'] }}</p>
                                             @endif
                                         </div>
-                                        <span class="ml-auto inline-flex shrink-0 items-center self-start whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide {{ $check['status'] === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
+                                        <span class="ml-auto inline-flex shrink-0 items-center self-start whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide {{ $check['status'] === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
                                             {{ $check['status'] === 'ok' ? __('Passed') : __('Needs attention') }}
                                         </span>
                                     </div>
@@ -1499,7 +1499,7 @@
                                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/40 text-brand-forest">
                                             <x-dynamic-component :component="$tile['icon']" class="h-4 w-4" aria-hidden="true" />
                                         </span>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $tile['label'] }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $tile['label'] }}</dt>
                                         <dd class="ml-auto min-w-0 truncate text-right text-sm font-semibold text-brand-ink">{{ $tile['value'] ?: '—' }}</dd>
                                     </div>
                                 @endforeach
@@ -1510,7 +1510,7 @@
                                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Expected services') }}</p>
                                     <div class="mt-2 flex flex-wrap gap-1.5">
                                         @foreach ($stackSummary['expected_services'] as $service)
-                                            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                                                 {{ $service }}
                                             </span>
@@ -1525,8 +1525,8 @@
                                     <dl class="mt-2 space-y-1.5">
                                         @foreach ($stackSummary['paths'] as $label => $path)
                                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg bg-brand-sand/15 px-3 py-2">
-                                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ ucfirst($label) }}</dt>
-                                                <dd class="break-all font-mono text-[11px] text-brand-ink">{{ $path }}</dd>
+                                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ ucfirst($label) }}</dt>
+                                                <dd class="break-all font-mono text-xs text-brand-ink">{{ $path }}</dd>
                                             </div>
                                         @endforeach
                                     </dl>
@@ -1540,7 +1540,7 @@
                                         @foreach ($stackSummary['config_files'] as $file)
                                             <li class="flex items-start gap-2 rounded-lg bg-brand-sand/15 px-3 py-2">
                                                 <x-heroicon-o-document-text class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" />
-                                                <code class="break-all font-mono text-[11px] text-brand-ink">{{ $file }}</code>
+                                                <code class="break-all font-mono text-xs text-brand-ink">{{ $file }}</code>
                                             </li>
                                         @endforeach
                                     </ul>
@@ -1581,7 +1581,7 @@
                                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-90" />
                                         {{ $artifact->label }}
                                     </span>
-                                    <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ str_replace('_', ' ', $artifact->type) }}</span>
+                                    <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ str_replace('_', ' ', $artifact->type) }}</span>
                                 </summary>
                                 @if ($artifact->content)
                                     <div class="max-h-[min(28rem,70vh)] min-w-0 overflow-auto border-t border-brand-ink/10 bg-slate-950">

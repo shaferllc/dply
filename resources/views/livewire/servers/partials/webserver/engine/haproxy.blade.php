@@ -85,7 +85,7 @@
                                             placeholder="app1 127.0.0.1:8080 check{{ "\n" }}app2 127.0.0.1:8081 check"
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                             required></textarea>
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Add `check` to enable health checking on each server; combine with `option httpchk GET /health` on the backend.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Add `check` to enable health checking on each server; combine with `option httpchk GET /health` on the backend.') }}</span>
                                     </label>
                                 </div>
 
@@ -158,12 +158,12 @@
                                         <span class="min-w-0 flex-1">
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $backendName }}</span>
-                                                <span class="text-[11px] text-brand-mist">{{ __(':n server(s)', ['n' => count($payload['servers'] ?? [])]) }}</span>
+                                                <span class="text-xs text-brand-mist">{{ __(':n server(s)', ['n' => count($payload['servers'] ?? [])]) }}</span>
                                                 @if (! empty($payload['values']['balance']))
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $payload['values']['balance'] }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $payload['values']['balance'] }}</span>
                                                 @endif
                                             </span>
-                                            <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ implode(', ', $payload['servers'] ?? []) ?: '—' }}</span>
+                                            <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ implode(', ', $payload['servers'] ?? []) ?: '—' }}</span>
                                         </span>
                                     </button>
 
@@ -172,7 +172,7 @@
                                             <button type="button"
                                                 wire:click="openConfirmActionModal('removeHaproxyBackend', ['{{ $backendName }}'], @js(__('Remove backend: :name', ['name' => $backendName])), @js(__('Remove the `:name` backend block? Frontends still routing here will fail validation on next reload.', ['name' => $backendName])), @js(__('Remove')), true)"
                                                 @disabled($isDeployer || $actionInFlight)
-                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
                                                 <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Remove') }}
                                             </button>
@@ -186,7 +186,7 @@
                                                 rows="5"
                                                 spellcheck="false"
                                                 class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30">{{ $haproxy_backends_servers_text[$backendName] ?? '' }}</textarea>
-                                            <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Each line: `<label> <host>:<port> [check] [weight=N] [maxconn=N] [backup] [disabled]`.') }}</span>
+                                            <span class="mt-1 block text-xs text-brand-mist">{{ __('Each line: `<label> <host>:<port> [check] [weight=N] [maxconn=N] [backup] [disabled]`.') }}</span>
                                         </label>
 
                                         <div class="grid gap-5 sm:grid-cols-2">
@@ -319,7 +319,7 @@
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                             required
                                         ></textarea>
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Any HAProxy bind expression — `*:80`, `127.0.0.1:7070`, `*:443 ssl crt /etc/ssl/...`, etc.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Any HAProxy bind expression — `*:80`, `127.0.0.1:7070`, `*:443 ssl crt /etc/ssl/...`, etc.') }}</span>
                                     </label>
                                     <label class="block">
                                         <span class="block text-xs font-medium text-brand-ink">{{ __('default_backend') }}</span>
@@ -329,7 +329,7 @@
                                             placeholder="caddy_backends"
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest"
                                         />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Name of an existing `backend <name>` block. Skip for ACL-only routing — the validate will fail if neither default_backend nor a use_backend ACL is present.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Name of an existing `backend <name>` block. Skip for ACL-only routing — the validate will fail if neither default_backend nor a use_backend ACL is present.') }}</span>
                                     </label>
                                 </div>
 
@@ -408,14 +408,14 @@
                                         <span class="min-w-0 flex-1">
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $frontendName }}</span>
-                                                <span class="text-[11px] text-brand-mist">{{ __(':n bind(s)', ['n' => count($payload['binds'] ?? [])]) }}</span>
+                                                <span class="text-xs text-brand-mist">{{ __(':n bind(s)', ['n' => count($payload['binds'] ?? [])]) }}</span>
                                                 @if (! empty($payload['values']['default_backend']))
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                         → {{ $payload['values']['default_backend'] }}
                                                     </span>
                                                 @endif
                                             </span>
-                                            <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ implode(', ', $payload['binds'] ?? []) ?: '—' }}</span>
+                                            <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ implode(', ', $payload['binds'] ?? []) ?: '—' }}</span>
                                         </span>
                                     </button>
 
@@ -425,7 +425,7 @@
                                                 type="button"
                                                 wire:click="openConfirmActionModal('removeHaproxyFrontend', ['{{ $frontendName }}'], @js(__('Remove frontend: :name', ['name' => $frontendName])), @js(__('Remove the `:name` frontend block? Traffic to its bound ports stops being routed immediately.', ['name' => $frontendName])), @js(__('Remove')), true)"
                                                 @disabled($isDeployer || $actionInFlight)
-                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Remove') }}
@@ -441,7 +441,7 @@
                                                 spellcheck="false"
                                                 class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                             >{{ $haproxy_frontends_binds_text[$frontendName] ?? '' }}</textarea>
-                                            <span class="mt-1 block text-[11px] text-brand-mist">{{ __('e.g. `*:80`, `127.0.0.1:7070`, `*:443 ssl crt /etc/ssl/<cert>.pem`.') }}</span>
+                                            <span class="mt-1 block text-xs text-brand-mist">{{ __('e.g. `*:80`, `127.0.0.1:7070`, `*:443 ssl crt /etc/ssl/<cert>.pem`.') }}</span>
                                         </label>
 
                                         <div class="grid gap-5 sm:grid-cols-2">
@@ -590,7 +590,7 @@
                         @else
                             <form wire:submit.prevent="saveHaproxyGlobalsConfig" class="mt-6 space-y-6">
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('global { … }') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('global { … }') }}</p>
                                     <div class="mt-3 grid gap-5 sm:grid-cols-2">
                                         @foreach ($haproxyGlobalParams as $paramKey => $meta)
                                             @php $formKey = 'global_'.$slug($paramKey); @endphp
@@ -623,7 +623,7 @@
                                 </div>
 
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('defaults { … }') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('defaults { … }') }}</p>
                                     <div class="mt-3 grid gap-5 sm:grid-cols-2">
                                         @foreach ($haproxyDefaultsParams as $paramKey => $meta)
                                             @php $formKey = 'defaults_'.$slug($paramKey); @endphp

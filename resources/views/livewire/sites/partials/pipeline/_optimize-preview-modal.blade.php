@@ -27,7 +27,7 @@
                 <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Optimize pipeline') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Optimize pipeline') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Review proposed changes') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('These steps are missing for the detected stack. Nothing changes until you apply.') }}
@@ -38,14 +38,14 @@
         <ul class="max-h-[min(60vh,420px)] divide-y divide-brand-ink/10 overflow-y-auto px-6 py-2">
             @foreach ($optPreview['steps'] as $step)
                 <li class="flex items-start gap-3 py-3">
-                    <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">+ {{ __('Add') }}</span>
+                    <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">+ {{ __('Add') }}</span>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-brand-ink">{{ $step['label'] ?? $step['type'] ?? '' }}</p>
                         @if (! empty($step['command']))
-                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss">{{ $step['command'] }}</p>
+                            <p class="mt-0.5 font-mono text-xs text-brand-moss">{{ $step['command'] }}</p>
                         @endif
                     </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $step['phase'] ?? '' }}</span>
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $step['phase'] ?? '' }}</span>
                 </li>
             @endforeach
         </ul>

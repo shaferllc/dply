@@ -4,7 +4,7 @@
             <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduled tasks') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live snapshot of `php artisan schedule:list` parsed into a chart with cron expressions, next-run times, and last exit codes.') }}</p>
         </div>

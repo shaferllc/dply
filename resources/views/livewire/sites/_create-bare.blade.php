@@ -84,7 +84,7 @@
                             <p class="font-semibold text-brand-ink">{{ $server->name }}</p>
                             <p class="text-brand-moss">{{ __('This site will be created on the selected server.') }}</p>
                         </div>
-                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/20">
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-xs font-semibold text-brand-forest ring-1 ring-brand-sage/20">
                             <span class="inline-flex h-1.5 w-1.5 rounded-full bg-brand-sage"></span>
                             {{ __('Ready') }}
                         </span>

@@ -84,7 +84,7 @@
                         wire:click="refreshSupervisorHealth"
                         wire:loading.attr="disabled"
                         wire:target="refreshSupervisorHealth"
-                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="refreshSupervisorHealth" class="inline-flex items-center gap-1">
                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -117,7 +117,7 @@
                             </span>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p>
-                                <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ $alert['message'] }}</p>
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $alert['message'] }}</p>
                             </div>
                         </div>
                         @if ($alert['link_label'])
@@ -126,7 +126,7 @@
                                 wire:click="setDaemonsWorkspaceTab(@js($alertTab))"
                                 x-data="{}"
                                 x-on:click="$nextTick(() => { const el = document.getElementById('daemons-workspace-tablist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
-                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                             >
                                 {{ $alert['link_label'] }}
                                 <x-heroicon-m-arrow-down class="h-3 w-3" aria-hidden="true" />
@@ -184,10 +184,10 @@
 
     @if ($hasDetail)
         <details class="border-b border-brand-ink/10">
-            <summary class="cursor-pointer select-none px-4 py-2 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 sm:px-5">
+            <summary class="cursor-pointer select-none px-4 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 sm:px-5">
                 {{ __('Raw supervisorctl output') }}
             </summary>
-            <pre class="max-h-64 overflow-auto border-t border-brand-ink/10 bg-white p-4 font-mono text-[11px] leading-relaxed text-brand-moss">{{ $report['health']['detail'] }}</pre>
+            <pre class="max-h-64 overflow-auto border-t border-brand-ink/10 bg-white p-4 font-mono text-xs leading-relaxed text-brand-moss">{{ $report['health']['detail'] }}</pre>
         </details>
     @endif
 
@@ -222,17 +222,17 @@
                                 <td class="px-3 py-2">
                                     <span class="font-medium text-brand-ink">{{ $row['slug'] }}</span>
                                     @if (! ($row['in_snapshot'] ?? true))
-                                        <p class="mt-0.5 text-[10px] text-amber-800">{{ __('Missing from last supervisorctl output') }}</p>
+                                        <p class="mt-0.5 text-2xs text-amber-800">{{ __('Missing from last supervisorctl output') }}</p>
                                     @endif
                                 </td>
                                 <td class="px-3 py-2">
-                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sloTonePalette['mist'] }}">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $sloTonePalette['mist'] }}">
                                         {{ $row['program_type'] }}
                                     </span>
                                 </td>
                                 <td class="px-3 py-2 text-brand-moss">{{ $row['site_name'] ?? __('Server') }}</td>
                                 <td class="px-3 py-2">
-                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $stateTone($row['state']) }}">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $stateTone($row['state']) }}">
                                         {{ $row['state'] }}
                                     </span>
                                 </td>

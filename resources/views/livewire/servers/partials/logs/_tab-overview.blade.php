@@ -67,7 +67,7 @@
             ['label' => __('SSH ready'), 'value' => $opsReady ? __('Yes') : __('No')],
         ] as $stat)
             <div class="bg-white px-3 py-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
                 <p class="mt-0.5 font-mono text-sm font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
             </div>
         @endforeach

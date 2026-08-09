@@ -35,7 +35,7 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Status') }}</p>
                 <p class="mt-1 text-sm text-slate-700">{{ $preflight['summary'] ?? __('Pick a provider, region, and plan to continue.') }}</p>
             </div>
-            <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $statusBadgeClasses }}">{{ $statusLabel }}</span>
+            <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] ring-1 {{ $statusBadgeClasses }}">{{ $statusLabel }}</span>
         </div>
 
         @if ($blockingChecks->isNotEmpty())

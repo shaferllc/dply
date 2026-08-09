@@ -40,7 +40,7 @@
         @endif
     @endforeach
     @if (count($items) === 0 && $empty)
-        <span @class(['inline-flex items-center gap-1 px-2 text-xs text-brand-moss', 'px-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800/70' => $compact])>
+        <span @class(['inline-flex items-center gap-1 px-2 text-xs text-brand-moss', 'px-1 text-2xs font-semibold uppercase tracking-wide text-amber-800/70' => $compact])>
             <x-heroicon-m-plus class="h-3.5 w-3.5 opacity-60 transition-opacity group-hover/hookzone:opacity-100" aria-hidden="true" />
             {{ $empty }}
         </span>

@@ -35,7 +35,7 @@
                 @foreach ($traefik_udp_routes_form as $udpSlug => $udpFields)
                     <form wire:submit.prevent="saveTraefikUdpRoute(@js($udpSlug))" class="mt-4 rounded-xl border border-brand-ink/10 p-4" wire:key="traefik-udp-{{ $udpSlug }}">
                         <div class="flex justify-between"><p class="font-mono text-sm font-semibold">dply-udp-{{ $udpSlug }}</p>
-                            <button type="button" wire:click="openConfirmActionModal('removeTraefikUdpRoute', [@js($udpSlug)], @js(__('Remove UDP route')), @js(__('Delete this UDP config?')), @js(__('Remove')), true)" class="text-[11px] text-rose-800">{{ __('Remove') }}</button></div>
+                            <button type="button" wire:click="openConfirmActionModal('removeTraefikUdpRoute', [@js($udpSlug)], @js(__('Remove UDP route')), @js(__('Delete this UDP config?')), @js(__('Remove')), true)" class="text-xs text-rose-800">{{ __('Remove') }}</button></div>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <label><span class="text-xs">{{ __('Entry points') }}</span><input type="text" wire:model.lazy="traefik_udp_routes_form.{{ $udpSlug }}.entry_points" class="mt-1 w-full rounded-md text-sm" /></label>
                             <label><span class="text-xs">{{ __('Backend') }}</span><input type="text" wire:model.lazy="traefik_udp_routes_form.{{ $udpSlug }}.server_address" class="mt-1 w-full rounded-md font-mono text-sm" /></label>

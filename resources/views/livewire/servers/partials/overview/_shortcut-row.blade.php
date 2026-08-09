@@ -29,7 +29,7 @@
          ("Insights", "Patches") and stacking made every row two lines tall. --}}
     <p class="flex min-w-0 flex-1 items-baseline gap-2">
         <span class="truncate text-sm font-semibold text-brand-ink">{{ $headline }}</span>
-        <span class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $label }}</span>
+        <span class="shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $label }}</span>
     </p>
     <span class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-brand-ink/70 transition group-hover:text-brand-ink">
         {{ $cta }}

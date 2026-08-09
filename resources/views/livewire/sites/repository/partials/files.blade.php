@@ -55,7 +55,7 @@
                             <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-moss" />
                             <span class="truncate font-mono text-sm text-brand-ink">{{ $entry['name'] }}</span>
                         </button>
-                        <span class="text-[10px] uppercase tracking-[0.12em] text-brand-mist">{{ __('dir') }}</span>
+                        <span class="text-2xs uppercase tracking-[0.12em] text-brand-mist">{{ __('dir') }}</span>
                     @else
                         <button type="button" wire:click="openFile('{{ $entry['path'] }}')"
                                 class="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -105,7 +105,7 @@
                     {{ ($filesView['binary'] ?? false) ? __('Binary file — preview suppressed. Open on the provider to download.') : __('File exceeds the preview size limit. Open on the provider to download.') }}
                 </div>
             @else
-                <pre class="max-h-[40rem] overflow-auto bg-brand-ink p-4 font-mono text-[11px] leading-relaxed text-brand-cream/90">{{ $filesView['content'] }}</pre>
+                <pre class="max-h-[40rem] overflow-auto bg-brand-ink p-4 font-mono text-xs leading-relaxed text-brand-cream/90">{{ $filesView['content'] }}</pre>
             @endif
         </div>
     @endif

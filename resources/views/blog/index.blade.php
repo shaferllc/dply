@@ -36,9 +36,9 @@
                                     wire:navigate
                                     class="group block px-5 py-5 transition-colors hover:bg-brand-sand/15 sm:px-6 sm:py-5"
                                 >
-                                    <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                         @if ($post['is_deep_dive'])
-                                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-forest/10 px-2 py-0.5 text-[10px] text-brand-forest ring-1 ring-inset ring-brand-forest/20">
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-forest/10 px-2 py-0.5 text-2xs text-brand-forest ring-1 ring-inset ring-brand-forest/20">
                                                 <x-heroicon-m-beaker class="h-3 w-3" aria-hidden="true" />
                                                 {{ __('Deep dive') }}
                                             </span>
@@ -47,7 +47,7 @@
                                         <span class="text-brand-mist/50">·</span>
                                         <span>{{ __(':n min read', ['n' => $post['reading_minutes']]) }}</span>
                                         @foreach (array_slice($post['tags'], 0, 3) as $tag)
-                                            <span class="rounded-md bg-brand-sand/55 px-2 py-0.5 text-[10px] text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $tag }}</span>
+                                            <span class="rounded-md bg-brand-sand/55 px-2 py-0.5 text-2xs text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $tag }}</span>
                                         @endforeach
                                     </div>
                                     <h2 class="mt-2 text-base font-semibold tracking-tight text-brand-ink transition group-hover:text-brand-forest sm:text-lg">

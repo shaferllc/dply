@@ -46,7 +46,7 @@
                 <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
                         <div class="min-w-0">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Organization') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Organization') }}</p>
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $currentOrganization->name }}</p>
                         </div>
                         @can('viewNotificationChannels', $currentOrganization)
@@ -63,9 +63,9 @@
                                 <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
-                                        <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
+                                        <p class="text-xs text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
                                     </div>
-                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
+                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
                                 </li>
                             @endforeach
                         </ul>
@@ -78,7 +78,7 @@
                     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
                             <div class="min-w-0">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Team') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Team') }}</p>
                                 <p class="truncate text-sm font-semibold text-brand-ink">{{ $entry['team']->name }}</p>
                             </div>
                             <a href="{{ route('teams.notification-channels', [$entry['team']->organization, $entry['team']]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">
@@ -90,9 +90,9 @@
                                 <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
-                                        <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
+                                        <p class="text-xs text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
                                     </div>
-                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
+                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
                                 </li>
                             @endforeach
                         </ul>
@@ -173,7 +173,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/5 text-left text-sm">
-                <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                     <tr>
                         <th scope="col" class="px-5 py-2 sm:px-6">{{ __('Label') }}</th>
                         <th scope="col" class="px-4 py-2">{{ __('Type') }}</th>
@@ -220,7 +220,7 @@
                             @else
                                 <td class="px-5 py-3 font-semibold text-brand-ink sm:px-6">{{ $channel->label }}</td>
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         {{ \App\Models\NotificationChannel::labelForType($channel->type) }}
                                     </span>
                                 </td>
@@ -251,7 +251,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="openConfirmActionModal('deleteChannel', ['{{ $channel->id }}'], @js(__('Delete notification channel')), @js(__('Remove this channel?')), @js(__('Delete')), true)"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                             >
                                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Delete') }}

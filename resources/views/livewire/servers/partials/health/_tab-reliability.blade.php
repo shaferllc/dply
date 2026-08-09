@@ -18,7 +18,7 @@
                         <a
                             href="{{ route('servers.deploys', $server) }}"
                             wire:navigate
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             {{ __('Deploy history') }}
                             <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -41,7 +41,7 @@
                     @foreach ($report['deployments']['recent'] as $failure)
                         <li class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs sm:px-5">
                             <span class="min-w-0 truncate font-semibold text-brand-ink">{{ $failure['site_name'] }}</span>
-                            <a href="{{ $failure['href'] }}" wire:navigate class="ml-auto shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">{{ $failure['at']?->diffForHumans() }}</a>
+                            <a href="{{ $failure['href'] }}" wire:navigate class="ml-auto shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ $failure['at']?->diffForHumans() }}</a>
                         </li>
                     @endforeach
                 </ul>
@@ -74,9 +74,9 @@
                         <li class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs sm:px-5">
                             <span class="shrink-0 font-semibold text-brand-ink">{{ $cert['site_name'] }}</span>
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                            <span class="min-w-0 flex-1 truncate text-[11px] text-brand-moss">{{ $cert['domain'] ?: $cert['status'] }}</span>
+                            <span class="min-w-0 flex-1 truncate text-xs text-brand-moss">{{ $cert['domain'] ?: $cert['status'] }}</span>
                             @if ($cert['href'])
-                                <a href="{{ $cert['href'] }}" wire:navigate class="ml-auto shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">
+                                <a href="{{ $cert['href'] }}" wire:navigate class="ml-auto shrink-0 text-xs font-semibold text-brand-forest hover:underline">
                                     @if ($cert['days_left'] !== null)
                                         {{ trans_choice(':days day|:days days', max(0, $cert['days_left']), ['days' => max(0, $cert['days_left'])]) }}
                                     @else
@@ -106,7 +106,7 @@
                     <a
                         href="{{ route('servers.workers', $server) }}"
                         wire:navigate
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         {{ __('Open workers') }}
                         <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -131,7 +131,7 @@
                         <span class="min-w-0 truncate font-mono font-semibold text-brand-ink">{{ $daemon['slug'] }}</span>
                         @if ($daemon['site_name'])
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                            <span class="min-w-0 truncate text-[11px] text-brand-moss">{{ $daemon['site_name'] }}</span>
+                            <span class="min-w-0 truncate text-xs text-brand-moss">{{ $daemon['site_name'] }}</span>
                         @endif
                     </li>
                 @endforeach

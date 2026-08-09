@@ -9,7 +9,7 @@
     <div class="space-y-6">
         @foreach ($groups as $group)
             <section class="dply-card-compact">
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</h2>
+                <h2 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</h2>
                 <ul class="mt-3 grid gap-2 lg:grid-cols-2">
                     @foreach ($group['flags'] as $flag)
                         <li wire:key="global-flag-{{ $flag['key'] }}">

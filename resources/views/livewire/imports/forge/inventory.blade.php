@@ -75,12 +75,12 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-base font-semibold text-brand-ink">{{ $server->name }}</h2>
                                 @if ($server->removed_from_source)
-                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-200">
+                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-200">
                                         {{ __('Removed from Forge') }}
                                     </span>
                                 @endif
                                 @if ($server->status)
-                                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                         {{ $server->status }}
                                     </span>
                                 @endif
@@ -127,8 +127,8 @@
                                         default => ['label' => $previous->status, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
                                     };
                                 @endphp
-                                <a href="{{ route('imports.ploi.migration.progress', $previous) }}" wire:navigate class="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-moss hover:text-brand-ink">
-                                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ring-1 {{ $prevPill['class'] }}">{{ $prevPill['label'] }}</span>
+                                <a href="{{ route('imports.ploi.migration.progress', $previous) }}" wire:navigate class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-moss hover:text-brand-ink">
+                                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide ring-1 {{ $prevPill['class'] }}">{{ $prevPill['label'] }}</span>
                                     <span>{{ __('Last migration · :ago', ['ago' => optional($previous->completed_at ?? $previous->created_at)->diffForHumans()]) }}</span>
                                 </a>
                             @endif
@@ -155,7 +155,7 @@
                                     <div class="min-w-0 space-y-0.5">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="truncate font-mono text-sm text-brand-ink">{{ $site->domain }}</span>
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $class }}">{{ $label }}</span>
+                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $class }}">{{ $label }}</span>
                                         </div>
                                         <p class="text-xs text-brand-moss">
                                             {{ $site->site_type }}@if ($site->php_version) · PHP {{ $site->php_version }} @endif

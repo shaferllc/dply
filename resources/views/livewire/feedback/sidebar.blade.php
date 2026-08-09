@@ -40,7 +40,7 @@
                 </span>
                 <div class="min-w-0">
                     <p id="feedback-sidebar-title" class="truncate text-sm font-semibold text-brand-ink">{{ __('Send feedback') }}</p>
-                    <p class="truncate text-[11px] text-brand-moss">{{ __('Found a bug or have an idea? Tell us.') }}</p>
+                    <p class="truncate text-xs text-brand-moss">{{ __('Found a bug or have an idea? Tell us.') }}</p>
                 </div>
             </div>
             <button

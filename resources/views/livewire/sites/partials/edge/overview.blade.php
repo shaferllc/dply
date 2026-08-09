@@ -11,7 +11,7 @@
                 <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delivery') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Where this site is published and how traffic is routed.') }}</p>
             </div>
@@ -57,7 +57,7 @@
                 <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Source') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Source') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Source') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Git repository connected to this Edge site.') }}</p>
             </div>
@@ -100,7 +100,7 @@
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hostnames routed to this Edge site.') }}</p>
             </div>

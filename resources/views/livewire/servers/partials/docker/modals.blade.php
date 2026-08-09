@@ -125,7 +125,7 @@
                         class="mt-3 flex flex-wrap items-center gap-2"
                         x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($shellSshCommand)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
                     >
-                        <code class="min-w-0 flex-1 break-all rounded-lg bg-brand-ink px-3 py-2 font-mono text-[11px] text-brand-cream">{{ $shellSshCommand }}</code>
+                        <code class="min-w-0 flex-1 break-all rounded-lg bg-brand-ink px-3 py-2 font-mono text-xs text-brand-cream">{{ $shellSshCommand }}</code>
                         <button type="button" x-on:click="copy()" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
                             <x-heroicon-o-clipboard class="h-4 w-4" aria-hidden="true" />
                             <span x-show="!copied">{{ __('Copy SSH command') }}</span>
@@ -193,7 +193,7 @@
                                             <pre class="mt-1 whitespace-pre-wrap break-all text-slate-100">{{ $entry['out'] }}</pre>
                                         @endif
                                         @if ($entry['exit'] !== null)
-                                            <p class="mt-1 text-[10px] text-slate-500">{{ __('Exit :code', ['code' => $entry['exit']]) }}</p>
+                                            <p class="mt-1 text-2xs text-slate-500">{{ __('Exit :code', ['code' => $entry['exit']]) }}</p>
                                         @endif
                                     </div>
                                 @endforeach

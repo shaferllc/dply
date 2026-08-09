@@ -35,7 +35,7 @@
                             <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Start with your repository') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('We shallow-clone the branch, detect runtimes (including monorepos), and map each package to Edge, Cloud, or BYO layers.') }}</p>
                         </div>
@@ -71,7 +71,7 @@
                                 <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Architecture') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Architecture') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recommended architecture') }}</h2>
                                 <p class="mt-1 font-mono text-sm text-brand-moss">{{ $plan['repo'] ?? '' }} @ {{ $plan['branch'] ?? 'main' }}</p>
                                 @if ($plan['is_monorepo'] ?? false)
@@ -124,7 +124,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <h3 class="text-base font-semibold text-brand-ink">{{ $layer['label'] ?? '' }}</h3>
-                                            <span @class(['rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide', $badgeClass])>{{ $status }}</span>
+                                            <span @class(['rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide', $badgeClass])>{{ $status }}</span>
                                             @if (! empty($layer['framework']))
                                                 <span class="text-xs font-medium text-brand-moss">{{ $layer['framework'] }}</span>
                                             @endif
@@ -156,7 +156,7 @@
                             <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Wiring') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Wiring') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Wiring guide') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Follow these steps after each layer is provisioned. Order matters when origins and databases must exist before the edge front goes live.') }}</p>
                         </div>

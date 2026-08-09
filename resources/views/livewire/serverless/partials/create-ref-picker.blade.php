@@ -18,7 +18,7 @@
             @else
                 <x-heroicon-o-arrow-trending-up class="h-4 w-4 text-brand-mist" aria-hidden="true" />
             @endif
-            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $refLabel }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $refLabel }}</span>
             <span class="font-mono text-sm text-brand-ink">{{ $git_branch !== '' ? $git_branch : __('—') }}</span>
         </div>
         <button
@@ -44,7 +44,7 @@
     @if ($refPickerOpen)
         <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-2 border-b border-brand-ink/10 px-3 py-2">
-                <div class="inline-flex rounded-md border border-brand-ink/15 bg-brand-sand/20 p-0.5 text-[11px] font-semibold">
+                <div class="inline-flex rounded-md border border-brand-ink/15 bg-brand-sand/20 p-0.5 text-xs font-semibold">
                     @foreach ([
                         'branches' => __('Branches'),
                         'tags' => __('Tags'),
@@ -126,7 +126,7 @@
             <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
                 <div class="flex flex-wrap items-end gap-2">
                     <div class="min-w-0 flex-1">
-                        <label for="serverless-ref-manual" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Or type a ref') }}</label>
+                        <label for="serverless-ref-manual" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Or type a ref') }}</label>
                         <x-text-input
                             id="serverless-ref-manual"
                             type="text"

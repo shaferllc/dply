@@ -32,7 +32,7 @@
 
 <nav aria-label="{{ __('Platform admin navigation') }}" class="dply-surface-nav sticky top-24 space-y-1">
     <div class="mb-4 px-3">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Platform admin') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Platform admin') }}</p>
         <p class="mt-1 text-xs text-brand-moss">{{ __('Operations, flags, and org overrides') }}</p>
     </div>
 
@@ -68,7 +68,7 @@
     </a>
 
     <div class="pt-2">
-        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Feature flags') }}</p>
+        <p class="px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Feature flags') }}</p>
         <a href="{{ route('admin.flags.all') }}" wire:navigate @class([$navBase, $allFlagsActive ? $navOn : $navOff])>
             <x-heroicon-o-flag class="{{ $navIcon }}" />
             {{ __('All flags') }}
@@ -78,8 +78,8 @@
             {{ __('Global') }}
         </a>
         <div class="mt-1 space-y-0.5 pl-2">
-            <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Product lines') }}</p>
-            <p class="px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-brand-mist/80">{{ __('VM') }}</p>
+            <p class="px-3 py-1 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Product lines') }}</p>
+            <p class="px-3 py-0.5 text-2xs font-semibold uppercase tracking-[0.1em] text-brand-mist/80">{{ __('VM') }}</p>
             @foreach ($vmLines as $slug)
                 @php $routeName = \App\Support\Admin\AdminFeatureFlags::productLineRoute($slug); @endphp
                 @if ($routeName && isset($productLines[$slug]))

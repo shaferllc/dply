@@ -19,13 +19,13 @@
                     <x-badge size="sm">{{ $project->roleLabel }}</x-badge>
                 @endif
                 @foreach ($project->labels as $label)
-                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</span>
+                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</span>
                 @endforeach
             </div>
             @if ($project->description)
                 <p class="mt-1 max-w-xl text-sm text-brand-moss line-clamp-2">{{ $project->description }}</p>
             @endif
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                 <span class="inline-flex items-center gap-1">
                     <x-heroicon-m-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     <span class="font-mono tabular-nums text-brand-ink">{{ $project->serversCount }}</span>

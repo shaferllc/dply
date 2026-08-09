@@ -31,23 +31,23 @@
 @endphp
 
 @if (! $hasAny)
-    <span {{ $attributes->class(['inline-flex items-center text-[10px] font-medium uppercase tracking-wide text-brand-mist']) }} title="{{ __('No metrics yet — install monitor on this server.') }}">
+    <span {{ $attributes->class(['inline-flex items-center text-2xs font-medium uppercase tracking-wide text-brand-mist']) }} title="{{ __('No metrics yet — install monitor on this server.') }}">
         <x-heroicon-o-minus-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span class="ml-1">{{ __('No metrics') }}</span>
     </span>
 @else
     <div {{ $attributes->class(['inline-flex items-center gap-1.5 font-mono tabular-nums', $stale ? 'opacity-60' : '']) }}
          title="{{ $sampleAge !== null ? __('Sampled :ago', ['ago' => $snapshot->captured_at->diffForHumans()]) : '' }}">
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($cpu) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('CPU') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($cpu) }}">
+            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('CPU') }}</span>
             <span>{{ $cpu !== null ? number_format($cpu, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($mem) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('MEM') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($mem) }}">
+            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('MEM') }}</span>
             <span>{{ $mem !== null ? number_format($mem, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($disk) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('DISK') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs font-semibold {{ $statusColor($disk) }}">
+            <span class="text-xxs font-bold uppercase tracking-wider opacity-60">{{ __('DISK') }}</span>
             <span>{{ $disk !== null ? number_format($disk, 0).'%' : '—' }}</span>
         </span>
     </div>

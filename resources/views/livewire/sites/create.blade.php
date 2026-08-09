@@ -103,18 +103,18 @@
                                         : __('This site will be created on the selected server and use its current web stack.') }}
                                 </p>
                             </div>
-                            <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                                 {{ __('Server ready') }}
                             </span>
                         </div>
 
                         <dl class="mt-5 grid gap-4 sm:grid-cols-2">
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Provider') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Provider') }}</dt>
                                 <dd class="mt-2 text-sm font-medium text-slate-900">{{ $server->providerDisplayLabel() }}</dd>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Health') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Health') }}</dt>
                                 <dd class="mt-2 text-sm font-medium text-slate-900">
                                     @if ($server->health_status === 'reachable')
                                         {{ __('Reachable') }}
@@ -126,11 +126,11 @@
                                 </dd>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('IP address') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('IP address') }}</dt>
                                 <dd class="mt-2 font-mono text-sm text-slate-900">{{ $functionsHost ? __('Not applicable') : ($server->ip_address ?? '—') }}</dd>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Existing sites') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Existing sites') }}</dt>
                                 <dd class="mt-2 text-sm font-medium text-slate-900">{{ number_format($server->sites_count) }}</dd>
                             </div>
                         </dl>
@@ -255,11 +255,11 @@
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Document root') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Document root') }}</dt>
                                 <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $form->document_root }}</dd>
                             </div>
                             <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Deploy path') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Deploy path') }}</dt>
                                 <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $form->repository_path }}</dd>
                             </div>
                         </div>
@@ -363,17 +363,17 @@
                                             {{ __('Dply inspected the selected repository and inferred a starting runtime/build setup. You can override it below if needed.') }}
                                         </p>
                                     </div>
-                                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
                                         {{ strtoupper((string) ($functionsDetection['confidence'] ?? 'low')) }}
                                     </span>
                                 </div>
                                 <dl class="grid gap-4 md:grid-cols-2">
                                     <div>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Framework') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Framework') }}</dt>
                                         <dd class="mt-1 text-sm font-medium text-slate-900">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Language') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Language') }}</dt>
                                         <dd class="mt-1 text-sm font-medium text-slate-900">{{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</dd>
                                     </div>
                                 </dl>

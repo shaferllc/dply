@@ -49,11 +49,11 @@
         >
             @if ($config_scope !== '')
                 <x-slot:actions>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-xs font-semibold text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-funnel class="h-3 w-3" />
                         {{ __('Filtered: :scope', ['scope' => \Illuminate\Support\Str::headline($config_scope)]) }}
                     </span>
-                    <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                    <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
                         <x-heroicon-o-x-mark class="h-3 w-3" />
                         {{ __('Show all files') }}
                     </button>
@@ -180,11 +180,11 @@
 
                         <dl class="grid grid-cols-2 gap-2">
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
                                 <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->region ?: '—' }}</dd>
                             </div>
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
                                 <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->size ?: '—' }}</dd>
                             </div>
                         </dl>

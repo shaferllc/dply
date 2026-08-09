@@ -117,7 +117,7 @@
                         class="pointer-events-none absolute top-0 z-10 w-56 rounded-lg border border-brand-ink/10 bg-white/95 p-3 text-xs shadow-lg backdrop-blur"
                         :style="tip ? (tip.x > 60 ? `right: ${100 - tip.x}%;` : `left: ${tip.x}%;`) : ''">
                         <p class="font-semibold text-brand-ink" x-text="tip?.label"></p>
-                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss" x-text="tip ? tip.time + ' (UTC)' : ''"></p>
+                        <p class="mt-0.5 font-mono text-xs text-brand-moss" x-text="tip ? tip.time + ' (UTC)' : ''"></p>
                     </div>
                 </div>
 
@@ -126,14 +126,14 @@
                     $n = count($buckets);
                     $ticks = $n > 0 ? array_values(array_unique([0, intdiv($n - 1, 2), $n - 1])) : [];
                 @endphp
-                <div class="relative mt-1 h-4 text-[10px] tabular-nums text-brand-mist">
+                <div class="relative mt-1 h-4 text-2xs tabular-nums text-brand-mist">
                     @foreach ($ticks as $i)
                         <span class="absolute -translate-x-1/2 whitespace-nowrap" style="left: {{ $buckets[$i]['x_pct'] }}%">{{ $buckets[$i]['label'] }}</span>
                     @endforeach
                 </div>
 
                 {{-- Legend + hint --}}
-                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-brand-moss">
+                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-brand-moss">
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-brand-sage/70"></span>{{ __('Logs') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-amber-400"></span>{{ __('Warnings') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-rose-500"></span>{{ __('Errors') }}</span>
@@ -141,7 +141,7 @@
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>{{ __('Error') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white"></span>{{ __('Incident') }}</span>
                 </div>
-                <p class="mt-2 text-[11px] text-brand-mist">
+                <p class="mt-2 text-xs text-brand-mist">
                     {{ $isLeaf
                         ? __('Click a minute to load its log lines below.')
                         : __('Click a bar to zoom in (:grain → finer). Hover a dot for the event.', ['grain' => $grains[$gran] ?? $gran]) }}

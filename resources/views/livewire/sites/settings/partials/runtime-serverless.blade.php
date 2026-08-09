@@ -31,7 +31,7 @@
                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
             </div>
@@ -43,27 +43,27 @@
         <div class="px-6 py-6 sm:px-7 space-y-5">
         <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Runtime') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Runtime') }}</dt>
                 <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $runtimeKind !== '' ? $runtimeKind : __('Auto-detected on deploy') }}</dd>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Entrypoint') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Entrypoint') }}</dt>
                 <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $entrypoint !== '' ? $entrypoint : '—' }}</dd>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Package') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Package') }}</dt>
                 <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $package }}</dd>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Action name') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Action name') }}</dt>
                 <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $actionName !== '' ? $actionName : '—' }}</dd>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Current revision') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Current revision') }}</dt>
                 <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $revision !== '' ? $revision : __('Not deployed') }}</dd>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Last deployed') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Last deployed') }}</dt>
                 <dd class="mt-2 text-sm text-brand-ink">
                     @if ($lastDeployedAt)
                         <span title="{{ $lastDeployedAt }}">{{ \Illuminate\Support\Carbon::parse($lastDeployedAt)->diffForHumans() }}</span>
@@ -76,7 +76,7 @@
 
         @if ($invocationUrl !== '')
             <div x-data="{ copied: false }" class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Invocation URL') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Invocation URL') }}</dt>
                 <div class="mt-2 flex items-center gap-2">
                     <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink" title="{{ $invocationUrl }}">{{ $invocationUrl }}</span>
                     <button type="button"
@@ -89,7 +89,7 @@
                     <a href="{{ $invocationUrl }}" target="_blank" rel="noreferrer" title="{{ __('Open') }}" class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink">
                         <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                     </a>
-                    <span x-show="copied" x-cloak class="shrink-0 text-[10px] font-medium text-brand-forest">{{ __('Copied') }}</span>
+                    <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
                 </div>
             </div>
         @endif
@@ -103,7 +103,7 @@
                 <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Limits') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Limits') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('How much the app gets per request. These are pushed to the action on the next deploy.') }}</p>
             </div>
@@ -177,7 +177,7 @@
                 <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Latency') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Latency') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Keep-warm is currently') }}

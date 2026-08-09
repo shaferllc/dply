@@ -42,7 +42,7 @@
                 >
                     @if ($isActive && $unit !== null)
                         <x-slot:actions>
-                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $pill['classes'] }}">
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-xs font-medium ring-1 ring-brand-ink/10 {{ $pill['classes'] }}">
                                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
                                 {{ $pill['label'] }}
                             </span>
@@ -75,7 +75,7 @@
                                     <div class="bg-white px-4 py-3 sm:px-5">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div class="min-w-0">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
+                                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
                                                 @if ($header['sub'] !== '')
                                                     <p class="mt-0.5 text-[12px] text-brand-mist">{{ $header['sub'] }}</p>
                                                 @endif
@@ -103,7 +103,7 @@
                                     <div class="bg-brand-sand/15 px-4 py-3 sm:px-5">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div class="min-w-0">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
+                                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
                                                 <p class="mt-0.5 text-[12px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
                                             </div>
                                             <div class="flex flex-wrap gap-2">
@@ -141,7 +141,7 @@
                                 'inflightSwitch' => $inflightSwitch,
                                 'edgeProxyActionTarget' => $edgeProxyActionTarget ?? null,
                             ])
-                            <p class="text-[11px] text-brand-mist sm:max-w-prose">
+                            <p class="text-xs text-brand-mist sm:max-w-prose">
                                 {{ __('Switch replaces the active edge proxy on :port in one cutover. Caddy stays the per-site backend on high ports.', ['port' => 80]) }}
                             </p>
                         @else
@@ -193,7 +193,7 @@
                                         {{ __('Opening…') }}
                                     </span>
                                 </button>
-                                <p class="text-[11px] text-brand-mist sm:max-w-xs">
+                                <p class="text-xs text-brand-mist sm:max-w-xs">
                                     {{ __('Switching rebinds :80 and rewrites every site\'s vhost config for the new engine. dply runs the cutover atomically; existing sites stay up.') }}
                                 </p>
                             @endif
@@ -312,7 +312,7 @@
                                     type="button"
                                     @click="pick(@js($opt))"
                                     :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
-                                    class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors"
+                                    class="rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide transition-colors"
                                 >
                                     {{ $rangeLabels[$opt] ?? $opt }}
                                 </button>
@@ -327,7 +327,7 @@
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
                             <p class="mt-2">{{ __('No health data yet. The agent will start posting :engine metrics on the next push.', ['engine' => $info['label']]) }}</p>
                             @if ($key === 'caddy')
-                                <p class="mt-1 text-[11px] text-brand-mist">
+                                <p class="mt-1 text-xs text-brand-mist">
                                     {{ __('Charts need the Monitor tab agent installed and pushing samples. Caddy is scraped from the admin API :endpoint — do not set :admin_off in the global Caddyfile.', ['endpoint' => '/metrics (:2019)', 'admin_off' => 'admin off']) }}
                                 </p>
                                 <p class="mt-2">
@@ -336,9 +336,9 @@
                                     </a>
                                 </p>
                             @elseif (in_array($key, ['nginx', 'apache'], true))
-                                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Existing servers may need a one-shot config backfill before the stats endpoint is reachable.') }}</p>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Existing servers may need a one-shot config backfill before the stats endpoint is reachable.') }}</p>
                             @else
-                                <p class="mt-1 text-[11px] text-brand-mist">
+                                <p class="mt-1 text-xs text-brand-mist">
                                     <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">
                                         {{ __('Open Monitor') }}
                                     </a>
@@ -418,9 +418,9 @@
                                  it via /metrics labels (not yet parsed but will land
                                  here when the agent learns to extract them). --}}
                             <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white">
-                                <div class="border-b border-brand-ink/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backends') }}</div>
+                                <div class="border-b border-brand-ink/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backends') }}</div>
                                 <table class="w-full text-left text-sm">
-                                    <thead class="text-[11px] uppercase tracking-wide text-brand-mist">
+                                    <thead class="text-xs uppercase tracking-wide text-brand-mist">
                                         <tr>
                                             <th class="px-4 py-2 font-medium">{{ __('Backend') }}</th>
                                             <th class="px-4 py-2 font-medium">{{ __('Server') }}</th>
@@ -441,7 +441,7 @@
                                                 <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $backend['backend'] ?? '—' }}</td>
                                                 <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $backend['name'] ?? '—' }}</td>
                                                 <td class="px-4 py-2">
-                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $status }}</span>
+                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $status }}</span>
                                                 </td>
                                             </tr>
                                         @endforeach

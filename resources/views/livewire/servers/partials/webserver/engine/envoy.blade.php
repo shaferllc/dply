@@ -52,13 +52,13 @@
 
                     <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
                             <dd class="mt-1 font-mono text-sm text-brand-ink">{{ is_string($envoyVersion) && $envoyVersion !== '' ? $envoyVersion : '—' }}</dd>
                         </div>
                         @if (is_array($envoyOverview))
                             @foreach (['listeners' => __('Listeners'), 'virtualhosts' => __('Virtual hosts'), 'clusters' => __('Clusters')] as $metric => $label)
                                 <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</dt>
                                     <dd class="mt-1 text-sm text-brand-ink tabular-nums">{{ number_format((int) ($envoyOverview[$metric] ?? 0)) }}</dd>
                                 </div>
                             @endforeach
@@ -73,7 +73,7 @@
                                         <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dply admin') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dply admin') }}</p>
                                         <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Open Envoy admin (signed in)') }}</h4>
                                         <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                                             {{ __('Envoy stays on localhost :9901 on the server. This URL proxies the admin UI over SSH — only members of your organization who can view this server can open it.', ['port' => '9901']) }}
@@ -121,15 +121,15 @@
                                                 </button>
                                             @endif
                                         </div>
-                                        <p class="mt-2 break-all font-mono text-[11px] text-brand-moss">{{ $envoyDplyAdminUrl }}</p>
+                                        <p class="mt-2 break-all font-mono text-xs text-brand-moss">{{ $envoyDplyAdminUrl }}</p>
                                     </div>
                                 </div>
                             </div>
                         @endif
                         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5 {{ $envoyDplyAdminUrl ? '' : 'lg:col-span-2' }}">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Local admin (on server)') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Local admin (on server)') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Used by dply live-state probes — not reachable from your browser.') }}</p>
-                            <code class="mt-3 block break-all rounded-lg bg-white px-3 py-2 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">http://127.0.0.1:9901/</code>
+                            <code class="mt-3 block break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">http://127.0.0.1:9901/</code>
                         </div>
                     </div>
 
@@ -195,7 +195,7 @@
                             <p class="mt-1 text-sm text-brand-moss">
                                 {{ __('Operator-tunable fields in /etc/envoy/envoy.yaml. Site routing blocks are regenerated when you apply edge backends or provision sites.') }}
                             </p>
-                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
+                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
                                 <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
                                 {{ __('Saving restarts Envoy — edge briefly drops connections.') }}
                             </p>
@@ -351,12 +351,12 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $clusterName }}</p>
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __(':n endpoint(s)', ['n' => count($payload['endpoints'] ?? [])]) }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ __(':n endpoint(s)', ['n' => count($payload['endpoints'] ?? [])]) }}</p>
                                         </div>
                                         <button type="button"
                                             wire:click="openConfirmActionModal('removeEnvoyCluster', ['{{ $clusterName }}'], @js(__('Remove cluster: :name', ['name' => $clusterName])), @js(__('Remove `:name` from persisted custom clusters and regenerate edge routing?', ['name' => $clusterName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
-                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800">
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
@@ -459,12 +459,12 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $vhostName }}</p>
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Routes to :cluster', ['cluster' => $payload['cluster'] ?? '—']) }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ __('Routes to :cluster', ['cluster' => $payload['cluster'] ?? '—']) }}</p>
                                         </div>
                                         <button type="button"
                                             wire:click="openConfirmActionModal('removeEnvoyVirtualHost', ['{{ $vhostName }}'], @js(__('Remove virtual host: :name', ['name' => $vhostName])), @js(__('Remove `:name` from persisted custom virtual hosts and regenerate edge routing?', ['name' => $vhostName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
-                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800">
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
@@ -575,12 +575,12 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $listenerName }}</p>
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __(':address::port', ['address' => $values['address'] ?? '0.0.0.0', 'port' => $values['port'] ?? '—']) }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ __(':address::port', ['address' => $values['address'] ?? '0.0.0.0', 'port' => $values['port'] ?? '—']) }}</p>
                                         </div>
                                         <button type="button"
                                             wire:click="openConfirmActionModal('removeEnvoyListener', ['{{ $listenerName }}'], @js(__('Remove listener: :name', ['name' => $listenerName])), @js(__('Remove `:name` from persisted custom listeners and regenerate edge routing?', ['name' => $listenerName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
-                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800">
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>

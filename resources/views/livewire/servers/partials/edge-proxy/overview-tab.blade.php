@@ -19,7 +19,7 @@
                     <button
                         type="button"
                         wire:click="setWorkspaceTab('{{ $activeEdgeProxy }}')"
-                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         {{ __('Open :name controls', ['name' => $activeEdgeInfo['label'] ?? ucfirst($activeEdgeProxy)]) }}
                     </button>
@@ -51,7 +51,7 @@
         ]" />
 
         @if ($activeWebserverInfo !== null)
-            <p class="border-b border-brand-ink/10 px-4 py-2 text-[11px] text-brand-moss sm:px-5">
+            <p class="border-b border-brand-ink/10 px-4 py-2 text-xs text-brand-moss sm:px-5">
                 {{ __('Webserver preference: :engine', ['engine' => $activeWebserverInfo['label']]) }}
                 <a href="{{ route('servers.webserver', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">
                     {{ __('Open Webserver workspace') }}

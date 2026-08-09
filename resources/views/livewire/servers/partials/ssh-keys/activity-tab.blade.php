@@ -42,7 +42,7 @@
                     </div>
 
                     @if (($activityPagination['total_pages'] ?? 1) > 1)
-                        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                             <span>
                                 {{ __('Showing :from–:to of :total', [
                                     'from' => $activityPagination['from'],
@@ -88,7 +88,7 @@
                             <x-heroicon-o-clock class="h-4 w-4" />
                         </span>
                         <p class="text-xs font-semibold text-brand-ink">{{ __('No SSH key activity yet.') }}</p>
-                        <p class="text-[11px] text-brand-moss">{{ __('Adding, editing, syncing, or deploying keys will all show up here.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Adding, editing, syncing, or deploying keys will all show up here.') }}</p>
                     </div>
                 @endif
             </div>

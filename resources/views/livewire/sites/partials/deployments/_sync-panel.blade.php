@@ -49,10 +49,10 @@
                                 <div class="flex items-center gap-2">
                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $candidate->name }}</span>
                                     @if ($candidate->id === $site->id)
-                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('this site') }}</span>
+                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('this site') }}</span>
                                     @endif
                                     @if ($candidate->isWorkerSite())
-                                        <span class="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ __('worker') }}</span>
+                                        <span class="rounded bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ __('worker') }}</span>
                                     @endif
                                 </div>
                                 <p class="mt-0.5 truncate text-xs text-brand-mist">{{ $candidate->server?->name ?? '—' }}@if ($candidate->git_branch) · {{ $candidate->git_branch }}@endif</p>

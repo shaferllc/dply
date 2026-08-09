@@ -12,7 +12,7 @@
         </p>
     </header>
 
-    <ol class="mt-6 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">
+    <ol class="mt-6 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">
         @foreach (['provider' => __('Provider'), 'credential' => __('Credential'), 'projects' => __('Project'), 'preview' => __('Preview')] as $key => $label)
             <li @class([
                 'rounded-full px-3 py-1',
@@ -50,7 +50,7 @@
                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Authenticate with :provider', ['provider' => $providerLabel]) }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ collect($providers)->firstWhere('key', $provider)['hint'] ?? '' }}
@@ -74,7 +74,7 @@
                 <label class="block">
                     <span class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Access token') }}</span>
                     <input type="password" wire:model.blur="apiToken" class="mt-1.5 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-800" autocomplete="off" placeholder="paste here" />
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Token stays in-memory for this session only — dply does not persist it.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Token stays in-memory for this session only — dply does not persist it.') }}</p>
                 </label>
 
                 @if ($probeResult !== null && ! ($probeResult['ok'] ?? false))
@@ -106,7 +106,7 @@
                     <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a project') }}</h2>
                     @if ($probeResult && ($probeResult['principal'] ?? '') !== '')
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Authenticated as :who', ['who' => $probeResult['principal']]) }}</p>
@@ -127,13 +127,13 @@
                         <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
                             <div class="min-w-0">
                                 <p class="font-mono text-sm font-medium text-brand-ink">{{ $project['name'] }}</p>
-                                <p class="mt-0.5 truncate text-[11px] text-brand-moss">
+                                <p class="mt-0.5 truncate text-xs text-brand-moss">
                                     @if ($project['repo'])<span class="font-mono">{{ $project['repo'] }}</span>@endif
                                     @if ($project['framework'])· <span class="uppercase tracking-wide">{{ $project['framework'] }}</span>@endif
                                     @if ($project['updated_at'])· {{ \Illuminate\Support\Carbon::parse($project['updated_at'])->diffForHumans() }}@endif
                                 </p>
                                 @if ($project['live_url'])
-                                    <a href="{{ $project['live_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] text-brand-forest hover:underline dark:text-brand-sage">{{ $project['live_url'] }}</a>
+                                    <a href="{{ $project['live_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-brand-forest hover:underline dark:text-brand-sage">{{ $project['live_url'] }}</a>
                                 @endif
                             </div>
                             <button type="button"
@@ -157,7 +157,7 @@
                     <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preview') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preview') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectPreview['name'] }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Review the translation, then continue to the Edge Create form to deploy.') }}</p>
                 </div>
@@ -165,13 +165,13 @@
             </div>
 
             <dl class="grid grid-cols-1 gap-y-3 gap-x-6 px-6 py-4 text-sm sm:grid-cols-2">
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Repository') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink break-all">{{ $projectPreview['repo'] ?? '—' }}</dd></div>
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Branch') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['branch'] ?? '—' }}</dd></div>
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Framework') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['framework'] ?? '—' }}</dd></div>
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Runtime mode') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['runtime_mode'] }}</dd></div>
-                <div class="sm:col-span-2"><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink break-all">{{ $projectPreview['build_command'] ?: __('(defaults)') }}</dd></div>
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Output dir') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['output_dir'] ?: __('(framework default)') }}</dd></div>
-                <div><dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env vars') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['env_count'] }} {{ __('key(s)') }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Repository') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink break-all">{{ $projectPreview['repo'] ?? '—' }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Branch') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['branch'] ?? '—' }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Framework') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['framework'] ?? '—' }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Runtime mode') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['runtime_mode'] }}</dd></div>
+                <div class="sm:col-span-2"><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink break-all">{{ $projectPreview['build_command'] ?: __('(defaults)') }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Output dir') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['output_dir'] ?: __('(framework default)') }}</dd></div>
+                <div><dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env vars') }}</dt><dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $projectPreview['env_count'] }} {{ __('key(s)') }}</dd></div>
             </dl>
 
             @if ($projectPreview['env_keys'] !== [])
@@ -200,7 +200,7 @@
                     <p class="font-semibold uppercase tracking-wide">{{ __('Custom domains — DNS swap runbook') }}</p>
                     <p class="mt-1 font-mono">{{ implode(', ', $projectPreview['custom_domains']) }}</p>
 
-                    <ol class="mt-3 space-y-2 text-[11px] leading-relaxed">
+                    <ol class="mt-3 space-y-2 text-xs leading-relaxed">
                         <li>
                             <span class="font-semibold text-brand-ink">{{ __('1. Deploy first.') }}</span>
                             {{ __('Continue to Create, ship one deploy on the dply edge subdomain (we provision one for free). Validate the live site works before swapping DNS.') }}
@@ -224,7 +224,7 @@
                             {{ __('In Domains, click Verify DNS and wait for Ready + TLS active, then remove the old custom-domain entry on :provider so it stops billing or holding the hostname.', ['provider' => $providerLabel]) }}
                         </li>
                     </ol>
-                    <p class="mt-2 text-[10px] text-brand-mist">
+                    <p class="mt-2 text-2xs text-brand-mist">
                         {{ __('Apex (root) domains: most providers require ALIAS/ANAME or a flattening CNAME — use the same target host as a normal CNAME.') }}
                     </p>
                     <div class="mt-2">

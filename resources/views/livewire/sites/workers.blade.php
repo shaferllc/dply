@@ -60,7 +60,7 @@
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-brand-ink">{{ __('DNS provisioning failed') }}</p>
                                     <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Check the zone/token in DigitalOcean, then retry.') }}</p>
-                                    <p class="mt-1 break-all font-mono text-[11px] text-rose-700">{{ $dns['error'] ?? __('No error detail recorded.') }}</p>
+                                    <p class="mt-1 break-all font-mono text-xs text-rose-700">{{ $dns['error'] ?? __('No error detail recorded.') }}</p>
                                 </div>
                             </div>
                             <button
@@ -82,7 +82,7 @@
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Process queue jobs') }}</p>
-                        <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">
+                        <p class="mt-0.5 text-xs leading-snug text-brand-moss">
                             {{ __('Minute-cadence tick drains the queue when enabled.') }}
                             @if ($lastTickAt)
                                 <span class="text-brand-mist">·</span>
@@ -121,9 +121,9 @@
                                 {{ __('Latest output') }}
                             </h3>
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[11px] text-brand-moss">
+                            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-brand-moss">
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.12em]',
                                     'bg-emerald-100 text-emerald-900' => ($latestQueue['status'] ?? '') === 'ok',
                                     'bg-rose-100 text-rose-900' => ($latestQueue['status'] ?? '') !== 'ok',
                                 ])>{{ $latestQueue['status'] ?? 'unknown' }}</span>
@@ -136,7 +136,7 @@
                         </div>
                         <div class="px-3 py-2.5 sm:px-4">
                             @if (! empty($latestQueue['error']))
-                                <div class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] text-rose-900">
+                                <div class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-900">
                                     <p class="font-semibold">{{ __('Error') }}</p>
                                     <p class="mt-0.5 font-mono">{{ $latestQueue['error'] }}</p>
                                 </div>
@@ -144,7 +144,7 @@
                             @php($body = trim((string) ($latestQueue['body_preview'] ?? '')))
                             @if ($body !== '')
                                 <pre @class([
-                                    'max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100',
+                                    'max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-xs leading-relaxed text-slate-100',
                                     'mt-2' => ! empty($latestQueue['error']),
                                 ])>{{ $body }}</pre>
                             @else
@@ -165,10 +165,10 @@
                             {{ __('Firing history') }}
                         </h3>
                         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Last 50 queue ticks. Newest first. Click a row for full output.') }}">
+                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Last 50 queue ticks. Newest first. Click a row for full output.') }}">
                             {{ __('Last 50 queue ticks · click a row for detail') }}
                         </p>
-                        <span class="shrink-0 text-[11px] tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count tick|[2,*] :count ticks', $queueHistory->count(), ['count' => $queueHistory->count()]) }}</span>
+                        <span class="shrink-0 text-xs tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count tick|[2,*] :count ticks', $queueHistory->count(), ['count' => $queueHistory->count()]) }}</span>
                     </div>
 
                     @if ($queueHistory->isEmpty())
@@ -182,7 +182,7 @@
                     @else
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                                <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                <thead class="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                     <tr>
                                         <th class="px-3 py-1.5 pr-3 sm:px-4">{{ __('When') }}</th>
                                         <th class="py-1.5 pr-3">{{ __('Status') }}</th>
@@ -204,7 +204,7 @@
                                             </td>
                                             <td class="py-1.5 pr-3">
                                                 <span @class([
-                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.12em]',
                                                     'bg-emerald-100 text-emerald-900' => ($entry['status'] ?? '') === 'ok',
                                                     'bg-rose-100 text-rose-900' => ($entry['status'] ?? '') !== 'ok',
                                                 ])>{{ $entry['status'] ?? 'unknown' }}</span>
@@ -215,7 +215,7 @@
                                             <td class="py-1.5 pr-3 font-mono text-xs text-brand-moss">
                                                 {{ (int) ($entry['duration_ms'] ?? 0) }}ms
                                             </td>
-                                            <td class="py-1.5 pr-3 break-all font-mono text-[11px] text-brand-moss sm:pr-4">
+                                            <td class="py-1.5 pr-3 break-all font-mono text-xs text-brand-moss sm:pr-4">
                                                 @if (! empty($entry['error']))
                                                     <span class="text-rose-700">{{ \Illuminate\Support\Str::limit($entry['error'], 100) }}</span>
                                                 @else
@@ -238,7 +238,7 @@
                             {{ __('Named workers') }}
                         </h3>
                         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Command, replicas, and restart policy. v1 shares the engine tick above.') }}">
+                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Command, replicas, and restart policy. v1 shares the engine tick above.') }}">
                             {{ __('Command · replicas · restart policy') }}
                         </p>
                         <button
@@ -258,7 +258,7 @@
                     @else
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                                <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                <thead class="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                     <tr>
                                         <th class="px-3 py-1.5 sm:px-4">{{ __('Worker') }}</th>
                                         <th class="px-2 py-1.5">{{ __('Command') }}</th>
@@ -277,7 +277,7 @@
                                             <td class="px-2 py-2 text-xs text-brand-moss">{{ $worker['restart_policy'] }}</td>
                                             <td class="px-2 py-2">
                                                 <span @class([
-                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.12em]',
                                                     'bg-emerald-100 text-emerald-900' => $worker['status'] === 'running',
                                                     'bg-rose-100 text-rose-900' => $worker['status'] === 'erroring',
                                                     'bg-sky-100 text-sky-900' => $worker['status'] === 'pending',
@@ -337,7 +337,7 @@
                         <h3 class="text-sm font-bold text-brand-ink">
                             {{ $editingWorkerId ? __('Edit worker') : __('Add worker') }}
                         </h3>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">
+                        <p class="mt-0.5 text-xs text-brand-moss">
                             {{ __('Command, replica count, and restart policy for this app.') }}
                         </p>
                     </div>

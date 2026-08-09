@@ -78,7 +78,7 @@
 
     @unless ($cloudEnabled)
         <div class="dply-card relative p-8 text-center">
-            <span class="absolute end-6 top-6 inline-flex rounded-full bg-brand-sand/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+            <span class="absolute end-6 top-6 inline-flex rounded-full bg-brand-sand/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                 {{ __('Coming soon') }}
             </span>
             <span class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-xl border border-brand-ink/10 bg-white text-brand-ink shadow-sm">
@@ -127,7 +127,7 @@
                     <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                         @foreach ($summaryStats as $stat)
                             <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                                     <span class="truncate">{{ $stat['label'] }}</span>
                                 </dt>
@@ -195,7 +195,7 @@
                         <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(122,154,122,0.14),_transparent_55%),radial-gradient(ellipse_at_bottom_left,_rgba(212,175,122,0.12),_transparent_50%)]" aria-hidden="true"></div>
                         <div class="relative flex flex-col gap-6 px-5 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:py-12">
                             <div class="min-w-0 max-w-2xl">
-                                <div class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-sage shadow-sm backdrop-blur-sm">
+                                <div class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage shadow-sm backdrop-blur-sm">
                                     <x-heroicon-o-cloud class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Get started') }}
                                 </div>

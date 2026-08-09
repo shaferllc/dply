@@ -8,6 +8,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ApiToken;
 use App\Models\Organization;
+use App\Support\Cli\DplyCliCommandCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -104,11 +105,16 @@ class CliAuthentications extends Component
                 ->get()
             : collect();
 
+        $catalog = DplyCliCommandCatalog::forServer();
+
         return view('livewire.settings.cli-authentications', [
             'organizations' => $this->adminOrganizations(),
             'cliTokens' => $cliTokens,
             'appUrl' => rtrim((string) config('app.url'), '/'),
             'cliTokenName' => (string) config('cli.token_name', 'dply CLI'),
+            'cliGroups' => $catalog['groups'],
+            'cliEntries' => $catalog['entries'],
+            'cliTotal' => $catalog['total'],
         ]);
     }
 }

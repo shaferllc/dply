@@ -63,7 +63,7 @@
 
                 <div class="min-w-0">
                     @if (filled($eyebrow))
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $eyebrow }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $eyebrow }}</p>
                     @endif
                     <h2 @class([
                         'font-semibold tracking-tight text-brand-ink',

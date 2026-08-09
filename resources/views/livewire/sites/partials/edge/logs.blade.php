@@ -26,7 +26,7 @@
 
     <section class="border-b border-brand-ink/10" @if ($hasBuilding) wire:poll.5s="refreshEdgeLogDeployments" @endif>
         <div class="flex items-center justify-between gap-2 px-5 py-3 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deploys') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deploys') }}</p>
         </div>
 
         @if ($edgeDeployments->isEmpty())
@@ -53,11 +53,11 @@
                                     <span class="font-mono text-xs text-brand-mist">· {{ \Illuminate\Support\Str::limit($deployment->git_commit, 7, '') }}</span>
                                 @endif
                             </p>
-                            <time class="shrink-0 text-[11px] text-brand-mist">
+                            <time class="shrink-0 text-xs text-brand-mist">
                                 {{ $deployment->created_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
                             </time>
                         </div>
-                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</p>
+                        <p class="mt-0.5 truncate font-mono text-xs text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</p>
 
                         @if (is_string($failureReason) && $failureReason !== '')
                             @include('livewire.sites.partials.edge.build-log-lint-callout', [
@@ -68,7 +68,7 @@
                                 'deployment' => $deployment,
                             ])
                             @if (! str_contains($failureReason, 'dply config lint failed'))
-                                <pre class="mt-2 max-h-40 overflow-auto rounded-lg border border-rose-200/60 bg-rose-50/50 p-2.5 font-mono text-[11px] text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
+                                <pre class="mt-2 max-h-40 overflow-auto rounded-lg border border-rose-200/60 bg-rose-50/50 p-2.5 font-mono text-xs text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
                             @endif
                         @endif
 
@@ -97,7 +97,7 @@
                                                     'deployment' => $deployment,
                                                 ])
                                             @endif
-                                            <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-brand-ink">{!! \App\Modules\Edge\Support\AnsiHtml::toHtml((string) $loadedBuildLog) !!}</pre>
+                                            <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-brand-ink">{!! \App\Modules\Edge\Support\AnsiHtml::toHtml((string) $loadedBuildLog) !!}</pre>
                                         @else
                                             <p class="text-xs text-brand-moss">{{ __('No build log stored for this deployment.') }}</p>
                                         @endif

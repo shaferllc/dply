@@ -32,7 +32,7 @@
 @endphp
 
 <div class="border-b border-brand-ink/10 px-4 py-3.5 sm:px-5">
-    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('What you get') }}</p>
+    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('What you get') }}</p>
     <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($previewPanels as $panel)
             <div class="flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
@@ -41,7 +41,7 @@
                 </span>
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-brand-ink">{{ $panel['title'] }}</p>
-                    <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ $panel['body'] }}</p>
+                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $panel['body'] }}</p>
                 </div>
             </div>
         @endforeach

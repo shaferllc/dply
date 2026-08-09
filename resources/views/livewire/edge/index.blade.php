@@ -57,7 +57,7 @@
                                     <input type="radio" wire:model.live="deleteMode" value="{{ $mode }}" class="peer sr-only" />
                                     <div class="rounded-xl border-2 border-zinc-200 bg-white px-3 py-2.5 text-sm transition peer-checked:border-red-500 peer-checked:bg-red-50 peer-focus-visible:ring-2 peer-focus-visible:ring-red-500/40 hover:border-zinc-300">
                                         <p class="font-semibold text-brand-ink">{{ $meta['label'] }}</p>
-                                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ $meta['help'] }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $meta['help'] }}</p>
                                     </div>
                                 </label>
                             @endforeach
@@ -74,7 +74,7 @@
                                 min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
                                 class="block w-full rounded-xl border-zinc-200 bg-white shadow-sm focus:border-red-500 focus:ring-red-500"
                             />
-                            <p class="text-[11px] text-brand-mist">{{ __('Uses your app timezone and must be in the future.') }}</p>
+                            <p class="text-xs text-brand-mist">{{ __('Uses your app timezone and must be in the future.') }}</p>
                             @error('scheduledDeleteAt')
                                 <p class="text-xs text-red-700">{{ $message }}</p>
                             @enderror
@@ -111,7 +111,7 @@
             <x-modal name="quick-look-edge-site" :show="false" maxWidth="3xl" overlayClass="bg-brand-ink/30" panelClass="dply-modal-panel" focusable>
                 <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-4">
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Quick look') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Quick look') }}</p>
                         <h2 class="mt-1 truncate text-base font-semibold text-brand-ink">
                             {{ $quickLookSite?->name ?? __('Edge site') }}
                         </h2>
@@ -120,7 +120,7 @@
                                 href="{{ $quickLookSite->edgeLiveUrl() }}"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                class="mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] text-brand-moss hover:text-brand-ink"
+                                class="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-brand-moss hover:text-brand-ink"
                             >
                                 {{ preg_replace('#^https?://#', '', $quickLookSite->edgeLiveUrl()) }}
                                 <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 opacity-70" />
@@ -152,19 +152,19 @@
                         @endphp
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Status') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Status') }}</p>
                                 <p class="mt-1 text-sm font-semibold capitalize text-brand-ink">{{ str_replace('_', ' ', (string) $quickLookSite->status) }}</p>
                             </div>
                             <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Total deploys') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Total deploys') }}</p>
                                 <p class="mt-1 text-sm font-semibold tabular-nums text-brand-ink">{{ number_format($quickLookStats['total_deploys']) }}</p>
                             </div>
                             <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live') }}</p>
                                 <p class="mt-1 text-sm font-semibold tabular-nums text-emerald-700">{{ number_format($quickLookStats['live_deploys']) }}</p>
                             </div>
                             <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Failed') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Failed') }}</p>
                                 <p class="mt-1 text-sm font-semibold tabular-nums {{ $quickLookStats['failed_deploys'] > 0 ? 'text-rose-700' : 'text-brand-mist' }}">{{ number_format($quickLookStats['failed_deploys']) }}</p>
                             </div>
                         </div>
@@ -173,32 +173,32 @@
                             <section class="dply-card mt-4 overflow-hidden">
                                 <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-5 py-3">
                                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Latest deployment') }}</h3>
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $latestStatusTone }}">
+                                    <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $latestStatusTone }}">
                                         {{ str_replace('_', ' ', (string) $latest->status) }}
                                     </span>
                                 </div>
                                 <dl class="grid grid-cols-1 gap-3 px-5 py-3 text-sm sm:grid-cols-2">
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Commit') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Commit') }}</dt>
                                         <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $latest->git_commit ? substr($latest->git_commit, 0, 12) : '—' }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Branch') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Branch') }}</dt>
                                         <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $latest->git_branch ?? '—' }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Published') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Published') }}</dt>
                                         <dd class="mt-0.5 text-xs text-brand-ink">{{ $latest->published_at ? $latest->published_at->diffForHumans() : '—' }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Created') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Created') }}</dt>
                                         <dd class="mt-0.5 text-xs text-brand-ink">{{ $latest->created_at?->diffForHumans() }}</dd>
                                     </div>
                                 </dl>
                                 @if ($latest->status === \App\Models\EdgeDeployment::STATUS_FAILED && $latest->failure_reason)
                                     <div class="border-t border-brand-ink/10 bg-rose-50/60 px-5 py-3">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-700">{{ __('Failure') }}</p>
-                                        <p class="mt-1 break-words font-mono text-[11px] leading-5 text-rose-900">{{ $latest->failure_reason }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-rose-700">{{ __('Failure') }}</p>
+                                        <p class="mt-1 break-words font-mono text-xs leading-5 text-rose-900">{{ $latest->failure_reason }}</p>
                                     </div>
                                 @endif
                             </section>
@@ -208,7 +208,7 @@
                     @endif
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3">
-                    <span class="text-[11px] text-brand-mist">{{ __('Live — updates every second while the build is running.') }}</span>
+                    <span class="text-xs text-brand-mist">{{ __('Live — updates every second while the build is running.') }}</span>
                     @if ($quickLookSite)
                         <a
                             href="{{ route('sites.show', ['server' => $quickLookSite->server, 'site' => $quickLookSite]) }}"

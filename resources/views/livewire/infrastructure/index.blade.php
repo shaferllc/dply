@@ -91,7 +91,7 @@
                         role="group"
                         aria-labelledby="infrastructure-cloud-soon"
                     >
-                        <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                             {{ __('Coming soon') }}
                         </span>
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
@@ -153,7 +153,7 @@
                         wire:navigate
                         class="group relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/70 p-6 opacity-[0.88] shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-ink/20 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
                     >
-                        <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                             {{ __('Coming soon') }}
                         </span>
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">

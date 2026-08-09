@@ -62,7 +62,7 @@
                                         <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                                     </x-icon-badge>
                                     <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</h3>
                                         <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ __('Connect DigitalOcean or AWS once — dply handles the rest.') }}</p>
                                     </div>
@@ -325,7 +325,7 @@
                                 <h2 class="text-base font-semibold text-brand-ink">{{ __('Environment') }}</h2>
                                 <p class="mt-0.5 text-sm text-brand-moss">{{ __('Plain .env-style key/value pairs merged into the container at boot.') }}</p>
                             </div>
-                            <span class="rounded-full bg-brand-cream/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist dark:bg-zinc-800">{{ __('Optional') }}</span>
+                            <span class="rounded-full bg-brand-cream/60 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-mist dark:bg-zinc-800">{{ __('Optional') }}</span>
                         </div>
                         <textarea id="env_file_content" wire:model="env_file_content" rows="6" class="block w-full rounded-lg border-brand-ink/15 bg-brand-cream/30 font-mono text-sm shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-800/60" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
                         <p class="text-xs text-brand-mist">{{ __('One KEY=value per line. Lines starting with # are ignored.') }}</p>
@@ -334,7 +334,7 @@
             </section>
 
             <div class="border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-2.5 sm:px-6">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Configure (optional)') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Configure (optional)') }}</p>
             </div>
 
             {{-- Databases — one row per attached/created managed database.
@@ -379,7 +379,7 @@
                                                 <span class="font-normal text-brand-mist">·</span>
                                                 <span class="font-mono normal-case">{{ strtoupper((string) ($db['env_prefix'] ?? 'DB')) }}_*</span>
                                             </p>
-                                            <button type="button" wire:click="removeDatabase({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                            <button type="button" wire:click="removeDatabase({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                         </div>
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
@@ -528,7 +528,7 @@
                                                 <span class="font-normal text-brand-mist">·</span>
                                                 <span class="font-mono normal-case">{{ strtoupper((string) ($bk['env_prefix'] ?? 'S3')) }}_*</span>
                                             </p>
-                                            <button type="button" wire:click="removeBucket({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                            <button type="button" wire:click="removeBucket({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                         </div>
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
@@ -590,7 +590,7 @@
                                 @foreach ($domains as $i => $hostname)
                                     <li class="flex items-center justify-between gap-3 px-3 py-2">
                                         <span class="font-mono text-xs text-brand-ink dark:text-brand-cream">{{ $hostname }}</span>
-                                        <button type="button" wire:click="removeDomain({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                        <button type="button" wire:click="removeDomain({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                     </li>
                                 @endforeach
                             </ul>
@@ -633,19 +633,19 @@
                                     @foreach ($workers as $i => $worker)
                                         <div class="grid grid-cols-1 gap-3 px-3 py-3 sm:grid-cols-12 sm:items-end">
                                             <div class="sm:col-span-2">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</label>
                                                 <div class="mt-1 text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $worker['type'] === 'scheduler' ? __('Scheduler') : __('Worker') }}</div>
                                             </div>
                                             <div class="sm:col-span-2">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
                                                 <input type="text" wire:model="workers.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-xs">
                                             </div>
                                             <div class="sm:col-span-4">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command') }}</label>
                                                 <input type="text" wire:model="workers.{{ $i }}.command" class="dply-input mt-1 block w-full font-mono text-xs" @disabled($worker['type'] === 'scheduler')>
                                             </div>
                                             <div class="sm:col-span-2">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
                                                 <select wire:model="workers.{{ $i }}.size" class="dply-input mt-1 block w-full text-xs">
                                                     <option value="small">small</option>
                                                     <option value="medium">medium</option>
@@ -654,11 +654,11 @@
                                                 </select>
                                             </div>
                                             <div class="sm:col-span-1">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inst.') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inst.') }}</label>
                                                 <input type="number" min="1" max="50" wire:model="workers.{{ $i }}.instance_count" class="dply-input mt-1 block w-full text-xs" @disabled($worker['type'] === 'scheduler')>
                                             </div>
                                             <div class="flex sm:col-span-1 sm:justify-end">
-                                                <button type="button" wire:click="removeWorker({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                                <button type="button" wire:click="removeWorker({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                             </div>
                                         </div>
                                     @endforeach
@@ -720,7 +720,7 @@
                                     @foreach ($deploy_tasks as $i => $task)
                                         <div class="grid grid-cols-1 gap-3 px-3 py-3 sm:grid-cols-12 sm:items-end">
                                             <div class="sm:col-span-3">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Trigger') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Trigger') }}</label>
                                                 <select wire:model="deploy_tasks.{{ $i }}.trigger" class="dply-input mt-1 block w-full text-xs">
                                                     <option value="pre_deploy">{{ __('Pre-deploy') }}</option>
                                                     <option value="post_deploy">{{ __('Post-deploy') }}</option>
@@ -729,17 +729,17 @@
                                                 </select>
                                             </div>
                                             <div class="sm:col-span-2">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
                                                 <input type="text" wire:model="deploy_tasks.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-xs">
                                                 <x-input-error :messages="$errors->get('deploy_tasks.'.$i.'.name')" class="mt-2" />
                                             </div>
                                             <div class="sm:col-span-5">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command') }}</label>
                                                 <input type="text" wire:model="deploy_tasks.{{ $i }}.command" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="php artisan cache:warm">
                                                 <x-input-error :messages="$errors->get('deploy_tasks.'.$i.'.command')" class="mt-2" />
                                             </div>
                                             <div class="sm:col-span-1">
-                                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
+                                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
                                                 <select wire:model="deploy_tasks.{{ $i }}.size" class="dply-input mt-1 block w-full text-xs">
                                                     <option value="small">small</option>
                                                     <option value="medium">medium</option>
@@ -748,7 +748,7 @@
                                                 </select>
                                             </div>
                                             <div class="flex sm:col-span-1 sm:justify-end">
-                                                <button type="button" wire:click="removeDeployTask({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                                <button type="button" wire:click="removeDeployTask({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                             </div>
                                         </div>
                                     @endforeach

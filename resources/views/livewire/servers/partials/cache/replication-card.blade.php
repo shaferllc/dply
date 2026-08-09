@@ -25,7 +25,7 @@
         </div>
         <div class="flex shrink-0 items-center gap-2">
             @if ($role)
-                <span class="inline-flex items-center gap-1.5 rounded-full {{ $isReplica ? 'bg-violet-50 text-violet-800 ring-violet-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200' }} px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1">
+                <span class="inline-flex items-center gap-1.5 rounded-full {{ $isReplica ? 'bg-violet-50 text-violet-800 ring-violet-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200' }} px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1">
                     <span class="h-1.5 w-1.5 rounded-full {{ $isReplica ? 'bg-violet-500' : 'bg-emerald-500' }}"></span>
                     {{ $isReplica ? __('Replica') : __('Master') }}
                 </span>
@@ -70,7 +70,7 @@
         <dl class="mt-4 grid gap-3 sm:grid-cols-3">
             @foreach (['Role', 'Replication ID', 'Connected replicas'] as $label)
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
                     <div class="mt-2 h-5 w-24 animate-pulse rounded bg-brand-ink/10"></div>
                 </div>
             @endforeach
@@ -82,15 +82,15 @@
             {{-- Replica view: surface upstream master + link health. --}}
             <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Master endpoint') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Master endpoint') }}</dt>
                     <dd class="mt-1 truncate font-mono text-sm text-brand-ink">{{ $state['master_endpoint'] ?? '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link status') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link status') }}</dt>
                     <dd class="mt-1 text-sm font-semibold {{ $state['master_link_status'] === 'up' ? 'text-emerald-700' : 'text-rose-700' }}">{{ $state['master_link_status'] ?? '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last IO from master') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last IO from master') }}</dt>
                     <dd class="mt-1 text-sm text-brand-ink">
                         @if ($state['master_last_io_seconds_ago'] !== null)
                             {{ trans_choice('{1} :n second ago|[2,*] :n seconds ago', (int) $state['master_last_io_seconds_ago'], ['n' => $state['master_last_io_seconds_ago']]) }}
@@ -100,7 +100,7 @@
                     </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sync in progress') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sync in progress') }}</dt>
                     <dd class="mt-1 text-sm text-brand-ink">{{ $state['master_sync_in_progress'] ? __('Yes') : __('No') }}</dd>
                 </div>
             </dl>
@@ -108,11 +108,11 @@
             {{-- Master view: surface connected replicas. --}}
             <dl class="mt-5 grid gap-3 sm:grid-cols-3">
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connected replicas') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connected replicas') }}</dt>
                     <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $state['connected_replicas'] }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 sm:col-span-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Replication ID') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Replication ID') }}</dt>
                     <dd class="mt-1 truncate font-mono text-xs text-brand-ink" title="{{ $state['master_replid'] }}">{{ $state['master_replid'] ?? '—' }}</dd>
                 </div>
             </dl>
@@ -120,7 +120,7 @@
             @if (! empty($state['replicas']))
                 <div class="mt-5 overflow-x-auto rounded-lg border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="bg-brand-sand/30 text-[10px] uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/30 text-2xs uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-3 py-2 text-left font-semibold">{{ __('Address') }}</th>
                                 <th class="px-3 py-2 text-left font-semibold">{{ __('State') }}</th>
@@ -158,13 +158,13 @@
                  list more if someone wired one up manually outside dply. --}}
             @if ($activeReplications->isNotEmpty())
                 <div class="mt-5">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tracked replicas') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tracked replicas') }}</p>
                     <ul class="mt-2 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10">
                         @foreach ($activeReplications as $tracked)
                             <li class="flex items-center justify-between gap-3 px-3 py-2">
                                 <div class="min-w-0">
                                     <p class="truncate text-xs font-semibold text-brand-ink">{{ $tracked->replicaCacheService?->server?->name ?? '—' }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                                    <p class="mt-0.5 text-xs text-brand-moss">
                                         {{ __('Status: :s', ['s' => $tracked->status]) }}
                                         @if ($tracked->last_polled_at)
                                             · {{ __('Polled :time', ['time' => $tracked->last_polled_at->diffForHumans()]) }}
@@ -175,7 +175,7 @@
                                     type="button"
                                     wire:click="removeReplica('{{ $tracked->id }}')"
                                     wire:confirm="{{ __('Detach this replica? REPLICAOF NO ONE is issued; the data already replicated stays on the target.') }}"
-                                    class="shrink-0 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100"
+                                    class="shrink-0 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
                                 >
                                     {{ __('Detach') }}
                                 </button>

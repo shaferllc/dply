@@ -92,7 +92,7 @@
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Approvals') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Approvals') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Approvals') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Sign off when the preview looks good. Promote requires resolved threads when that gate is enabled.') }}</p>
                 </div>
@@ -146,7 +146,7 @@
                     <x-heroicon-o-chat-bubble-left-right class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New thread') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New thread') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Start a thread') }}</h3>
                 </div>
             </div>
@@ -174,7 +174,7 @@
                 <x-heroicon-o-chat-bubble-left-right class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Threads') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Threads') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Review threads') }} <span class="ml-2 text-xs font-normal text-brand-moss">{{ $threads->count() }}</span></h3>
             </div>
         </div>

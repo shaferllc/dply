@@ -44,7 +44,7 @@
                             <label for="in-{{ $key }}" class="flex flex-wrap items-center gap-2">
                                 <span class="font-semibold text-brand-ink">{{ __($def['label'] ?? $key) }}</span>
                                 @if ($requiresPro)
-                                    <span class="rounded-md bg-brand-ink/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-cream">Pro</span>
+                                    <span class="rounded-md bg-brand-ink/90 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-cream">Pro</span>
                                 @endif
                             </label>
                             <p class="mt-1 text-sm text-brand-moss">{{ __($def['description'] ?? '') }}</p>

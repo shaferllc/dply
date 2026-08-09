@@ -76,11 +76,11 @@
         >
             @if ($serverPubInfo)
                 <x-slot:actions>
-                    <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink">
+                    <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink">
                         {{ $typeLabels[$serverPubInfo['type']] ?? $serverPubInfo['type'] }}
                     </span>
                     @if ($serverPubInfo['comment'])
-                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-[11px] text-brand-moss">
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-xs text-brand-moss">
                             {{ $serverPubInfo['comment'] }}
                         </span>
                     @endif
@@ -173,12 +173,12 @@
                 <div class="flex items-center justify-between gap-2">
                     <dt class="text-sm font-semibold text-brand-ink">{{ __('Operational key') }}</dt>
                     @if ($operationalPub)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-medium text-brand-forest">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ __('Stored') }}
                         </span>
                     @else
-                        <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-red-600"></span>
                             {{ __('Missing') }}
                         </span>
@@ -186,7 +186,7 @@
                 </div>
                 <dd class="mt-1 text-xs text-brand-moss">{{ __('Used as :user for deploys and Manage actions.', ['user' => $server->ssh_user ?: 'deploy']) }}</dd>
                 @if ($operationalFp)
-                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-[11px] text-brand-ink" title="{{ $operationalFp }}">{{ $operationalFp }}</code>
+                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-xs text-brand-ink" title="{{ $operationalFp }}">{{ $operationalFp }}</code>
                 @endif
             </div>
 
@@ -194,19 +194,19 @@
                 <div class="flex items-center justify-between gap-2">
                     <dt class="text-sm font-semibold text-brand-ink">{{ __('Recovery key (root)') }}</dt>
                     @if ($recoveryPub)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-medium text-brand-forest">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ __('Stored') }}
                         </span>
                     @else
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-medium text-brand-moss">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/10 px-2 py-0.5 text-xs font-medium text-brand-moss">
                             {{ __('Not configured') }}
                         </span>
                     @endif
                 </div>
                 <dd class="mt-1 text-xs text-brand-moss">{{ __('Hidden break-glass key used only when the operational key fails.') }}</dd>
                 @if ($recoveryFp)
-                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-[11px] text-brand-ink" title="{{ $recoveryFp }}">{{ $recoveryFp }}</code>
+                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-xs text-brand-ink" title="{{ $recoveryFp }}">{{ $recoveryFp }}</code>
                 @endif
             </div>
         </dl>

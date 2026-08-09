@@ -32,7 +32,7 @@
                 <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
                     @foreach ($recentCronRuns as $run)
                         <tr>
-                            <td class="whitespace-nowrap px-4 py-2 font-mono text-[11px]">{{ $run->started_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</td>
+                            <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">{{ $run->started_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</td>
                             <td class="max-w-xs truncate px-4 py-2">{{ $run->cronJob?->description ?: \Illuminate\Support\Str::limit($run->cronJob?->command ?? '—', 48) }}</td>
                             <td class="px-4 py-2">{{ $run->status }}</td>
                             <td class="px-4 py-2 font-mono">{{ $run->exit_code ?? '—' }}</td>

@@ -26,7 +26,7 @@
         class="rounded-t-2xl border-b border-brand-ink/10"
     >
         <x-slot:actions>
-            <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+            <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
         </x-slot:actions>
     </x-workspace-panel-head>
     <div class="px-4 py-3.5 sm:px-5">

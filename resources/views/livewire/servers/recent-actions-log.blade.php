@@ -31,7 +31,7 @@
             </span>
         @endif
         <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Action logs') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Action logs') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent action logs') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Installs and per-service actions, newest first. Click a row to view the SSH output.') }}</p>
         </div>
@@ -69,7 +69,7 @@
                     >
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $bg }} {{ $text }} {{ $ring }}">{{ strtoupper($row->status) }}</span>
+                                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $bg }} {{ $text }} {{ $ring }}">{{ strtoupper($row->status) }}</span>
                                 <span class="truncate text-sm font-medium text-brand-ink">{{ $row->label ?: $row->task_name }}</span>
                             </div>
                             <p class="mt-1 break-all font-mono text-xs text-brand-mist">{{ $row->task_name }}</p>
@@ -88,7 +88,7 @@
                                 @endif
                             </span>
                             @if ($clickable)
-                                <span class="text-[11px] font-medium text-brand-forest">{{ __('View output') }} →</span>
+                                <span class="text-xs font-medium text-brand-forest">{{ __('View output') }} →</span>
                             @endif
                         </div>
                     </button>
@@ -157,8 +157,8 @@
                             class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner"
                         >
                             <div class="mb-2 flex items-center justify-between gap-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink">{{ __('Output') }}</p>
-                                <button type="button" @click="copy()" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-ink">{{ __('Output') }}</p>
+                                <button type="button" @click="copy()" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <template x-if="copied">
                                         <span class="inline-flex items-center gap-1 text-emerald-700">
                                             <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -174,7 +174,7 @@
                                 </button>
                             </div>
                             <pre x-ref="raw" class="hidden">{{ $openLog->output }}</pre>
-                            <pre class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-zinc-900 [overflow-wrap:anywhere]">{{ $openLog->output }}</pre>
+                            <pre class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-snug text-zinc-900 [overflow-wrap:anywhere]">{{ $openLog->output }}</pre>
                         </div>
                     @else
                         <p class="text-xs text-brand-moss">{{ __('No output was captured for this action.') }}</p>

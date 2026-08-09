@@ -66,14 +66,14 @@
                     <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actions') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actions') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Queued over SSH — output streams in the banner above. Run Refresh scan after upgrades to update the package list.') }}
                     </p>
                 </div>
             </div>
-            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-server-stack class="h-4 w-4" aria-hidden="true" />
                 {{ __('Debian / Ubuntu') }}
             </span>
@@ -82,7 +82,7 @@
         <div class="space-y-8 px-5 py-6 sm:px-6">
             @foreach ($aptActionGroups as $groupLabel => $groupActions)
                 <div>
-                    <h3 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $groupLabel }}</h3>
+                    <h3 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $groupLabel }}</h3>
                     <div @class([
                         'mt-3 grid gap-3',
                         'max-w-md' => count($groupActions) === 1,
@@ -165,7 +165,7 @@
             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reboot') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reboot') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot & uptime') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Kernel reboot flag and live uptime from the extended probe.') }}</p>
         </div>
@@ -173,11 +173,11 @@
     <div class="space-y-4 px-5 py-4 sm:px-6">
         <div class="flex flex-wrap items-center gap-2">
             @if (($report['reboot']['required'] ?? null) === true)
-                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
                     {{ __('Reboot required') }}
                 </span>
             @elseif (($report['reboot']['required'] ?? null) === false)
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
                     {{ __('No reboot pending') }}
                 </span>
             @else

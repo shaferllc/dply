@@ -1,7 +1,7 @@
 <section class="dply-card overflow-hidden">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployments') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deploy, view history, and roll back releases from the Deployments workspace.') }}</p>
         </div>

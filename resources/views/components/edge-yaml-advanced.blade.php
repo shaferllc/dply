@@ -11,7 +11,7 @@
         <span class="inline-flex items-center gap-2">
             {{ __('Advanced') }}
             @if ($hasRepo)
-                <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                     {{ $repoBadge ?? __('Repo') }}
                 </span>
             @endif
@@ -21,7 +21,7 @@
 
     <div class="space-y-4 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $file]) }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $file]) }}</p>
             <a
                 href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
                 class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline"

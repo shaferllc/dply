@@ -19,12 +19,12 @@
                 @else
                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $function->name }}</span>
                 @endif
-                <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-semibold {{ $function->statusBadgeClass }}">
+                <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold {{ $function->statusBadgeClass }}">
                     {{ $function->statusLabel }}
                 </span>
             </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                 <span class="inline-flex max-w-full items-center gap-1 truncate font-mono">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     <span class="truncate">{{ $function->repositoryUrl ?? '—' }}</span>

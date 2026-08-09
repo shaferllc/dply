@@ -29,18 +29,18 @@
             <div class="min-w-0">
                 <p @class([
                     'font-semibold uppercase tracking-[0.14em] text-amber-800',
-                    'text-[10px]' => $embedded && $compact,
-                    'text-[11px] tracking-[0.18em]' => ! ($embedded && $compact),
+                    'text-2xs' => $embedded && $compact,
+                    'text-xs tracking-[0.18em]' => ! ($embedded && $compact),
                 ])>{{ $title ?? __('Preflight issues') }}</p>
                 <p @class([
                     'text-amber-950/90',
-                    'mt-0.5 text-[11px] leading-relaxed' => $embedded && $compact,
+                    'mt-0.5 text-xs leading-relaxed' => $embedded && $compact,
                     'mt-1 text-sm leading-relaxed' => ! ($embedded && $compact),
                 ])>
                     {{ $description ?? __('Review each item below and jump to the matching workspace section to fix it.') }}
                 </p>
             </div>
-            <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
+            <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
                 {{ trans_choice('{1} :count issue|[2,*] :count issues', $issues->count(), ['count' => $issues->count()]) }}
             </span>
         </div>
@@ -68,13 +68,13 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span @class([
-                                    'inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                    'inline-flex rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                     'bg-red-100 text-red-800' => $isError,
                                     'bg-amber-100 text-amber-900' => ! $isError,
                                 ])>
                                     {{ $isError ? __('Blocker') : __('Warning') }}
                                 </span>
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     {{ str($issue['key'] ?? 'check')->headline() }}
                                 </span>
                             </div>

@@ -32,7 +32,7 @@
             <x-slot:actions>
                 <a
                     href="{{ route('organizations.compliance-export', $organization) }}"
-                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                 >
                     <x-heroicon-o-archive-box-arrow-down class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Compliance export') }}
@@ -41,7 +41,7 @@
                     <button
                         type="button"
                         wire:click="clearFilters"
-                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Clear filters') }}
@@ -52,15 +52,15 @@
             <x-slot:stats>
                 <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Activity at a glance') }}">
                     <div class="bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Events') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Events') }}</dt>
                         <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ number_format($eventsTotal) }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Families') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Families') }}</dt>
                         <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $activeFamilies }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Audit log') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Audit log') }}</dt>
                         <dd class="mt-0.5 flex items-center gap-1 text-sm font-semibold text-brand-forest">
                             <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Append-only') }}
@@ -77,7 +77,7 @@
                             type="button"
                             wire:click="setFamily('')"
                             @class([
-                                'inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] font-semibold transition shadow-sm',
+                                'inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-semibold transition shadow-sm',
                                 'border-brand-ink bg-brand-ink text-brand-cream' => $family === '',
                                 'border-brand-ink/15 bg-white text-brand-moss hover:border-brand-ink/30 hover:text-brand-ink' => $family !== '',
                             ])
@@ -85,7 +85,7 @@
                             <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('All') }}
                             <span @class([
-                                'ms-0.5 rounded px-1 py-px text-[10px] tabular-nums',
+                                'ms-0.5 rounded px-1 py-px text-2xs tabular-nums',
                                 'bg-brand-cream/20 text-brand-cream' => $family === '',
                                 'bg-brand-sand/60 text-brand-moss' => $family !== '',
                             ])>{{ $allTotal }}</span>
@@ -97,7 +97,7 @@
                                 wire:click="setFamily('{{ $f['id'] }}')"
                                 @disabled($count === 0 && $family !== $f['id'])
                                 @class([
-                                    'inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] font-semibold transition shadow-sm',
+                                    'inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-semibold transition shadow-sm',
                                     'border-brand-ink bg-brand-ink text-brand-cream' => $family === $f['id'],
                                     'border-brand-ink/15 bg-white text-brand-moss hover:border-brand-ink/30 hover:text-brand-ink' => $family !== $f['id'] && $count > 0,
                                     'border-brand-ink/10 bg-white text-brand-mist cursor-not-allowed opacity-60' => $count === 0 && $family !== $f['id'],
@@ -106,7 +106,7 @@
                                 <x-dynamic-component :component="$f['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ $f['label'] }}
                                 <span @class([
-                                    'ms-0.5 rounded px-1 py-px text-[10px] tabular-nums',
+                                    'ms-0.5 rounded px-1 py-px text-2xs tabular-nums',
                                     'bg-brand-cream/20 text-brand-cream' => $family === $f['id'],
                                     'bg-brand-sand/60 text-brand-moss' => $family !== $f['id'],
                                 ])>{{ $count }}</span>
@@ -151,7 +151,7 @@
                             @endif
                         </p>
                         @if ($family !== '' || $search !== '')
-                            <button type="button" wire:click="clearFilters" class="mt-2 text-[11px] font-semibold text-brand-sage hover:text-brand-ink">
+                            <button type="button" wire:click="clearFilters" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">
                                 {{ __('Clear filters') }}
                             </button>
                         @endif
@@ -184,11 +184,11 @@
                                             <p class="text-sm font-semibold text-brand-ink">
                                                 {{ $meta['label'] }}
                                             </p>
-                                            <p class="shrink-0 text-[11px] text-brand-mist tabular-nums" title="{{ $log->created_at->toDayDateTimeString() }}">
+                                            <p class="shrink-0 text-xs text-brand-mist tabular-nums" title="{{ $log->created_at->toDayDateTimeString() }}">
                                                 {{ $log->created_at->diffForHumans() }}
                                             </p>
                                         </div>
-                                        <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-brand-moss">
+                                        <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-brand-moss">
                                             @if ($log->user)
                                                 <span class="inline-flex items-center gap-1">
                                                     <x-heroicon-m-user-circle class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -202,10 +202,10 @@
                                             @endif
                                             @if ($log->subject_summary)
                                                 <span class="text-brand-mist">·</span>
-                                                <span class="truncate font-mono text-[11px] text-brand-ink/85">{{ $log->subject_summary }}</span>
+                                                <span class="truncate font-mono text-xs text-brand-ink/85">{{ $log->subject_summary }}</span>
                                             @endif
                                             <span class="text-brand-mist">·</span>
-                                            <code class="font-mono text-[10px] text-brand-mist">{{ $log->action }}</code>
+                                            <code class="font-mono text-2xs text-brand-mist">{{ $log->action }}</code>
                                         </p>
                                     </div>
 
@@ -224,19 +224,19 @@
                                     <div class="border-t border-brand-ink/10 bg-brand-cream/40 px-3 py-2.5 sm:px-4">
                                         <div class="grid gap-2 sm:grid-cols-2">
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Before') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Before') }}</p>
                                                 @if (! empty($log->old_values))
-                                                    <pre class="mt-1 max-h-40 overflow-auto rounded-md border border-brand-ink/10 bg-white p-2 font-mono text-[11px] leading-relaxed text-brand-ink">{{ json_encode($log->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
+                                                    <pre class="mt-1 max-h-40 overflow-auto rounded-md border border-brand-ink/10 bg-white p-2 font-mono text-xs leading-relaxed text-brand-ink">{{ json_encode($log->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
                                                 @else
-                                                    <p class="mt-1 rounded-md border border-dashed border-brand-ink/10 bg-white/60 p-2 text-[11px] text-brand-mist">{{ __('—') }}</p>
+                                                    <p class="mt-1 rounded-md border border-dashed border-brand-ink/10 bg-white/60 p-2 text-xs text-brand-mist">{{ __('—') }}</p>
                                                 @endif
                                             </div>
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('After') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('After') }}</p>
                                                 @if (! empty($log->new_values))
-                                                    <pre class="mt-1 max-h-40 overflow-auto rounded-md border border-brand-ink/10 bg-white p-2 font-mono text-[11px] leading-relaxed text-brand-ink">{{ json_encode($log->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
+                                                    <pre class="mt-1 max-h-40 overflow-auto rounded-md border border-brand-ink/10 bg-white p-2 font-mono text-xs leading-relaxed text-brand-ink">{{ json_encode($log->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
                                                 @else
-                                                    <p class="mt-1 rounded-md border border-dashed border-brand-ink/10 bg-white/60 p-2 text-[11px] text-brand-mist">{{ __('—') }}</p>
+                                                    <p class="mt-1 rounded-md border border-dashed border-brand-ink/10 bg-white/60 p-2 text-xs text-brand-mist">{{ __('—') }}</p>
                                                 @endif
                                             </div>
                                         </div>
@@ -247,12 +247,12 @@
                     </ul>
 
                     <div class="flex flex-col items-stretch gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-4">
-                        <label class="inline-flex items-center gap-2 text-[11px] text-brand-moss" for="activity-per-page">
+                        <label class="inline-flex items-center gap-2 text-xs text-brand-moss" for="activity-per-page">
                             <span class="whitespace-nowrap">{{ __('Rows per page') }}</span>
                             <select
                                 id="activity-per-page"
                                 wire:model.live="perPage"
-                                class="h-7 rounded-md border-brand-ink/15 bg-white py-1 pl-2 pr-7 text-[11px] text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                class="h-7 rounded-md border-brand-ink/15 bg-white py-1 pl-2 pr-7 text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                             >
                                 @foreach ([10, 25, 50, 100] as $n)
                                     <option value="{{ $n }}">{{ $n }}</option>
@@ -264,7 +264,7 @@
                                 {{ $this->auditLogs->links() }}
                             </div>
                         @else
-                            <span class="text-end text-[11px] tabular-nums text-brand-moss">{{ __(':n total', ['n' => $this->auditLogs->total()]) }}</span>
+                            <span class="text-end text-xs tabular-nums text-brand-moss">{{ __(':n total', ['n' => $this->auditLogs->total()]) }}</span>
                         @endif
                     </div>
                 @endif

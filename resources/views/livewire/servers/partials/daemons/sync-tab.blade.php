@@ -62,7 +62,7 @@
                     wire:loading.attr="disabled"
                     wire:target="loadPreviewSync"
                     @disabled($supervisor_installed !== true)
-                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="loadPreviewSync" aria-hidden="true" />
                     <x-spinner wire:loading wire:target="loadPreviewSync" variant="forest" size="sm" />
@@ -98,7 +98,7 @@
                     wire:loading.attr="disabled"
                     wire:target="loadDrift"
                     @disabled($supervisor_installed !== true)
-                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <x-heroicon-m-arrows-right-left class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="loadDrift" aria-hidden="true" />
                     <x-spinner wire:loading wire:target="loadDrift" variant="forest" size="sm" />

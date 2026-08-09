@@ -61,7 +61,7 @@
                                 <td class="px-4 py-3 font-mono text-xs text-brand-ink">{{ $row['age_label'] }}</td>
                                 <td class="px-4 py-3 text-brand-moss">{{ $row['trigger'] ?? '—' }}</td>
                                 <td class="px-5 py-3 sm:px-6">
-                                    <a href="{{ route('sites.deployments.show', ['server' => $row['site']->server_id, 'site' => $row['site'], 'deployment' => $row['deployment_id']]) }}" wire:navigate class="select-all rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">{{ $row['deployment_id'] }}</a>
+                                    <a href="{{ route('sites.deployments.show', ['server' => $row['site']->server_id, 'site' => $row['site'], 'deployment' => $row['deployment_id']]) }}" wire:navigate class="select-all rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">{{ $row['deployment_id'] }}</a>
                                 </td>
                             </tr>
                         @endforeach

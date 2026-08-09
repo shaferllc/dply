@@ -89,7 +89,7 @@
                 >
                     {{ __('Runtimes') }}
                     @if (($summary['runtime_versions'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-brand-moss">
+                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs tabular-nums text-brand-moss">
                             {{ $summary['runtime_versions'] }}
                         </span>
                     @endif

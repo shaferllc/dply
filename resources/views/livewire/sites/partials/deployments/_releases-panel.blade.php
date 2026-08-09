@@ -14,7 +14,7 @@
     />
 
     @if ($releases === null || $releases->isEmpty())
-        <p class="px-3 py-4 text-center text-[11px] text-brand-moss sm:px-4">
+        <p class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
             {{ __('No releases on disk yet. Run a deploy with the atomic strategy and it will appear here.') }}
         </p>
     @else
@@ -25,10 +25,10 @@
                         <p class="flex flex-wrap items-center gap-1.5 font-mono text-xs text-brand-ink">
                             {{ $rel->folder }}
                             @if ($rel->is_active)
-                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-inset ring-emerald-200">{{ __('Active') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-inset ring-emerald-200">{{ __('Active') }}</span>
                             @endif
                         </p>
-                        <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                        <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                             @if ($rel->git_sha)
                                 <span class="font-mono">{{ \Illuminate\Support\Str::limit($rel->git_sha, 7, '') }}</span>
                             @endif
@@ -73,11 +73,11 @@
 <x-modal name="release-info" maxWidth="lg" overlayClass="bg-brand-ink/40" focusable>
     @php $info = $releaseInfo; @endphp
     <div class="relative border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release details') }}</p>
+        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release details') }}</p>
         <h2 class="mt-1 flex flex-wrap items-center gap-2 font-mono text-lg font-semibold text-brand-ink">
             {{ $info['folder'] ?? '—' }}
             @if ($info && ($info['is_active'] ?? false))
-                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-inset ring-emerald-200">{{ __('Active') }}</span>
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-inset ring-emerald-200">{{ __('Active') }}</span>
             @endif
         </h2>
         <p class="mt-1 text-xs text-brand-moss">{{ __('On-disk release folder kept for zero-downtime deploys and rollback.') }}</p>
@@ -107,30 +107,30 @@
             <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-ink/[0.06] ring-1 ring-inset ring-brand-ink/10">
                 @foreach ($facts as $fact)
                     <div @class(['bg-white px-3 py-2.5', 'col-span-2' => $oddCount && $loop->last])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $fact['label'] }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $fact['label'] }}</dt>
                         <dd class="mt-0.5 {{ $fact['class'] }}" @isset($fact['title']) title="{{ $fact['title'] }}" @endisset>{{ $fact['value'] }}</dd>
                     </div>
                 @endforeach
             </dl>
 
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('On-disk path') }}</p>
-                <code class="mt-1 block break-all rounded-lg bg-brand-sand/40 px-3 py-2 font-mono text-[11px] text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $info['path'] }}</code>
+                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('On-disk path') }}</p>
+                <code class="mt-1 block break-all rounded-lg bg-brand-sand/40 px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $info['path'] }}</code>
                 @if ($info['is_active'])
-                    <p class="mt-1.5 text-[11px] text-brand-moss">
+                    <p class="mt-1.5 text-xs text-brand-moss">
                         {{ __('Live symlink') }}
                         <span class="font-mono text-brand-ink">{{ $info['current_symlink'] }}</span>
                         →
                         <span class="font-mono text-brand-ink">{{ $info['path'] }}</span>
                     </p>
                 @else
-                    <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Rollback swaps the current symlink to this folder without a new deploy.') }}</p>
+                    <p class="mt-1.5 text-xs text-brand-moss">{{ __('Rollback swaps the current symlink to this folder without a new deploy.') }}</p>
                 @endif
             </div>
 
             @if ($info['git_sha'])
                 <div x-data="{ copied: false }">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Git SHA') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Git SHA') }}</p>
                     <div class="mt-1 flex items-center gap-2">
                         <code class="min-w-0 flex-1 truncate rounded-lg bg-brand-sand/40 px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $info['git_sha'] }}</code>
                         <button

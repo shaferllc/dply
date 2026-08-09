@@ -40,7 +40,7 @@
             >
                 {{ $meta['label'] }}
                 @if (! $meta['enabled'])
-                    <span class="ml-1 text-[9px] uppercase tracking-wide">{{ __('soon') }}</span>
+                    <span class="ml-1 text-3xs uppercase tracking-wide">{{ __('soon') }}</span>
                 @endif
             </button>
         @endforeach
@@ -54,7 +54,7 @@
                     <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
                 </div>
@@ -93,7 +93,7 @@
                     <div class="flex flex-wrap items-center gap-2 text-xs text-brand-moss">
                         <span class="font-mono">wp {{ $latestRun->command }}</span>
                         <span @class([
-                            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                             'bg-brand-sage/15 text-brand-forest' => $latestRun->status === 'completed',
                             'bg-rose-100 text-rose-700' => $latestRun->status === 'failed',
                             'bg-brand-gold/20 text-brand-ink animate-pulse' => in_array($latestRun->status, ['queued', 'running'], true),
@@ -103,17 +103,17 @@
                         @endif
                     </div>
                     @if ($latestRun->stdout)
-                        <pre class="mt-3 max-h-72 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-brand-cream">{{ $latestRun->stdout }}</pre>
+                        <pre class="mt-3 max-h-72 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-xs leading-relaxed text-brand-cream">{{ $latestRun->stdout }}</pre>
                     @endif
                     @if ($latestRun->stderr)
-                        <pre class="mt-2 max-h-48 overflow-auto rounded-lg bg-rose-950/95 p-3 font-mono text-[11px] leading-relaxed text-rose-100">{{ $latestRun->stderr }}</pre>
+                        <pre class="mt-2 max-h-48 overflow-auto rounded-lg bg-rose-950/95 p-3 font-mono text-xs leading-relaxed text-rose-100">{{ $latestRun->stderr }}</pre>
                     @endif
                 </div>
             @endif
 
             @if ($history->isNotEmpty())
                 <div class="mt-6">
-                    <h4 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Recent runs') }}</h4>
+                    <h4 class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Recent runs') }}</h4>
                     <ul class="mt-2 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white text-sm">
                         @foreach ($history as $run)
                             <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
@@ -141,7 +141,7 @@
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
                 </div>
@@ -209,7 +209,7 @@
                     <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
                 </div>
@@ -246,7 +246,7 @@
                                 </p>
                             </div>
                             <span @class([
-                                'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                 'bg-brand-sand/40 text-brand-ink' => $snapshot->destination === 'local_disk',
                                 'bg-brand-sage/15 text-brand-forest' => $snapshot->destination === 's3',
                             ])>{{ $snapshot->destination }}</span>
@@ -286,7 +286,7 @@
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hardening') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hardening') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
                 </div>
@@ -302,7 +302,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
                                 <p class="text-sm font-semibold text-brand-ink">{{ $copy['title'] }}</p>
-                                <span class="rounded bg-brand-ink/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $copy['wp_constant'] }}</span>
+                                <span class="rounded bg-brand-ink/[0.04] px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $copy['wp_constant'] }}</span>
                             </div>
                             <p class="mt-1 text-xs text-brand-moss">{{ $copy['description'] }}</p>
                         </div>

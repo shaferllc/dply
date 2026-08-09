@@ -50,7 +50,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan sizing') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan sizing') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $sizeRoleMismatch['label'] }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $sizeRoleMismatch['detail'] }}</p>
                     </div>
@@ -58,7 +58,7 @@
                 <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7">
                     @if ($sizeRoleMismatch['suggested_size'] !== '')
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss/70">{{ __('Suggested plan') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss/70">{{ __('Suggested plan') }}</p>
                             <p class="mt-0.5 text-sm font-medium text-brand-ink">{{ $sizeRoleMismatch['suggested_label'] }}</p>
                         </div>
                         <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
@@ -305,7 +305,7 @@
                 @if ($orgBlueprints->isNotEmpty())
                     <div class="space-y-3">
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Your blueprints') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Your blueprints') }}</p>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Golden-server snapshots saved from ready VMs in your organization.') }}</p>
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -321,7 +321,7 @@
                                         'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md' => $selectedBlueprintId !== $blueprint['id'],
                                     ])
                                 >
-                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700 ring-1 ring-violet-200">{{ __('Blueprint') }}</span>
+                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-violet-700 ring-1 ring-violet-200">{{ __('Blueprint') }}</span>
                                     <span class="text-sm font-semibold text-brand-ink">{{ $blueprint['name'] }}</span>
                                     <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $blueprint['description'] }}</span>
                                     <span
@@ -349,12 +349,12 @@
                             ])
                         >
                             @if ($preset['id'] === 'polyglot')
-                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-gold ring-1 ring-brand-gold/30">{{ __('Differentiator') }}</span>
+                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-gold ring-1 ring-brand-gold/30">{{ __('Differentiator') }}</span>
                             @endif
                             <span class="text-sm font-semibold text-brand-ink">{{ $preset['name'] }}</span>
                             <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $preset['description'] }}</span>
                             @if ($selectedPreset === $preset['id'])
-                                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                                     <x-heroicon-m-check class="h-3 w-3" />
                                     {{ __('Picked') }}
                                 </span>
@@ -365,7 +365,7 @@
                             <span
                                 wire:loading
                                 wire:target="applyPreset('{{ $preset['id'] }}')"
-                                class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-[10px] font-semibold text-brand-cream shadow-sm"
+                                class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-2xs font-semibold text-brand-cream shadow-sm"
                             >
                                 <x-spinner variant="cream" size="sm" />
                                 {{ __('Applying…') }}
@@ -394,7 +394,7 @@
                                 <span
                                     wire:loading
                                     wire:target="applyPreset('{{ $preset['id'] }}')"
-                                    class="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-[10px] font-semibold text-brand-cream shadow-sm"
+                                    class="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-2xs font-semibold text-brand-cream shadow-sm"
                                 >
                                     <x-spinner variant="cream" size="sm" />
                                     {{ __('Applying…') }}
@@ -437,61 +437,61 @@
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         @if ($selectedInstallProfile)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $selectedInstallProfile['label'] }}</span>
                             </span>
                         @endif
                         @if ($selectedServerRole)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $selectedServerRole['label'] }}</span>
                             </span>
                         @endif
                         @if ($form->webserver)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->webserver }}</span>
                             </span>
                         @endif
                         @if ($form->php_version)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->php_version }}</span>
                             </span>
                         @endif
                         @if ($form->database)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->database }}</span>
                             </span>
                         @endif
                         @if ($form->cache_service)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
                             </span>
                         @endif
                         @if ($form->ruby_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ruby') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ruby') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->ruby_version }}</span>
                             </span>
                         @endif
                         @if ($form->node_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Node') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Node') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->node_version }}</span>
                             </span>
                         @endif
                         @if ($form->python_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Python') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Python') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->python_version }}</span>
                             </span>
                         @endif
                         @if ($form->go_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Go') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Go') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->go_version }}</span>
                             </span>
                         @endif
@@ -543,13 +543,13 @@
                         {{ __('Override the template') }}
                     </h3>
                     <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                    <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
+                    <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
                     <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
 
                 <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ __('Profile bundles a default package set; role narrows what actually installs (web vs db node vs LB).') }}</p>
                         <div class="mt-3 grid gap-4 sm:grid-cols-2">
                             @include('livewire.servers.create._rich-select', [
@@ -604,7 +604,7 @@
 
                     @if ($hasComponents)
                         <div class="border-t border-brand-ink/10 pt-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Individual stack components') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Individual stack components') }}</p>
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Swap a single piece (e.g. switch from Nginx to Caddy) without leaving the bundle.') }}</p>
                             <div class="mt-3 grid gap-4 sm:grid-cols-2">
                                 @if ($showWebserver)
@@ -653,7 +653,7 @@
 
                     @if ($hasRuntimes)
                         <div class="border-t border-brand-ink/10 pt-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Language runtimes') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Language runtimes') }}</p>
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Templates pre-fill these (Rails → Ruby, Next.js → Node, etc.); pick "Not installed" to drop one.') }}</p>
                             <div class="mt-3 grid gap-4 sm:grid-cols-2">
                                 @if ($showRuby)
@@ -761,7 +761,7 @@
       <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                     <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('Cluster + namespace') }}
                 </p>
@@ -779,7 +779,7 @@
         @else
             @if ($isDedicatedServerPurpose ?? false)
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                    <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                         <x-heroicon-m-academic-cap class="h-4 w-4" />
                         {{ __('Dedicated server') }}
                     </p>
@@ -789,7 +789,7 @@
                 </div>
             @else
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                     <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('How these fit together') }}
                 </p>
@@ -812,7 +812,7 @@
 
             @if ($selectedServerRole && ! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
                     <p class="mt-1 text-xs text-brand-mist">{{ __('From your current job choice') }}</p>
                     <ul class="mt-2 space-y-1 text-xs text-brand-moss">
                         @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)

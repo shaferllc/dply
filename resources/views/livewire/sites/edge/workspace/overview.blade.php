@@ -62,7 +62,7 @@
 
     <section class="border-b border-brand-ink/10">
         <div class="px-5 py-3 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Manage') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Manage') }}</p>
         </div>
         <div class="grid gap-px border-t border-brand-ink/10 bg-brand-ink/[0.07] sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($jumpLinks as $link)
@@ -89,7 +89,7 @@
     @if ($recentDeployments->isNotEmpty())
         <section>
             <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deploys') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deploys') }}</p>
                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}" wire:navigate class="text-xs font-semibold text-brand-sage hover:underline">
                     {{ __('View all') }}
                 </a>
@@ -107,7 +107,7 @@
                             class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm hover:bg-brand-sand/20 sm:px-6"
                         >
                             <span class="inline-flex min-w-0 items-center gap-2">
-                                <span class="rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                <span class="rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                     {{ str_replace('_', ' ', (string) $deployment->status) }}
                                 </span>
                                 @if ($sha)

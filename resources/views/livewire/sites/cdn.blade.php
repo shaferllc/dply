@@ -91,7 +91,7 @@
                         >
                             <x-slot:actions>
                                 @if ($lastPurgeAt)
-                                    <span class="hidden text-[10px] text-brand-mist sm:inline">{{ __('Purged') }} <span class="font-mono text-brand-moss">{{ $lastPurgeAt }}</span></span>
+                                    <span class="hidden text-2xs text-brand-mist sm:inline">{{ __('Purged') }} <span class="font-mono text-brand-moss">{{ $lastPurgeAt }}</span></span>
                                 @endif
                                 <button type="button" wire:click="purge" @disabled(! $enabled) class="{{ $btnOutline }}" wire:loading.attr="disabled" wire:target="purge">
                                     <span wire:loading.remove wire:target="purge">{{ __('Purge cache') }}</span>
@@ -119,10 +119,10 @@
                                     <span class="text-xs font-semibold text-brand-ink">{{ __('Edge in front of this site') }}</span>
                                 </label>
                                 @if ($lastAppliedAt)
-                                    <p class="text-[11px] text-brand-moss">{{ __('Last sync:') }} <span class="font-mono text-brand-ink">{{ $lastAppliedAt }}</span></p>
+                                    <p class="text-xs text-brand-moss">{{ __('Last sync:') }} <span class="font-mono text-brand-ink">{{ $lastAppliedAt }}</span></p>
                                 @endif
                                 @if ($lastError)
-                                    <p class="text-[11px] text-rose-700">{{ __('Last error:') }} {{ $lastError }}</p>
+                                    <p class="text-xs text-rose-700">{{ __('Last error:') }} {{ $lastError }}</p>
                                 @endif
                             </div>
                         </div>
@@ -143,7 +143,7 @@
                                         <select id="provider" wire:model.live="provider" class="{{ $inputCls }}">
                                             <option value="cloudflare">{{ __('Cloudflare') }}</option>
                                         </select>
-                                        @error('provider') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                        @error('provider') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="{{ $labelCls }}" for="credentialId">{{ __('Credential') }}</label>
@@ -155,23 +155,23 @@
                                                 @endif
                                             @endforeach
                                         </select>
-                                        @error('credentialId') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                        @error('credentialId') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="{{ $labelCls }}" for="zoneName">{{ __('Zone (apex domain)') }}</label>
                                         <input id="zoneName" type="text" wire:model="zoneName" placeholder="example.com" class="{{ $inputCls }}">
-                                        @error('zoneName') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                        @error('zoneName') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="{{ $labelCls }}" for="hostname">{{ __('Site hostname') }}</label>
                                         <input id="hostname" type="text" wire:model="hostname" placeholder="app.example.com" class="{{ $inputCls }}">
-                                        @error('hostname') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                        @error('hostname') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                     </div>
                                     <div class="sm:col-span-2">
                                         <label class="{{ $labelCls }}" for="originIp">{{ __('Origin IP') }}</label>
                                         <input id="originIp" type="text" wire:model="originIp" placeholder="203.0.113.10" class="{{ $inputCls }}">
-                                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Defaults to the server’s public IP. Change if you front a load balancer.') }}</p>
-                                        @error('originIp') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Defaults to the server’s public IP. Change if you front a load balancer.') }}</p>
+                                        @error('originIp') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
                             </div>
@@ -201,13 +201,13 @@
                                             </span>
                                             <span class="min-w-0 flex-1">
                                                 <span class="block text-xs font-semibold text-brand-ink">{{ $meta['name'] }}</span>
-                                                <span class="mt-0.5 block text-[11px] leading-relaxed text-brand-moss">{{ $meta['desc'] }}</span>
+                                                <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</span>
                                             </span>
                                         </label>
                                     </li>
                                 @endforeach
                             </ul>
-                            @error('cachePreset') <p class="px-5 py-2 text-[11px] text-rose-700 sm:px-6">{{ $message }}</p> @enderror
+                            @error('cachePreset') <p class="px-5 py-2 text-xs text-rose-700 sm:px-6">{{ $message }}</p> @enderror
                         </div>
 
                         {{-- Path rules --}}
@@ -226,23 +226,23 @@
                                             <div class="flex flex-wrap items-center gap-2 px-3 py-2">
                                                 <span class="min-w-[10rem] flex-1 break-all font-mono text-xs text-brand-ink">{{ $rule['path'] }}</span>
                                                 <span @class([
-                                                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset',
+                                                    'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 ring-inset',
                                                     'bg-amber-100 text-amber-800 ring-amber-200/70' => $rule['action'] === 'bypass',
                                                     'bg-emerald-50 text-emerald-800 ring-emerald-200/70' => $rule['action'] !== 'bypass',
                                                 ])>
                                                     {{ $rule['action'] === 'bypass' ? __('Bypass') : __('Cache') }}
                                                 </span>
                                                 @if ($rule['action'] === 'cache')
-                                                    <span class="text-[11px] text-brand-moss">{{ __('TTL') }}: <span class="font-mono text-brand-ink">{{ $rule['ttl'] }}s</span></span>
+                                                    <span class="text-xs text-brand-moss">{{ __('TTL') }}: <span class="font-mono text-brand-ink">{{ $rule['ttl'] }}s</span></span>
                                                 @endif
-                                                <button type="button" wire:click="removeRule({{ $idx }})" class="text-[11px] font-semibold text-rose-700 hover:underline">
+                                                <button type="button" wire:click="removeRule({{ $idx }})" class="text-xs font-semibold text-rose-700 hover:underline">
                                                     {{ __('Remove') }}
                                                 </button>
                                             </div>
                                         @endforeach
                                     </div>
                                 @else
-                                    <p class="text-[11px] italic text-brand-moss">{{ __('No path rules yet — the cache preset applies to all paths.') }}</p>
+                                    <p class="text-xs italic text-brand-moss">{{ __('No path rules yet — the cache preset applies to all paths.') }}</p>
                                 @endif
 
                                 <div class="grid grid-cols-1 items-end gap-2 sm:grid-cols-12">
@@ -289,27 +289,27 @@
 
                                 <div class="{{ $panelBody }} space-y-2">
                                     @if ($metricsError)
-                                        <p class="text-[11px] text-rose-700">{{ __('Last poll error:') }} {{ $metricsError }}</p>
+                                        <p class="text-xs text-rose-700">{{ __('Last poll error:') }} {{ $metricsError }}</p>
                                     @endif
                                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                         <div class="rounded-lg border border-brand-ink/10 px-3 py-2">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hit rate') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hit rate') }}</p>
                                             <p class="mt-0.5 text-base font-semibold text-brand-ink">{{ $hitRate !== null ? number_format($hitRate * 100, 1).'%' : '—' }}</p>
                                         </div>
                                         <div class="rounded-lg border border-brand-ink/10 px-3 py-2">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Requests') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Requests') }}</p>
                                             <p class="mt-0.5 text-base font-semibold text-brand-ink">{{ number_format($reqAll) }}</p>
-                                            <p class="text-[10px] text-brand-moss">{{ number_format($reqCached) }} {{ __('cached') }}</p>
+                                            <p class="text-2xs text-brand-moss">{{ number_format($reqCached) }} {{ __('cached') }}</p>
                                         </div>
                                         <div class="rounded-lg border border-brand-ink/10 px-3 py-2">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bandwidth') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bandwidth') }}</p>
                                             <p class="mt-0.5 text-base font-semibold text-brand-ink">{{ $formatBytes($bwAll) }}</p>
-                                            <p class="text-[10px] text-brand-moss">{{ $formatBytes($bwCached) }} {{ __('cached') }}</p>
+                                            <p class="text-2xs text-brand-moss">{{ $formatBytes($bwCached) }} {{ __('cached') }}</p>
                                         </div>
                                         <div class="rounded-lg border border-brand-ink/10 px-3 py-2">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin saved') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin saved') }}</p>
                                             <p class="mt-0.5 text-base font-semibold text-brand-ink">{{ $formatBytes($bwCached) }}</p>
-                                            <p class="text-[10px] text-brand-moss">{{ __('served from edge') }}</p>
+                                            <p class="text-2xs text-brand-moss">{{ __('served from edge') }}</p>
                                         </div>
                                     </div>
                                 </div>

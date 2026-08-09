@@ -23,7 +23,7 @@
                         <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">{{ __('Destructive') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">{{ __('Destructive') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-rose-900 dark:text-rose-100">{{ __('Delete Edge site') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Removes the site from dply Edge. A background job tears down deployments, CDN/storage artifacts, custom domain routing, and preview child sites. Live traffic stops when teardown completes.') }}

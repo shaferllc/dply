@@ -13,7 +13,7 @@
 <aside class="space-y-3 pb-24 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
         <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-4 py-3 dark:border-brand-mist/15">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
             <p class="mt-1 truncate text-sm font-semibold text-brand-ink">{{ $appLabel }}</p>
         </div>
         <dl class="divide-y divide-brand-ink/8 text-sm dark:divide-brand-mist/15">
@@ -21,7 +21,7 @@
                 <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Source') }}</dt>
                 <dd class="min-w-0 text-end font-mono text-xs text-brand-ink dark:text-brand-cream">
                     <span class="block truncate">{{ $repoLabel }}</span>
-                    <span class="mt-0.5 block text-[11px] text-brand-moss">
+                    <span class="mt-0.5 block text-xs text-brand-moss">
                         {{ match ($git_ref_kind ?? 'branch') {
                             'tag' => __('Tag'),
                             'commit' => __('Commit'),
@@ -53,24 +53,24 @@
                             ${{ number_format($functionFee, 2) }}<span class="text-sm font-medium text-brand-moss">/mo</span>
                         @endif
                     </p>
-                    <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">
+                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                         @if ($delivery_mode === 'managed')
                             {{ __('Flat dply per-app fee plus metered usage above a monthly allowance.') }}
                         @else
                             {{ __('Flat dply per-app fee once live. Provider usage bills to your account.') }}
                         @endif
                     </p>
-                    <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('Databases or Redis you attach later are billed separately.') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-mist">{{ __('Databases or Redis you attach later are billed separately.') }}</p>
                 </dd>
             </div>
         </dl>
     </div>
 
     <div class="rounded-2xl border border-brand-ink/10 bg-white p-3.5 shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Works great with') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Works great with') }}</p>
         <div class="mt-2 flex flex-wrap gap-1.5">
             @foreach (['Laravel', 'PHP', 'Node.js', 'Python', 'Go'] as $framework)
-                <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-brand-cream/60 px-2 py-0.5 text-[11px] font-semibold text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-sage">
+                <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-brand-cream/60 px-2 py-0.5 text-xs font-semibold text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-sage">
                     {{ $framework }}
                 </span>
             @endforeach

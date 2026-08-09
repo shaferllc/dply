@@ -84,11 +84,11 @@
                                     <article class="rounded-xl border border-brand-sage/30 bg-brand-sage/5 p-4">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <h4 class="text-sm font-semibold text-brand-ink">{{ $suggestion['title'] }}</h4>
-                                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                            <span class="rounded-full bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                                 {{ $suggestion['confidence'] }}
                                             </span>
                                             @if (($suggestion['source'] ?? 'heuristic') === 'llm')
-                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">
+                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">
                                                     {{ __('AI') }}
                                                 </span>
                                             @endif
@@ -144,7 +144,7 @@
                                         <article class="rounded-xl border border-brand-forest/15 bg-brand-cream/30 p-4">
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <h4 class="text-sm font-semibold text-brand-ink">{{ $suggestion['title'] }}</h4>
-                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggested by AI') }}</span>
+                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggested by AI') }}</span>
                                             </div>
                                             <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $suggestion['summary'] }}</p>
                                             @if (! empty($suggestion['actions']))
@@ -204,7 +204,7 @@
                         @if (is_array($context['repo_config']) && $context['repo_config'] !== [])
                             <div class="border-t border-brand-ink/10 px-5 py-5 md:border-t-0 sm:px-6">
                                 <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Repo config snapshot') }}</h3>
-                                <pre class="mt-3 max-h-48 overflow-auto rounded-lg bg-brand-sand/40 p-3 font-mono text-[11px] leading-5 text-brand-ink">{{ json_encode($context['repo_config'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                <pre class="mt-3 max-h-48 overflow-auto rounded-lg bg-brand-sand/40 p-3 font-mono text-xs leading-5 text-brand-ink">{{ json_encode($context['repo_config'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                             </div>
                         @endif
                     </div>
@@ -229,7 +229,7 @@
                                     <p class="mb-3 font-mono text-xs text-rose-900">{{ $failure['summary'] }}</p>
                                 @endif
                                 @if (($failure['log_excerpt'] ?? '') !== '')
-                                    <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-brand-ink">{{ $failure['log_excerpt'] }}</pre>
+                                    <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-brand-ink">{{ $failure['log_excerpt'] }}</pre>
                                 @endif
                             </div>
                         </details>

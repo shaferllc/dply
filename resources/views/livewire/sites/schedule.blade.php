@@ -38,7 +38,7 @@
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function holds a stale command secret') }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The latest tick was rejected by the function with "invalid command secret" — its baked DPLY_COMMAND_SECRET doesn\'t match what dply is signing requests with. Redeploy once to bake the current secret into the function; ticks succeed from there on.') }}</p>
                                 </div>
@@ -65,7 +65,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scheduler') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scheduler') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run the scheduler every minute') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('When enabled, dply invokes the function in scheduler mode every minute. Use this for Laravel `schedule:run`, periodic queue draining, or any one-minute-cadence job. Future versions will let you define multiple named cron rules here.') }}
@@ -109,7 +109,7 @@
                             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Output') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Output') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Latest output') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Most recent scheduler invocation — the function\'s response body, captured by the tick command. Refreshes every 15 seconds.') }}
@@ -137,7 +137,7 @@
                         @endif
                         @php($body = trim((string) ($latestSchedule['body_preview'] ?? '')))
                         @if ($body !== '')
-                            <pre class="@if (! empty($latestSchedule['error'])) mt-4 @endif max-h-[28rem] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $body }}</pre>
+                            <pre class="@if (! empty($latestSchedule['error'])) mt-4 @endif max-h-[28rem] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-xs leading-relaxed text-slate-100">{{ $body }}</pre>
                         @else
                             <p class="@if (! empty($latestSchedule['error'])) mt-4 @endif text-xs text-brand-moss">{{ __('No response body captured.') }}</p>
                         @endif
@@ -151,7 +151,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Firing history') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Last 50 scheduler ticks. Newest first. Click a row to see its full output.') }}
@@ -172,7 +172,7 @@
                 @else
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                            <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                            <thead class="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                 <tr>
                                     <th class="py-2 pr-3">{{ __('When') }}</th>
                                     <th class="py-2 pr-3">{{ __('Status') }}</th>
@@ -194,7 +194,7 @@
                                         </td>
                                         <td class="py-2 pr-3">
                                             <span @class([
-                                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]',
+                                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.12em]',
                                                 'bg-emerald-100 text-emerald-900' => ($entry['status'] ?? '') === 'ok',
                                                 'bg-rose-100 text-rose-900' => ($entry['status'] ?? '') !== 'ok',
                                             ])>{{ $entry['status'] ?? 'unknown' }}</span>
@@ -205,7 +205,7 @@
                                         <td class="py-2 pr-3 font-mono text-xs text-brand-moss">
                                             {{ (int) ($entry['duration_ms'] ?? 0) }}ms
                                         </td>
-                                        <td class="py-2 break-all font-mono text-[11px] text-brand-moss">
+                                        <td class="py-2 break-all font-mono text-xs text-brand-moss">
                                             @if (! empty($entry['error']))
                                                 <span class="text-rose-700">{{ \Illuminate\Support\Str::limit($entry['error'], 120) }}</span>
                                             @else

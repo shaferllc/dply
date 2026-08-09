@@ -125,11 +125,11 @@
                 <div class="space-y-4 px-6 py-5">
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
                             <p class="mt-1 break-all rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 font-mono text-sm text-brand-ink" x-text="username"></p>
                         </div>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path') }}</p>
                             <p class="mt-1 break-all rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 font-mono text-sm text-brand-ink" x-text="path"></p>
                         </div>
                     </div>
@@ -159,7 +159,7 @@
                             autocomplete="new-password"
                             spellcheck="false"
                         />
-                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('8–255 characters. Click Generate for a fresh random secret.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('8–255 characters. Click Generate for a fresh random secret.') }}</p>
                     </div>
                 </div>
 

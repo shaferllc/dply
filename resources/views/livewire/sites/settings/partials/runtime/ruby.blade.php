@@ -2,7 +2,7 @@
     $detectedFramework = strtolower((string) ($site->resolvedRuntimeAppDetection()['framework'] ?? ''));
     $isRailsLike = $detectedFramework === 'rails' || $site->shouldShowRailsRuntimeSettings();
     $panelBody = 'px-5 py-3 sm:px-6';
-    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
+    $fieldHelp = 'mt-1 text-xs text-brand-moss';
 @endphp
 
 @if ($isRailsLike)

@@ -32,11 +32,11 @@
                         {{-- The note is plain text in a dense head, so the "Learn
                              more" link that used to sit inside the prose moves
                              here rather than being dropped. --}}
-                        <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap text-[11px] font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
+                        <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
                         <button
                             type="button"
                             x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
-                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
                             <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Add a key') }}
@@ -48,7 +48,7 @@
                             wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
                             @disabled($syncBusy)
                             title="{{ $syncBusy ? __('A sync is already running. Wait for it to finish.') : '' }}"
-                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" aria-hidden="true" />
                             <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-3.5 w-3.5 items-center justify-center">
@@ -57,7 +57,7 @@
                             <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
                             <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
                         </button>
-                        <button type="button" wire:click="setSshWorkspaceTab('preview')" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                        <button type="button" wire:click="setSshWorkspaceTab('preview')" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             <x-heroicon-m-magnifying-glass class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Review drift') }}
                         </button>
@@ -71,7 +71,7 @@
                             {{ __('Add one to authorized_keys, then sync.') }}
                         </p>
                         @if ($profileKeys->isEmpty())
-                            <button type="button" x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')" class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-semibold text-amber-900 hover:bg-amber-100">
+                            <button type="button" x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')" class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-white px-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">
                                 <x-heroicon-o-plus class="h-3.5 w-3.5" />
                                 {{ __('Add profile key') }}
                             </button>
@@ -321,24 +321,24 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <p class="text-sm font-semibold text-brand-ink">{{ $ak->name }}</p>
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 <x-heroicon-m-user class="h-3 w-3" />
                                                 {{ $effectiveUser }}@if ($effectiveUser === $server->ssh_user) · {{ __('login') }}@endif
                                             </span>
                                             @if ($isOverdue)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800">
                                                     <x-heroicon-m-clock class="h-3 w-3" />
                                                     {{ __('Review due') }}
                                                 </span>
                                             @endif
                                         </div>
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">
+                                        <p class="mt-0.5 text-xs text-brand-mist">
                                             {{ __('Added :time', ['time' => $ak->created_at?->diffForHumans() ?? '—']) }}
                                         </p>
 
                                         @if ($fp)
                                             <details class="mt-2">
-                                                <summary class="cursor-pointer list-none text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
+                                                <summary class="cursor-pointer list-none text-xs font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
                                                     <span class="inline-flex items-center gap-1">
                                                         <x-heroicon-o-chevron-down class="h-3 w-3" />
                                                         {{ __('Fingerprints') }}
@@ -346,10 +346,10 @@
                                                 </summary>
                                                 <div class="mt-2 space-y-1 rounded-lg bg-brand-sand/15 px-3 py-2">
                                                     @if (! empty($fp['sha256']))
-                                                        <p class="font-mono text-[11px] text-brand-ink"><span class="text-brand-mist">SHA256</span> {{ $fp['sha256'] }}</p>
+                                                        <p class="font-mono text-xs text-brand-ink"><span class="text-brand-mist">SHA256</span> {{ $fp['sha256'] }}</p>
                                                     @endif
                                                     @if (! empty($fp['md5']))
-                                                        <p class="font-mono text-[11px] text-brand-moss"><span class="text-brand-mist">MD5&nbsp;&nbsp;&nbsp;</span> {{ $fp['md5'] }}</p>
+                                                        <p class="font-mono text-xs text-brand-moss"><span class="text-brand-mist">MD5&nbsp;&nbsp;&nbsp;</span> {{ $fp['md5'] }}</p>
                                                     @endif
                                                 </div>
                                             </details>
@@ -358,7 +358,7 @@
 
                                     <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
                                         <div class="flex items-stretch overflow-hidden rounded-lg border border-brand-ink/15 bg-white">
-                                            <span class="flex shrink-0 items-center bg-brand-sand/30 px-2 text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Review') }}</span>
+                                            <span class="flex shrink-0 items-center bg-brand-sand/30 px-2 text-2xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Review') }}</span>
                                             <input
                                                 id="rev-{{ $ak->id }}"
                                                 type="date"
@@ -370,7 +370,7 @@
                                                 wire:click="updateKeyReviewFromInput('{{ $ak->id }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="updateKeyReviewFromInput('{{ $ak->id }}')"
-                                                class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-2 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                                class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                                                 title="{{ __('Save review-after date') }}"
                                             >
                                                 <x-heroicon-m-check wire:loading.remove wire:target="updateKeyReviewFromInput('{{ $ak->id }}')" class="h-3 w-3" />

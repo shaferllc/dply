@@ -65,7 +65,7 @@
     @else
         <div class="mt-4 overflow-x-auto rounded-lg border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                <thead class="bg-brand-sand/30 text-[10px] uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-2xs uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th scope="col" class="px-3 py-2 text-left font-semibold">{{ __('Time') }}</th>
                         <th scope="col" class="px-3 py-2 text-right font-semibold">{{ __('Duration') }}</th>
@@ -94,6 +94,6 @@
                 </tbody>
             </table>
         </div>
-        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Threshold lives in CONFIG GET slowlog-log-slower-than. Tune it from the Configure subtab if you need finer-grained capture.') }}</p>
+        <p class="mt-2 text-xs text-brand-mist">{{ __('Threshold lives in CONFIG GET slowlog-log-slower-than. Tune it from the Configure subtab if you need finer-grained capture.') }}</p>
     @endif
 </div>

@@ -23,7 +23,7 @@
             <a
                 href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
                 wire:navigate
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 {{ __('Manage in Settings') }}
                 <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -32,7 +32,7 @@
     </x-workspace-panel-head>
 
     @if ($subscriptionsByChannel->isEmpty())
-        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
             <x-heroicon-m-bell-slash class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
             {{ __('No external channels are routed for security digest events yet — add one below to get an email or chat message when this server’s posture degrades.') }}
         </p>
@@ -43,10 +43,10 @@
                 <li class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:px-5" wire:key="secdigest-notif-ch-{{ $channelId }}">
                     <p class="min-w-0 truncate text-xs font-semibold text-brand-ink">{{ $channel?->label ?? __('(deleted channel)') }}</p>
                     <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                    <p class="shrink-0 text-[11px] text-brand-mist">{{ ucfirst((string) ($channel?->type ?? '—')) }}</p>
+                    <p class="shrink-0 text-xs text-brand-mist">{{ ucfirst((string) ($channel?->type ?? '—')) }}</p>
                     <div class="ml-auto flex flex-wrap items-center gap-1.5">
                         @foreach ($subs as $sub)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="secdigest-notif-sub-{{ $sub->id }}">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="secdigest-notif-sub-{{ $sub->id }}">
                                 {{ $notifEventLabels[$sub->event_key] ?? $sub->event_key }}
                                 <button
                                     type="button"
@@ -88,18 +88,18 @@
                     </select>
                     <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                         @if ($notifChannels->isEmpty())
-                            <p class="text-[11px] text-brand-moss">{{ __('You have no notification channels yet.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('You have no notification channels yet.') }}</p>
                         @endif
                         <button
                             type="button"
                             wire:click="openCreateChannelModal"
-                            class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-ink hover:text-brand-sage"
+                            class="inline-flex items-center gap-1 text-xs font-semibold text-brand-ink hover:text-brand-sage"
                         >
                             <x-heroicon-m-plus-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Create a channel') }}
                         </button>
-                        <span class="text-[10px] text-brand-mist" aria-hidden="true">·</span>
-                        <a href="{{ route('profile.notification-channels') }}" class="text-[11px] text-brand-mist hover:text-brand-ink" wire:navigate>
+                        <span class="text-2xs text-brand-mist" aria-hidden="true">·</span>
+                        <a href="{{ route('profile.notification-channels') }}" class="text-xs text-brand-mist hover:text-brand-ink" wire:navigate>
                             {{ __('Manage all in Settings →') }}
                         </a>
                     </div>

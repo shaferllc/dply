@@ -175,7 +175,7 @@
                     >
                         {{ $tab['label'] }}
                         @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
-                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                         @endif
                         @if (! empty($tab['needs_setup']))
                             <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>

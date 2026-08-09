@@ -34,18 +34,18 @@
                 <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Organization settings at a glance') }}">
                     <x-fleet-stat :label="__('Plan')">
                         <p class="mt-2 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Org-wide subscription') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Members')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('With access') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('With access') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Created')">
                         <p class="mt-2 truncate text-sm font-semibold text-brand-ink">{{ $organization->created_at?->format('M j, Y') ?? '—' }}</p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->created_at?->diffForHumans() ?? '' }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ $organization->created_at?->diffForHumans() ?? '' }}</p>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -69,7 +69,7 @@
                         <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Branding') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Branding') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization icon') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Shown beside this organization across the dashboard. PNG, JPG, WEBP, GIF or ICO up to 1 MB.') }}
@@ -125,7 +125,7 @@
                         <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('General') }}</h2>
                     </div>
                 </div>
@@ -182,7 +182,7 @@
                     <div class="flex items-start gap-3 border-b border-red-200/80 bg-red-50 px-5 py-4 sm:px-6">
                         <x-heroicon-o-exclamation-triangle class="h-6 w-6 shrink-0 text-red-600" aria-hidden="true" />
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-red-900">{{ __('Delete organization') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-red-800/90">
                                 {{ __('Permanently delete this organization and its settings. Remove all servers and sites and cancel any subscription first. This cannot be undone.') }}

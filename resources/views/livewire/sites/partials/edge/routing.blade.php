@@ -32,19 +32,19 @@
             <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Routing rules') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Redirects, rewrites, and header rules from the latest deploy. Managed via :file in your repository — edit there, then redeploy.', ['file' => $sourcePath]) }}
             </p>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                 {{ __('Repo-managed') }}
             </span>
             <a
                 href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
                 title="{{ __('Download a dply.yaml that mirrors the current routing + crons') }}"
             >
                 <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
@@ -64,14 +64,14 @@
             <div>
                 <h4 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                     <span>{{ __('Redirects') }}</span>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] text-brand-moss">{{ count($redirects) }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs text-brand-moss">{{ count($redirects) }}</span>
                 </h4>
                 @if ($redirects === [])
                     <p class="mt-2 text-xs text-brand-moss">{{ __('No redirects declared.') }}</p>
                 @else
                     <div class="mt-2 overflow-x-auto rounded-lg border border-brand-ink/10">
                         <table class="min-w-full divide-y divide-brand-ink/8 text-xs">
-                            <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <tr>
                                     <th class="px-3 py-2">{{ __('From') }}</th>
                                     <th class="px-3 py-2">{{ __('To') }}</th>
@@ -96,14 +96,14 @@
             <div>
                 <h4 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                     <span>{{ __('Rewrites') }}</span>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] text-brand-moss">{{ count($rewrites) }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs text-brand-moss">{{ count($rewrites) }}</span>
                 </h4>
                 @if ($rewrites === [])
                     <p class="mt-2 text-xs text-brand-moss">{{ __('No rewrites declared.') }}</p>
                 @else
                     <div class="mt-2 overflow-x-auto rounded-lg border border-brand-ink/10">
                         <table class="min-w-full divide-y divide-brand-ink/8 text-xs">
-                            <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <tr>
                                     <th class="px-3 py-2">{{ __('From') }}</th>
                                     <th class="px-3 py-2">{{ __('To') }}</th>
@@ -126,7 +126,7 @@
             <div>
                 <h4 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                     <span>{{ __('Header rules') }}</span>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] text-brand-moss">{{ count($headers) }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs text-brand-moss">{{ count($headers) }}</span>
                 </h4>
                 @if ($headers === [])
                     <p class="mt-2 text-xs text-brand-moss">{{ __('No header rules declared.') }}</p>

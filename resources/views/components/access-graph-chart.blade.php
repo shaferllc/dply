@@ -97,12 +97,12 @@
 
         <div
             x-show="tip" x-cloak
-            class="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md border border-brand-ink/10 bg-white px-2 py-1 text-[10px] leading-tight text-brand-ink shadow-md"
+            class="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md border border-brand-ink/10 bg-white px-2 py-1 text-2xs leading-tight text-brand-ink shadow-md"
             :style="`left: ${tipX}%`"
         >
             <div class="font-mono whitespace-nowrap" x-text="tip ? formatTime(tip.at) : ''"></div>
             <div class="mt-0.5 font-semibold tabular-nums text-brand-forest" x-text="tip ? `${tip.total} total` : ''"></div>
-            <div class="text-[9px] text-amber-700 tabular-nums whitespace-nowrap" x-text="tip ? `${tip.you} you` : ''"></div>
+            <div class="text-3xs text-amber-700 tabular-nums whitespace-nowrap" x-text="tip ? `${tip.you} you` : ''"></div>
         </div>
     @endif
 </div>

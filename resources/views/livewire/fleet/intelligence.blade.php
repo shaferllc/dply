@@ -68,14 +68,14 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="h-2 w-2 rounded-full {{ $tone['dot'] }}" aria-hidden="true"></span>
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $tone['pill'] }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $tone['pill'] }}">
                                         {{ $ruleLabel }}
                                     </span>
-                                    <span class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ $alert->severity }}</span>
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ $alert->severity }}</span>
                                     @if ($alert->resolved_at)
-                                        <span class="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">{{ __('resolved') }}</span>
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-emerald-700">{{ __('resolved') }}</span>
                                     @elseif ($alert->dismissed_at)
-                                        <span class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('dismissed') }}</span>
+                                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('dismissed') }}</span>
                                     @endif
                                 </div>
                                 <p class="mt-1 text-sm font-semibold text-brand-ink">{{ $alert->title }}</p>

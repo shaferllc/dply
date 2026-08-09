@@ -13,7 +13,7 @@
                 <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Certificate alerts') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s certificate events — issued / renewed and renewal failures. Each row binds one channel to one event.') }}
@@ -56,7 +56,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             @foreach ($subs as $sub)
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="cert-notif-sub-{{ $sub->id }}">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="cert-notif-sub-{{ $sub->id }}">
                                     {{ $notifEventLabels[$sub->event_key] ?? $sub->event_key }}
                                     <button
                                         type="button"
@@ -75,7 +75,7 @@
     </div>
 
     <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
         <form wire:submit="addCertNotificationSubscription" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -102,7 +102,7 @@
                             <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                             {{ __('Create a channel') }}
                         </button>
-                        <span class="text-[10px] text-brand-mist">·</span>
+                        <span class="text-2xs text-brand-mist">·</span>
                         <a href="{{ route('profile.notification-channels') }}" class="text-xs text-brand-mist hover:text-brand-ink" wire:navigate>
                             {{ __('Manage all in Settings →') }}
                         </a>

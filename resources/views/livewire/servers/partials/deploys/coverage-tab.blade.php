@@ -45,14 +45,14 @@
                 <li wire:key="policy-site-{{ $row['id'] }}" class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:px-5">
                     <p class="shrink-0 text-xs font-semibold text-brand-ink">{{ $row['name'] }}</p>
                     <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                    <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-mist" title="{{ $row['primary_hostname'] }}">{{ $row['primary_hostname'] }}</p>
+                    <p class="min-w-0 flex-1 truncate font-mono text-xs text-brand-mist" title="{{ $row['primary_hostname'] }}">{{ $row['primary_hostname'] }}</p>
                     @if ($row['detail'])
-                        <p class="min-w-0 shrink truncate text-[11px] text-amber-900" title="{{ $row['detail'] }}">{{ $row['detail'] }}</p>
+                        <p class="min-w-0 shrink truncate text-xs text-amber-900" title="{{ $row['detail'] }}">{{ $row['detail'] }}</p>
                     @endif
-                    <span @class(['ml-auto inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1', $statusTone($row['status'])])>
+                    <span @class(['ml-auto inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold ring-1', $statusTone($row['status'])])>
                         {{ $row['status_label'] }}
                     </span>
-                    <a href="{{ $row['show_url'] }}" wire:navigate class="shrink-0 text-[11px] font-semibold text-brand-moss hover:text-brand-ink">{{ __('Workspace') }}</a>
+                    <a href="{{ $row['show_url'] }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('Workspace') }}</a>
                 </li>
             @endforeach
         </ul>

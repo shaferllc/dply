@@ -17,7 +17,7 @@
                                     wire:click="loadNginxModulesConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadNginxModulesConfig"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadNginxModulesConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -52,7 +52,7 @@
                                 >
                                     <x-spinner variant="forest" class="h-5 w-5" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Listing modules…') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Reading `nginx -V` and modules-enabled over SSH.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Reading `nginx -V` and modules-enabled over SSH.') }}</p>
                                 </div>
 
                                 <div
@@ -62,11 +62,11 @@
                                 >
                                     <x-heroicon-o-puzzle-piece class="h-5 w-5 text-brand-mist" aria-hidden="true" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Modules not loaded') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read this server to list installable and enabled dynamic modules.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Read this server to list installable and enabled dynamic modules.') }}</p>
                                     <button
                                         type="button"
                                         wire:click="loadNginxModulesConfig"
-                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Reload from server') }}
@@ -94,7 +94,7 @@
                                 ];
                             @endphp
                             <div class="flex flex-wrap items-center justify-between gap-2">
-                                <p class="text-[11px] text-brand-moss">
+                                <p class="text-xs text-brand-moss">
                                     {{ __(':enabled of :total dynamic modules enabled', ['enabled' => $enabledCount, 'total' => count($nginx_modules_list)]) }}
                                 </p>
                                 <div class="flex flex-wrap gap-1">
@@ -103,14 +103,14 @@
                                             type="button"
                                             wire:click="setNginxModulesFilter('{{ $filterKey }}')"
                                             @class([
-                                                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium transition',
+                                                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition',
                                                 'border-brand-forest bg-brand-forest text-brand-cream' => $nginx_modules_filter === $filterKey,
                                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $nginx_modules_filter !== $filterKey,
                                             ])
                                         >
                                             {{ $filterLabel }}
                                             @if ($filterKey !== 'all')
-                                                <span class="text-[10px] opacity-70">{{ count(array_filter($nginx_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
+                                                <span class="text-2xs opacity-70">{{ count(array_filter($nginx_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -119,7 +119,7 @@
 
                             <div class="mt-2.5 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
                                 <table class="w-full text-left text-xs">
-                                    <thead class="bg-brand-sand/30 text-[11px] uppercase tracking-wide text-brand-mist">
+                                    <thead class="bg-brand-sand/30 text-xs uppercase tracking-wide text-brand-mist">
                                         <tr>
                                             <th class="px-3 py-1.5 font-medium">{{ __('Module') }}</th>
                                             <th class="px-3 py-1.5 font-medium">{{ __('Package') }}</th>
@@ -132,31 +132,31 @@
                                         @foreach ($filtered as $mod)
                                             <tr wire:key="nginx-mod-{{ $mod['name'] }}">
                                                 <td class="px-3 py-1.5 font-mono text-brand-ink">{{ $mod['name'] }}</td>
-                                                <td class="px-3 py-1.5 font-mono text-[11px] text-brand-moss">{{ $mod['package'] ?: '—' }}</td>
+                                                <td class="px-3 py-1.5 font-mono text-xs text-brand-moss">{{ $mod['package'] ?: '—' }}</td>
                                                 <td class="px-3 py-1.5">
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
                                                 </td>
                                                 <td class="px-3 py-1.5">
                                                     @if (! $mod['installed'])
-                                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{{ __('not installed') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800">{{ __('not installed') }}</span>
                                                     @elseif ($mod['enabled'])
-                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('enabled') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('enabled') }}</span>
                                                     @else
-                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('disabled') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold text-brand-moss">{{ __('disabled') }}</span>
                                                     @endif
                                                     @if ($mod['protected'])
-                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700" title="{{ __('Required for dply — disabling is blocked.') }}">{{ __('protected') }}</span>
+                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-700" title="{{ __('Required for dply — disabling is blocked.') }}">{{ __('protected') }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-3 py-1.5 text-right">
                                                     @if ($mod['protected'] && $mod['enabled'])
-                                                        <span class="text-brand-mist text-[11px]">—</span>
+                                                        <span class="text-brand-mist text-xs">—</span>
                                                     @elseif ($mod['enabled'])
                                                         <button
                                                             type="button"
                                                             wire:click="openConfirmActionModal('toggleNginxModule', ['{{ $mod['name'] }}', false], @js(__('Disable module: :name', ['name' => $mod['name']])), @js(__('Remove the modules-enabled symlink for :name? nginx reloads after the change and reverts automatically if `nginx -t` fails.', ['name' => $mod['name']])), @js(__('Disable')), true)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-no-symbol class="h-3 w-3" />
                                                             {{ __('Disable') }}
@@ -166,7 +166,7 @@
                                                             type="button"
                                                             wire:click="toggleNginxModule('{{ $mod['name'] }}', true)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-power class="h-3 w-3" />
                                                             {{ $mod['installed'] ? __('Enable') : __('Install & enable') }}
@@ -182,10 +182,10 @@
                             @if ($nginx_modules_builtins !== [])
                                 <details class="mt-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
                                     <summary class="cursor-pointer text-xs font-semibold text-brand-ink">{{ __('Built-in modules (:n)', ['n' => count($nginx_modules_builtins)]) }}</summary>
-                                    <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Compiled into this nginx binary (`nginx -V`). These cannot be toggled from Dply.') }}</p>
+                                    <p class="mt-1.5 text-xs text-brand-moss">{{ __('Compiled into this nginx binary (`nginx -V`). These cannot be toggled from Dply.') }}</p>
                                     <ul class="mt-2 flex flex-wrap gap-1.5">
                                         @foreach ($nginx_modules_builtins as $builtin)
-                                            <li class="rounded-md bg-white px-2 py-1 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">{{ $builtin['name'] }}</li>
+                                            <li class="rounded-md bg-white px-2 py-1 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">{{ $builtin['name'] }}</li>
                                         @endforeach
                                     </ul>
                                 </details>
@@ -194,7 +194,7 @@
                             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
                                 <x-heroicon-o-puzzle-piece class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
                                 <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('No dynamic module support') }}</p>
-                                <p class="mx-auto mt-0.5 max-w-md text-[11px] leading-relaxed text-brand-moss">
+                                <p class="mx-auto mt-0.5 max-w-md text-xs leading-relaxed text-brand-moss">
                                     {{ __('This nginx binary was built without loadable-module support, so there is no modules-enabled directory to manage. Everything it can do is compiled in — the live table below lists what `nginx -V` reports.') }}
                                 </p>
                             </div>
@@ -220,7 +220,7 @@
                                     type="button"
                                     wire:click="openAddNginxCustomHostForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Add host') }}
@@ -230,7 +230,7 @@
                                     wire:click="loadNginxCustomHostsConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadNginxCustomHostsConfig"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadNginxCustomHostsConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
@@ -279,7 +279,7 @@
                                     <label class="block sm:col-span-2">
                                         <span class="block text-xs font-medium text-brand-ink">{{ __('Upstream (optional)') }}</span>
                                         <input type="text" wire:model.lazy="nginx_custom_hosts_new.upstream" placeholder="unix:/run/php/php8.3-fpm.sock" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('fastcgi_pass or proxy_pass target — PHP socket, upstream name, or http:// backend.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('fastcgi_pass or proxy_pass target — PHP socket, upstream name, or http:// backend.') }}</span>
                                     </label>
                                 </div>
 
@@ -303,16 +303,16 @@
                                 <div wire:loading wire:target="loadNginxCustomHostsConfig" class="flex flex-col items-center">
                                     <x-spinner variant="forest" class="h-5 w-5" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading custom host files…') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Listing dply-custom-*.conf under sites-available over SSH.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Listing dply-custom-*.conf under sites-available over SSH.') }}</p>
                                 </div>
                                 <div wire:loading.remove wire:target="loadNginxCustomHostsConfig" class="flex flex-col items-center">
                                     <x-heroicon-o-globe-alt class="h-5 w-5 text-brand-mist" aria-hidden="true" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Custom hosts not loaded') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read dply-custom-*.conf from this server to edit or remove standalone hosts.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Read dply-custom-*.conf from this server to edit or remove standalone hosts.') }}</p>
                                     <button
                                         type="button"
                                         wire:click="loadNginxCustomHostsConfig"
-                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Reload from server') }}
@@ -323,7 +323,7 @@
                             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
                                 <x-heroicon-o-globe-alt class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
                                 <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('No custom hosts') }}</p>
-                                <p class="mx-auto mt-0.5 max-w-md text-[11px] leading-relaxed text-brand-moss">
+                                <p class="mx-auto mt-0.5 max-w-md text-xs leading-relaxed text-brand-moss">
                                     {{ __('Standalone `server {}` blocks you add here live in dply-custom-*.conf. Site vhosts Dply provisions are managed from the Sites workspace — both show in the live server-block table below.') }}
                                 </p>
                                 <div class="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
@@ -331,7 +331,7 @@
                                         type="button"
                                         wire:click="openAddNginxCustomHostForm"
                                         @disabled($isDeployer || $actionInFlight)
-                                        class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                        class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Add host') }}
@@ -339,7 +339,7 @@
                                     <a
                                         href="{{ route('servers.sites', $server) }}"
                                         wire:navigate
-                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         {{ __('Open Sites') }}
                                         <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -357,13 +357,13 @@
                                     <div class="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p class="font-mono text-sm font-semibold text-brand-ink">dply-custom-{{ $hostSlug }}.conf</p>
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Custom host') }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ __('Custom host') }}</p>
                                         </div>
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('removeNginxCustomHost', [@js($hostSlug)], @js(__('Remove custom host: :slug', ['slug' => $hostSlug])), @js(__('Delete sites-available/dply-custom-:slug.conf and its sites-enabled symlink?', ['slug' => $hostSlug])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
-                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
@@ -420,7 +420,7 @@
                                     type="button"
                                     wire:click="openAddNginxUpstreamForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Add upstream') }}
@@ -430,7 +430,7 @@
                                     wire:click="loadNginxUpstreamsConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadNginxUpstreamsConfig"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadNginxUpstreamsConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
@@ -482,7 +482,7 @@
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                             required
                                         ></textarea>
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Any nginx server-line: `host:port`, `unix:/path`, optionally followed by `weight=N`, `max_fails=N`, `fail_timeout=Ns`, `backup`, `down`.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Any nginx server-line: `host:port`, `unix:/path`, optionally followed by `weight=N`, `max_fails=N`, `fail_timeout=Ns`, `backup`, `down`.') }}</span>
                                     </label>
                                 </div>
 
@@ -523,16 +523,16 @@
                                 <div wire:loading wire:target="loadNginxUpstreamsConfig" class="flex flex-col items-center">
                                     <x-spinner variant="forest" class="h-5 w-5" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading nginx.conf…') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Parsing http-level upstream blocks over SSH.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Parsing http-level upstream blocks over SSH.') }}</p>
                                 </div>
                                 <div wire:loading.remove wire:target="loadNginxUpstreamsConfig" class="flex flex-col items-center">
                                     <x-heroicon-o-arrows-right-left class="h-5 w-5 text-brand-mist" aria-hidden="true" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Upstreams not loaded') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read /etc/nginx/nginx.conf from this server to edit pool members and parameters.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Read /etc/nginx/nginx.conf from this server to edit pool members and parameters.') }}</p>
                                     <button
                                         type="button"
                                         wire:click="loadNginxUpstreamsConfig"
-                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Reload from server') }}
@@ -543,14 +543,14 @@
                             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
                                 <x-heroicon-o-arrows-right-left class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
                                 <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('No shared upstreams') }}</p>
-                                <p class="mx-auto mt-0.5 max-w-md text-[11px] leading-relaxed text-brand-moss">
+                                <p class="mx-auto mt-0.5 max-w-md text-xs leading-relaxed text-brand-moss">
                                     {{ __('Nothing at the http level of nginx.conf yet. Add a pool to load-balance several backends behind one name — per-site fastcgi_pass sockets keep working without one, and every live pool still shows in the table below.') }}
                                 </p>
                                 <button
                                     type="button"
                                     wire:click="openAddNginxUpstreamForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Add upstream') }}
@@ -596,9 +596,9 @@
                                         <span class="min-w-0 flex-1">
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $upstreamName }}</span>
-                                                <span class="text-[11px] text-brand-mist">{{ __(':n backend(s)', ['n' => count($payload['servers'] ?? [])]) }}</span>
+                                                <span class="text-xs text-brand-mist">{{ __(':n backend(s)', ['n' => count($payload['servers'] ?? [])]) }}</span>
                                             </span>
-                                            <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ implode(', ', $payload['servers'] ?? []) ?: '—' }}</span>
+                                            <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ implode(', ', $payload['servers'] ?? []) ?: '—' }}</span>
                                         </span>
                                     </button>
 
@@ -608,7 +608,7 @@
                                                 type="button"
                                                 wire:click="openConfirmActionModal('removeNginxUpstream', ['{{ $upstreamName }}'], @js(__('Remove upstream: :name', ['name' => $upstreamName])), @js(__('Remove the `:name` upstream block? Sites that still `proxy_pass http://:name` will fail to validate on next reload.', ['name' => $upstreamName])), @js(__('Remove')), true)"
                                                 @disabled($isDeployer || $actionInFlight)
-                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Remove') }}
@@ -624,7 +624,7 @@
                                                 spellcheck="false"
                                                 class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                             >{{ $nginx_upstreams_servers_text[$upstreamName] ?? '' }}</textarea>
-                                            <span class="mt-1 block text-[11px] text-brand-mist">{{ __('host:port, unix:/path, optionally with weight=N, max_fails=N, fail_timeout=Ns, backup, down.') }}</span>
+                                            <span class="mt-1 block text-xs text-brand-mist">{{ __('host:port, unix:/path, optionally with weight=N, max_fails=N, fail_timeout=Ns, backup, down.') }}</span>
                                         </label>
 
                                         <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -637,19 +637,19 @@
                                                                 wire:model.live="nginx_upstreams_form.{{ $upstreamName }}.values.{{ $paramKey }}"
                                                                 @checked(($payload['values'][$paramKey] ?? '0') === '1')
                                                                 class="h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
-                                                            <span class="text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                            <span class="text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                         </span>
                                                     @elseif ($meta['type'] === 'int')
                                                         <input type="number"
                                                             wire:model.lazy="nginx_upstreams_form.{{ $upstreamName }}.values.{{ $paramKey }}"
                                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                        <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                        <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                     @else
                                                         <input type="text"
                                                             wire:model.lazy="nginx_upstreams_form.{{ $upstreamName }}.values.{{ $paramKey }}"
                                                             placeholder="{{ $meta['default'] !== '' ? $meta['default'] : '' }}"
                                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                        <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                        <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                     @endif
                                                 </label>
                                             @endforeach
@@ -700,7 +700,7 @@
                                 <a
                                     href="{{ route('servers.cert-inventory', $server) }}"
                                     wire:navigate
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                 >
                                     {{ __('Cert inventory') }}
                                     <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -709,7 +709,7 @@
                             <a
                                 href="{{ route('servers.sites', $server) }}"
                                 wire:navigate
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             >
                                 {{ __('Open Sites') }}
                                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -742,7 +742,7 @@
                         }
                     @endphp
 
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                         <span class="inline-flex items-center gap-1.5">
                             <span class="font-semibold text-brand-ink">{{ trans_choice(':count certificate|:count certificates', count((array) $nginxCertUnits), ['count' => count((array) $nginxCertUnits)]) }}</span>
                             {{ __('in the live config') }}
@@ -819,7 +819,7 @@
                             <span class="shrink-0 text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('nginx global options') }}</span>
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
                             <span
-                                class="min-w-0 flex-1 truncate text-[11px] text-brand-mist"
+                                class="min-w-0 flex-1 truncate text-xs text-brand-mist"
                                 title="{{ __('Top of /etc/nginx/nginx.conf — worker count + rlimits, events block, and http block defaults. Site blocks under sites-enabled / conf.d pass through untouched. Save runs `nginx -t` and reloads; a failed validate auto-restores the previous file.') }}"
                             >
                                 {{ __('Top of /etc/nginx/nginx.conf — worker count + rlimits, events block, and http block defaults. Site blocks under sites-enabled / conf.d pass through untouched. Save runs `nginx -t` and reloads; a failed validate auto-restores the previous file.') }}
@@ -831,7 +831,7 @@
                             wire:loading.attr="disabled"
                             wire:target="loadNginxGlobalsConfig"
                             x-show="expanded"
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadNginxGlobalsConfig" class="inline-flex">
                                 <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
@@ -858,16 +858,16 @@
                                 <div wire:loading.block wire:target="loadNginxGlobalsConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
                                     <x-spinner variant="forest" class="h-5 w-5" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading nginx.conf…') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Parsing worker, events, and http defaults over SSH.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Parsing worker, events, and http defaults over SSH.') }}</p>
                                 </div>
                                 <div wire:loading.remove wire:target="loadNginxGlobalsConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
                                     <x-heroicon-o-cpu-chip class="h-5 w-5 text-brand-mist" aria-hidden="true" />
                                     <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Global options not loaded') }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read the current worker and http defaults from this server to edit them.') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Read the current worker and http defaults from this server to edit them.') }}</p>
                                     <button
                                         type="button"
                                         wire:click="loadNginxGlobalsConfig"
-                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Reload from server') }}
@@ -877,7 +877,7 @@
                         @else
                             <form wire:submit.prevent="saveNginxGlobalsConfig" class="space-y-4">
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Top-level') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Top-level') }}</p>
                                     <div class="mt-2 grid gap-3 sm:grid-cols-2">
                                         @foreach ($nginxTopParams as $paramKey => $meta)
                                             <label class="block">
@@ -891,14 +891,14 @@
                                                         wire:model.lazy="nginx_globals_form.{{ $paramKey }}"
                                                         class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
                                                 @endif
-                                                <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                             </label>
                                         @endforeach
                                     </div>
                                 </div>
 
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('events { … }') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('events { … }') }}</p>
                                     <div class="mt-2 grid gap-3 sm:grid-cols-3">
                                         @foreach ($nginxEventsParams as $paramKey => $meta)
                                             <label class="block">
@@ -909,19 +909,19 @@
                                                             wire:model.live="nginx_globals_form.events_{{ $paramKey }}"
                                                             @checked(($nginx_globals_form['events_'.$paramKey] ?? '0') === '1')
                                                             class="h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
-                                                        <span class="text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                        <span class="text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                     </span>
                                                 @elseif ($meta['type'] === 'int')
                                                     <input type="number"
                                                         wire:model.lazy="nginx_globals_form.events_{{ $paramKey }}"
                                                         class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                    <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                    <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                 @else
                                                     <input type="text"
                                                         wire:model.lazy="nginx_globals_form.events_{{ $paramKey }}"
                                                         placeholder="{{ $meta['default'] !== '' ? $meta['default'] : '' }}"
                                                         class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                    <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                    <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                 @endif
                                             </label>
                                         @endforeach
@@ -929,7 +929,7 @@
                                 </div>
 
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('http { … }') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('http { … }') }}</p>
                                     <div class="mt-2 grid gap-3 sm:grid-cols-2">
                                         @foreach ($nginxHttpParams as $paramKey => $meta)
                                             <label class="block">
@@ -940,18 +940,18 @@
                                                             wire:model.live="nginx_globals_form.http_{{ $paramKey }}"
                                                             @checked(($nginx_globals_form['http_'.$paramKey] ?? '0') === '1')
                                                             class="h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
-                                                        <span class="text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                        <span class="text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                     </span>
                                                 @elseif ($meta['type'] === 'int')
                                                     <input type="number"
                                                         wire:model.lazy="nginx_globals_form.http_{{ $paramKey }}"
                                                         class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                    <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                    <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                 @else
                                                     <input type="text"
                                                         wire:model.lazy="nginx_globals_form.http_{{ $paramKey }}"
                                                         class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                                    <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                                    <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                                 @endif
                                             </label>
                                         @endforeach
@@ -993,7 +993,7 @@
                     >
                         <x-slot:actions>
                             <button type="button" wire:click="loadNginxCacheConfig" wire:loading.attr="disabled" wire:target="loadNginxCacheConfig"
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                 <span wire:loading.remove wire:target="loadNginxCacheConfig" class="inline-flex"><x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" /></span>
                                 <span wire:loading wire:target="loadNginxCacheConfig" class="inline-flex"><x-spinner class="h-3.5 w-3.5" /></span>
                                 {{ __('Reload') }}
@@ -1002,7 +1002,7 @@
                                 wire:click="openConfirmActionModal('purgeNginxEngineCacheConfirmed', [], @js(__('Purge engine cache')), @js(__('Remove all FastCGI and proxy cache files on disk and send PURGE requests to local vhosts?')), @js(__('Purge cache')), true)"
                                 wire:loading.attr="disabled"
                                 @disabled($isDeployer || $actionInFlight || ! $opsReady)
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
                                 <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" />
                                 {{ __('Purge all cache') }}
                             </button>
@@ -1028,16 +1028,16 @@
                             <div wire:loading.block wire:target="loadNginxCacheConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
                                 <x-spinner variant="forest" class="h-5 w-5" />
                                 <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading cache settings…') }}</p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Parsing the shared cache-zone conf over SSH.') }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Parsing the shared cache-zone conf over SSH.') }}</p>
                             </div>
                             <div wire:loading.remove wire:target="loadNginxCacheConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
                                 <x-heroicon-o-bolt class="h-5 w-5 text-brand-mist" aria-hidden="true" />
                                 <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Cache settings not loaded') }}</p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read the zone sizes and inactive windows from this server to edit them.') }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Read the zone sizes and inactive windows from this server to edit them.') }}</p>
                                 <button
                                     type="button"
                                     wire:click="loadNginxCacheConfig"
-                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                 >
                                     <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Reload') }}
@@ -1045,7 +1045,7 @@
                             </div>
                         </div>
                     @else
-                        <dl class="grid gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 text-[11px] sm:grid-cols-2">
+                        <dl class="grid gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 text-xs sm:grid-cols-2">
                             <div><dt class="font-semibold text-brand-moss">{{ __('FastCGI zone') }}</dt><dd class="mt-0.5 break-all font-mono text-brand-ink">{{ $nginx_cache_meta['fcgi_zone'] ?? '—' }} → {{ $nginx_cache_meta['fcgi_path'] ?? '—' }}</dd></div>
                             <div><dt class="font-semibold text-brand-moss">{{ __('Proxy zone') }}</dt><dd class="mt-0.5 break-all font-mono text-brand-ink">{{ $nginx_cache_meta['proxy_zone'] ?? '—' }} → {{ $nginx_cache_meta['proxy_path'] ?? '—' }}</dd></div>
                         </dl>
@@ -1056,7 +1056,7 @@
                                         <span class="block text-xs font-medium text-brand-ink">{{ __($meta['label']) }}</span>
                                         <input type="number" min="1" wire:model.lazy="nginx_cache_form.{{ $paramKey }}"
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white text-sm font-medium text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                        <span class="mt-1 block text-[11px] text-brand-moss">{{ __($meta['help']) }}</span>
+                                        <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
                                     </label>
                                 @endforeach
                             </div>

@@ -69,7 +69,7 @@
                             <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Ops Copilot') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Ops Copilot') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Explain this deploy failure') }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Fleet Copilot assembles the latest failure log, repo config snapshot, intelligence alerts, and heuristic fix suggestions for :site.', ['site' => $site->name]) }}
@@ -81,7 +81,7 @@
                     </div>
                     <div class="flex shrink-0 flex-wrap items-center gap-2 sm:pt-1">
                         @if ($llmEnabled)
-                            <span class="inline-flex items-center rounded-full bg-brand-sand px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center rounded-full bg-brand-sand px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-ink/10">
                                 {{ __('AI ready') }}
                             </span>
                         @endif

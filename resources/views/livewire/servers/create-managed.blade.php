@@ -12,7 +12,7 @@
                     <x-heroicon-o-server class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed server') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed server') }}</p>
                     <h1 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a dply-hosted server') }}</h1>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('We provision and run the VM on dply\'s own infrastructure — no provider account to connect. You pay one all-in monthly price; we handle the underlying hosting.') }}
@@ -92,7 +92,7 @@
                                     </span>
                                 @endif
                             </span>
-                            <span class="shrink-0 rounded-full bg-brand-forest/10 px-2.5 py-1 text-[11px] font-semibold text-brand-forest">{{ __('Free in beta') }}</span>
+                            <span class="shrink-0 rounded-full bg-brand-forest/10 px-2.5 py-1 text-xs font-semibold text-brand-forest">{{ __('Free in beta') }}</span>
                         </div>
                     @else
                     <div class="mt-2 grid gap-3 sm:grid-cols-2">
@@ -108,7 +108,7 @@
                                 </span>
                                 <span class="shrink-0 text-right">
                                     <span class="block text-sm font-semibold text-brand-ink">${{ number_format($option['monthly_cents'] / 100, 2) }}</span>
-                                    <span class="block text-[11px] text-brand-moss">{{ __('/mo') }}</span>
+                                    <span class="block text-xs text-brand-moss">{{ __('/mo') }}</span>
                                 </span>
                             </label>
                         @endforeach
@@ -139,10 +139,10 @@
                     <div class="text-right shrink-0">
                         @if ($isBeta)
                             <p class="text-lg font-bold text-brand-forest">{{ __('Free') }}</p>
-                            <p class="text-[11px] text-brand-moss line-through">${{ number_format($selectedMonthlyCents / 100, 2) }}{{ __('/mo') }}</p>
+                            <p class="text-xs text-brand-moss line-through">${{ number_format($selectedMonthlyCents / 100, 2) }}{{ __('/mo') }}</p>
                         @else
                             <p class="text-lg font-bold text-brand-ink">${{ number_format($selectedMonthlyCents / 100, 2) }}</p>
-                            <p class="text-[11px] text-brand-moss">{{ __('/mo') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('/mo') }}</p>
                         @endif
                     </div>
                 </div>

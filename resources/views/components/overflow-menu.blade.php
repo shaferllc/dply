@@ -13,7 +13,7 @@
         type="button"
         x-on:click="open = ! open"
         x-bind:aria-expanded="open"
-        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+        class="inline-flex items-center justify-center rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
         title="{{ $label ?? __('More actions') }}"
         aria-label="{{ $label ?? __('More actions') }}"
     >

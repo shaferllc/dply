@@ -26,7 +26,7 @@
                             <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $provider ?: __('Repository') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $provider ?: __('Repository') }}</p>
                             @if ($remoteLabel)
                                 <h2 class="mt-0.5 truncate text-base font-semibold text-brand-ink" title="{{ $remoteLabel }}">{{ $remoteLabel }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent commits from your connected Git provider, filtered by branch and message.') }}</p>
@@ -134,13 +134,13 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="font-mono text-xs font-semibold text-brand-sage bg-brand-sand/60 px-1.5 py-0.5 rounded">{{ $c['short_sha'] }}</span>
                                         @if ($shaMatch)
-                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 ring-1 ring-green-200">{{ __('Deployed') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-green-800 ring-1 ring-green-200">{{ __('Deployed') }}</span>
                                         @endif
                                     </div>
                                     <p class="mt-2 font-medium text-brand-ink text-sm leading-snug break-words">{{ $c['message'] }}</p>
                                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                                         <span class="inline-flex items-center gap-1.5">
-                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-ink/10 text-[10px] font-bold text-brand-ink" aria-hidden="true">
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-ink/10 text-2xs font-bold text-brand-ink" aria-hidden="true">
                                                 {{ strtoupper(mb_substr($c['author_name'], 0, 1)) }}
                                             </span>
                                             {{ $c['author_name'] }}
@@ -156,7 +156,7 @@
                                             href="{{ $c['html_url'] }}"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors !py-2 !px-3 !text-[11px]"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors !py-2 !px-3 !text-xs"
                                         >
                                             {{ __('View commit') }}
                                         </a>

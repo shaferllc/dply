@@ -166,14 +166,14 @@
 
             {{-- Packets lost stat --}}
             <div class="pointer-events-none absolute bottom-3 left-0 right-0 flex justify-center" x-show="!restored">
-                <span class="rounded-md bg-brand-ink/60 px-2 py-0.5 font-mono text-[10px] text-brand-gold/80 backdrop-blur-sm">
+                <span class="rounded-md bg-brand-ink/60 px-2 py-0.5 font-mono text-2xs text-brand-gold/80 backdrop-blur-sm">
                     {{ __('packets lost: 404') }}
                 </span>
             </div>
         </div>
 
         {{-- Konami hint (tiny, fades in after a few seconds) --}}
-        <p class="not-found-konami-hint mt-2 text-center font-mono text-[10px] text-brand-moss/30 select-none">↑↑↓↓←→←→BA</p>
+        <p class="not-found-konami-hint mt-2 text-center font-mono text-2xs text-brand-moss/30 select-none">↑↑↓↓←→←→BA</p>
     </div>
 
     <p
@@ -238,7 +238,7 @@
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-rust/90"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-gold/90"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-sage/90"></span>
-                <span class="ml-1 text-[10px] font-semibold uppercase tracking-widest text-brand-mist">{{ __('Route trace') }}</span>
+                <span class="ml-1 text-2xs font-semibold uppercase tracking-widest text-brand-mist">{{ __('Route trace') }}</span>
             </div>
             <ul class="max-h-48 space-y-0.5 overflow-y-auto px-3 py-3 font-mono text-xs leading-relaxed text-brand-sand/90">
                 <template x-for="(line, index) in logs" :key="index">

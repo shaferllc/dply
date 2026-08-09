@@ -25,7 +25,7 @@
                         <div class="min-w-0 flex-1">
                             <h2 class="text-sm font-semibold text-amber-900">{{ __('Save this identity now — it is shown once') }}</h2>
                             <p class="mt-1 text-sm text-amber-800">{{ __('dply does NOT keep a copy. You must supply this to deploy or reveal customer-held secrets. Lose it and those secrets are unrecoverable.') }}</p>
-                            <pre class="mt-3 overflow-x-auto rounded-lg border border-amber-300 bg-white p-3 font-mono text-[11px] text-brand-ink">{{ $revealed_identity }}</pre>
+                            <pre class="mt-3 overflow-x-auto rounded-lg border border-amber-300 bg-white p-3 font-mono text-xs text-brand-ink">{{ $revealed_identity }}</pre>
                             <div class="mt-3">
                                 <x-secondary-button type="button" wire:click="dismissIdentity">{{ __('I have saved it') }}</x-secondary-button>
                             </div>
@@ -40,7 +40,7 @@
                         <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Residency') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Residency') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Encryption key') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Who holds the key that encrypts secrets moved out of plaintext .env.') }}</p>
                     </div>
@@ -49,25 +49,25 @@
                     @if ($orgKey)
                         <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
-                                <dt class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Held by') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Held by') }}</dt>
                                 <dd class="mt-1 text-sm text-brand-ink">
                                     @if ($orgKey->identity_holder === \App\Models\OrgSecretKey::HOLDER_CUSTOMER)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-2 py-0.5 text-[11px] font-semibold text-brand-forest ring-1 ring-inset ring-brand-forest/20">{{ __('You (customer-held)') }}</span>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-2 py-0.5 text-xs font-semibold text-brand-forest ring-1 ring-inset ring-brand-forest/20">{{ __('You (customer-held)') }}</span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/55 px-2 py-0.5 text-[11px] font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ __('dply-managed') }}</span>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/55 px-2 py-0.5 text-xs font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ __('dply-managed') }}</span>
                                     @endif
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Fingerprint') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Fingerprint') }}</dt>
                                 <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $orgKey->fingerprint ?: '—' }}</dd>
                             </div>
                             <div>
-                                <dt class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('dply can decrypt') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('dply can decrypt') }}</dt>
                                 <dd class="mt-1 text-sm text-brand-ink">{{ $orgKey->dplyCanDecrypt() ? __('Yes') : __('No') }}</dd>
                             </div>
                         </dl>
-                        <p class="break-all font-mono text-[11px] text-brand-moss">{{ $orgKey->public_recipient }}</p>
+                        <p class="break-all font-mono text-xs text-brand-moss">{{ $orgKey->public_recipient }}</p>
                     @else
                         <p class="text-sm text-brand-moss">{{ __('No key yet — dply mints a managed key automatically the first time you move a secret to the org key. Or establish a customer-held key below.') }}</p>
                     @endif
@@ -102,7 +102,7 @@
                         <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('External') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('External') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('External secret stores') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Reference secrets that live in your own store; the value never enters dply.') }}</p>
                     </div>
@@ -114,7 +114,7 @@
                             <li class="flex items-center justify-between gap-3 px-5 py-3 sm:px-6" wire:key="store-{{ $store->id }}">
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $store->name }}</p>
-                                    <p class="text-[11px] text-brand-moss">
+                                    <p class="text-xs text-brand-moss">
                                         {{ strtoupper($store->driver) }} ·
                                         {{ $store->resolution === \App\Models\ExternalSecretStore::RESOLUTION_ONBOX ? __('resolved on the server (dply never sees values)') : __('resolved by dply at deploy') }}
                                     </p>

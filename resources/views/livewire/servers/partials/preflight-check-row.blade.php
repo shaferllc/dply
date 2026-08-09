@@ -66,7 +66,7 @@
                 </div>
             @endif
         </div>
-        <span class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em]">
+        <span class="shrink-0 text-xs font-semibold uppercase tracking-[0.16em]">
             {{ $check['blocking'] ? __('Blocking') : match ($check['severity']) {
                 'warning' => __('Warning'),
                 default => __('Ready'),

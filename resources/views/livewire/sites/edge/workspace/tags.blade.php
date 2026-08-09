@@ -38,7 +38,7 @@
             </label>
 
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 dark:bg-brand-sand/10 sm:px-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Click to add a starter script URL, then replace the placeholder ID with yours before Save.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($examples as $example)
@@ -108,7 +108,7 @@
                         <dd class="text-brand-moss">{{ __('Required in repo') }}</dd>
                     @endif
                 </dl>
-                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
+                <p class="mt-2 text-xs text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
             @else
                 <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
             @endif

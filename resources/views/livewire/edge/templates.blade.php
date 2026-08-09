@@ -20,11 +20,11 @@
 
     @if ($tags !== [])
         <div class="mt-6 flex flex-wrap items-center gap-2">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Filter') }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Filter') }}</span>
             <button type="button"
                     wire:click="setFilter('')"
                     @class([
-                        'rounded-full px-3 py-1 text-[11px] font-semibold transition',
+                        'rounded-full px-3 py-1 text-xs font-semibold transition',
                         'bg-brand-ink text-white' => $filterTag === '',
                         'bg-brand-sand/30 text-brand-moss hover:bg-brand-sand/60' => $filterTag !== '',
                     ])>{{ __('All') }}</button>
@@ -32,7 +32,7 @@
                 <button type="button"
                         wire:click="setFilter('{{ $tag }}')"
                         @class([
-                            'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition',
+                            'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
                             'bg-brand-ink text-white' => $filterTag === $tag,
                             'bg-brand-sand/30 text-brand-moss hover:bg-brand-sand/60' => $filterTag !== $tag,
                         ])>{{ $tag }}</button>
@@ -63,7 +63,7 @@
                         </div>
                         <div class="px-5 pt-4">
                             <h2 class="text-sm font-semibold text-brand-ink">{{ $template['name'] }}</h2>
-                            <p class="mt-0.5 font-mono text-[10px] text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
+                            <p class="mt-0.5 font-mono text-2xs text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
                         </div>
                     @else
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4">
@@ -72,7 +72,7 @@
                             </span>
                             <div class="min-w-0">
                                 <h2 class="text-sm font-semibold text-brand-ink">{{ $template['name'] }}</h2>
-                                <p class="mt-0.5 font-mono text-[10px] text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
+                                <p class="mt-0.5 font-mono text-2xs text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
                             </div>
                         </div>
                     @endif
@@ -80,15 +80,15 @@
                     @if (! empty($template['tags']))
                         <div class="flex flex-wrap gap-1.5 px-5 pb-3">
                             @foreach ($template['tags'] as $tag)
-                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $tag }}</span>
+                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $tag }}</span>
                             @endforeach
                         </div>
                     @endif
                     <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $template['framework'] ?? 'static' }} · {{ $template['runtime_mode'] ?? 'static' }}</span>
+                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $template['framework'] ?? 'static' }} · {{ $template['runtime_mode'] ?? 'static' }}</span>
                         <a href="{{ $deployUrl }}"
                            wire:navigate
-                           class="inline-flex items-center gap-1 rounded-lg bg-brand-ink px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90">
+                           class="inline-flex items-center gap-1 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90">
                             {{ __('Deploy') }} <span aria-hidden="true">→</span>
                         </a>
                     </div>

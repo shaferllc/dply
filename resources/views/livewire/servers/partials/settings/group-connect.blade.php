@@ -464,22 +464,22 @@
             @endphp
             <dl class="grid gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                     <dd class="mt-1 flex items-center gap-2 text-sm font-medium text-brand-ink">
                         <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
                         <span>{{ __($server->status) }}@if ($server->health_status) <span class="text-brand-mist">/</span> {{ __($server->health_status) }}@endif</span>
                     </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $providerLine }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
                     <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
                 </div>
                 @php
@@ -495,19 +495,19 @@
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3 sm:col-span-2">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
                             <dd class="mt-1 font-mono text-sm font-medium text-brand-ink">{{ $server->size ?: '—' }}</dd>
                             @if ($specBits !== [])
                                 <p class="mt-0.5 text-xs text-brand-moss">{{ implode(' · ', $specBits) }}</p>
                             @endif
                             @if (is_array($providerSpec) && ! empty($providerSpec['size_changed_from']))
-                                <p class="mt-1 text-[11px] text-emerald-700">{{ __('Resize detected — was :old', ['old' => $providerSpec['size_changed_from']]) }}</p>
+                                <p class="mt-1 text-xs text-emerald-700">{{ __('Resize detected — was :old', ['old' => $providerSpec['size_changed_from']]) }}</p>
                             @endif
                             @if (is_array($providerSpec) && ! empty($providerSpec['synced_at']))
-                                <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Verified with provider :ago', ['ago' => \Illuminate\Support\Carbon::parse($providerSpec['synced_at'])->diffForHumans()]) }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">{{ __('Verified with provider :ago', ['ago' => \Illuminate\Support\Carbon::parse($providerSpec['synced_at'])->diffForHumans()]) }}</p>
                             @endif
                             @if (is_array($providerSpecError))
-                                <p class="mt-1 text-[11px] text-rose-700">{{ __('Last verify failed: :msg', ['msg' => $providerSpecError['message'] ?? __('unknown error')]) }}</p>
+                                <p class="mt-1 text-xs text-rose-700">{{ __('Last verify failed: :msg', ['msg' => $providerSpecError['message'] ?? __('unknown error')]) }}</p>
                             @endif
                         </div>
                         {{-- Post-resize re-sync: re-reads size/region/specs from the
@@ -526,11 +526,11 @@
                     </div>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inventory last checked') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inventory last checked') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ ($invAt ?? null) ? \Illuminate\Support\Carbon::parse($invAt)->timezone(config('app.timezone'))->toDayDateTimeString() : '—' }}</dd>
                 </div>
             </dl>

@@ -67,7 +67,7 @@
                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Network access') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Network access') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-mist">
                         {{ __('Dedicated database hosts usually serve app servers on your VPC. Pick a trusted CIDR and dply opens the engine port in UFW.') }}
                     </p>
@@ -105,7 +105,7 @@
                 >
                     <span class="flex items-center gap-2">
                         <span class="text-sm font-semibold text-brand-ink">{{ __('Other servers on my network') }}</span>
-                        <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Recommended') }}</span>
+                        <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Recommended') }}</span>
                     </span>
                     <p class="mt-2 text-xs leading-relaxed text-brand-moss">{{ __('Listen on all interfaces, open port :port, and add a UFW allow rule for a trusted CIDR.', ['port' => $dbPort]) }}</p>
                 </button>
@@ -135,7 +135,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('form.database_allowed_from', @js($nextWithNet))"
-                                    class="rounded-full bg-sky-50 px-2.5 py-1 font-mono text-[11px] font-medium text-sky-800 ring-1 ring-sky-200 transition hover:bg-sky-100"
+                                    class="rounded-full bg-sky-50 px-2.5 py-1 font-mono text-xs font-medium text-sky-800 ring-1 ring-sky-200 transition hover:bg-sky-100"
                                     title="{{ __('Allow the private network this server attaches to') }}"
                                 >
                                     + {{ __('this network') }} ({{ $networkCidr }})
@@ -149,7 +149,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('form.database_allowed_from', @js($nextAllowedFrom))"
-                                    class="rounded-full bg-brand-sand/40 px-2.5 py-1 font-mono text-[11px] font-medium text-brand-forest transition hover:bg-brand-sage/15 hover:ring-1 hover:ring-brand-sage/30"
+                                    class="rounded-full bg-brand-sand/40 px-2.5 py-1 font-mono text-xs font-medium text-brand-forest transition hover:bg-brand-sage/15 hover:ring-1 hover:ring-brand-sage/30"
                                 >
                                     + {{ $exampleCidr }}
                                 </button>
@@ -162,7 +162,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('form.database_allowed_from', @js($nextWithIp))"
-                                    class="rounded-full bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-100"
+                                    class="rounded-full bg-emerald-50 px-2.5 py-1 font-mono text-xs font-medium text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-100"
                                 >
                                     + {{ __('your IP') }} ({{ $operatorPublicIp }}/32)
                                 </button>
@@ -183,7 +183,7 @@
     @endif
 
     <div class="rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.02] p-4 sm:p-5">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Provision preview') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Provision preview') }}</p>
         <ul class="mt-3 space-y-2 text-sm text-brand-ink">
             <li class="flex items-start gap-2">
                 <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />

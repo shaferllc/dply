@@ -30,7 +30,7 @@
             :breadcrumb="$breadcrumbs"
         >
             <x-slot:actions>
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                     {{ ucfirst($app->status) }}
                 </span>
                 @if ($canManage)
@@ -50,22 +50,22 @@
                     <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="{{ __('App at a glance') }}">
                         <x-fleet-stat :label="__('Tier')">
                             <p class="mt-2 text-sm font-semibold text-brand-forest">{{ $tier['label'] }}</p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $money($app->priceCents()) }}/{{ __('mo') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ $money($app->priceCents()) }}/{{ __('mo') }}</p>
                         </x-fleet-stat>
                         <x-fleet-stat :label="__('Peak')">
                             <p class="mt-2 flex items-baseline gap-1">
                                 <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format((int) ($app->peak_connections ?? 0)) }}</span>
-                                <span class="text-[11px] text-brand-moss">/ {{ number_format($tier['max_connections']) }}</span>
+                                <span class="text-xs text-brand-moss">/ {{ number_format($tier['max_connections']) }}</span>
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('peak conns') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('peak conns') }}</p>
                         </x-fleet-stat>
                         <x-fleet-stat :label="__('Status')">
                             <p class="mt-2 text-sm font-semibold text-brand-ink">{{ ucfirst($app->status) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Relay state') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Relay state') }}</p>
                         </x-fleet-stat>
                         <x-fleet-stat :label="__('Sites')">
                             <p class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format($sites->count()) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Attached') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Attached') }}</p>
                         </x-fleet-stat>
                     </dl>
                 </div>
@@ -95,37 +95,37 @@
                 <div class="flex items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Live stats') }}</h3>
                     <button type="button" wire:click="refreshStats" wire:loading.attr="disabled" wire:target="refreshStats"
-                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5 text-brand-forest" wire:loading.class="animate-spin" wire:target="refreshStats" /> {{ __('Refresh') }}
                     </button>
                 </div>
 
                 <div class="mt-4 grid gap-4 sm:grid-cols-4">
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Live now') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Live now') }}</p>
                         <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $liveConnections !== null ? number_format($liveConnections) : '—' }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('current connections') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('current connections') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Peak') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Peak') }}</p>
                         <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ number_format($peak) }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('since last reset') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('since last reset') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Tier cap') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Tier cap') }}</p>
                         <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ number_format($cap) }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ $tier['label'] }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $tier['label'] }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Headroom') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Headroom') }}</p>
                         <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ number_format($headroom) }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('before the cap') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('before the cap') }}</p>
                     </div>
                 </div>
 
                 {{-- Peak vs. tier-cap utilization. --}}
                 <div class="mt-4">
-                    <div class="flex items-center justify-between text-[11px] text-brand-moss">
+                    <div class="flex items-center justify-between text-xs text-brand-moss">
                         <span>{{ __('Peak utilization') }}</span>
                         <span class="font-semibold {{ $util >= 90 ? 'text-red-600' : ($util >= 75 ? 'text-amber-600' : 'text-brand-forest') }}">{{ $util }}%</span>
                     </div>
@@ -133,7 +133,7 @@
                         <div class="h-full rounded-full {{ $util >= 90 ? 'bg-red-500' : ($util >= 75 ? 'bg-amber-500' : 'bg-brand-forest') }}" style="width: {{ max(2, $util) }}%"></div>
                     </div>
                     @if ($util >= 90)
-                        <p class="mt-1.5 text-[11px] text-red-600">{{ __('Near the tier cap — connections beyond it are rejected. Consider a higher tier.') }}</p>
+                        <p class="mt-1.5 text-xs text-red-600">{{ __('Near the tier cap — connections beyond it are rejected. Consider a higher tier.') }}</p>
                     @endif
                 </div>
 
@@ -151,27 +151,27 @@
                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Details') }}</h3>
                 <dl class="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</dt>
                         <dd class="mt-0.5 text-sm text-brand-ink">{{ ucfirst($app->status) }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Monthly charge') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Monthly charge') }}</dt>
                         <dd class="mt-0.5 text-sm font-semibold text-brand-forest">{{ $money($app->priceCents()) }}/{{ __('mo') }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Tier') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Tier') }}</dt>
                         <dd class="mt-0.5 text-sm text-brand-ink">{{ $tier['label'] }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Backend') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Backend') }}</dt>
                         <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $app->backend }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Created') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Created') }}</dt>
                         <dd class="mt-0.5 text-sm text-brand-ink">{{ $app->created_at?->diffForHumans() }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Attached sites') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Attached sites') }}</dt>
                         <dd class="mt-0.5 text-sm text-brand-ink">{{ number_format($sites->count()) }}</dd>
                     </div>
                 </dl>
@@ -190,16 +190,16 @@
                                         async copyVal() { try { await navigator.clipboard.writeText(@js($cred['value'])); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }">
                                     <dt class="shrink-0 text-xs font-medium text-brand-moss">{{ $cred['label'] }}</dt>
                                     <dd class="flex min-w-0 items-center gap-2">
-                                        <span class="truncate font-mono text-[11px] text-brand-ink">
+                                        <span class="truncate font-mono text-xs text-brand-ink">
                                             <span x-show="show" x-cloak>{{ $cred['value'] === '' ? '—' : $cred['value'] }}</span>
                                             <span x-show="! show">••••••••••••</span>
                                         </span>
                                         @if ($cred['secret'])
-                                            <button type="button" @click="show = ! show" class="shrink-0 text-[11px] font-semibold text-brand-sage hover:underline">
+                                            <button type="button" @click="show = ! show" class="shrink-0 text-xs font-semibold text-brand-sage hover:underline">
                                                 <span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span>
                                             </button>
                                         @endif
-                                        <button type="button" @click="copyVal()" class="shrink-0 text-[11px] font-semibold text-brand-sage hover:underline">
+                                        <button type="button" @click="copyVal()" class="shrink-0 text-xs font-semibold text-brand-sage hover:underline">
                                             <span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span>
                                         </button>
                                     </dd>
@@ -254,7 +254,7 @@
                     @foreach ($tiers as $slug => $tierOption)
                         <button type="button" wire:click="$set('selectedTier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $selectedTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
                             <div class="text-sm font-semibold text-brand-ink">{{ $tierOption['label'] }}</div>
-                            <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tierOption['max_connections']) }} {{ __('connections') }}</div>
+                            <div class="mt-0.5 text-xs text-brand-moss">{{ number_format($tierOption['max_connections']) }} {{ __('connections') }}</div>
                             <div class="mt-1 text-xs font-semibold text-brand-forest">{{ $money((int) $tierOption['price_cents']) }}/{{ __('mo') }}</div>
                         </button>
                     @endforeach

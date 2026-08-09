@@ -72,12 +72,12 @@
         >
             <x-slot:actions>
                 @if ($anyExposed)
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-amber-200">
                         <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                         {{ __(':n exposed', ['n' => $engineDatabases->where('remote_access', true)->count()]) }}
                     </span>
                 @else
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                         <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                         {{ __('Localhost only') }}
                     </span>
@@ -103,16 +103,16 @@
                 <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</p>
                 @if ($db->username)
                     <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                    <p class="truncate font-mono text-[11px] text-brand-mist">{{ $db->username }}</p>
+                    <p class="truncate font-mono text-xs text-brand-mist">{{ $db->username }}</p>
                 @endif
                 <div class="ml-auto flex shrink-0 items-center gap-1.5">
                     @if ($dbRemote)
-                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-amber-200">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                             {{ __('Exposed · :cidr', ['cidr' => $dbCidr]) }}
                         </span>
                     @else
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
                             {{ __('Localhost only') }}
                         </span>
                     @endif
@@ -153,7 +153,7 @@
                             @error('db_networking_allowed_from.'.$db->id)
                                 <p class="text-xs text-rose-700">{{ $message }}</p>
                             @enderror
-                            <p class="text-[11px] text-brand-moss">{{ __('Required · 10.0.0.0/8 for a VPC · 203.0.113.5/32 for one app server') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Required · 10.0.0.0/8 for a VPC · 203.0.113.5/32 for one app server') }}</p>
                         </div>
                         <button
                             type="button"

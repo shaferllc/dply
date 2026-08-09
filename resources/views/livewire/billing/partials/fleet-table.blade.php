@@ -10,7 +10,7 @@
             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fleet') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fleet') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your fleet') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Servers dply is tracking. Ready, mature servers count toward your bill — fresh or paused servers don\'t.') }}

@@ -170,7 +170,7 @@
                                         <span class="flex items-center justify-between gap-2">
                                             <span class="truncate">{{ $org->name }}</span>
                                             @if ($currentOrgId == $org->id)
-                                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
                                             @endif
                                         </span>
                                     </x-dropdown-link>
@@ -255,15 +255,15 @@
                 <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
                 @if ($user)
                     <p class="mt-0.5 truncate text-sm font-semibold text-brand-ink" title="{{ $user->name }}">{{ $user->name }}</p>
-                    <p class="mt-0.5 truncate text-[11px] text-brand-mist" title="{{ $user->email }}">{{ $user->email }}</p>
+                    <p class="mt-0.5 truncate text-xs text-brand-mist" title="{{ $user->email }}">{{ $user->email }}</p>
                 @endif
             </div>
         </div>
 
-        <p class="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
+        <p class="mt-4 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
         <nav class="{{ $accountNavClass }}" aria-label="{{ __('Account settings') }}">
             <a
                 href="{{ route('profile.api-keys') }}"
@@ -344,11 +344,11 @@
 
         <div class="mt-5 border-t border-brand-ink/10 pt-4">
             <div class="flex items-center justify-between gap-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Organizations') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Organizations') }}</p>
                 <a
                     href="{{ route('organizations.create') }}"
                     wire:navigate
-                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-sage hover:text-brand-ink"
+                    class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink"
                     title="{{ __('New organization') }}"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -374,7 +374,7 @@
                         <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
                             <span class="truncate">{{ $org->name }}</span>
                             @if ($currentOrgId == $org->id)
-                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
                             @endif
                         </span>
                     </a>
@@ -383,7 +383,7 @@
         </div>
 
         <div class="mt-5 border-t border-brand-ink/10 pt-4">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
             <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
                 <a
                     href="{{ route('docs.index') }}"

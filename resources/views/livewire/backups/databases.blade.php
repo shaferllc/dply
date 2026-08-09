@@ -36,7 +36,7 @@
                     <a
                         href="{{ route('profile.backup-configurations') }}"
                         wire:navigate
-                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-archive-box-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
                         {{ __('Destinations') }}
@@ -81,7 +81,7 @@
                     <dl class="grid grid-cols-2 gap-px bg-brand-ink/5 sm:grid-cols-3 lg:grid-cols-5">
                         @foreach ($metricCards as $card)
                             <div class="bg-white px-3 py-2">
-                                <dt class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <dt class="flex items-center gap-1 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <x-dynamic-component :component="$card['icon']" class="h-3.5 w-3.5 shrink-0 {{ $card['tone'] }}" aria-hidden="true" />
                                     <span class="truncate">{{ $card['label'] }}</span>
                                 </dt>
@@ -119,7 +119,7 @@
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead>
-                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                         <th class="px-3 py-2 sm:px-4">{{ __('Server') }}</th>
                                         <th class="px-3 py-2">{{ __('Target') }}</th>
                                         <th class="px-3 py-2">{{ __('Cadence') }}</th>
@@ -141,7 +141,7 @@
                                                 <div class="flex flex-col gap-0.5">
                                                     <span class="font-medium text-brand-ink">{{ $schedule->targetLabel() }}</span>
                                                     <span @class([
-                                                        'inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                                        'inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                                         'bg-brand-forest/10 text-brand-forest' => $schedule->target_type === 'database',
                                                         'bg-brand-gold/20 text-amber-800' => $schedule->target_type !== 'database',
                                                     ])>
@@ -152,17 +152,17 @@
                                             <td class="px-3 py-2 text-xs text-brand-moss">
                                                 <span class="font-mono">{{ $schedule->cron_expression }}</span>
                                                 @if ($cronDesc = $schedule->cronDescription())
-                                                    <span class="mt-0.5 block text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-mist">{{ $cronDesc }}</span>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if ($schedule->is_active)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-semibold text-brand-forest">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-semibold text-brand-forest">
                                                         <span class="h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
                                                         {{ __('Active') }}
                                                     </span>
                                                 @else
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[11px] font-semibold text-brand-mist">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-mist">
                                                         <span class="h-1.5 w-1.5 rounded-full bg-brand-mist" aria-hidden="true"></span>
                                                         {{ __('Paused') }}
                                                     </span>
@@ -180,7 +180,7 @@
                                                         type="button"
                                                         wire:click="runScheduleNow('{{ $schedule->id }}')"
                                                         wire:loading.attr="disabled"
-                                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                                         title="{{ __('Run now') }}"
                                                     >
                                                         <x-heroicon-o-play class="h-3.5 w-3.5" aria-hidden="true" />
@@ -190,7 +190,7 @@
                                                         type="button"
                                                         wire:click="toggleSchedule('{{ $schedule->id }}')"
                                                         wire:loading.attr="disabled"
-                                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                                         title="{{ $schedule->is_active ? __('Pause') : __('Resume') }}"
                                                     >
                                                         @if ($schedule->is_active)
@@ -230,7 +230,7 @@
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead>
-                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                         <th class="px-3 py-2 sm:px-4">{{ __('Database') }}</th>
                                         <th class="px-3 py-2">{{ __('Server') }}</th>
                                         <th class="px-3 py-2">{{ __('Engine') }}</th>
@@ -273,7 +273,7 @@
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead>
-                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                         <th class="px-3 py-2 sm:px-4">{{ __('Status') }}</th>
                                         <th class="px-3 py-2">{{ __('Server / Database') }}</th>
                                         <th class="px-3 py-2">{{ __('Size') }}</th>
@@ -286,17 +286,17 @@
                                         <tr wire:key="run-{{ $run->id }}" class="hover:bg-brand-sand/10">
                                             <td class="px-3 py-2 sm:px-4">
                                                 @if ($run->status === 'completed')
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-semibold text-brand-forest">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-semibold text-brand-forest">
                                                         <x-heroicon-m-check class="h-3 w-3" aria-hidden="true" />
                                                         {{ __('Done') }}
                                                     </span>
                                                 @elseif ($run->status === 'failed')
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-rust/10 px-2 py-0.5 text-[11px] font-semibold text-brand-rust">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-rust/10 px-2 py-0.5 text-xs font-semibold text-brand-rust">
                                                         <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
                                                         {{ __('Failed') }}
                                                     </span>
                                                 @else
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-gold/20 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-gold/20 px-2 py-0.5 text-xs font-semibold text-amber-800">
                                                         <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" aria-hidden="true"></span>
                                                         {{ __('Pending') }}
                                                     </span>
@@ -340,7 +340,7 @@
                             <a
                                 href="{{ route('profile.backup-configurations') }}"
                                 wire:navigate
-                                class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             >
                                 <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
                                 {{ __('Add') }}
@@ -373,7 +373,7 @@
                                     </span>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-brand-ink">{{ $destination->name }}</p>
-                                        <p class="text-[11px] text-brand-mist">
+                                        <p class="text-xs text-brand-mist">
                                             {{ \App\Models\BackupConfiguration::labelForProvider($destination->provider) }}
                                             @if ($usedBy > 0)
                                                 · {{ trans_choice(':count schedule|:count schedules', $usedBy, ['count' => $usedBy]) }}

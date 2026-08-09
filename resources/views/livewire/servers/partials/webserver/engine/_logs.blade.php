@@ -57,7 +57,7 @@
                                 <div class="inline-flex items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm" role="group" aria-label="{{ __('Log source') }}">
                                     @foreach ($logKinds as $logKind)
                                         <button type="button" wire:click="refreshWebserverLog('{{ $logKind['key'] }}')" @class([
-                                            'inline-flex h-6 items-center rounded-md px-2 text-[11px] font-semibold transition',
+                                            'inline-flex h-6 items-center rounded-md px-2 text-xs font-semibold transition',
                                             'bg-brand-ink text-brand-cream shadow-sm' => $log_kind === $logKind['key'],
                                             'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $log_kind !== $logKind['key'],
                                         ])>{{ $logKind['label'] }}</button>
@@ -65,7 +65,7 @@
                                 </div>
                             @endif
 
-                            <button type="button" wire:click="refreshWebserverLog" wire:loading.attr="disabled" wire:target="refreshWebserverLog" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60">
+                            <button type="button" wire:click="refreshWebserverLog" wire:loading.attr="disabled" wire:target="refreshWebserverLog" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60">
                                 <span wire:loading.remove wire:target="refreshWebserverLog" class="inline-flex">
                                     <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 </span>
@@ -75,7 +75,7 @@
                                 {{ __('Refresh') }}
                             </button>
                             <button type="button" wire:click="toggleWebserverLogLive" @class([
-                                'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold shadow-sm transition',
+                                'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold shadow-sm transition',
                                 'border-emerald-300 bg-emerald-50 text-emerald-900' => $log_live,
                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_live,
                             ])>
@@ -88,7 +88,7 @@
                             </button>
                             @if ($log_kind === 'access' && ($accessLog['structured'] || $log_raw) && $log_output !== '')
                                 <button type="button" wire:click="toggleWebserverLogRaw" @class([
-                                    'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold shadow-sm transition',
+                                    'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold shadow-sm transition',
                                     'border-brand-ink bg-brand-ink text-brand-cream' => $log_raw,
                                     'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_raw,
                                 ])>
@@ -96,9 +96,9 @@
                                     {{ __('Raw') }}
                                 </button>
                             @endif
-                            <span class="ml-auto inline-flex items-center gap-1 text-[11px] text-brand-moss">
+                            <span class="ml-auto inline-flex items-center gap-1 text-xs text-brand-moss">
                                 {{ __('Lines:') }}
-                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="h-6 rounded-md border border-brand-ink/15 bg-white py-0 pl-2 pr-7 text-[11px] font-semibold text-brand-ink">
+                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="h-6 rounded-md border border-brand-ink/15 bg-white py-0 pl-2 pr-7 text-xs font-semibold text-brand-ink">
                                     @foreach ([100, 300, 500, 1000, 2000] as $n)
                                         <option value="{{ $n }}" @selected($log_lines === $n)>{{ $n }}</option>
                                     @endforeach
@@ -163,13 +163,13 @@
                             }">
                                 {{-- Summary header --}}
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-3 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-3 py-1 text-xs font-semibold text-brand-forest ring-1 ring-brand-sage/25">
                                         {{ trans_choice(':count request|:count requests', $summary['total'], ['count' => $summary['total']]) }}
                                     </span>
                                     @foreach (['2xx', '3xx', '4xx', '5xx'] as $cls)
                                         @if (($summary['classes'][$cls] ?? 0) > 0)
                                             @php $m = $statusMeta[$cls]; @endphp
-                                            <span class="inline-flex items-center gap-1.5 rounded-full {{ $m['bg'] }} px-2.5 py-1 text-[11px] font-medium {{ $m['text'] }} ring-1 {{ $m['ring'] }}">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full {{ $m['bg'] }} px-2.5 py-1 text-xs font-medium {{ $m['text'] }} ring-1 {{ $m['ring'] }}">
                                                 <span class="inline-block h-1.5 w-1.5 rounded-full {{ $m['dot'] }}" aria-hidden="true"></span>
                                                 {{ $m['label'] }} · {{ $summary['classes'][$cls] }}
                                             </span>
@@ -177,9 +177,9 @@
                                     @endforeach
                                     @if (! empty($summary['top_paths']))
                                         <span class="mx-1 hidden h-4 w-px bg-brand-ink/10 sm:inline-block" aria-hidden="true"></span>
-                                        <span class="text-[11px] text-brand-moss">{{ __('Top:') }}</span>
+                                        <span class="text-xs text-brand-moss">{{ __('Top:') }}</span>
                                         @foreach ($summary['top_paths'] as $tp)
-                                            <span class="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-md bg-brand-sand/50 px-2 py-1 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10" title="{{ $tp['path'] }} ({{ $tp['count'] }})">
+                                            <span class="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-md bg-brand-sand/50 px-2 py-1 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10" title="{{ $tp['path'] }} ({{ $tp['count'] }})">
                                                 <span class="truncate">{{ $tp['path'] }}</span>
                                                 <span class="text-brand-mist">×{{ $tp['count'] }}</span>
                                             </span>
@@ -196,7 +196,7 @@
                                 {{-- Structured table --}}
                                 <div class="mt-3 max-h-[60vh] overflow-auto rounded-lg border border-brand-ink/10 bg-white">
                                     <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
-                                        <thead class="sticky top-0 z-10 bg-brand-sand/60 text-[10px] font-semibold uppercase tracking-wider text-brand-moss">
+                                        <thead class="sticky top-0 z-10 bg-brand-sand/60 text-2xs font-semibold uppercase tracking-wider text-brand-moss">
                                             <tr>
                                                 <th class="px-3 py-2">{{ __('When') }}</th>
                                                 <th class="px-3 py-2">{{ __('Status') }}</th>
@@ -210,7 +210,7 @@
                                             <template x-for="(r, i) in visible" :key="i">
                                                 <tr class="align-top hover:bg-brand-sand/30">
                                                     <template x-if="!r.parsed">
-                                                        <td colspan="6" class="px-3 py-1.5 font-mono text-[11px] text-brand-moss break-all" x-text="r.raw"></td>
+                                                        <td colspan="6" class="px-3 py-1.5 font-mono text-xs text-brand-moss break-all" x-text="r.raw"></td>
                                                     </template>
                                                     <template x-if="r.parsed">
                                                         <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">
@@ -219,28 +219,28 @@
                                                     </template>
                                                     <template x-if="r.parsed">
                                                         <td class="px-3 py-1.5">
-                                                            <span class="inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold ring-1 ring-inset"
+                                                            <span class="inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold ring-1 ring-inset"
                                                                 :class="statusStyle(r.statusClass)" x-text="r.status ?? '—'"></span>
                                                         </td>
                                                     </template>
                                                     <template x-if="r.parsed">
                                                         <td class="px-3 py-1.5">
-                                                            <span class="inline-flex items-center rounded bg-brand-ink/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-ink" x-text="r.method || '—'"></span>
+                                                            <span class="inline-flex items-center rounded bg-brand-ink/5 px-1.5 py-0.5 font-mono text-2xs font-semibold text-brand-ink" x-text="r.method || '—'"></span>
                                                         </td>
                                                     </template>
                                                     <template x-if="r.parsed">
                                                         <td class="px-3 py-1.5">
-                                                            <span class="block max-w-[28rem] truncate font-mono text-[11px] text-brand-ink" :title="r.path" x-text="r.path || '—'"></span>
-                                                            <span class="text-[10px] text-brand-mist" x-text="r.protocol"></span>
+                                                            <span class="block max-w-[28rem] truncate font-mono text-xs text-brand-ink" :title="r.path" x-text="r.path || '—'"></span>
+                                                            <span class="text-2xs text-brand-mist" x-text="r.protocol"></span>
                                                         </td>
                                                     </template>
                                                     <template x-if="r.parsed">
-                                                        <td class="whitespace-nowrap px-3 py-1.5 text-right font-mono text-[11px] text-brand-moss" x-text="r.bytesHuman"></td>
+                                                        <td class="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-brand-moss" x-text="r.bytesHuman"></td>
                                                     </template>
                                                     <template x-if="r.parsed">
                                                         <td class="px-3 py-1.5">
-                                                            <span class="block font-mono text-[11px] text-brand-ink" x-text="r.ip || '—'"></span>
-                                                            <span class="block max-w-[18rem] truncate text-[10px] text-brand-mist" :title="r.user_agent" x-text="r.user_agent || ''"></span>
+                                                            <span class="block font-mono text-xs text-brand-ink" x-text="r.ip || '—'"></span>
+                                                            <span class="block max-w-[18rem] truncate text-2xs text-brand-mist" :title="r.user_agent" x-text="r.user_agent || ''"></span>
                                                         </td>
                                                     </template>
                                                 </tr>

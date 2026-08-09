@@ -14,7 +14,7 @@
                 <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h2>
             </div>
-            <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ __('Shell during this function\'s deploy — e.g. compile assets. A non-zero exit aborts the deploy.') }}</p>
+            <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ __('Shell during this function\'s deploy — e.g. compile assets. A non-zero exit aborts the deploy.') }}</p>
         </div>
         <button type="button" wire:click="$toggle('formOpen')"
                 class="inline-flex shrink-0 items-center rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
@@ -25,7 +25,7 @@
     @if ($formOpen)
         <form wire:submit="addHook" class="space-y-2 border-b border-brand-ink/10 bg-brand-sand/10 {{ $pad }}">
             <div class="flex flex-wrap gap-2">
-                <label class="text-[11px] text-brand-moss">
+                <label class="text-xs text-brand-moss">
                     <span class="block font-semibold">{{ __('Phase') }}</span>
                     <select wire:model="newPhase" class="mt-0.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs">
                         @foreach ($phaseLabels as $phase => $label)
@@ -33,12 +33,12 @@
                         @endforeach
                     </select>
                 </label>
-                <label class="text-[11px] text-brand-moss">
+                <label class="text-xs text-brand-moss">
                     <span class="block font-semibold">{{ __('Order') }}</span>
                     <input type="number" wire:model="newOrder" min="0" max="999"
                            class="mt-0.5 w-16 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs">
                 </label>
-                <label class="text-[11px] text-brand-moss">
+                <label class="text-xs text-brand-moss">
                     <span class="block font-semibold">{{ __('Timeout (s)') }}</span>
                     <input type="number" wire:model="newTimeout" min="30" max="3600"
                            class="mt-0.5 w-20 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs">
@@ -63,22 +63,22 @@
             <div class="{{ $pad }}">
                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <h3 class="text-xs font-semibold text-brand-ink">{{ $label }}</h3>
-                    <span class="text-[11px] text-brand-moss/60">{{ $phaseHints[$phase] ?? '' }}</span>
+                    <span class="text-xs text-brand-moss/60">{{ $phaseHints[$phase] ?? '' }}</span>
                 </div>
                 @if ($hooks->isEmpty())
-                    <p class="mt-1 text-[11px] text-brand-moss/60">{{ __('No hooks in this phase.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss/60">{{ __('No hooks in this phase.') }}</p>
                 @else
                     <ul class="mt-1.5 space-y-1.5">
                         @foreach ($hooks as $hook)
                             <li class="rounded-lg border border-brand-ink/10 bg-white px-2.5 py-2" wire:key="deploy-hook-{{ $hook->id }}">
-                                <div class="flex items-center justify-between gap-2 text-[11px] text-brand-moss">
+                                <div class="flex items-center justify-between gap-2 text-xs text-brand-moss">
                                     <span class="font-semibold text-brand-ink">#{{ $hook->sort_order }}
                                         <span class="font-normal text-brand-moss">· {{ (int) ($hook->timeout_seconds ?? 900) }}s {{ __('timeout') }}</span>
                                     </span>
                                     <button type="button" wire:click="confirmDeleteHook('{{ $hook->id }}')"
                                             class="font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                 </div>
-                                <pre class="mt-1.5 overflow-x-auto rounded-md bg-brand-ink p-2 text-[11px] leading-relaxed text-brand-cream">{{ \Illuminate\Support\Str::limit($hook->script, 800) }}</pre>
+                                <pre class="mt-1.5 overflow-x-auto rounded-md bg-brand-ink p-2 text-xs leading-relaxed text-brand-cream">{{ \Illuminate\Support\Str::limit($hook->script, 800) }}</pre>
                             </li>
                         @endforeach
                     </ul>

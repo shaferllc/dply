@@ -14,7 +14,7 @@
                 wire:target="refreshDatabaseCapabilities"
                 @disabled($isDeployer ?? false)
                 title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span wire:loading.remove wire:target="refreshDatabaseCapabilities" class="inline-flex items-center gap-1">
                     <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
@@ -31,7 +31,7 @@
                 wire:loading.attr="disabled"
                 wire:target="synchronizeDatabases"
                 @disabled($isDeployer ?? false)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span wire:loading.remove wire:target="synchronizeDatabases" class="inline-flex items-center gap-1">
                     <x-heroicon-m-magnifying-glass class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />

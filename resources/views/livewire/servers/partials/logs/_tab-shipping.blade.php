@@ -29,7 +29,7 @@
             ] as $key => $meta)
                 <button type="button" wire:click="setShippingSubTab('{{ $key }}')"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition',
+                        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold leading-none transition',
                         'bg-brand-forest text-white shadow-sm' => $sub === $key,
                         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $sub !== $key,
                     ])>
@@ -99,7 +99,7 @@
         >
             @if ($agent !== null)
                 <x-slot:actions>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $statusTone }}">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $statusTone }}">
                         {{ $statusMeta['label'] }}
                         @if ($agent->version)
                             <span class="font-normal opacity-70">· v{{ $agent->version }}</span>
@@ -160,10 +160,10 @@
                 >
                     <div class="min-w-0">
                         <p class="text-xs font-semibold text-brand-ink">{{ __('Sources') }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
-                        <span class="rounded-full bg-brand-ink/5 px-2 py-0.5 text-[11px] font-semibold text-brand-moss">
+                        <span class="rounded-full bg-brand-ink/5 px-2 py-0.5 text-xs font-semibold text-brand-moss">
                             {{ __(':on / :total on', ['on' => $sourcesOnCount, 'total' => $sourcesTotal]) }}
                         </span>
                         <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
@@ -250,10 +250,10 @@
             <div class="space-y-3 px-5 py-3 sm:px-6">
                 @if ($agent)
                     <dl class="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                        <div><dt class="text-[11px] text-brand-moss">{{ __('Status') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $statusMeta['label'] }}</dd></div>
-                        <div><dt class="text-[11px] text-brand-moss">{{ __('Vector version') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->version ? 'v'.$agent->version : '—' }}</dd></div>
-                        <div><dt class="text-[11px] text-brand-moss">{{ __('Last seen') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->last_seen_at?->diffForHumans() ?? __('never') }}</dd></div>
-                        <div class="min-w-0"><dt class="text-[11px] text-brand-moss">{{ __('Client cert') }}</dt><dd class="mt-0.5 truncate font-mono text-xs text-brand-ink" title="{{ $agent->client_cert_fingerprint }}">{{ $agent->client_cert_fingerprint ? \Illuminate\Support\Str::limit($agent->client_cert_fingerprint, 18) : '—' }}</dd></div>
+                        <div><dt class="text-xs text-brand-moss">{{ __('Status') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $statusMeta['label'] }}</dd></div>
+                        <div><dt class="text-xs text-brand-moss">{{ __('Vector version') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->version ? 'v'.$agent->version : '—' }}</dd></div>
+                        <div><dt class="text-xs text-brand-moss">{{ __('Last seen') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->last_seen_at?->diffForHumans() ?? __('never') }}</dd></div>
+                        <div class="min-w-0"><dt class="text-xs text-brand-moss">{{ __('Client cert') }}</dt><dd class="mt-0.5 truncate font-mono text-xs text-brand-ink" title="{{ $agent->client_cert_fingerprint }}">{{ $agent->client_cert_fingerprint ? \Illuminate\Support\Str::limit($agent->client_cert_fingerprint, 18) : '—' }}</dd></div>
                     </dl>
 
                     @if ($agent->error_message)
@@ -266,7 +266,7 @@
                     @if (trim((string) $agent->install_output) !== '')
                         <div>
                             <p class="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Install output') }}</p>
-                            <pre class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02] px-3 py-2 text-[11px] leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
+                            <pre class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02] px-3 py-2 text-xs leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
                         </div>
                     @else
                         <p class="text-xs text-brand-moss">{{ __('No install output recorded yet.') }}</p>
@@ -417,7 +417,7 @@
                 @else
                     <div class="max-h-[28rem] overflow-auto">
                         <table class="min-w-full text-left text-xs">
-                            <thead class="sticky top-0 z-10 bg-brand-sand text-[10px] uppercase tracking-wider text-brand-moss shadow-sm">
+                            <thead class="sticky top-0 z-10 bg-brand-sand text-2xs uppercase tracking-wider text-brand-moss shadow-sm">
                                 <tr class="border-b border-brand-ink/10">
                                     <th class="whitespace-nowrap px-4 py-2 font-semibold">{{ __('Time') }}</th>
                                     <th class="px-3 py-2 font-semibold">{{ __('Level') }}</th>
@@ -436,12 +436,12 @@
                                             };
                                         @endphp
                                         <tr class="bg-brand-sage/[0.07]" wire:key="dep-{{ $entry['deployment_id'] }}">
-                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-forest">{{ $entry['timestamp'] }}</td>
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-xs tabular-nums text-brand-forest">{{ $entry['timestamp'] }}</td>
                                             <td colspan="3" class="px-3 py-1.5">
-                                                <span class="inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-brand-forest">
+                                                <span class="inline-flex flex-wrap items-center gap-1.5 text-xs font-semibold text-brand-forest">
                                                     <x-heroicon-m-rocket-launch class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ $entry['running'] ? __('Deploy in progress') : __('Deployed') }} · {{ $entry['site_name'] }}
-                                                    <span class="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ring-1 ring-inset ring-brand-sage/30 {{ $deployTone }}">{{ $entry['status'] }}</span>
+                                                    <span class="rounded px-1.5 py-0.5 text-2xs uppercase tracking-wide ring-1 ring-inset ring-brand-sage/30 {{ $deployTone }}">{{ $entry['status'] }}</span>
                                                     @if ($entry['site'])
                                                         <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $entry['site'], 'deployment' => $entry['deployment_id']]) }}"
                                                             wire:navigate
@@ -463,21 +463,21 @@
                                             };
                                         @endphp
                                         <tr class="align-top hover:bg-brand-sand/10">
-                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-moss">{{ $entry['timestamp'] ?? '' }}</td>
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-xs tabular-nums text-brand-moss">{{ $entry['timestamp'] ?? '' }}</td>
                                             <td class="px-3 py-1.5">
                                                 @if ($lvl !== '')
-                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
+                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-2xs font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
                                                 @endif
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">{{ $entry['source'] ?? '' }}</td>
-                                            <td class="px-4 py-1.5 font-mono text-[11px] leading-relaxed text-brand-ink/80">{{ $entry['message'] ?? '' }}</td>
+                                            <td class="px-4 py-1.5 font-mono text-xs leading-relaxed text-brand-ink/80">{{ $entry['message'] ?? '' }}</td>
                                         </tr>
                                     @endif
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-brand-ink/10 px-5 py-1.5 text-[11px] text-brand-moss sm:px-6">
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-brand-ink/10 px-5 py-1.5 text-xs text-brand-moss sm:px-6">
                         <span class="inline-flex flex-wrap items-center gap-x-2">
                             <span>{{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif</span>
                             @if ($deployCount > 0)

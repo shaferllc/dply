@@ -155,7 +155,7 @@
                                 title="{{ __('Search — ⌘K') }}"
                             >
                                 <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0" />
-                                <kbd class="hidden items-center rounded bg-brand-sand/60 px-1 py-0.5 text-[10px] font-semibold text-brand-moss lg:inline-flex">⌘K</kbd>
+                                <kbd class="hidden items-center rounded bg-brand-sand/60 px-1 py-0.5 text-2xs font-semibold text-brand-moss lg:inline-flex">⌘K</kbd>
                             </button>
                             <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                                 <x-slot name="icon">
@@ -196,7 +196,7 @@
                                     <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
                                         {{-- Compute --}}
                                         <div class="p-2">
-                                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Compute') }}</p>
+                                            <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Compute') }}</p>
                                             <x-dropdown-link :href="route('servers.index')" :description="__('Provision & manage VMs')">
                                                 <x-slot name="icon">
                                                     <x-heroicon-o-server class="{{ $hi }}" />
@@ -258,7 +258,7 @@
 
                                         {{-- Apps + Org --}}
                                         <div class="p-2">
-                                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Apps') }}</p>
+                                            <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Apps') }}</p>
                                             <x-dropdown-link :href="route('sites.index')" :description="__('Deploy apps to your servers')">
                                                 <x-slot name="icon">
                                                     <x-heroicon-o-globe-alt class="{{ $hi }}" />
@@ -302,7 +302,7 @@
                                                 </x-dropdown-link>
                                             @endif
 
-                                            <p class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</p>
+                                            <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</p>
                                             <x-dropdown-link :href="route('organizations.index')" :description="__('Workspaces, members & billing')">
                                                 <x-slot name="icon">
                                                     <x-heroicon-o-building-office-2 class="{{ $hi }}" />
@@ -343,7 +343,7 @@
                                 <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
                                     {{-- Product --}}
                                     <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Product') }}</p>
+                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Product') }}</p>
                                         <x-dropdown-link :href="route('features')" :description="__('Everything dply can do')">
                                             <x-slot name="icon">
                                                 <x-heroicon-o-sparkles class="{{ $hi }}" />
@@ -366,7 +366,7 @@
 
                                     {{-- Resources + Workspace --}}
                                     <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Resources') }}</p>
+                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Resources') }}</p>
                                         <x-dropdown-link :href="route('docs.index')" :description="__('Guides & API reference')">
                                             <x-slot name="icon">
                                                 <x-heroicon-o-book-open class="{{ $hi }}" />
@@ -387,7 +387,7 @@
                                         </x-dropdown-link>
 
                                         @if (feature('surface.status_pages') || feature('surface.marketplace') || feature('surface.scripts'))
-                                            <p class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Workspace') }}</p>
+                                            <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Workspace') }}</p>
                                             @feature('surface.status_pages')
                                                 <x-dropdown-link :href="route('status-pages.index')" :description="__('Public status pages')">
                                                     <x-slot name="icon">
@@ -419,7 +419,7 @@
                                 @can('viewPlatformAdmin')
                                     {{-- Privileged tools as a full-width footer strip. --}}
                                     <div class="border-t border-brand-ink/10 bg-brand-sand/20 p-3">
-                                        <p class="flex items-center gap-1.5 px-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                        <p class="flex items-center gap-1.5 px-1 pb-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                             <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                             {{ __('Platform admin') }}
                                         </p>

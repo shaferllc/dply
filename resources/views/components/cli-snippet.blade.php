@@ -16,7 +16,7 @@
 @php
     $resolvedTone = $tone
         ?? ($commands !== null && $commands !== [] ? 'details' : ($command !== null ? 'footer' : 'stub'));
-    $rowSizeClass = $size === '10' ? 'text-[10px]' : 'text-[11px]';
+    $rowSizeClass = $size === '10' ? 'text-2xs' : 'text-xs';
     $detailsSummary = $summary ?? __('CLI commands');
     $footerLabel = $summary ?? __('CLI commands:');
     $stubMessage = __('CLI commands for this section are coming soon.');
@@ -44,7 +44,7 @@
         >
             <x-heroicon-o-clipboard class="h-3 w-3" />
         </button>
-        <span x-show="copied" x-cloak class="ml-1 text-[10px] font-medium text-emerald-700">{{ __('Copied') }}</span>
+        <span x-show="copied" x-cloak class="ml-1 text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
     </footer>
 @elseif ($resolvedTone === 'details' && $rows !== [])
     {{-- Flush disclosure — no nested rounded card (merged chrome footers). --}}
@@ -73,7 +73,7 @@
                     >
                         <x-heroicon-o-clipboard class="h-3 w-3" />
                     </button>
-                    <span x-show="copied" x-cloak class="text-[10px] font-medium text-emerald-700">{{ __('Copied') }}</span>
+                    <span x-show="copied" x-cloak class="text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
                 </li>
             @endforeach
         </ul>

@@ -59,7 +59,7 @@
                         <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
                         <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
                     </div>
-                    <span class="truncate font-mono text-[11px] font-medium text-slate-300">{{ $prompt }}</span>
+                    <span class="truncate font-mono text-xs font-medium text-slate-300">{{ $prompt }}</span>
                     <span class="inline-flex items-center gap-1.5 text-emerald-300/90">
                         <span class="relative flex h-1.5 w-1.5">
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/50 opacity-75"></span>

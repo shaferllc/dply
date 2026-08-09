@@ -81,7 +81,7 @@
                         <x-slot:actions>
                             @if ($badge)
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                                     'bg-amber-50 text-amber-800 ring-amber-200' => $badge['tone'] === 'amber',
                                     'bg-sky-50 text-sky-800 ring-sky-200' => $badge['tone'] === 'sky',
                                 ])>

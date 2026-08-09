@@ -19,7 +19,7 @@
                     {{-- Ancestors stay on one muted line and truncate; the current
                          page reads as the title below. Avoids the breadcrumb
                          wrapping vertically in a narrow panel. --}}
-                    <nav aria-label="{{ __('Documentation breadcrumb') }}" class="flex min-w-0 items-center gap-1 text-[11px] leading-none text-brand-moss">
+                    <nav aria-label="{{ __('Documentation breadcrumb') }}" class="flex min-w-0 items-center gap-1 text-xs leading-none text-brand-moss">
                         @foreach ($ancestors as $index => $crumb)
                             @if ($index > 0)
                                 <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0 text-brand-mist/70" aria-hidden="true" />
@@ -47,7 +47,7 @@
                     </nav>
                     <h2 class="mt-1 truncate text-base font-semibold leading-tight text-brand-ink dark:text-brand-cream">{{ $current['label'] }}</h2>
                 @else
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Documentation') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Documentation') }}</p>
                     <h2 class="truncate text-base font-semibold leading-tight text-brand-ink dark:text-brand-cream">{{ $title }}</h2>
                 @endif
             </div>
@@ -83,7 +83,7 @@
                 type="button"
                 x-on:click="open = !open"
                 :aria-expanded="open ? 'true' : 'false'"
-                class="flex w-full items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist hover:text-brand-ink dark:hover:text-brand-cream"
+                class="flex w-full items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist hover:text-brand-ink dark:hover:text-brand-cream"
             >
                 <span>{{ $guideGroupLabel }}</span>
                 <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 transition-transform" x-bind:class="open ? '' : '-rotate-90'" aria-hidden="true" />
@@ -114,7 +114,7 @@
                 type="button"
                 x-on:click="open = !open"
                 :aria-expanded="open ? 'true' : 'false'"
-                class="flex w-full items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist hover:text-brand-ink dark:hover:text-brand-cream"
+                class="flex w-full items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist hover:text-brand-ink dark:hover:text-brand-cream"
             >
                 <span>{{ __('On this page') }}</span>
                 <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 transition-transform" x-bind:class="open ? '' : '-rotate-90'" aria-hidden="true" />
@@ -136,7 +136,7 @@
 
     @if ($docsAskEnabled && ! $isIndex && ($html !== '' || $virtualSummary))
         <div class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Ask about this page') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Ask about this page') }}</p>
             <form wire:submit="submitDocsAsk" class="mt-2 space-y-2">
                 <label for="docs-ask-question" class="sr-only">{{ __('Question') }}</label>
                 <textarea
@@ -161,10 +161,10 @@
             @endif
             @if ($askAnswer !== '')
                 <div class="mt-3 rounded-xl border border-brand-sage/25 bg-brand-sage/5 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Answer') }} · {{ $askConfidence }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Answer') }} · {{ $askConfidence }}</p>
                     <p class="mt-2 text-sm leading-relaxed text-brand-ink dark:text-brand-cream">{{ $askAnswer }}</p>
                     @if ($askCitedHeadings !== [])
-                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Referenced sections:') }} {{ implode(', ', $askCitedHeadings) }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Referenced sections:') }} {{ implode(', ', $askCitedHeadings) }}</p>
                     @endif
                 </div>
             @endif

@@ -23,7 +23,7 @@
                                     type="button"
                                     wire:click="openAddApacheCustomVhostForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-o-plus class="h-3.5 w-3.5" />
                                     {{ __('Add vhost') }}
@@ -33,7 +33,7 @@
                                     wire:click="loadApacheCustomVhostsConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadApacheCustomVhostsConfig"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadApacheCustomVhostsConfig" class="inline-flex">
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
@@ -93,7 +93,7 @@
                                     <label class="block sm:col-span-2">
                                         <span class="block text-xs font-medium text-brand-ink">{{ __('PHP-FPM socket (optional)') }}</span>
                                         <input type="text" wire:model.lazy="apache_custom_vhosts_new.php_socket" placeholder="/run/php/php8.3-fpm.sock" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Leave empty for static-only. Enables PHP via mod_proxy_fcgi when set.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Leave empty for static-only. Enables PHP via mod_proxy_fcgi when set.') }}</span>
                                     </label>
                                 </div>
 
@@ -176,13 +176,13 @@
                                     <div class="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p class="font-mono text-sm font-semibold text-brand-ink">dply-custom-{{ $vhostSlug }}.conf</p>
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Custom vhost') }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ __('Custom vhost') }}</p>
                                         </div>
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('removeApacheCustomVhost', [@js($vhostSlug)], @js(__('Remove custom vhost: :slug', ['slug' => $vhostSlug])), @js(__('Delete sites-available/dply-custom-:slug.conf and its sites-enabled symlink?', ['slug' => $vhostSlug])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
-                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}

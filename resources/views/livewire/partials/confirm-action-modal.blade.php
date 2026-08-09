@@ -39,7 +39,7 @@
                         <dl class="divide-y divide-brand-ink/8 rounded-xl border border-brand-ink/10 bg-brand-sand/15 text-sm">
                             @foreach ($confirmActionModalDetails as $row)
                                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5" wire:key="confirm-detail-{{ $loop->index }}">
-                                    <dt class="w-36 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $row['label'] }}</dt>
+                                    <dt class="w-36 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $row['label'] }}</dt>
                                     <dd @class([
                                         'min-w-0 flex-1 break-all text-brand-ink',
                                         'font-mono text-xs' => ! empty($row['mono']),

@@ -114,13 +114,13 @@
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
                             <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add resource') }}
-                            <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
+                            <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-2xs font-semibold">{{ $availableCount }}</span>
                             <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         </button>
                     </x-slot>
                     <x-slot name="content">
                         @foreach ($availableByGroup as $groupLabel => $items)
-                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
+                            <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
                             @foreach ($items as $at)
                                 @php
                                     $atType = $at['type'];
@@ -139,7 +139,7 @@
                                         </span>
                                         <span class="min-w-0">
                                             <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
-                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
                                         </span>
                                     </a>
                                 @else
@@ -150,7 +150,7 @@
                                         </span>
                                         <span class="min-w-0">
                                             <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
-                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
                                         </span>
                                     </button>
                                 @endif
@@ -170,7 +170,7 @@
                 <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                 {{ $attachedTypes }}/{{ $totalTypes }} {{ __('configured') }}
             </span>
-            <div class="hidden items-center gap-3 text-[11px] font-medium text-brand-mist sm:flex">
+            <div class="hidden items-center gap-3 text-xs font-medium text-brand-mist sm:flex">
                 <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-brand-forest"></span>{{ __('Attached') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full border border-dashed border-brand-ink/30"></span>{{ __('Available') }}</span>
             </div>
@@ -208,7 +208,7 @@
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Release health') }}</h3>
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $card['dot'] }}"></span>
                                         {{ $state === 'drifted' ? __('Workers pinned') : ($state === 'in_sync' ? __('In sync') : __('Unconfirmed')) }}
                                     </span>
@@ -222,7 +222,7 @@
                                         {{ __('Couldn’t confirm the live release (the workers’ cache is empty or just flushed). Refresh after some traffic.') }}
                                     @endif
                                 </p>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-mist">
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-mist">
                                     <span>{{ __('Activated') }}: <span class="font-mono text-brand-ink">{{ $expected ?? '—' }}</span></span>
                                     <span>{{ __('Serving') }}: <span class="font-mono {{ $state === 'drifted' ? 'text-amber-700' : 'text-brand-ink' }}">{{ $serving ?? '—' }}</span></span>
                                     @if (is_array($oc) && ($oc['enabled'] ?? false))
@@ -236,13 +236,13 @@
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button type="button" wire:click="refreshReleaseHealth" wire:loading.attr="disabled" wire:target="refreshReleaseHealth"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshReleaseHealth" />
                                 {{ __('Refresh') }}
                             </button>
                             @if ($state === 'drifted')
                                 <button type="button" wire:click="flushOpcacheResync" wire:loading.attr="disabled" wire:target="flushOpcacheResync"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
                                     <x-heroicon-o-bolt class="h-3.5 w-3.5" />
                                     {{ __('Flush OPcache & re-sync') }}
                                 </button>
@@ -397,19 +397,19 @@
                         </span>
                         <div class="min-w-0">
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ __('Routing') }}</p>
-                            <p class="text-[11px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Inbound') }}</p>
+                            <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Inbound') }}</p>
                         </div>
                     </div>
                     <div class="mt-3 border-t border-brand-ink/10 pt-2.5">
                         @if ($routingActive)
-                            <p class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $routingPrimary?->hostname ?? __('Configured') }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="truncate font-mono text-xs font-medium text-brand-moss">{{ $routingPrimary?->hostname ?? __('Configured') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ trans_choice(':n domain|:n domains', $routingDomainCount, ['n' => $routingDomainCount]) }}@if ($routingRedirectCount > 0) · {{ trans_choice(':n redirect|:n redirects', $routingRedirectCount, ['n' => $routingRedirectCount]) }}@endif
                             </p>
                         @else
-                            <p class="text-[11px] text-brand-moss">{{ __('No public domain yet') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('No public domain yet') }}</p>
                         @endif
-                        <a href="{{ $sectionUrl('routing') }}" wire:navigate class="mt-2 inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <a href="{{ $sectionUrl('routing') }}" wire:navigate class="mt-2 inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage routing') }}
                         </a>
                     </div>
@@ -425,10 +425,10 @@
                         </span>
                         <div class="min-w-0">
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $site->domain ?? $site->name ?? __('This site') }}</p>
-                            <p class="text-[11px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Site') }}</p>
+                            <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Site') }}</p>
                         </div>
                     </div>
-                    <div class="mt-3 flex items-center gap-1.5 border-t border-brand-ink/10 pt-2.5 text-[11px] text-brand-moss">
+                    <div class="mt-3 flex items-center gap-1.5 border-t border-brand-ink/10 pt-2.5 text-xs text-brand-moss">
                         <x-heroicon-o-server class="h-3.5 w-3.5 text-brand-mist" />
                         <span class="truncate">{{ $server->name }}</span>
                     </div>
@@ -453,8 +453,8 @@
                 {{-- Group hub --}}
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
                     </div>
                 </div>
 
@@ -588,18 +588,18 @@
                                     </div>
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                            <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
+                                            <span class="truncate font-mono text-xs font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
                                             @if ($dbVmServerUrl)
                                                 <a href="{{ $dbVmServerUrl }}" wire:navigate
                                                     title="{{ $binding->status === 'provisioning' ? __('View provisioning status') : __('View database server') }}"
-                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
+                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
                                             @else
-                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
                                             @endif
                                             @if ($needsRedeploy)
                                                 <a href="{{ $sectionUrl('deploy') }}" wire:navigate
                                                     title="{{ __('The connection variables apply at the next deploy.') }}"
-                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
+                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
                                                     <x-heroicon-o-arrow-path class="h-2.5 w-2.5" /> {{ __('Redeploy to apply') }}
                                                 </a>
                                             @endif
@@ -609,17 +609,17 @@
                                                 $reachOk = (bool) ($conn['ok'] ?? false);
                                                 $reachWhen = ! empty($conn['checked_at']) ? Carbon::parse($conn['checked_at'])->diffForHumans(short: true) : null;
                                             @endphp
-                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {{ $reachOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}" title="{{ $conn['detail'] ?? ($reachOk ? __('Reachable from the server') : '') }}">
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-3xs font-semibold {{ $reachOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}" title="{{ $conn['detail'] ?? ($reachOk ? __('Reachable from the server') : '') }}">
                                                 <span class="h-1.5 w-1.5 rounded-full {{ $reachOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
                                                 {{ $reachOk ? __('Reachable') : __('Unreachable') }}@if ($reachWhen) · {{ $reachWhen }}@endif
                                             </span>
                                         @elseif ($reachTarget)
-                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-[9px] font-medium text-brand-moss">
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-3xs font-medium text-brand-moss">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-brand-mist"></span>{{ __('Not checked') }}
                                             </span>
                                         @endif
                                     @else
-                                        <p class="mt-0.5 line-clamp-2 text-[11px] leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
+                                        <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
                                     @endif
                                 </div>
                             </div>
@@ -627,9 +627,9 @@
                             {{-- injected variables: collapsed summary, expands to full list --}}
                             @if ($attached && $envKeys !== [])
                                 <div class="mt-2">
-                                    <p x-show="! open" class="truncate font-mono text-[10px] text-brand-mist">{{ collect($envKeys)->take(4)->implode(' · ') }}{{ count($envKeys) > 4 ? ' · +'.(count($envKeys) - 4) : '' }}</p>
+                                    <p x-show="! open" class="truncate font-mono text-2xs text-brand-mist">{{ collect($envKeys)->take(4)->implode(' · ') }}{{ count($envKeys) > 4 ? ' · +'.(count($envKeys) - 4) : '' }}</p>
                                     <div x-show="open" x-cloak class="rounded-lg bg-brand-cream/40 p-2">
-                                        <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
+                                        <p class="mb-1 text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($binding->injected_env as $k => $v)
                                                 {{-- Hover/click a chip to reveal its injected value (masked by
@@ -641,21 +641,21 @@
                                                     class="relative"
                                                 >
                                                     <button type="button" @click="pop = ! pop"
-                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
+                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-2xs text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
                                                     <div x-show="pop" x-cloak x-transition.opacity
                                                         class="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-brand-ink/10 bg-white p-2 text-left shadow-xl">
                                                         <div class="flex items-center justify-between gap-2">
-                                                            <span class="truncate font-mono text-[10px] font-semibold text-brand-ink">{{ $k }}</span>
-                                                            <div class="flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                                                            <span class="truncate font-mono text-2xs font-semibold text-brand-ink">{{ $k }}</span>
+                                                            <div class="flex shrink-0 items-center gap-2 text-2xs font-semibold">
                                                                 <button type="button" @click="show = ! show" class="text-brand-sage hover:underline"><span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span></button>
                                                                 <button type="button" @click="copyVal()" class="text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                                             </div>
                                                         </div>
-                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-[10px] text-brand-ink">
+                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-2xs text-brand-ink">
                                                             <span x-show="show" x-cloak>{{ ((string) $v) === '' ? '(empty)' : $v }}</span>
                                                             <span x-show="! show">••••••••••</span>
                                                         </p>
-                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:underline">
+                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-2xs font-semibold text-brand-forest hover:underline">
                                                             <x-heroicon-o-pencil-square class="h-3 w-3" /> {{ __('Override in Environment') }}
                                                         </a>
                                                     </div>
@@ -667,10 +667,10 @@
                                                  the app's config/database.php — hand over the exact array. --}}
                                             <div class="mt-2" x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js((string) ($cfg['connection_snippet'] ?? ''))); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }">
                                                 <div class="flex items-center justify-between">
-                                                    <p class="text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
-                                                    <button type="button" @click="copy()" class="text-[10px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                    <p class="text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
+                                                    <button type="button" @click="copy()" class="text-2xs font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                                 </div>
-                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
+                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-2xs leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
                                             </div>
                                         @endif
                                     </div>
@@ -686,18 +686,18 @@
                                     @if (in_array($type, ['database', 'redis'], true))
                                         <button type="button" wire:click="startFixBinding(@js((string) $binding->id))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')"
                                             title="{{ __('Fix the private-network connectivity for this resource.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </button>
                                     @elseif ($isLogging)
                                         <a href="{{ $sectionUrl('logs') }}" wire:navigate
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </a>
                                     @else
                                         <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
                                             title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </button>
                                     @endif
@@ -712,7 +712,7 @@
                                         <div class="relative" x-data="{ open: false }" wire:key="cardmailtest-{{ md5((string) $binding->id) }}">
                                             <button type="button" x-on:click="open = !open"
                                                 title="{{ __('Send a test email through this transport.') }}"
-                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                                 <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                             </button>
                                             <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
@@ -721,13 +721,13 @@
                                                 <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
                                                     <x-heroicon-o-paper-airplane class="h-4 w-4" /> {{ __('Send test email') }}
                                                 </button>
-                                                <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                                <p class="mt-1.5 text-xs text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
                                             </div>
                                         </div>
                                     @elseif (in_array($type, ['database', 'redis', 'cache', 'queue', 'session'], true) && method_exists($this, 'verifyBinding'))
                                         <button type="button" wire:click="verifyBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="verifyBinding"
                                             title="{{ __('Probe this connection from the server now.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
                                     @elseif ($type === 'broadcasting' && method_exists($this, 'testBroadcastingBinding'))
@@ -735,7 +735,7 @@
                                              to the server-side TCP probe (handled in the method). --}}
                                         <button type="button" wire:click="testBroadcastingBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="testBroadcastingBinding"
                                             title="{{ __('Publish a test event to the relay now.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
                                     @endif
@@ -743,7 +743,7 @@
                                 @if ($attached && method_exists($this, 'openBindingInfoModal'))
                                     <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
                                         title="{{ __('View this connection\'s details (injected variables + reachability).') }}"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ __('Info') }}
                                     </button>
                                 @endif
@@ -752,12 +752,12 @@
                                 @if ($type === 'broadcasting' && $attached && $binding->target_type === 'realtime_app' && (auth()->user()?->can('view', $site->organization) ?? false))
                                     <a href="{{ route('organizations.realtime.show', [$site->organization, $binding->target_id]) }}" wire:navigate
                                         title="{{ __('Manage the relay app (credentials, stats, tier).') }}"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage app') }}
                                     </a>
                                 @endif
                                 @if ($isLogging)
-                                    <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </a>
                                 @elseif ($canProvision)
@@ -768,14 +768,14 @@
                                         {{-- Already wired up: one binding per type, so attach/provision
                                              both *replace* it. Offer a single "Replace…" that opens the
                                              modal (where you can re-link an existing one or spin up a new). --}}
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Replace…') }}
                                         </button>
                                     @else
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ __('Attach') }}
                                         </button>
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
                                             <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Provision') }}
                                         </button>
                                     @endif
@@ -785,7 +785,7 @@
                                              "Add another" sits below; the id-less Configure button here
                                              would open a fresh form, so it's suppressed. --}}
                                     @else
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                         </button>
                                     @endif
@@ -798,7 +798,7 @@
                                         };
                                     @endphp
                                     @if ($runtimeUrl)
-                                        <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Configure') }}
                                         </a>
                                     @elseif ($type === 'publication')
@@ -810,18 +810,18 @@
                                             $pubHref = $pubUrl ? (\Illuminate\Support\Str::startsWith($pubUrl, ['http://', 'https://']) ? $pubUrl : 'https://'.$pubUrl) : null;
                                         @endphp
                                         @if ($pubHref)
-                                            <span class="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-medium">
+                                            <span class="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium">
                                                 <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
                                                 <span class="shrink-0 text-brand-mist">{{ __('Published') }}</span>
                                                 <a href="{{ $pubHref }}" target="_blank" rel="noopener" class="truncate font-mono text-brand-forest hover:underline">{{ $pubUrl }}</a>
                                             </span>
                                         @else
-                                            <span title="{{ __('Set automatically on deploy') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                            <span title="{{ __('Set automatically on deploy') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                                 <x-heroicon-o-cpu-chip class="h-3 w-3" /> {{ __('Managed by the runtime') }}
                                             </span>
                                         @endif
                                     @else
-                                        <span class="text-[11px] italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
+                                        <span class="text-xs italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
                                     @endif
                                 @endif
                             </div>
@@ -832,7 +832,7 @@
                                  a second database / connection). It lands in this same
                                  column once attached. --}}
                             <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
-                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-[11px] font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
+                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
                                 <x-heroicon-o-plus class="h-3.5 w-3.5 text-brand-forest" />
                                 {{ __('Add another :label', ['label' => \Illuminate\Support\Str::lower($t['label'])]) }}
                             </button>
@@ -848,8 +848,8 @@
                 @php $wcol = $groupCount + 1; @endphp
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $wcol }}; grid-row: 3;">
                     <div data-hub="workers" class="w-44 rounded-xl border border-violet-200 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
                     </div>
                 </div>
                 <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $wcol }}; grid-row: 4;">
@@ -868,12 +868,12 @@
                                 </span>
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</p>
-                                    <p class="text-[11px] text-brand-moss">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }} · {{ $pool->status }}</p>
+                                    <p class="text-xs text-brand-moss">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }} · {{ $pool->status }}</p>
                                 </div>
                             </div>
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
                                 @if ($primary)
-                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
                                     </a>
                                 @endif

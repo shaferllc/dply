@@ -6,7 +6,7 @@
 
     {{-- Header --}}
     <header class="rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream via-white to-brand-sand/30 p-8 shadow-sm">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Installing app') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Installing app') }}</p>
         <h1 class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ $site->name }}</h1>
         <p class="mt-2 text-sm text-brand-moss">{{ __('Watching the :framework install pipeline. This is separate from your site setup — the server, domains, and testing URL are already in place.', ['framework' => $scaffoldFramework]) }}</p>
     </header>
@@ -18,7 +18,7 @@
                 <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Pipeline') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Pipeline') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install steps') }}</h2>
             </div>
         </div>
@@ -27,7 +27,7 @@
             @foreach ($steps as $step)
                 <li class="flex items-start gap-3">
                     <span @class([
-                        'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
+                        'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
                         'bg-brand-sage text-white' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_COMPLETED,
                         'bg-brand-gold/30 text-brand-ink animate-pulse' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_RUNNING,
                         'bg-rose-100 text-rose-700' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_FAILED,
@@ -61,7 +61,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Failed') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Failed') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install failed') }}</h2>
                     @if ($failedStep)
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stopped at step ":step". Retry will destroy server-side artifacts and start over.', ['step' => $failedStep['label'] ?? $failedStep['key']]) }}</p>
@@ -100,7 +100,7 @@
                     <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Complete') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Complete') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install complete') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your :framework install is up. The admin password is shown only once — save it now.', ['framework' => $scaffoldFramework]) }}</p>
                 </div>

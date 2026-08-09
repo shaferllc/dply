@@ -10,7 +10,7 @@
                 {{ __('Resolve a reference code') }}
             </h3>
             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-            <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Paste the X-Dply-Ref from a branded 5xx page to find the request and error trace in this site’s logs.') }}">
+            <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Paste the X-Dply-Ref from a branded 5xx page to find the request and error trace in this site’s logs.') }}">
                 {{ __('Paste the X-Dply-Ref from a branded 5xx page to find the request and error trace in this site’s logs.') }}
             </p>
         </div>

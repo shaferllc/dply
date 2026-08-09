@@ -101,7 +101,7 @@
                             <dl class="mt-4 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
                                 @foreach ($stats as $label => $value)
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                         <dd class="mt-1 font-mono text-xs text-brand-ink">{{ $value }}</dd>
                                     </div>
                                 @endforeach

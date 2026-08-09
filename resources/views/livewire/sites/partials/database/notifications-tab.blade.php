@@ -19,7 +19,7 @@
             </p>
             {{-- Folded up from its own full-width callout strip: it\'s a caveat on
                  the sentence above, not a separate section. --}}
-            <p class="mt-1 max-w-3xl text-[11px] leading-relaxed text-brand-mist">
+            <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-mist">
                 {{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry for these events — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}
             </p>
         </div>
@@ -54,7 +54,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             @foreach ($subs as $sub)
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="db-notif-sub-{{ $sub->id }}">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="db-notif-sub-{{ $sub->id }}">
                                     {{ $notifEventLabels[$sub->event_key] ?? $sub->event_key }}
                                     <button
                                         type="button"
@@ -101,7 +101,7 @@
                             <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                             {{ __('Create a channel') }}
                         </button>
-                        <span class="text-[10px] text-brand-mist">·</span>
+                        <span class="text-2xs text-brand-mist">·</span>
                         <a href="{{ route('profile.notification-channels') }}" class="text-xs text-brand-mist hover:text-brand-ink" wire:navigate>
                             {{ __('Manage all in Settings →') }}
                         </a>

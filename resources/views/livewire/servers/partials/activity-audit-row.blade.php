@@ -24,9 +24,9 @@
     <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs font-semibold text-brand-ink" title="{{ $event->event }}">{{ $eventLabel }}</span>
-            <span class="text-[11px] text-brand-mist" title="{{ $event->created_at?->toIso8601String() }}">{{ $event->created_at?->diffForHumans() }}</span>
+            <span class="text-xs text-brand-mist" title="{{ $event->created_at?->toIso8601String() }}">{{ $event->created_at?->diffForHumans() }}</span>
         </div>
-        <p class="mt-0.5 text-[11px] text-brand-moss">
+        <p class="mt-0.5 text-xs text-brand-moss">
             {{ __('by :actor', ['actor' => $actor]) }}
             @if ($ip)
                 <span class="ml-1 text-brand-mist">· {{ $ip }}</span>

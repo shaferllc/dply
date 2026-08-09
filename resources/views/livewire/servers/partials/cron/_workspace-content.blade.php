@@ -13,7 +13,7 @@
     />
 
     @if ($opsReady && $server->organization?->cron_maintenance_until && now()->lt($server->organization->cron_maintenance_until))
-        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
             <x-heroicon-m-wrench class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span class="font-semibold">{{ __('Cron pause active.') }}</span>
             {{ __('Managed cron lines are not installed on servers until :time.', ['time' => $server->organization->cron_maintenance_until->timezone(config('app.timezone'))->format('Y-m-d H:i T')]) }}
@@ -30,7 +30,7 @@
                     <x-heroicon-o-no-symbol class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Unavailable') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Unavailable') }}</p>
                     <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Cron jobs are not available for this site’s runtime') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Managed SSH crontab applies to VM-hosted sites. For container or serverless runtimes, use that platform’s scheduler or workers instead.') }}

@@ -48,7 +48,7 @@
                 'sm:border-t-0' => $i < $columns,
                 'sm:border-t' => $i >= $columns,
             ])>
-                <dt class="truncate text-[10px] font-semibold uppercase tracking-wide text-brand-mist" @if (! empty($stat['hint'])) title="{{ $stat['hint'] }}" @endif>{{ $stat['label'] }}</dt>
+                <dt class="truncate text-2xs font-semibold uppercase tracking-wide text-brand-mist" @if (! empty($stat['hint'])) title="{{ $stat['hint'] }}" @endif>{{ $stat['label'] }}</dt>
                 <dd class="mt-0.5 truncate font-mono text-sm font-semibold tabular-nums {{ $valueTone }}">{{ $stat['value'] }}</dd>
             </div>
         @endforeach

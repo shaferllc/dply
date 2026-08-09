@@ -14,7 +14,7 @@
                         <h3 class="text-xs font-semibold text-brand-ink">
                             {{ trans_choice('{1} :count required variable is missing|[2,*] :count required variables are missing', count($missingEnv), ['count' => count($missingEnv)]) }}
                         </h3>
-                        <span class="text-[11px] text-brand-moss">{{ __('referenced by the deployed code but not set here') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('referenced by the deployed code but not set here') }}</span>
                     </div>
 
                     <div class="flex shrink-0 flex-nowrap items-center gap-1.5 whitespace-nowrap">
@@ -54,7 +54,7 @@
                 <div class="flex flex-wrap gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
                     @foreach (array_slice($missingEnv, 0, 24) as $entry)
                         <span
-                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800"
+                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-mono text-xs font-semibold text-rose-800"
                             title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
                         >
                             {{ $entry['key'] }}
@@ -66,7 +66,7 @@
                         </span>
                     @endforeach
                     @if (count($missingEnv) > 24)
-                        <span class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
+                        <span class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">
                             {{ __('+:count more', ['count' => count($missingEnv) - 24]) }}
                         </span>
                     @endif

@@ -53,10 +53,10 @@
                             <span wire:loading wire:target="createServerImage">{{ __('Queueing…') }}</span>
                         </x-primary-button>
                     </div>
-                    <p class="text-[11px] text-brand-moss">{{ __('Auto-named with the date & time — edit to rename, or clear to regenerate on save.') }}</p>
+                    <p class="text-xs text-brand-moss">{{ __('Auto-named with the date & time — edit to rename, or clear to regenerate on save.') }}</p>
                 </form>
                 @unless ($opsReady)
-                    <p class="mt-3 text-[11px] text-amber-700">{{ __('This server is still provisioning — imaging unlocks once it is ready.') }}</p>
+                    <p class="mt-3 text-xs text-amber-700">{{ __('This server is still provisioning — imaging unlocks once it is ready.') }}</p>
                 @endunless
             @endif
         </div>
@@ -85,7 +85,7 @@
             @else
                 <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="bg-brand-sand/40 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/40 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-3 py-2">{{ __('Started') }}</th>
                                 <th class="px-3 py-2">{{ __('Name') }}</th>
@@ -110,9 +110,9 @@
                                     <td class="px-3 py-2 text-brand-moss" title="{{ $image->created_at?->toDateTimeString() }}">{{ $image->created_at?->diffForHumans() }}</td>
                                     <td class="px-3 py-2 font-medium text-brand-ink">{{ $image->name }}</td>
                                     <td class="px-3 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $image->status }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $statusClass }}">{{ $image->status }}</span>
                                         @if ($image->status === 'failed' && $image->error_message)
-                                            <p class="mt-1 max-w-md truncate text-[11px] text-rose-700" title="{{ $image->error_message }}">{{ $image->error_message }}</p>
+                                            <p class="mt-1 max-w-md truncate text-xs text-rose-700" title="{{ $image->error_message }}">{{ $image->error_message }}</p>
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-ink">{{ $image->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $image->bytes) : '—' }}</td>

@@ -12,7 +12,7 @@
                 <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Systemd') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Systemd') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed units') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Workers and schedulers run as separate systemd units. PHP/Laravel queue workers use Workers (Supervisor) instead.') }}</p>
             </div>
@@ -50,7 +50,7 @@
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('web') }}</span>
+                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('web') }}</span>
                         <h3 class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $webUnitName }}</h3>
                         <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $site->start_command }}</p>
                     </div>
@@ -78,10 +78,10 @@
                         <li class="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-brand-ink/10 bg-white p-3">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $process->type }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $process->type }}</span>
                                     <span class="font-mono text-sm font-semibold text-brand-ink">{{ $unitName }}</span>
                                     @if (! $process->is_active)
-                                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('inactive') }}</span>
+                                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('inactive') }}</span>
                                     @endif
                                 </div>
                                 <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $process->command }}</p>
@@ -109,7 +109,7 @@
 
             @if (is_array($systemdPresets) && $systemdPresets !== [])
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Presets') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Presets') }}</p>
                     <div class="mt-2 flex flex-wrap gap-2">
                         @foreach ($systemdPresets as $presetKey => $preset)
                             <button
@@ -123,10 +123,10 @@
             @endif
 
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/10 p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add unit') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add unit') }}</p>
                 <div class="mt-3 grid gap-2 sm:grid-cols-[110px,200px,1fr,auto] sm:items-end">
                     <div>
-                        <label for="svc_process_type" class="block text-[11px] font-medium text-brand-moss">{{ __('Type') }}</label>
+                        <label for="svc_process_type" class="block text-xs font-medium text-brand-moss">{{ __('Type') }}</label>
                         <select id="svc_process_type" wire:model="new_site_process_type" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
                             <option value="worker">{{ __('worker') }}</option>
                             <option value="scheduler">{{ __('scheduler') }}</option>
@@ -134,12 +134,12 @@
                         </select>
                     </div>
                     <div>
-                        <label for="svc_process_name" class="block text-[11px] font-medium text-brand-moss">{{ __('Name') }}</label>
+                        <label for="svc_process_name" class="block text-xs font-medium text-brand-moss">{{ __('Name') }}</label>
                         <input type="text" id="svc_process_name" wire:model="new_site_process_name" placeholder="sidekiq" class="mt-1 block w-full rounded-lg border-brand-ink/15 font-mono text-sm shadow-sm" />
                         <x-input-error :messages="$errors->get('new_site_process_name')" class="mt-1" />
                     </div>
                     <div>
-                        <label for="svc_process_command" class="block text-[11px] font-medium text-brand-moss">{{ __('Command') }}</label>
+                        <label for="svc_process_command" class="block text-xs font-medium text-brand-moss">{{ __('Command') }}</label>
                         <input type="text" id="svc_process_command" wire:model="new_site_process_command" placeholder="bundle exec sidekiq -C config/sidekiq.yml" class="mt-1 block w-full rounded-lg border-brand-ink/15 font-mono text-sm shadow-sm" />
                         <x-input-error :messages="$errors->get('new_site_process_command')" class="mt-1" />
                     </div>

@@ -41,7 +41,7 @@
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
-                <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold ring-1', $overallTone])>
+                <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-semibold ring-1', $overallTone])>
                     @switch($report['overall'] ?? 'healthy')
                         @case('critical')
                             <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -67,7 +67,7 @@
                 >
                     {{ __('Overview') }}
                     @if ($report['alert_count'] > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -86,7 +86,7 @@
                 >
                     {{ __('Releases') }}
                     @if (($report['releases']['sites_over_keep'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format((int) $report['releases']['sites_over_keep']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format((int) $report['releases']['sites_over_keep']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -103,7 +103,7 @@
                             + (int) ($report['daemons']['inactive_count'] ?? 0);
                     @endphp
                     @if ($reliabilityCount > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format($reliabilityCount) }}</span>
+                        <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss">{{ number_format($reliabilityCount) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab

@@ -35,7 +35,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="refreshCacheStatusModal,setCacheStatusModalView"
                                     @disabled($cacheStatusModalLoading)
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-xs font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
                                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="refreshCacheStatusModal,setCacheStatusModalView" />
                                     <span wire:loading.remove wire:target="refreshCacheStatusModal,setCacheStatusModalView">{{ __('Refresh') }}</span>
@@ -44,13 +44,13 @@
                                 <button
                                     type="button"
                                     wire:click="closeCacheStatusModal"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                 >
                                     {{ __('Close') }}
                                 </button>
                             </div>
                         </div>
-                        <div class="flex items-center gap-1 text-[11px] font-medium">
+                        <div class="flex items-center gap-1 text-xs font-medium">
                             <button
                                 type="button"
                                 wire:click="setCacheStatusModalView('status')"
@@ -84,7 +84,7 @@
                             <p class="text-xs font-medium text-brand-ink">
                                 {{ $cacheStatusModalView === 'logs' ? __('Fetching journalctl logs…') : __('Fetching systemctl status…') }}
                             </p>
-                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
                         @endif
                         @if ($cacheStatusModalError)
                             <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $cacheStatusModalError }}</div>
@@ -92,11 +92,11 @@
                         @if ($cacheStatusModalOutput !== '')
                             <div class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner">
                                 <div class="mb-2 flex items-center justify-between gap-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink">
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-ink">
                                         {{ $cacheStatusModalView === 'logs' ? __('journalctl -u') : __('systemctl status') }}
                                     </p>
                                 </div>
-                                <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{{ $cacheStatusModalOutput }}</pre>
+                                <pre class="font-mono text-xs leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{{ $cacheStatusModalOutput }}</pre>
                             </div>
                         @elseif (! $cacheStatusModalLoading && $cacheStatusModalError === null)
                             <p class="text-xs text-brand-moss">{{ __('No output yet. Choose Refresh.') }}</p>

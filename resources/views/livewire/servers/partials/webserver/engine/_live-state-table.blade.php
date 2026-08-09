@@ -100,7 +100,7 @@
                         <x-slot:actions>
                         <div class="min-w-0">
                             @if ($liveCapturedAt)
-                                <p class="text-[11px] tabular-nums text-brand-mist">
+                                <p class="text-xs tabular-nums text-brand-mist">
                                     {{ __('As of :time', ['time' => $liveCapturedAt->diffForHumans()]) }}
                                     <span
                                         wire:loading
@@ -111,12 +111,12 @@
                                     </span>
                                     <span wire:loading.remove wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal">
                                         @if ($liveState && ! $liveState->isFresh)
-                                            <span class="ml-1 inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-200">{{ __('Cached') }}</span>
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-800 ring-1 ring-sky-200">{{ __('Cached') }}</span>
                                         @endif
                                     </span>
                                 </p>
                             @else
-                                <p class="inline-flex items-center gap-1 text-[11px] text-brand-forest">
+                                <p class="inline-flex items-center gap-1 text-xs text-brand-forest">
                                     <span
                                         wire:loading
                                         wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal"
@@ -132,7 +132,7 @@
                             wire:click="refreshEngineLiveState"
                             wire:loading.attr="disabled"
                             wire:target="refreshEngineLiveState"
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="refreshEngineLiveState" class="inline-flex">
                                 <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -292,7 +292,7 @@
                     @else
                         <div class="mt-5 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                             <table class="w-full text-left text-sm">
-                                <thead class="bg-brand-sand/30 text-[11px] uppercase tracking-wide text-brand-mist">
+                                <thead class="bg-brand-sand/30 text-xs uppercase tracking-wide text-brand-mist">
                                     <tr>
                                         @switch($engine_subtab)
                                             @case('vhosts')
@@ -502,7 +502,7 @@
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['server_name'] ?? '—' }}</td>
                                                         <td class="px-4 py-2 tabular-nums text-xs">{{ $row['port'] ?? '—' }}</td>
                                                         <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['aliases'] ?? []) ?: '—' }}</td>
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['config'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['config'] ?? '—' }}</td>
                                                     @else
                                                         @php $vhSite = $sitesByVhostName[(string) ($row['name'] ?? '')] ?? null; @endphp
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
@@ -511,7 +511,7 @@
                                                         <td class="px-4 py-2 text-xs">{{ $row['php_version'] ?? '—' }}</td>
                                                         <td class="px-4 py-2 text-xs">
                                                             @if (! empty($row['ssl']))
-                                                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('on') }}</span>
+                                                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('on') }}</span>
                                                             @else
                                                                 <span class="text-brand-mist">—</span>
                                                             @endif
@@ -520,14 +520,14 @@
                                                             @if ($vhSite)
                                                                 <a
                                                                     href="{{ route('sites.show', ['server' => $server, 'site' => $vhSite->id]) }}"
-                                                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                                     title="{{ __('PHP version, SSL, env, and other per-site settings are managed in the Site workspace.') }}"
                                                                 >
                                                                     <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
                                                                     {{ __('Open site') }}
                                                                 </a>
                                                             @else
-                                                                <span class="text-brand-mist text-[11px]">—</span>
+                                                                <span class="text-brand-mist text-xs">—</span>
                                                             @endif
                                                         </td>
                                                     @endif
@@ -541,13 +541,13 @@
                                                 @case('extapps')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['type'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['path'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['path'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['php_version'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">
                                                         @if (! empty($row['installed']))
-                                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('installed') }}</span>
+                                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('installed') }}</span>
                                                         @else
-                                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('missing') }}</span>
+                                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700">{{ __('missing') }}</span>
                                                         @endif
                                                     </td>
                                                     @break
@@ -561,13 +561,13 @@
                                                 @case('routes')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['server'] ?? 'srv0' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['host'] ?? []) ?: __('(catch-all)') }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['listen'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ implode(', ', $row['listen'] ?? []) ?: '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(' → ', $row['handlers'] ?? []) ?: '—' }}</td>
                                                     @break
                                                 @case('upstreams')
                                                     @if ($key === 'nginx' || $key === 'openresty')
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ is_array($row['servers'] ?? null) ? implode(', ', $row['servers']) : '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ is_array($row['servers'] ?? null) ? implode(', ', $row['servers']) : '—' }}</td>
                                                     @else
                                                         @php
                                                             $upstreamAddress = (string) ($row['address'] ?? '');
@@ -596,9 +596,9 @@
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $upstreamAddress !== '' ? $upstreamAddress : '—' }}</td>
                                                         <td class="px-4 py-2 text-xs">
                                                             @if (! empty($row['healthy']))
-                                                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('healthy') }}</span>
+                                                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('healthy') }}</span>
                                                             @else
-                                                                <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('down') }}</span>
+                                                                <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700">{{ __('down') }}</span>
                                                             @endif
                                                         </td>
                                                         <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['num_requests'] ?? 0)) }}</td>
@@ -614,7 +614,7 @@
                                                                         wire:click="openConfirmActionModal('repairCaddyPhpFpmUpstream', [@js($upstreamAddress)], @js(__('Repair PHP-FPM for Caddy')), @js($repairCaddyPhpFpmAction['confirm'] ?? ''), @js(__('Repair PHP-FPM')), false, @js($repairModalDetails))"
                                                                         wire:loading.attr="disabled"
                                                                         wire:target="openConfirmActionModal,repairCaddyPhpFpmUpstream,confirmActionModal"
-                                                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                                                     >
                                                                         <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
                                                                         {{ __('Repair PHP-FPM') }}
@@ -628,12 +628,12 @@
                                                     @break
                                                 @case('hosts')
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['server_names'] ?? []) ?: '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['listen'] ?? []) ?: '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['root'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['upstream'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ implode(', ', $row['listen'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['root'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['upstream'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">
                                                         @if (! empty($row['ssl']))
-                                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('on') }}</span>
+                                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('on') }}</span>
                                                         @else
                                                             <span class="text-brand-mist">—</span>
                                                         @endif
@@ -648,7 +648,7 @@
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $kind = (string) ($row['kind'] ?? ''); @endphp
                                                         <span @class([
-                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => in_array($kind, ['static', 'builtin'], true),
                                                             'bg-sky-50 text-sky-700 ring-sky-200' => in_array($kind, ['shared', 'dynamic'], true),
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($kind, ['static', 'shared', 'builtin', 'dynamic'], true),
@@ -657,17 +657,17 @@
                                                     @break
                                                 @case('certs')
                                                     @if ($key === 'nginx')
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss break-all">{{ $row['path'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss break-all">{{ $row['path'] ?? '—' }}</td>
                                                         <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['hosts'] ?? []) ?: '—' }}</td>
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['expiry'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['expiry'] ?? '—' }}</td>
                                                     @elseif ($key === 'apache')
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss break-all">{{ $row['path'] ?? '—' }}</td>
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['expiry'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss break-all">{{ $row['path'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['expiry'] ?? '—' }}</td>
                                                     @else
                                                         <td class="px-4 py-2 text-xs">
                                                             @php $kind = (string) ($row['kind'] ?? ''); @endphp
                                                             <span @class([
-                                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                                'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                                 'bg-sky-50 text-sky-700 ring-sky-200' => $kind === 'policy',
                                                                 'bg-emerald-50 text-emerald-700 ring-emerald-200' => $kind === 'local_ca',
                                                                 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($kind, ['policy', 'local_ca'], true),
@@ -686,7 +686,7 @@
                                                 @case('routers')
                                                 @case('tcprouters')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['rule'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['rule'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['service'] ?? '—' }}</td>
                                                     @if ($engine_subtab === 'routers')
                                                         <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['middlewares'] ?? []) ?: '—' }}</td>
@@ -695,7 +695,7 @@
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
                                                         <span @class([
-                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => $st === 'ENABLED',
                                                             'bg-amber-50 text-amber-700 ring-amber-200' => $st === 'WARNING',
                                                             'bg-rose-50 text-rose-700 ring-rose-200' => $st === 'DISABLED' || $st === 'ERROR',
@@ -705,13 +705,13 @@
                                                     @break
                                                 @case('entrypoints')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['address'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['address'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['transport'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
                                                     @break
                                                 @case('tcpservices')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['provider'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
                                                     @break
@@ -723,7 +723,7 @@
                                                     @break
                                                 @case('udpservices')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['provider'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
                                                     @break
@@ -736,7 +736,7 @@
                                                 @case('services')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">{{ $row['type'] ?? 'loadBalancer' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['provider'] ?? '—' }}</td>
                                                     @break
                                                 @case('middlewares')
@@ -755,7 +755,7 @@
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
                                                         <span @class([
-                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => $st === 'OPEN' || $st === 'UP',
                                                             'bg-rose-50 text-rose-700 ring-rose-200' => $st === 'DOWN' || $st === 'STOP',
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($st, ['OPEN', 'UP', 'DOWN', 'STOP'], true),
@@ -770,18 +770,18 @@
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
                                                         <span @class([
-                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => $st === 'UP',
                                                             'bg-rose-50 text-rose-700 ring-rose-200' => str_contains($st, 'DOWN'),
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => $st === '' || (! in_array($st, ['UP'], true) && ! str_contains($st, 'DOWN')),
                                                         ])>{{ $st ?: '—' }}</span>
                                                     </td>
-                                                    <td class="px-4 py-2 text-[11px] text-brand-moss">
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">
                                                         @foreach (($row['servers'] ?? []) as $srv)
                                                             <div class="inline-flex items-center gap-1 mr-2">
                                                                 <span class="font-mono">{{ $srv['name'] }}</span>
                                                                 <span @class([
-                                                                    'text-[10px]',
+                                                                    'text-2xs',
                                                                     'text-emerald-700' => strtoupper($srv['status'] ?? '') === 'UP',
                                                                     'text-rose-700' => str_contains(strtoupper($srv['status'] ?? ''), 'DOWN'),
                                                                 ])>{{ $srv['status'] ?? '' }}</span>
@@ -797,19 +797,19 @@
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
                                                         <span @class([
-                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase ring-1',
                                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => $st === 'UP',
                                                             'bg-amber-50 text-amber-800 ring-amber-200' => $st === 'DEGRADED',
                                                             'bg-rose-50 text-rose-700 ring-rose-200' => str_contains($st, 'DOWN'),
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($st, ['UP', 'DEGRADED'], true) && ! str_contains($st, 'DOWN'),
                                                         ])>{{ $st ?: '—' }}</span>
                                                     </td>
-                                                    <td class="px-4 py-2 text-[11px] text-brand-moss">
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">
                                                         @foreach (($row['servers'] ?? []) as $srv)
                                                             <div class="inline-flex items-center gap-1 mr-2">
                                                                 <span class="font-mono">{{ $srv['name'] }}</span>
                                                                 <span @class([
-                                                                    'text-[10px]',
+                                                                    'text-2xs',
                                                                     'text-emerald-700' => strtoupper($srv['status'] ?? '') === 'UP',
                                                                     'text-rose-700' => str_contains(strtoupper($srv['status'] ?? ''), 'DOWN'),
                                                                 ])>{{ $srv['status'] ?? '' }}</span>
@@ -823,26 +823,26 @@
                                                     @php $envoySite = ! empty($row['site_id']) ? ($sitesByEnvoyVhost[(string) $row['site_id']] ?? null) : null; @endphp
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['domains'] ?? []) ?: '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['cluster'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['cluster'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-right">
                                                         @if ($envoySite)
                                                             <a
                                                                 href="{{ route('sites.show', ['server' => $server, 'site' => $envoySite->id]) }}"
-                                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                             >
                                                                 <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
                                                                 {{ __('Open site') }}
                                                             </a>
                                                         @else
-                                                            <span class="text-brand-mist text-[11px]">—</span>
+                                                            <span class="text-brand-mist text-xs">—</span>
                                                         @endif
                                                     </td>
                                                     @break
                                                 @case('servers')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['server_names'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['listen'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['upstream'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['listen'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['upstream'] ?? '—' }}</td>
                                                     @break
                                                 @case('stats')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>

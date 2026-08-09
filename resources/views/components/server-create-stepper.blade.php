@@ -46,7 +46,7 @@
             <li class="flex items-center gap-2 sm:gap-3">
                 @if ($isClickable)
                     <a href="{{ route($step['route'], $step['params'] ?? []) }}" wire:navigate class="group flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors hover:border-emerald-400 hover:bg-emerald-100 sm:text-sm {{ $stateClasses }}">
-                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-[11px] {{ $bubbleClasses }}">
+                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs {{ $bubbleClasses }}">
                             @if ($isReached && ! $isCurrent && ! $isSkipped)
                                 <x-heroicon-o-check class="h-3.5 w-3.5" />
                             @else
@@ -57,7 +57,7 @@
                     </a>
                 @else
                     <span aria-current="{{ $isCurrent ? 'step' : 'false' }}" class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold sm:text-sm {{ $stateClasses }}">
-                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-[11px] {{ $bubbleClasses }}">
+                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs {{ $bubbleClasses }}">
                             @if ($isReached && ! $isCurrent && ! $isSkipped)
                                 <x-heroicon-o-check class="h-3.5 w-3.5" />
                             @else

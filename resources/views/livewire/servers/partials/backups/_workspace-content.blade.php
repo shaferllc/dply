@@ -22,14 +22,14 @@
             {{-- Site filter. This was an icon-badge card with an eyebrow, a
                  heading and a sentence, all to say "you are looking at one
                  site" — one tinted line carries it, with Clear on the right. --}}
-            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-sky-50/50 px-4 py-2 text-[11px] text-sky-900 sm:px-5">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-sky-50/50 px-4 py-2 text-xs text-sky-900 sm:px-5">
                 <x-heroicon-m-funnel class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('Filtered to :site.', ['site' => $contextSite->name]) }}</span>
                 {{ __('Runs and schedules target only this site and any databases linked to it.') }}
                 <a href="{{ route('servers.backups', $server) }}" wire:navigate class="ml-auto shrink-0 font-semibold underline decoration-sky-900/30 underline-offset-2 hover:decoration-sky-900">{{ __('Clear filter') }}</a>
             </p>
         @elseif ($contextSite && ($siteDedicatedContext ?? false))
-            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2 text-[11px] text-brand-moss sm:px-5">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2 text-xs text-brand-moss sm:px-5">
                 {{ __('Scoped to :site — runs and schedules here only target this site and its linked databases.', ['site' => $contextSite->name]) }}
                 <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">{{ __('Open server backups') }}</a>
             </p>
@@ -224,7 +224,7 @@
 
             {{-- Detection state --}}
             @if (! $liveDbDetected && ! $contextSite)
-                <div class="flex items-center gap-2 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+                <div class="flex items-center gap-2 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                     <svg class="h-3.5 w-3.5 animate-spin text-brand-sage" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -538,7 +538,7 @@
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $schedule->targetLabel() }}</p>
                                         @if ($latestStatusTone)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $latestStatusTone[0] }}">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $latestStatusTone[0] }}">
                                                 @if ($latestStatusTone[1] === 'm-check-circle')
                                                     <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 @elseif ($latestStatusTone[1] === 'm-x-circle')
@@ -550,15 +550,15 @@
                                             </span>
                                         @endif
                                         @if (! $schedule->is_active)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800">
                                                 <x-heroicon-m-pause class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Paused') }}
                                             </span>
                                         @endif
                                     </div>
-                                    <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-brand-mist">
                                         <span class="inline-flex items-center gap-1">
-                                            <span class="text-[10px] uppercase tracking-wide">{{ __('Type') }}</span>
+                                            <span class="text-2xs uppercase tracking-wide">{{ __('Type') }}</span>
                                             <span class="text-brand-ink">{{ $schedule->target_type }}</span>
                                         </span>
                                         <span aria-hidden="true" class="text-brand-mist/60">·</span>
@@ -567,14 +567,14 @@
                                                 type="text"
                                                 wire:model="editing_schedules.{{ $schedule->id }}"
                                                 wire:keydown.enter="saveScheduleCadence('{{ $schedule->id }}')"
-                                                class="rounded border border-brand-ink/20 bg-white px-1.5 py-0.5 font-mono text-[11px] text-brand-ink"
+                                                class="rounded border border-brand-ink/20 bg-white px-1.5 py-0.5 font-mono text-xs text-brand-ink"
                                                 placeholder="0 3 * * *"
                                             />
                                         @else
                                             <span class="font-mono text-brand-ink">{{ $schedule->cron_expression }}</span>
                                         @endif
                                         @if ($cronDesc = $schedule->cronDescription())
-                                            <span class="text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                            <span class="text-xs text-brand-mist">{{ $cronDesc }}</span>
                                         @endif
                                         <span aria-hidden="true" class="text-brand-mist/60">·</span>
                                         <button type="button" wire:click="toggleNotifyOnFailure('{{ $schedule->id }}')"
@@ -651,7 +651,7 @@
                                     <ul class="divide-y divide-brand-ink/10">
                                         @foreach ($recentRuns as $run)
                                             <li class="flex items-center gap-3 py-2 text-xs">
-                                                <span class="inline-flex w-24 items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip($run->status) }}">{{ $run->status }}</span>
+                                                <span class="inline-flex w-24 items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusChip($run->status) }}">{{ $run->status }}</span>
                                                 <span class="w-20 font-mono tabular-nums text-brand-mist">{{ $run->bytes ? $formatBytes((int) $run->bytes) : '—' }}</span>
                                                 <span class="flex-1 truncate text-brand-mist">
                                                     @if ($run->error_message)
@@ -707,9 +707,9 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->serverDatabase)->name ?? '(deleted)' }}</p>
-                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip($backup->status) }}">{{ $backup->status }}</span>
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusChip($backup->status) }}">{{ $backup->status }}</span>
                                 </div>
-                                <p class="mt-0.5 text-[11px] text-brand-mist">
+                                <p class="mt-0.5 text-xs text-brand-mist">
                                     @if ($backup->bytes)
                                         <span class="font-mono tabular-nums text-brand-ink">{{ $formatBytes((int) $backup->bytes) }}</span>
                                         <span aria-hidden="true" class="text-brand-mist/60">·</span>
@@ -781,9 +781,9 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->site)->name ?? '(deleted)' }}</p>
-                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip($backup->status) }}">{{ $backup->status }}</span>
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusChip($backup->status) }}">{{ $backup->status }}</span>
                                 </div>
-                                <p class="mt-0.5 text-[11px] text-brand-mist">
+                                <p class="mt-0.5 text-xs text-brand-mist">
                                     @if ($backup->bytes)
                                         <span class="font-mono tabular-nums text-brand-ink">{{ $formatBytes((int) $backup->bytes) }}</span>
                                         <span aria-hidden="true" class="text-brand-mist/60">·</span>

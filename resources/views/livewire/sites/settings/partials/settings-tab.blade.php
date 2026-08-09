@@ -7,7 +7,7 @@
 
 @php
     $panelBody = 'px-5 py-3 sm:px-6';
-    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
+    $fieldHelp = 'mt-1 text-xs text-brand-moss';
     $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
 @endphp
 
@@ -102,7 +102,7 @@
             <input type="checkbox" wire:model.live="worker_mode" class="mt-0.5 h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/30" />
             <span class="min-w-0">
                 <span class="block text-xs font-semibold text-brand-ink">{{ __('Run this site as a worker (no web interface)') }}</span>
-                <span class="mt-0.5 block text-[11px] text-brand-moss">
+                <span class="mt-0.5 block text-xs text-brand-moss">
                     @if ($server->isWorkerHost())
                         {{ __('Worker hosts default this on. Turning it off lets this site serve HTTP.') }}
                     @else
@@ -165,10 +165,10 @@
         @if ($site->workspace)
             @feature('surface.projects')
                 <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-1.5">
-                    <p class="text-[11px] text-brand-moss">
+                    <p class="text-xs text-brand-moss">
                         {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
                     </p>
-                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold">
+                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-semibold">
                         <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="text-brand-forest hover:underline">{{ __('Resources') }}</a>
                         <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="text-brand-forest hover:underline">{{ __('Operations') }}</a>
                         <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="text-brand-forest hover:underline">{{ __('Delivery') }}</a>

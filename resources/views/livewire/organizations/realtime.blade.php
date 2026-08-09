@@ -37,16 +37,16 @@
                         <x-fleet-stat :label="__('On this bill')">
                             <p class="mt-2 flex items-baseline gap-1">
                                 <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $money($monthlyCents) }}</span>
-                                <span class="text-[11px] text-brand-moss">/{{ __('mo') }}</span>
+                                <span class="text-xs text-brand-moss">/{{ __('mo') }}</span>
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Workspace subscription') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Workspace subscription') }}</p>
                         </x-fleet-stat>
                         <x-fleet-stat :label="__('Active apps')">
                             <p class="mt-2 flex items-baseline gap-1.5">
                                 <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $activeCount }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('app|apps', $activeCount) }}</span>
+                                <span class="text-xs text-brand-moss">{{ trans_choice('app|apps', $activeCount) }}</span>
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across your sites') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Across your sites') }}</p>
                         </x-fleet-stat>
                         <x-fleet-stat
                             :label="__('Managed realtime')"
@@ -64,7 +64,7 @@
                                     <span class="text-sm font-semibold text-brand-mist">{{ __('Unavailable') }}</span>
                                 @endif
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Feature flag') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Feature flag') }}</p>
                         </x-fleet-stat>
                     </dl>
                 </x-slot:stats>
@@ -118,13 +118,13 @@
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2">
                                         <h3 class="truncate text-base font-semibold text-brand-ink">{{ $app->name }}</h3>
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                                             {{ ucfirst($app->status) }}
                                         </span>
                                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" />
                                     </div>
                                     <p class="mt-1 font-mono text-xs text-brand-moss">{{ $app->app_key }}</p>
-                                    <p class="mt-0.5 font-mono text-[11px] text-brand-moss/80">{{ $app->host() }}</p>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-moss/80">{{ $app->host() }}</p>
                                     @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
                                         <p class="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
                                     @endif
@@ -195,7 +195,7 @@
                         @foreach ($tiers as $slug => $tier)
                             <button type="button" wire:click="$set('selectedTier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $selectedTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
                                 <div class="text-sm font-semibold text-brand-ink">{{ $tier['label'] }}</div>
-                                <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tier['max_connections']) }} {{ __('connections') }}</div>
+                                <div class="mt-0.5 text-xs text-brand-moss">{{ number_format($tier['max_connections']) }} {{ __('connections') }}</div>
                                 <div class="mt-1 text-xs font-semibold text-brand-forest">{{ $money((int) $tier['price_cents']) }}/{{ __('mo') }}</div>
                             </button>
                         @endforeach
@@ -285,7 +285,7 @@
                         @foreach ($tiers as $slug => $tierOption)
                             <button type="button" wire:click="$set('createTier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $createTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
                                 <div class="text-sm font-semibold text-brand-ink">{{ $tierOption['label'] }}</div>
-                                <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tierOption['max_connections']) }} {{ __('connections') }}</div>
+                                <div class="mt-0.5 text-xs text-brand-moss">{{ number_format($tierOption['max_connections']) }} {{ __('connections') }}</div>
                                 <div class="mt-1 text-xs font-semibold text-brand-forest">{{ $money((int) $tierOption['price_cents']) }}/{{ __('mo') }}</div>
                             </button>
                         @endforeach

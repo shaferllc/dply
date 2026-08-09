@@ -39,15 +39,15 @@
                 >
                     <x-slot:actions>
                         <span @class([
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                             $statusBadgeClass,
                         ])>{{ $statusLabel }}</span>
-                        <a href="{{ $historyUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
+                        <a href="{{ $historyUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
                             <x-heroicon-o-arrow-left class="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
                             {{ __('History') }}
                         </a>
                         @if ($this->showWindowLogCorrelation)
-                            <button type="button" wire:click="openLogsForDeploy" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
+                            <button type="button" wire:click="openLogsForDeploy" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
                                 <x-heroicon-m-bars-3-bottom-left class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
                                 {{ __('Logs') }}
                             </button>
@@ -58,7 +58,7 @@
                             aria-pressed="{{ $showOutput ? 'true' : 'false' }}"
                             title="{{ $showOutput ? __('Collapse per-step output') : __('Expand phases and show per-step output') }}"
                             @class([
-                                'inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition',
+                                'inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition',
                                 'border border-brand-ink bg-brand-ink text-brand-cream' => $showOutput,
                                 'border border-brand-ink/15 bg-white/80 text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800' => ! $showOutput,
                             ])
@@ -76,12 +76,12 @@
 
                 <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/10 sm:grid-cols-4">
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Trigger') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Trigger') }}</dt>
                         <dd class="mt-0.5 truncate text-xs text-brand-ink">{{ $deployment->trigger ?: '—' }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Commit') }}</dt>
-                        <dd class="mt-0.5 truncate font-mono text-[11px] text-brand-ink" title="{{ $deployment->git_sha }}">
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Commit') }}</dt>
+                        <dd class="mt-0.5 truncate font-mono text-xs text-brand-ink" title="{{ $deployment->git_sha }}">
                             @if ($deployment->git_sha)
                                 {{ \Illuminate\Support\Str::limit($deployment->git_sha, 12, '') }}
                             @else
@@ -90,36 +90,36 @@
                         </dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Exit') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Exit') }}</dt>
                         <dd @class([
-                            'mt-0.5 font-mono text-[11px]',
+                            'mt-0.5 font-mono text-xs',
                             'text-rose-700' => $deployment->exit_code !== null && $deployment->exit_code !== 0,
                             'text-brand-ink' => $deployment->exit_code === null || $deployment->exit_code === 0,
                         ])>{{ $deployment->exit_code === null ? '—' : $deployment->exit_code }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Duration') }}</dt>
-                        <dd class="mt-0.5 font-mono text-[11px] tabular-nums text-brand-ink">{{ $durationMs > 0 ? number_format($durationMs / 1000, 1).'s' : '—' }}</dd>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Duration') }}</dt>
+                        <dd class="mt-0.5 font-mono text-xs tabular-nums text-brand-ink">{{ $durationMs > 0 ? number_format($durationMs / 1000, 1).'s' : '—' }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Started') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Started') }}</dt>
                         <dd class="mt-0.5 truncate text-xs text-brand-moss" @if ($deployment->started_at) title="{{ $deployment->started_at->toIso8601String() }}" @endif>
                             {{ $deployment->started_at?->diffForHumans() ?? '—' }}
                         </dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Finished') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Finished') }}</dt>
                         <dd class="mt-0.5 truncate text-xs text-brand-moss" @if ($deployment->finished_at) title="{{ $deployment->finished_at->toIso8601String() }}" @endif>
                             {{ $deployment->finished_at?->diffForHumans() ?? '—' }}
                         </dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Steps') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Steps') }}</dt>
                         <dd class="mt-0.5 text-xs tabular-nums text-brand-ink">{{ $stepCount }}</dd>
                     </div>
                     <div class="bg-white px-3 py-2 sm:px-4">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Idempotency') }}</dt>
-                        <dd class="mt-0.5 truncate font-mono text-[11px] text-brand-moss" title="{{ $deployment->idempotency_key }}">{{ $deployment->idempotency_key ?: '—' }}</dd>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Idempotency') }}</dt>
+                        <dd class="mt-0.5 truncate font-mono text-xs text-brand-moss" title="{{ $deployment->idempotency_key }}">{{ $deployment->idempotency_key ?: '—' }}</dd>
                     </div>
                 </dl>
 
@@ -154,7 +154,7 @@
                             :title="__('Deploy log')"
                             :note="__('Combined stdout/stderr from the runner.')"
                         />
-                        <pre class="max-h-80 overflow-auto bg-brand-ink px-3 py-3 font-mono text-[11px] leading-relaxed text-brand-cream/95 sm:px-4">{{ trim((string) $deployment->log_output) }}</pre>
+                        <pre class="max-h-80 overflow-auto bg-brand-ink px-3 py-3 font-mono text-xs leading-relaxed text-brand-cream/95 sm:px-4">{{ trim((string) $deployment->log_output) }}</pre>
                     </div>
                 @endif
 

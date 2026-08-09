@@ -23,7 +23,7 @@
                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $app->name }}</span>
                 @endif
                 @if ($app->previewBranch)
-                    <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-900/50">
+                    <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-900/50">
                         @if ($app->previewPrNumber)
                             PR #{{ $app->previewPrNumber }}
                         @else
@@ -31,7 +31,7 @@
                         @endif
                     </span>
                 @endif
-                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $app->statusBadgeClass }}">
+                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $app->statusBadgeClass }}">
                     <span class="relative inline-flex h-1.5 w-1.5">
                         @if ($app->statusPulse)
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-50"></span>
@@ -42,7 +42,7 @@
                 </span>
             </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                 @if ($app->liveUrl)
                     <a
                         href="{{ $app->liveUrl }}"

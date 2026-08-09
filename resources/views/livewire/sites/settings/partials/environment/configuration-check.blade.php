@@ -33,7 +33,7 @@
                     </h3>
                     {{-- Severity split up front: "7 warnings" alone doesn't say how
                          many are boot-breaking versus merely untidy. --}}
-                    <span class="flex items-center gap-1.5 text-[11px] font-medium">
+                    <span class="flex items-center gap-1.5 text-xs font-medium">
                         @if ($dangerCount > 0)
                             <span class="rounded-full bg-rose-100 px-1.5 py-0.5 tabular-nums text-rose-700">{{ __(':n breaking', ['n' => $dangerCount]) }}</span>
                         @endif
@@ -115,7 +115,7 @@
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs leading-5 text-brand-ink">
                                     @foreach ($gKeys as $gk)
-                                        <span class="font-mono text-[11px] font-semibold {{ $isDanger ? 'text-rose-700' : ($isWarn ? 'text-amber-800' : 'text-brand-moss') }}">{{ $gk }}</span>{{ ! $loop->last ? ', ' : '' }}
+                                        <span class="font-mono text-xs font-semibold {{ $isDanger ? 'text-rose-700' : ($isWarn ? 'text-amber-800' : 'text-brand-moss') }}">{{ $gk }}</span>{{ ! $loop->last ? ', ' : '' }}
                                     @endforeach
                                     @if ($gKeys !== [])
                                         <span class="text-brand-mist" aria-hidden="true">·</span>
@@ -124,11 +124,11 @@
                                 </p>
                                 @if ($g['detail'])
                                     <details class="group/detail mt-0.5">
-                                        <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-brand-moss hover:text-brand-ink [&::-webkit-details-marker]:hidden">
+                                        <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-brand-moss hover:text-brand-ink [&::-webkit-details-marker]:hidden">
                                             <x-heroicon-o-chevron-right class="h-3 w-3 transition-transform group-open/detail:rotate-90" />
                                             {{ __('How to fix') }}
                                         </summary>
-                                        <p class="mt-1 pl-4 text-[11px] leading-relaxed text-brand-moss">{{ $g['detail'] }}</p>
+                                        <p class="mt-1 pl-4 text-xs leading-relaxed text-brand-moss">{{ $g['detail'] }}</p>
                                     </details>
                                 @endif
                             </div>
@@ -168,7 +168,7 @@
                 </ul>
                 <div class="mt-3">
                     @if ($suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
-                        <p class="mt-2 text-[11px] text-brand-mist">
+                        <p class="mt-2 text-xs text-brand-mist">
                             {{ trans_choice('{1} :count warning suppressed.|[2,*] :count warnings suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}
                             @foreach ($suppressedEnvWarningKeys as $sk)
                                 <button type="button" wire:click="unignoreEnvWarning(@js($sk))" class="ml-1 font-semibold hover:underline" title="{{ __('Re-enable :key warning', ['key' => $sk]) }}">{{ $sk }}</button>
@@ -206,7 +206,7 @@
                     @endphp
                     @if ($resourceActions !== [])
                         <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-black/5 pt-3">
-                            <span class="text-[11px] font-medium text-brand-moss">{{ __('Manage the resource instead:') }}</span>
+                            <span class="text-xs font-medium text-brand-moss">{{ __('Manage the resource instead:') }}</span>
                             @foreach ($resourceActions as $type => $meta)
                                 <button type="button" wire:click="openBindingModal(@js($type))"
                                     class="dply-btn dply-btn-xs dply-btn-outline whitespace-nowrap">

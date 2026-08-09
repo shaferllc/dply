@@ -52,7 +52,7 @@
                     <button
                         type="button"
                         wire:click="openEngineDatabaseCreate('{{ $engine }}')"
-                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                     >
                         <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Create database') }}

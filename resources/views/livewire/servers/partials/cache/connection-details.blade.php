@@ -50,12 +50,12 @@
                 </p>
             </div>
             @if ($isExposed)
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                     <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                     {{ __('Remote') }}
                 </span>
             @else
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                     {{ __('Loopback only') }}
                 </span>
@@ -82,7 +82,7 @@
 
         <dl class="mt-5 grid gap-3 sm:grid-cols-2">
             <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</dt>
                 <dd class="mt-1">
                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-zinc-50 px-3 py-2">
                         <code class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">{{ $effectiveHost }}</code>
@@ -96,12 +96,12 @@
                         </button>
                     </div>
                     @if (! $isExposed && $remoteHost !== '')
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Server public IP is :ip — connections will start working from there once you expose the engine.', ['ip' => $remoteHost]) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Server public IP is :ip — connections will start working from there once you expose the engine.', ['ip' => $remoteHost]) }}</p>
                     @endif
                 </dd>
             </div>
             <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
                 <dd class="mt-1">
                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-zinc-50 px-3 py-2">
                         <code class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">{{ $row->port }}</code>
@@ -117,13 +117,13 @@
                 </dd>
             </div>
             <div class="sm:col-span-2">
-                <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <dt class="flex items-center justify-between text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <span>{{ __('AUTH password') }}</span>
                     @if ($hasAuth)
                         <button
                             type="button"
                             wire:click="setEngineSubtab('configure')"
-                            class="rounded-md font-sans text-[11px] font-medium normal-case tracking-normal text-brand-forest hover:underline"
+                            class="rounded-md font-sans text-xs font-medium normal-case tracking-normal text-brand-forest hover:underline"
                         >
                             {{ __('Rotate') }}
                         </button>
@@ -170,7 +170,7 @@
                 </dd>
             </div>
             <div class="sm:col-span-2" wire:init="primeCachePrefix">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CACHE_PREFIX') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('CACHE_PREFIX') }}</dt>
                 <dd class="mt-1">
                     <div class="flex flex-wrap items-stretch gap-2">
                         <div class="min-w-0 flex-1">
@@ -204,14 +204,14 @@
                             </button>
                         @endif
                     </div>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Laravel prepends this string to every key (CACHE_PREFIX env). Letters, digits, "_", "-", ":" only; max 64 chars. Leave blank for no prefix.') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Laravel prepends this string to every key (CACHE_PREFIX env). Letters, digits, "_", "-", ":" only; max 64 chars. Leave blank for no prefix.') }}</p>
                 </dd>
             </div>
         </dl>
 
         @if ($hasAuth || $isExposed)
             <div class="mt-5">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Open a remote :cli session', ['cli' => $cliBin]) }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Open a remote :cli session', ['cli' => $cliBin]) }}</p>
                 <div class="mt-1 flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-zinc-50 px-3 py-2">
                     <code class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-brand-ink">
                         <span x-show="! shown">{{ $cliCommandMasked }}</span>
@@ -226,7 +226,7 @@
                         <x-heroicon-o-clipboard class="h-4 w-4" />
                     </button>
                 </div>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Toggle the eye icon above to reveal the password inside this command.') }}</p>
+                <p class="mt-1 text-xs text-brand-mist">{{ __('Toggle the eye icon above to reveal the password inside this command.') }}</p>
             </div>
         @endif
     </div>

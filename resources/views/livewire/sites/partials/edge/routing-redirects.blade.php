@@ -1,10 +1,10 @@
 <section class="px-5 py-4 sm:px-6">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Redirects') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Redirects') }}</p>
             <p class="mt-1 text-sm text-brand-moss">{{ __('HTTP redirects. Repo rows from :file are read-only; add dashboard rows below.', ['file' => $sourcePath]) }}</p>
         </div>
-        <span wire:loading.inline-flex wire:target="addRedirect,removeRedirect,applyTemplate" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+        <span wire:loading.inline-flex wire:target="addRedirect,removeRedirect,applyTemplate" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
             <x-spinner size="sm" variant="muted" />
             {{ __('Saving…') }}
         </span>
@@ -21,7 +21,7 @@
     @else
         <div class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/8 text-xs">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-3 py-2">{{ __('From') }}</th>
                         <th class="px-3 py-2">{{ __('To') }}</th>
@@ -39,7 +39,7 @@
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('removeRedirect', @js([$index]), @js(__('Remove redirect')), @js(__('Remove :from → :to?', ['from' => $rule['from'], 'to' => $rule['to']])), @js(__('Remove')), true)"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                 >{{ __('Remove') }}</button>
                             </td>
                         </tr>
@@ -51,16 +51,16 @@
 
     <form wire:submit.prevent="addRedirect" class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[2fr_2fr_6rem_auto] sm:items-end">
         <div>
-            <label for="new-redir-from" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('From') }}</label>
+            <label for="new-redir-from" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('From') }}</label>
             <input id="new-redir-from" type="text" wire:model="new_redirect_from" class="mt-1 block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink focus:border-brand-forest focus:ring-brand-forest" placeholder="/old-page" autocomplete="off" />
             @error('new_redirect_from') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
         </div>
         <div>
-            <label for="new-redir-to" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('To') }}</label>
+            <label for="new-redir-to" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('To') }}</label>
             <input id="new-redir-to" type="text" wire:model="new_redirect_to" class="mt-1 block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink focus:border-brand-forest focus:ring-brand-forest" placeholder="/new-page" autocomplete="off" />
         </div>
         <div>
-            <label for="new-redir-status" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
+            <label for="new-redir-status" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
             <select id="new-redir-status" wire:model="new_redirect_status" class="mt-1 block w-full rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 font-mono text-xs text-brand-ink focus:border-brand-forest focus:ring-brand-forest">
                 <option value="301">301</option>
                 <option value="302">302</option>
@@ -91,13 +91,13 @@ redirects:
     status: 301
             </x-edge-yaml-example>
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Templates') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Templates') }}</p>
                 <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     @foreach (collect($templates)->only(['blog-migration']) as $key => $template)
                         <div class="rounded-lg border border-brand-ink/10 p-3">
                             <div class="flex items-baseline justify-between gap-2">
                                 <p class="text-sm font-semibold text-brand-ink">{{ $template['label'] }}</p>
-                                <button type="button" wire:click="applyTemplate('{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40">{{ __('Apply') }}</button>
+                                <button type="button" wire:click="applyTemplate('{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40">{{ __('Apply') }}</button>
                             </div>
                             <p class="mt-1 text-xs text-brand-moss">{{ $template['hint'] }}</p>
                         </div>

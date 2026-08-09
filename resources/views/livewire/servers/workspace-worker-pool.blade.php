@@ -104,19 +104,19 @@
                 :note="$statusMeta['blurb'] ?: __('Scale queue workers; one primary owns the scheduler.')"
             >
                 <x-slot:actions>
-                    <span class="inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
+                    <span class="inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
                         @if ($effectiveStatus === 'scaling')
                             <span class="inline-flex h-3.5 w-3.5"><x-spinner variant="forest" size="sm" /></span>
                         @endif
                         {{ $statusMeta['label'] }}
                     </span>
-                    <span class="hidden text-[10px] text-brand-mist sm:inline">{{ __('Updated :ago', ['ago' => $pool->updated_at?->diffForHumans() ?? '—']) }}</span>
+                    <span class="hidden text-2xs text-brand-mist sm:inline">{{ __('Updated :ago', ['ago' => $pool->updated_at?->diffForHumans() ?? '—']) }}</span>
                     <button
                         type="button"
                         wire:click="reconcileNow"
                         wire:loading.attr="disabled"
                         wire:target="reconcileNow"
-                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         title="{{ __('Re-run the reconciler to advance stuck members and re-check pending deploys.') }}"
                     >
                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
@@ -125,7 +125,7 @@
                     <button
                         type="button"
                         wire:click="openConfirmActionModal('tearDownPool', [], @js(__('Tear down pool')), @js(__('This drains and DESTROYS all :n replica(s). :primary stays as a standalone worker. This cannot be undone.', ['n' => max(0, $members->count() - 1), 'primary' => $pool->primaryServer?->name ?? $server->name])), @js(__('Tear down pool')), true)"
-                        class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                     >
                         <x-heroicon-o-trash class="h-3.5 w-3.5" />
                         {{ __('Tear down') }}
@@ -149,7 +149,7 @@
                 @endphp
                 @foreach ($tiles as $t)
                     <div class="bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
                         <dd class="mt-0.5 text-base font-semibold tabular-nums text-brand-ink">{{ $t['v'] }}</dd>
                     </div>
                 @endforeach
@@ -206,7 +206,7 @@
             </x-server-workspace-tab>
             <x-server-workspace-tab :active="$tab === 'members'" wire:click="setTab('members')">
                 {{ __('Members') }}
-                <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
+                <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-xs text-brand-moss">{{ $members->count() }}</span>
             </x-server-workspace-tab>
             <x-server-workspace-tab :active="$tab === 'horizon'" wire:click="setTab('horizon')">
                 {{ __('Horizon') }}
@@ -309,7 +309,7 @@
                     :note="__('Bind backends (password-gated) and allowlist worker IPs at the firewall.')"
                 >
                     <x-slot:actions>
-                        <button type="button" wire:click="openConfirmActionModal('applyExposure', [], @js(__('Expose & allowlist backends')), @js(__('Bind these backends (password-gated) and allowlist the worker IPs at the firewall now?')), @js(__('Expose & allowlist')), false)" class="inline-flex h-6 items-center rounded-md bg-amber-600 px-2 text-[11px] font-semibold text-white hover:bg-amber-700">{{ __('Expose & allowlist') }}</button>
+                        <button type="button" wire:click="openConfirmActionModal('applyExposure', [], @js(__('Expose & allowlist backends')), @js(__('Bind these backends (password-gated) and allowlist the worker IPs at the firewall now?')), @js(__('Expose & allowlist')), false)" class="inline-flex h-6 items-center rounded-md bg-amber-600 px-2 text-xs font-semibold text-white hover:bg-amber-700">{{ __('Expose & allowlist') }}</button>
                     </x-slot:actions>
                 </x-workspace-panel-head>
                 @php $exposure = $pool->meta['exposure'] ?? null; @endphp
@@ -434,13 +434,13 @@
                                 <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $isReady ? 'bg-emerald-500' : 'bg-amber-400' }}" title="{{ $isReady ? __('Server ready') : __('Server not ready') }}"></span>
                                 <a href="{{ route('servers.overview', $member) }}" wire:navigate class="text-sm font-semibold text-brand-ink hover:text-brand-forest hover:underline">{{ $member->name }}</a>
                                 @if ($member->isPoolPrimary())
-                                    <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Primary') }}</span>
+                                    <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Primary') }}</span>
                                 @else
-                                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Replica') }}</span>
+                                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Replica') }}</span>
                                 @endif
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $sm['cls'] }}">{{ $sm['label'] }}</span>
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $sm['cls'] }}">{{ $sm['label'] }}</span>
                                 @if ($crossRegion)
-                                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-200">{{ __('Cross-region') }}</span>
+                                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-200">{{ __('Cross-region') }}</span>
                                 @endif
                             </div>
                             <p class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-brand-moss">
@@ -474,7 +474,7 @@
             </div>
         </section>
 
-        <p class="border-b border-brand-ink/10 px-3 py-2 text-[11px] text-brand-moss sm:px-4">
+        <p class="border-b border-brand-ink/10 px-3 py-2 text-xs text-brand-moss sm:px-4">
             {{ __('Same-region workers join this server\'s private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
         </p>
         @endif {{-- /members --}}
@@ -541,7 +541,7 @@
                         {{ __('Running config differs from saved') }}
                     </div>
                     <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don\'t match this pool\'s saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
-                    <ul class="mt-2 space-y-0.5 font-mono text-[11px] text-amber-800">
+                    <ul class="mt-2 space-y-0.5 font-mono text-xs text-amber-800">
                         @foreach ($hzDrift as $field => $d)
                             <li>{{ $field }}: <span class="text-amber-600">saved={{ is_array($d['saved'] ?? null) ? implode(',', $d['saved']) : ($d['saved'] ?? '—') }}</span> → <span class="font-semibold">running={{ is_array($d['running'] ?? null) ? implode(',', $d['running']) : ($d['running'] ?? '—') }}</span></li>
                         @endforeach
@@ -559,27 +559,27 @@
                     <x-slot:actions>
                         @if ($hzStatus)
                             <span @class([
-                                'inline-flex h-6 items-center rounded-full px-2 text-[11px] font-semibold uppercase tracking-wide ring-1',
+                                'inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold uppercase tracking-wide ring-1',
                                 'bg-emerald-50 text-emerald-700 ring-emerald-200' => $hzStatus === 'running',
                                 'bg-amber-50 text-amber-700 ring-amber-200' => $hzStatus === 'paused',
                                 'bg-rose-50 text-rose-700 ring-rose-200' => ! in_array($hzStatus, ['running', 'paused'], true),
                             ])>{{ $hzStatus }}</span>
                         @endif
                         <div class="inline-flex h-6 overflow-hidden rounded-md border border-brand-ink/15" title="{{ __('Control Horizon on every member.') }}">
-                            <button type="button" wire:click="controlPoolHorizon('horizon:pause')" class="px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Pause') }}</button>
-                            <button type="button" wire:click="controlPoolHorizon('horizon:continue')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Resume') }}</button>
-                            <button type="button" wire:click="controlPoolHorizon('horizon:terminate')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
-                            <button type="button" wire:click="controlPoolHorizon('horizon:snapshot')" class="border-l border-brand-ink/15 px-2 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Snapshot') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:pause')" class="px-2 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Pause') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:continue')" class="border-l border-brand-ink/15 px-2 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Resume') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:terminate')" class="border-l border-brand-ink/15 px-2 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
+                            <button type="button" wire:click="controlPoolHorizon('horizon:snapshot')" class="border-l border-brand-ink/15 px-2 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Snapshot') }}</button>
                         </div>
                         <button type="button" wire:click="runHorizonTestJobs" wire:loading.attr="disabled" wire:target="runHorizonTestJobs"
-                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                             title="{{ __('Dispatch 5 throwaway test jobs onto the queue, then re-pull the snapshot to confirm Horizon picked them up.') }}">
                             <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runHorizonTestJobs" />
                             <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>
                             {{ __('Test') }}
                         </button>
                         <button type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon"
-                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60">
+                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60">
                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refreshHorizon" />
                             <span wire:loading wire:target="refreshHorizon" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                             {{ __('Refresh') }}
@@ -587,10 +587,10 @@
                     </x-slot:actions>
                 </x-workspace-panel-head>
                 @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
-                <p class="border-b border-brand-ink/10 px-3 py-1.5 text-[11px] text-brand-moss sm:px-4">
+                <p class="border-b border-brand-ink/10 px-3 py-1.5 text-xs text-brand-moss sm:px-4">
                     <span class="font-medium text-brand-ink">{{ __('Queues:') }}</span>
                     @foreach ($watchedQueues as $q)
-                        <code class="ml-1 rounded bg-brand-sand/60 px-1 py-0.5 font-mono text-[10px]">{{ $q }}</code>
+                        <code class="ml-1 rounded bg-brand-sand/60 px-1 py-0.5 font-mono text-2xs">{{ $q }}</code>
                     @endforeach
                     @if ($hzError)
                         <span class="ml-2 font-medium text-rose-600" title="{{ $hzError }}">{{ __('last refresh failed') }}</span>
@@ -615,7 +615,7 @@
                         @endphp
                         @foreach ($hzTiles as $t)
                             <div class="bg-white px-3 py-2.5">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
                                 <dd class="mt-1 text-lg font-semibold tabular-nums text-brand-ink">{{ is_numeric($t['v']) ? number_format((float) $t['v']) : $t['v'] }}</dd>
                             </div>
                         @endforeach
@@ -649,9 +649,9 @@
                             @php $liveAge = ! empty($j['received_at']) ? max(0, now()->timestamp - (int) $j['received_at']) : null; @endphp
                             <div class="flex flex-wrap items-center gap-2 px-3 py-1.5 sm:px-4" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
                                 <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
-                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] }}</span>
+                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-xs text-brand-moss">{{ $j['queue'] }}</span>
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1',
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1',
                                     'bg-sky-50 text-sky-700 ring-sky-200' => $j['status'] === 'processing',
                                     'bg-emerald-50 text-emerald-700 ring-emerald-200' => $j['status'] === 'completed',
                                     'bg-rose-50 text-rose-700 ring-rose-200' => $j['status'] === 'failed',
@@ -754,7 +754,7 @@
                                         <span class="ml-1 font-normal text-brand-moss">· {{ $detSource }}</span>
                                     </p>
                                     <p class="mt-1 break-words font-mono text-xs text-brand-ink">{{ $detQueues }}</p>
-                                    <p class="mt-1 text-[11px] text-brand-moss">
+                                    <p class="mt-1 text-xs text-brand-moss">
                                         {{ __('Suggested :min–:max processes · :mem MB · :to s timeout', [
                                             'min' => $hzRec['min_processes'] ?? '—',
                                             'max' => $hzRec['max_processes'] ?? '—',
@@ -768,7 +768,7 @@
                                     {{ __('Apply suggestions') }}
                                 </x-secondary-button>
                             </div>
-                            <p class="mt-2 text-[11px] text-brand-moss">{{ __('Fills the fields below — review, then Save & apply to push to the workers.') }}</p>
+                            <p class="mt-2 text-xs text-brand-moss">{{ __('Fills the fields below — review, then Save & apply to push to the workers.') }}</p>
                         </div>
                     @endif
 
@@ -788,7 +788,7 @@
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
                         {{-- Live preview: the FIRST queue is the dispatch target (REDIS_QUEUE) —
                              so a typo here silently misroutes jobs. Make it visible before save. --}}
-                        <p class="mt-1 text-[11px] text-brand-moss">
+                        <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Dispatch queue (REDIS_QUEUE):') }}
                             <span class="font-mono font-semibold text-brand-ink" x-text="first"></span>
                             <span class="text-brand-mist"> · </span>{{ __('watching') }}
@@ -846,7 +846,7 @@
                     <div x-show="open" x-collapse>
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="border-b border-brand-ink/10 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                            <tr class="border-b border-brand-ink/10 text-left text-xs uppercase tracking-wide text-brand-mist">
                                 <th class="px-3 py-1.5 sm:px-4">{{ __('Queue') }}</th>
                                 <th class="px-3 py-2">{{ __('Length') }}</th>
                                 <th class="px-3 py-2">{{ __('Wait') }}</th>
@@ -924,9 +924,9 @@
                             @foreach ($hz[$list['key']] as $j)
                                 <div class="flex flex-wrap items-center gap-2 px-3 py-1.5 sm:px-4">
                                     <span class="text-sm font-medium text-brand-ink">{{ $j['name'] ?? 'job' }}</span>
-                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] ?? '?' }}</span>
+                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-xs text-brand-moss">{{ $j['queue'] ?? '?' }}</span>
                                     @if (! empty($j['status']))
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $statusTone($j['status']) }}">{{ $j['status'] }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $statusTone($j['status']) }}">{{ $j['status'] }}</span>
                                     @endif
                                     @if (($j['age'] ?? null) !== null)
                                         <span class="ml-auto text-xs text-brand-mist" title="{{ $hzAt ? $hzAt->copy()->subSeconds((int) $j['age'])->toDayDateTimeString() : '' }}">{{ $fmtAge($j['age']) }}</span>
@@ -965,15 +965,15 @@
                             <div class="px-3 py-2 sm:px-4" x-data="{ open: false }">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="text-sm font-semibold text-brand-ink">{{ $fj['name'] ?? 'job' }}</span>
-                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $fj['queue'] ?? '?' }}</span>
+                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-xs text-brand-moss">{{ $fj['queue'] ?? '?' }}</span>
                                     @foreach (($fj['tags'] ?? []) as $tag)
-                                        <span class="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[11px] text-indigo-700 ring-1 ring-indigo-100">{{ $tag }}</span>
+                                        <span class="rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700 ring-1 ring-indigo-100">{{ $tag }}</span>
                                     @endforeach
                                     <span class="ml-auto text-xs text-brand-mist">{{ $fj['failed_at'] ?? '' }}</span>
                                     @if (! empty($fj['uuid']))
                                         <span class="inline-flex overflow-hidden rounded-md border border-brand-ink/15">
-                                            <button type="button" wire:click="retryFailedJob('{{ $fj['uuid'] }}')" class="px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Retry') }}</button>
-                                            <button type="button" wire:click="openConfirmActionModal('forgetFailedJob', @js([$fj['uuid']]), @js(__('Delete failed job')), @js(__('Permanently delete this failed job?')), @js(__('Delete')), true)" class="border-l border-brand-ink/15 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
+                                            <button type="button" wire:click="retryFailedJob('{{ $fj['uuid'] }}')" class="px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Retry') }}</button>
+                                            <button type="button" wire:click="openConfirmActionModal('forgetFailedJob', @js([$fj['uuid']]), @js(__('Delete failed job')), @js(__('Permanently delete this failed job?')), @js(__('Delete')), true)" class="border-l border-brand-ink/15 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
                                         </span>
                                     @endif
                                 </div>
@@ -984,12 +984,12 @@
                                     </button>
                                     @if (! empty($fj['exception_full']))
                                         <div x-show="open" x-cloak class="relative mt-2" x-data="{ copied: false, copyTrace() { navigator.clipboard.writeText(@js($fj['exception_full'])).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">
-                                            <button type="button" x-on:click="copyTrace()" class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-medium text-rose-100/90 backdrop-blur transition hover:bg-white/20" :title="copied ? @js(__('Copied!')) : @js(__('Copy stack trace'))">
+                                            <button type="button" x-on:click="copyTrace()" class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-rose-100/90 backdrop-blur transition hover:bg-white/20" :title="copied ? @js(__('Copied!')) : @js(__('Copy stack trace'))">
                                                 <x-heroicon-o-clipboard class="h-4 w-4" x-show="! copied" />
                                                 <x-heroicon-o-check class="h-4 w-4" x-show="copied" x-cloak />
                                                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></span>
                                             </button>
-                                            <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 pr-20 font-mono text-[11px] leading-relaxed text-rose-100">{{ $fj['exception_full'] }}</pre>
+                                            <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 pr-20 font-mono text-xs leading-relaxed text-rose-100">{{ $fj['exception_full'] }}</pre>
                                         </div>
                                     @endif
                                 @endif
@@ -1017,21 +1017,21 @@
                 >
                     <x-slot:actions>
                         <button type="button" wire:click="ensureWorkers" wire:loading.attr="disabled" wire:target="ensureWorkers"
-                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
+                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
                             title="{{ __('Define the queue daemon (Horizon if installed, else queue:work) on every member and start it via systemd.') }}">
                             <x-heroicon-o-bolt class="h-3.5 w-3.5" wire:loading.remove wire:target="ensureWorkers" />
                             <span wire:loading wire:target="ensureWorkers" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                             {{ __('Ensure workers') }}
                         </button>
                         <button type="button" wire:click="runTestJobs" wire:loading.attr="disabled" wire:target="runTestJobs"
-                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             title="{{ __('Dispatch 5 throwaway jobs onto the queue and confirm the workers process them.') }}">
                             <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runTestJobs" />
                             <span wire:loading wire:target="runTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Test jobs') }}
                         </button>
                         <button type="button" wire:click="collectStats" wire:loading.attr="disabled" wire:target="collectStats"
-                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="collectStats" />
                             <span wire:loading wire:target="collectStats" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Refresh') }}
@@ -1059,7 +1059,7 @@
                     @endphp
                     @foreach ($poolTiles as $t)
                         <div class="bg-white px-3 py-2.5">
-                            <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $t['k'] }}</dt>
                             <dd class="mt-1 text-lg font-semibold tabular-nums text-brand-ink">{{ $t['v'] }}</dd>
                         </div>
                     @endforeach
@@ -1090,7 +1090,7 @@
                             <span class="inline-flex h-2 w-2 rounded-full {{ $member->isReady() ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
                             <span class="text-sm font-semibold text-brand-ink">{{ $member->name }}</span>
                             @if ($member->isPoolPrimary())
-                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Primary') }}</span>
+                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Primary') }}</span>
                             @endif
                             @php
                                 $hp = (int) ($st['horizon_procs'] ?? 0);
@@ -1106,7 +1106,7 @@
                                 }
                             @endphp
                             @if ($daemon)
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $daemon['cls'] }}">{{ $daemon['label'] }}</span>
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $daemon['cls'] }}">{{ $daemon['label'] }}</span>
                             @endif
                         </div>
                         <span class="text-xs text-brand-moss">{{ $collectedAt ? __('collected :ago', ['ago' => $collectedAt->diffForHumans()]) : __('no data yet') }}</span>
@@ -1137,7 +1137,7 @@
                             @endphp
                             @foreach ($facts as $label => $value)
                                 <div>
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-mist">{{ $label }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.1em] text-brand-mist">{{ $label }}</dt>
                                     <dd class="mt-0.5 font-mono text-brand-ink">{{ $value !== '' ? $value : '—' }}</dd>
                                 </div>
                             @endforeach

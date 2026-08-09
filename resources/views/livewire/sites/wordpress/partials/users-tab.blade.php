@@ -4,7 +4,7 @@
             <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Users') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Users') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Users') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only inventory from `wp user list`. Creating, deleting, and role changes stay in the wp-admin / Console for now.') }}</p>
         </div>
@@ -32,7 +32,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-4 py-3 sm:px-6">{{ __('ID') }}</th>
                         <th class="px-4 py-3">{{ __('Login') }}</th>
@@ -51,7 +51,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap gap-1">
                                     @forelse (array_filter(array_map('trim', explode(',', $wpUser['roles']))) as $role)
-                                        <span class="rounded-full bg-brand-ink/[0.05] px-2 py-0.5 text-[10px] font-medium text-brand-moss">{{ $role }}</span>
+                                        <span class="rounded-full bg-brand-ink/[0.05] px-2 py-0.5 text-2xs font-medium text-brand-moss">{{ $role }}</span>
                                     @empty
                                         <span class="text-brand-mist">—</span>
                                     @endforelse

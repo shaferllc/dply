@@ -64,14 +64,14 @@
                         <button
                             type="button"
                             wire:click="openAddSiteModal"
-                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
                         >
                             <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ $addCtaLabel }}
                         </button>
                     @else
                         <span
-                            class="inline-flex h-6 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-md bg-brand-mist/30 px-2 text-[11px] font-semibold text-brand-moss"
+                            class="inline-flex h-6 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-md bg-brand-mist/30 px-2 text-xs font-semibold text-brand-moss"
                             title="{{ $this->addSiteBlockedReason }}"
                         >
                             <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -82,7 +82,7 @@
             </x-workspace-panel-head>
 
             @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
                     <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span>{{ $this->addSiteBlockedReason }}</span>
                 </p>
@@ -92,10 +92,10 @@
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listHeading }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listHeading }}</p>
                     </div>
                     @if ($siteCount > 0)
-                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
                     @endif
                 </div>
                 <p class="mt-1 text-xs text-brand-moss">
@@ -245,30 +245,30 @@
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $s->isCustom() ? $s->name : $displayHost }}</span>
                                         @if ($s->isCustom())
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 <x-heroicon-m-wrench-screwdriver class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Custom') }}
                                             </span>
                                         @elseif ($sslOn)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
                                                 <x-heroicon-s-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('SSL') }}
                                             </span>
                                         @endif
                                         @if ($debugOn)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800">
                                                 <x-heroicon-m-bug-ant class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Debug') }}
                                             </span>
                                         @endif
                                         @if ($isWaitingOnHost)
-                                            <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                                            <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-700">
                                                 <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Waiting for host') }}
                                             </span>
                                         @endif
                                     </div>
-                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-brand-moss">
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-brand-moss">
                                         @if ($gitShort)
                                             <span class="inline-flex items-center gap-1">
                                                 <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -290,14 +290,14 @@
                                         </span>
                                         @if ($s->type?->value === 'php' && $s->php_version)
                                             <span class="inline-flex items-center gap-1">
-                                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">PHP</span>
+                                                <span class="text-2xs uppercase tracking-wide text-brand-mist">PHP</span>
                                                 <span class="font-mono text-brand-ink">{{ $s->php_version }}</span>
                                             </span>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
-                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip['tone'] }}">
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusChip['tone'] }}">
                                         @if ($statusChip['icon'] === 'm-check-circle')
                                             <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         @elseif ($statusChip['icon'] === 'm-x-circle')
@@ -385,11 +385,11 @@
                             <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New site') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New site') }}</p>
                             {{-- $sites is not passed to this view; the rest of the file reads $server->sites (eager-loaded in render()). --}}
                             @if($server->sites->count() > 0)
                             <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                                <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                     {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
                                 </p>
                             @endif
@@ -579,7 +579,7 @@
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Bulk deploy') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Bulk deploy') }}</p>
                             <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Redeploy selected sites?') }}</h2>
                             <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Queues a manual deploy for each selected site that is ready for traffic. Suspended or still-provisioning sites in your selection are skipped.') }}

@@ -55,25 +55,25 @@
                                 <span class="text-sm font-semibold text-brand-ink">{{ __('No customer') }}</span>
                             @endif
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Customer record') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Customer record') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Invoices')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $total }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $total) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('total|total', $total) }}</span>
                         </p>
                         @if ($total > 0 && $search !== '')
-                            <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ __('Filtered by :q', ['q' => $search]) }}">{{ __('Filtered') }}</p>
+                            <p class="mt-1 truncate text-xs text-brand-mist" title="{{ __('Filtered by :q', ['q' => $search]) }}">{{ __('Filtered') }}</p>
                         @else
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('From Stripe') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('From Stripe') }}</p>
                         @endif
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Page')">
                         <p class="mt-2 flex items-baseline gap-1">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $currentPage }}</span>
-                            <span class="text-[11px] text-brand-moss">/ {{ $lastPage }}</span>
+                            <span class="text-xs text-brand-moss">/ {{ $lastPage }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n per page|:n per page', $perPage, ['n' => $perPage]) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ trans_choice(':n per page|:n per page', $perPage, ['n' => $perPage]) }}</p>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -103,7 +103,7 @@
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('All invoices') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Search by number or description, sort any column, and toggle visibility on a per-column basis.') }}</p>
                         </div>
@@ -130,7 +130,7 @@
                                 x-transition
                                 class="absolute left-0 z-20 mt-1 w-56 rounded-xl border border-brand-ink/10 bg-white py-2 shadow-lg"
                             >
-                                <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Visible columns') }}</p>
+                                <p class="px-3 pb-2 text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Visible columns') }}</p>
                                 @foreach (['number' => __('Number'), 'description' => __('Description'), 'status' => __('Status'), 'total' => __('Total'), 'date' => __('Date'), 'actions' => __('Actions')] as $key => $label)
                                     <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-brand-ink hover:bg-brand-sand/40">
                                         <input type="checkbox" wire:model.live="columns.{{ $key }}" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
@@ -171,7 +171,7 @@
                     @else
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-brand-ink/5 text-left text-sm">
-                                <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
                                         @if ($columns['number'])
                                             <th scope="col" class="px-5 py-2 sm:px-6">
@@ -233,7 +233,7 @@
                                             @endif
                                             @if ($columns['status'])
                                                 <td class="whitespace-nowrap px-4 py-3">
-                                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusClasses }}">
+                                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusClasses }}">
                                                         {{ $row['status_label'] }}
                                                     </span>
                                                 </td>

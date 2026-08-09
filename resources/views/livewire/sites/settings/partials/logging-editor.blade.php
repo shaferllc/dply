@@ -25,7 +25,7 @@
                 <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Logging') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Logging') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Logging configuration') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('dply generates and owns config/logging.php from this configuration. It is validated and written into each release at deploy; your repo copy is never touched in git.') }}
@@ -38,7 +38,7 @@
         {{-- Channels --}}
         <div class="space-y-3">
             <div class="flex items-center justify-between">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Channels') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Channels') }}</p>
                 <div x-data="{ open: false }" class="relative">
                     <button type="button" x-on:click="open = !open" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
                         <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add channel') }}
@@ -47,7 +47,7 @@
                         @foreach ($typeOptions as $opt)
                             <button type="button" wire:click="addLoggingChannel('{{ $opt['type'] }}')" x-on:click="open = false" class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
                                 <span>{{ $opt['label'] }}</span>
-                                @if ($opt['escape'])<span class="text-[10px] text-amber-600">{{ __('advanced') }}</span>@endif
+                                @if ($opt['escape'])<span class="text-2xs text-amber-600">{{ __('advanced') }}</span>@endif
                             </button>
                         @endforeach
                     </div>
@@ -71,9 +71,9 @@
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <span class="font-mono text-sm font-semibold text-brand-ink">{{ $name }}</span>
-                            <span class="rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $meta['label'] }}</span>
+                            <span class="rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $meta['label'] }}</span>
                             @if ($meta['is_escape_hatch'] ?? false)
-                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('unvalidated') }}</span>
+                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold text-amber-700">{{ __('unvalidated') }}</span>
                             @endif
                         </div>
                         <button type="button" wire:click="removeLoggingChannel('{{ $name }}')" class="text-brand-mist hover:text-rose-600" title="{{ __('Remove channel') }}">
@@ -84,7 +84,7 @@
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         @if ($meta['supports_level'] ?? false)
                             <label class="block">
-                                <span class="text-[11px] font-medium text-brand-moss">{{ __('Level') }}</span>
+                                <span class="text-xs font-medium text-brand-moss">{{ __('Level') }}</span>
                                 <select wire:model="loggingSpec.channels.{{ $i }}.level" class="dply-input mt-1 w-full text-sm">
                                     @foreach ($levels as $lvl)<option value="{{ $lvl }}">{{ $lvl }}</option>@endforeach
                                 </select>
@@ -92,7 +92,7 @@
                         @endif
                         @if ($meta['supports_format'] ?? false)
                             <label class="block">
-                                <span class="text-[11px] font-medium text-brand-moss">{{ __('Format') }}</span>
+                                <span class="text-xs font-medium text-brand-moss">{{ __('Format') }}</span>
                                 <select wire:model="loggingSpec.channels.{{ $i }}.format" class="dply-input mt-1 w-full text-sm">
                                     <option value="line">{{ __('Line (human-readable)') }}</option>
                                     <option value="json">{{ __('JSON (structured)') }}</option>
@@ -109,27 +109,27 @@
                             @continue($isSystem)
                             @if ($isSecret)
                                 <label class="block">
-                                    <span class="text-[11px] font-medium text-brand-moss">{{ $field['label'] }}</span>
+                                    <span class="text-xs font-medium text-brand-moss">{{ $field['label'] }}</span>
                                     <input type="password" autocomplete="new-password" wire:model="loggingSecrets.{{ $name }}.{{ $fkey }}" placeholder="{{ __('•••• (leave blank to keep)') }}" class="dply-input mt-1 w-full text-sm" />
                                 </label>
                             @elseif (in_array(($field['kind'] ?? 'text'), ['keyval', 'classlist'], true))
                                 {{-- custom-channel free-text inputs, parsed on save --}}
                                 <label class="block sm:col-span-2">
-                                    <span class="text-[11px] font-medium text-brand-moss">{{ $field['label'] }}</span>
+                                    <span class="text-xs font-medium text-brand-moss">{{ $field['label'] }}</span>
                                     <textarea rows="2" wire:model="loggingSpec.channels.{{ $i }}.{{ $fkey === 'handler_with' ? 'handler_with_text' : ($fkey === 'processors' ? 'processors_text' : $fkey) }}" placeholder="{{ ($field['kind'] === 'keyval') ? 'key: value' : 'Fully\\Qualified\\ClassName' }}" class="dply-input mt-1 w-full font-mono text-xs"></textarea>
                                 </label>
                             @else
                                 <label class="block">
-                                    <span class="text-[11px] font-medium text-brand-moss">{{ $field['label'] }}</span>
+                                    <span class="text-xs font-medium text-brand-moss">{{ $field['label'] }}</span>
                                     <input type="{{ ($field['kind'] ?? 'text') === 'number' ? 'number' : 'text' }}" wire:model="loggingSpec.channels.{{ $i }}.{{ $fkey }}" class="dply-input mt-1 w-full text-sm" />
-                                    @if (! empty($field['help']))<span class="mt-1 block text-[10px] leading-snug text-brand-mist">{{ $field['help'] }}</span>@endif
+                                    @if (! empty($field['help']))<span class="mt-1 block text-2xs leading-snug text-brand-mist">{{ $field['help'] }}</span>@endif
                                 </label>
                             @endif
                         @endforeach
                     </div>
 
                     @if (isset(LoggingChannelCatalog::TRANSPORT_PACKAGES[$type]))
-                        <p class="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[10px] leading-snug text-amber-700">
+                        <p class="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-2xs leading-snug text-amber-700">
                             {{ __('Requires your app to composer require :pkg — a missing package fails the deploy probe.', ['pkg' => LoggingChannelCatalog::TRANSPORT_PACKAGES[$type]]) }}
                         </p>
                     @endif
@@ -154,15 +154,15 @@
         {{-- Composition: stack-as-default + deprecations --}}
         <div class="grid grid-cols-1 gap-4 rounded-xl bg-brand-cream/40 p-4 sm:grid-cols-2">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default target') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Default target') }}</p>
                 <label class="mt-2 inline-flex items-center gap-1.5 text-xs">
                     <input type="radio" wire:click="setLoggingDefault('stack')" @checked(($spec['default'] ?? null) === 'stack') @disabled(count($stack) === 0) class="text-brand-forest" />
                     <span class="text-brand-moss">{{ __('Use the stack (:members)', ['members' => count($stack) ? implode(', ', $stack) : __('empty')]) }}</span>
                 </label>
-                <p class="mt-1 text-[10px] text-brand-mist">{{ __('Or pick a single default on a channel above.') }}</p>
+                <p class="mt-1 text-2xs text-brand-mist">{{ __('Or pick a single default on a channel above.') }}</p>
             </div>
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deprecations') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deprecations') }}</p>
                 <div class="mt-2 flex items-center gap-3">
                     <select wire:model="loggingSpec.deprecations.channel" class="dply-input text-xs">
                         <option value="null">{{ __('null (ignore)') }}</option>
@@ -192,10 +192,10 @@
         @if ($showLoggingPreview)
             <div class="rounded-xl border border-brand-ink/10 bg-brand-ink/5">
                 <div class="flex items-center justify-between border-b border-brand-ink/10 px-4 py-2">
-                    <p class="font-mono text-[11px] text-brand-moss">config/logging.php</p>
+                    <p class="font-mono text-xs text-brand-moss">config/logging.php</p>
                     <button type="button" wire:click="$set('showLoggingPreview', false)" class="text-brand-mist hover:text-brand-ink"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
                 </div>
-                <pre class="max-h-96 overflow-auto px-4 py-3 text-[11px] leading-relaxed text-brand-ink"><code>{{ $loggingPreviewContent }}</code></pre>
+                <pre class="max-h-96 overflow-auto px-4 py-3 text-xs leading-relaxed text-brand-ink"><code>{{ $loggingPreviewContent }}</code></pre>
             </div>
         @endif
     </div>

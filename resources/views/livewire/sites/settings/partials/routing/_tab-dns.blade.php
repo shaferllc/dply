@@ -78,12 +78,12 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $row['hostname'] }}</span>
-                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $meta['cls'] }}">
+                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $meta['cls'] }}">
                                     <x-dynamic-component :component="$meta['icon']" class="h-3 w-3" />
                                     {{ $meta['label'] }}
                                 </span>
                             </div>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-brand-moss"
+                            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-brand-moss"
                                 x-data="{ copied: false }">
                                 <span class="inline-flex items-center gap-1.5 rounded-md bg-brand-sand/30 px-2 py-0.5 ring-1 ring-inset ring-brand-ink/5">
                                     <span class="text-brand-mist">{{ $row['type'] }}</span>
@@ -132,7 +132,7 @@
             <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
             <span class="min-w-0 text-sm font-semibold text-brand-ink">{{ __('DNS provider & zone (advanced)') }}</span>
         </span>
-        <span class="flex shrink-0 items-center gap-2 text-[11px] text-brand-mist">
+        <span class="flex shrink-0 items-center gap-2 text-xs text-brand-mist">
             <span class="inline-flex items-center gap-1">
                 <span class="inline-block h-1.5 w-1.5 rounded-full {{ $resolvedCredential ? 'bg-brand-forest' : 'bg-amber-500' }}"></span>
                 {{ $resolvedCredential ? $resolvedCredential->dnsProviderLabel() : __('no DNS credential') }}

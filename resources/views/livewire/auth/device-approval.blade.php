@@ -52,7 +52,7 @@
                             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Device') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Device') }}</p>
                             <h1 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Authorize device') }}</h1>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('The dply CLI is asking to connect to your account. Enter the code printed in your terminal to continue.') }}
@@ -112,7 +112,7 @@
                             <x-heroicon-o-shield-check class="h-6 w-6" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Authorize') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Authorize') }}</p>
                             <h1 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Approve dply CLI?') }}</h1>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Approving creates an API token for the CLI. Revoke it anytime from Profile → CLI.') }}
@@ -120,7 +120,7 @@
                         </div>
                     </div>
                     <div class="shrink-0 rounded-xl border border-brand-ink/15 bg-brand-ink px-4 py-3 text-center sm:min-w-[10rem]">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-cream/70">{{ __('Terminal code') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-cream/70">{{ __('Terminal code') }}</p>
                         <p class="mt-1 font-mono text-xl font-semibold tracking-[0.18em] text-brand-cream">{{ $formattedCode }}</p>
                     </div>
                 </div>
@@ -186,7 +186,7 @@
                             <div class="mt-4 max-h-[min(28rem,55vh)] space-y-5 overflow-y-auto pr-1">
                                 @foreach ($scopeGroups as $groupLabel => $scopes)
                                     <div>
-                                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $groupLabel }}</p>
+                                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $groupLabel }}</p>
                                         <div class="grid gap-2 sm:grid-cols-2">
                                             @foreach ($scopes as $scope)
                                                 <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 text-sm transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
@@ -197,7 +197,7 @@
                                                         class="mt-0.5 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest"
                                                     />
                                                     <span class="min-w-0">
-                                                        <span class="block truncate font-mono text-[11px] text-brand-moss">{{ $scope['ability'] }}</span>
+                                                        <span class="block truncate font-mono text-xs text-brand-moss">{{ $scope['ability'] }}</span>
                                                         <span class="mt-0.5 block text-xs leading-snug text-brand-ink">{{ $scope['label'] }}</span>
                                                     </span>
                                                 </label>

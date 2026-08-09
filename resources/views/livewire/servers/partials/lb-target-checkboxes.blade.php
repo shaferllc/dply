@@ -10,7 +10,7 @@
             />
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-brand-ink">{{ $s->name }}</p>
-                <p class="font-mono text-[11px] text-brand-mist">
+                <p class="font-mono text-xs text-brand-mist">
                     {{ $s->private_ip_address ?? $s->ip_address }} · {{ $s->region }}
                     @if ($s->private_ip_address)
                         <span class="text-emerald-600">· {{ __('private') }}</span>

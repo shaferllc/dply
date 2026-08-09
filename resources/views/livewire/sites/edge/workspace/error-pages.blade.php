@@ -22,7 +22,7 @@
     {{-- Starters — same pattern as Tags / Snippets examples. --}}
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 dark:bg-brand-sand/10 sm:px-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
             <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Fill 404, 500, and maintenance at once — then edit before Save. Self-contained HTML with inline CSS.') }}</p>
             <div class="mt-3 flex flex-wrap gap-2">
                 @foreach ($templates as $key => $template)
@@ -38,11 +38,11 @@
                 @endforeach
             </div>
             <div class="mt-3 flex flex-wrap gap-2 border-t border-brand-ink/10 pt-3">
-                <span class="w-full text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Per page') }}</span>
+                <span class="w-full text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Per page') }}</span>
                 @foreach ($templates as $key => $template)
-                    <button type="button" wire:click="applyTemplate('html_404', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900" title="{{ $template['hint'] }}">{{ __('404') }} · {{ $template['label'] }}</button>
-                    <button type="button" wire:click="applyTemplate('html_500', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('500') }} · {{ $template['label'] }}</button>
-                    <button type="button" wire:click="applyTemplate('maintenance', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('Maint') }} · {{ $template['label'] }}</button>
+                    <button type="button" wire:click="applyTemplate('html_404', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900" title="{{ $template['hint'] }}">{{ __('404') }} · {{ $template['label'] }}</button>
+                    <button type="button" wire:click="applyTemplate('html_500', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('500') }} · {{ $template['label'] }}</button>
+                    <button type="button" wire:click="applyTemplate('maintenance', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('Maint') }} · {{ $template['label'] }}</button>
                 @endforeach
             </div>
         </div>
@@ -65,7 +65,7 @@
 
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <label class="block" for="error-404">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('404 page') }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('404 page') }}</span>
             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Shown when a path isn’t found. Blank = built-in default.') }}</span>
         </label>
         <textarea
@@ -81,7 +81,7 @@
 
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <label class="block" for="error-500">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('500 page') }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('500 page') }}</span>
             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Unexpected errors. Blank = built-in default.') }}</span>
         </label>
         <textarea
@@ -97,7 +97,7 @@
 
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <label class="block" for="maintenance-html">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Maintenance page') }}</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Maintenance page') }}</span>
             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Optional HTML when maintenance mode is on.') }}</span>
         </label>
         <textarea
@@ -112,7 +112,7 @@
     </section>
 
     <div class="flex items-center justify-end gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
-        <span wire:loading.inline-flex wire:target="save" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+        <span wire:loading.inline-flex wire:target="save" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
             <x-spinner size="sm" variant="muted" />
             {{ __('Saving…') }}
         </span>
@@ -134,7 +134,7 @@
             <span class="inline-flex items-center gap-2">
                 {{ __('Advanced') }}
                 @if ($hasRepoErrors)
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                         {{ __('Repo') }}
                     </span>
                 @endif
@@ -145,7 +145,7 @@
         <div class="space-y-5 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
             <div>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                     <a
                         href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
                         class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline"
@@ -173,7 +173,7 @@
                             <dd class="text-brand-moss">{{ __('Set in repo') }}</dd>
                         @endif
                     </dl>
-                    <p class="mt-2 text-[11px] text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
+                    <p class="mt-2 text-xs text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
                 @else
                     <p class="mt-2 text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
                 @endif

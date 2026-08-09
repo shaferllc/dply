@@ -24,18 +24,18 @@
     ])>
         <div class="flex flex-wrap items-center gap-1">
             <button type="button" wire:click="setCategory('')"
-                class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $category === '' ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
+                class="rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $category === '' ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
                 {{ __('All') }} <span class="opacity-60">{{ array_sum($facets) }}</span>
             </button>
             @foreach ($facets as $cat => $count)
                 <button type="button" wire:click="setCategory('{{ $cat }}')"
-                    class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $category === $cat ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
+                    class="rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $category === $cat ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40 dark:bg-brand-ink/5' }}">
                     {{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $cat)) }} <span class="opacity-60">{{ $count }}</span>
                 </button>
             @endforeach
         </div>
         <div class="flex items-center gap-2.5">
-            <label class="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+            <label class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-brand-moss">
                 <input type="checkbox" wire:model.live="showDismissed" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest">
                 {{ __('Show dismissed') }}
             </label>
@@ -44,7 +44,7 @@
                      components) instead of the native browser confirm(). --}}
                 <button type="button"
                     wire:click="openConfirmActionModal('dismissAll', [], @js(__('Dismiss all open errors?')), @js(__('This dismisses every open error in this list. You can re-show dismissed errors with the filter. This does not fix the underlying issues.')), @js(__('Dismiss all')), false)"
-                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40 dark:bg-brand-ink/5">
+                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-moss hover:bg-brand-sand/40 dark:bg-brand-ink/5">
                     {{ __('Dismiss all') }}
                 </button>
             @endif
@@ -81,17 +81,17 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span class="text-sm font-semibold text-brand-ink">{{ $event->title }}</span>
-                            <span class="rounded-full bg-brand-sand/50 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $event->category)) }}</span>
+                            <span class="rounded-full bg-brand-sand/50 px-1.5 py-px text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ \Illuminate\Support\Str::headline(str_replace(['_', '.', ':'], ' ', $event->category)) }}</span>
                             @if ($event->dismissed_at)
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dismissed') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dismissed') }}</span>
                             @endif
-                            <span class="text-[11px] text-brand-mist">{{ $event->occurred_at?->diffForHumans() }}</span>
+                            <span class="text-xs text-brand-mist">{{ $event->occurred_at?->diffForHumans() }}</span>
                         </div>
                         @if (filled($event->detail))
                             <div class="mt-0.5">
-                                <p class="font-mono text-[11px] leading-snug text-brand-moss" x-bind:class="open ? '' : 'line-clamp-2'">{{ $event->detail }}</p>
+                                <p class="font-mono text-xs leading-snug text-brand-moss" x-bind:class="open ? '' : 'line-clamp-2'">{{ $event->detail }}</p>
                                 @if (strlen($event->detail) > 140)
-                                    <button type="button" x-on:click="open = !open" class="mt-0.5 text-[11px] font-semibold text-brand-forest hover:underline" x-text="open ? '{{ __('Show less') }}' : '{{ __('Show more') }}'"></button>
+                                    <button type="button" x-on:click="open = !open" class="mt-0.5 text-xs font-semibold text-brand-forest hover:underline" x-text="open ? '{{ __('Show less') }}' : '{{ __('Show more') }}'"></button>
                                 @endif
                             </div>
                         @endif
@@ -105,7 +105,7 @@
                             {{-- Link action: the fix lives on another page (e.g. an expired
                                  Git token), not in an SSH script — navigate, don't dispatch. --}}
                             <a href="{{ route($recAction['route']) }}" wire:navigate
-                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-600"
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
                                 title="{{ $rem['title'] }}">
                                 <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ $recAction['label'] }}
                             </a>
@@ -116,19 +116,19 @@
                                     ['label' => __('Runs on'), 'value' => $event->server?->name ?? __('the server')],
                                     ['label' => __('How'), 'value' => __('dply runs this over SSH, then resolves this error if it succeeds. You can re-run the original operation afterward.'), 'multiline' => true],
                                 ]))"
-                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
                                 title="{{ $rem['title'] }}">
                                 <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Fix') }}
                             </button>
                         @endif
                         @if ($event->isRetryable() && ! $event->dismissed_at)
                             <button type="button" wire:click="retry('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="retry('{{ $event->id }}')"
-                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Retry') }}
                             </button>
                         @endif
                         @if ($event->link_url)
-                            <a href="{{ $event->link_url }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-forest hover:bg-brand-sand/40 dark:bg-brand-ink/5">
+                            <a href="{{ $event->link_url }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40 dark:bg-brand-ink/5">
                                 {{ __('Open') }} <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                             </a>
                         @endif
@@ -137,7 +137,7 @@
                              is undefined elsewhere, so ?? false hides it for site error views. --}}
                         @if (($showLogCorrelation ?? false) && $event->server_id)
                             <button type="button" wire:click="openLogsForError('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="openLogsForError('{{ $event->id }}')"
-                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-forest hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40 disabled:opacity-60 dark:bg-brand-ink/5">
                                 <x-heroicon-o-bars-3-bottom-left class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Logs') }}
                             </button>
                         @endif

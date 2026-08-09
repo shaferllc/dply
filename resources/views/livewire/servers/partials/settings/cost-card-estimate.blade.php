@@ -70,7 +70,7 @@
                     <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
                     <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">
                         @switch($report['overall'])
                             @case('critical') {{ __('Capacity constrained') }} @break
@@ -131,14 +131,14 @@
 
         <div class="grid gap-4 border-t border-brand-ink/10 p-6 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
             <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Full stack') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Full stack') }}</p>
                 <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $report['totals']['formatted'] ?? '—' }}</p>
-                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Provider + dply tier') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Provider + dply tier') }}</p>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider infra') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider infra') }}</p>
                 <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $providerFormatted }}</p>
-                <p class="mt-1 text-[11px] text-brand-moss">
+                <p class="mt-1 text-xs text-brand-moss">
                     @if (($report['provider']['source'] ?? '') === 'catalog')
                         {{ __('Catalog estimate') }}
                     @elseif (($report['provider']['source'] ?? '') === 'note')
@@ -149,17 +149,17 @@
                 </p>
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply tier fee') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply tier fee') }}</p>
                 @if ($summary['charges_tier_fee'] ?? true)
                     <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $report['dply']['formatted'] ?? '—' }}</p>
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __(':tier from detected specs', ['tier' => $report['dply']['tier_label'] ?? '—']) }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __(':tier from detected specs', ['tier' => $report['dply']['tier_label'] ?? '—']) }}</p>
                 @else
                     <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">$0.00<span class="text-xs font-normal text-brand-moss">/mo</span></p>
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('No tier fee — :hosting', ['hosting' => $server->hostingBackendLabel()]) }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('No tier fee — :hosting', ['hosting' => $server->hostingBackendLabel()]) }}</p>
                 @endif
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Per site (est.)') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Per site (est.)') }}</p>
                 <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">
                     @if (($summary['per_site_cents'] ?? null) !== null)
                         ${{ number_format($summary['per_site_cents'] / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span>
@@ -167,13 +167,13 @@
                         <span class="text-lg">—</span>
                     @endif
                 </p>
-                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Equal share of stack total') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Equal share of stack total') }}</p>
             </div>
         </div>
 
         @if ($stackCents > 0)
             <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Stack split') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Stack split') }}</p>
                 <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-brand-sand/50 ring-1 ring-brand-ink/10">
                     @if ($breakdown['provider_pct'] > 0)
                         <span class="bg-brand-forest/70" style="width: {{ $breakdown['provider_pct'] }}%"></span>
@@ -199,20 +199,20 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }} overflow-hidden p-0">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hardware & billing tier') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hardware & billing tier') }}</p>
                 <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Detected specs') }}</h4>
             </div>
             <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('vCPU') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('vCPU') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $hardware['cpu_count'] ?? __('Unknown') }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $hardware['mem_formatted'] ?? __('Unknown') }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider / plan') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider / plan') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">
                         {{ $hardware['provider'] ?? '—' }}
                         @if (! empty($hardware['plan']))
@@ -221,16 +221,16 @@
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply tier') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply tier') }}</dt>
                     <dd class="mt-1">
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $tonePalette['forest'] }}">
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $tonePalette['forest'] }}">
                             {{ $hardware['tier_label'] ?? '—' }}
                         </span>
                     </dd>
                 </div>
             </dl>
             <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tier ladder (monthly)') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tier ladder (monthly)') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($report['tiers'] ?? [] as $tierRow)
                         <span @class([
@@ -238,7 +238,7 @@
                             'border-brand-forest bg-brand-sage/15 ring-1 ring-brand-forest/30' => $tierRow['current'],
                             'border-brand-ink/10 bg-white' => ! $tierRow['current'],
                         ])>
-                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $tierRow['label'] }}</span>
+                            <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tierRow['label'] }}</span>
                             <span class="mt-0.5 font-mono text-sm font-semibold tabular-nums text-brand-ink">{{ $tierRow['formatted'] }}</span>
                         </span>
                     @endforeach
@@ -248,7 +248,7 @@
 
         <div class="{{ $card }} overflow-hidden p-0">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Utilization') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Utilization') }}</p>
                 <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Capacity headroom') }}</h4>
                 <p class="mt-0.5 text-xs text-brand-moss">
                     @if ($metricsAt)
@@ -260,15 +260,15 @@
             </div>
             <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CPU utilization') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('CPU utilization') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $report['capacity']['cpu_pct'] !== null ? number_format($report['capacity']['cpu_pct'], 0).'%' : __('Pending') }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory utilization') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory utilization') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $report['capacity']['mem_pct'] !== null ? number_format((float) $report['capacity']['mem_pct'], 0).'%' : __('Pending') }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Headroom estimate') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Headroom estimate') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">
                         @if ($report['capacity']['headroom_sites'] !== null)
                             {{ trans_choice('~:count more small site|~:count more small sites', $report['capacity']['headroom_sites'], ['count' => $report['capacity']['headroom_sites']]) }}
@@ -278,7 +278,7 @@
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('vs Forge Hobby') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('vs Forge Hobby') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">${{ number_format($forgeBaseline / 100, 2) }}/mo</dd>
                     <dd class="mt-0.5 text-xs text-brand-moss">
                         @if ($deltaVsForge !== 0)

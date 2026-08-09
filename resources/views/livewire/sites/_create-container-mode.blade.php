@@ -15,7 +15,7 @@
                 >
                     <p class="text-sm font-semibold text-slate-900">{{ $preset['label'] }}</p>
                     <p class="mt-1 text-xs text-slate-600">{{ $preset['description'] }}</p>
-                    <p class="mt-2 truncate font-mono text-[11px] text-slate-500">{{ \Illuminate\Support\Str::after($preset['url'], 'https://') }}</p>
+                    <p class="mt-2 truncate font-mono text-xs text-slate-500">{{ \Illuminate\Support\Str::after($preset['url'], 'https://') }}</p>
                 </button>
             @endforeach
         </div>
@@ -114,19 +114,19 @@
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Detection') }}</p>
                 <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div class="rounded-2xl border border-sky-200 bg-white p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Framework') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Framework') }}</p>
                         <p class="mt-2 text-sm font-medium text-slate-900">{{ data_get($container_inspection, 'detection.framework', 'unknown') }}</p>
                     </div>
                     <div class="rounded-2xl border border-sky-200 bg-white p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</p>
                         <p class="mt-2 text-sm font-medium text-slate-900">{{ data_get($container_inspection, 'detection.target_kind', 'docker') }}</p>
                     </div>
                     <div class="rounded-2xl border border-sky-200 bg-white p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Confidence') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Confidence') }}</p>
                         <p class="mt-2 text-sm font-medium text-slate-900">{{ data_get($container_inspection, 'detection.confidence', 'unknown') }}</p>
                     </div>
                     <div class="rounded-2xl border border-sky-200 bg-white p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('App port') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('App port') }}</p>
                         <p class="mt-2 text-sm font-medium text-slate-900">{{ data_get($container_inspection, 'detection.app_port') ?: 'default' }}</p>
                     </div>
                 </div>
@@ -136,7 +136,7 @@
                 @endphp
                 @if ($reasons !== [] || $warnings !== [])
                     <div class="mt-4 rounded-2xl border border-sky-200 bg-white p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Detection notes') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Detection notes') }}</p>
                         <ul class="mt-3 space-y-2 text-sm text-slate-700">
                             @foreach ($reasons as $reason)
                                 <li>{{ $reason }}</li>

@@ -97,7 +97,7 @@
                 ]) aria-hidden="true" />
                 {{ __('Console') }}
                 @if ($consoleLive)
-                    <kbd class="ms-0.5 hidden items-center rounded bg-white/15 px-1 py-0.5 text-[10px] font-medium sm:inline-flex">`</kbd>
+                    <kbd class="ms-0.5 hidden items-center rounded bg-white/15 px-1 py-0.5 text-2xs font-medium sm:inline-flex">`</kbd>
                 @endif
             </button>
         @endif

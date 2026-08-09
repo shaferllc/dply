@@ -11,7 +11,7 @@
             {{ __('Edge hostname & DNS') }}
         </h3>
         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">
+        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">
             {{ __('Auto-provisioned testing-domain subdomain — CNAME target for custom domains') }}
         </p>
     </div>

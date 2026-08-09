@@ -948,7 +948,7 @@ Unified Button And Binding UI',
                                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                     <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $tagDot[$entry['primary']] ?? 'bg-brand-mist' }}" aria-hidden="true"></span>
                                                     @foreach ($entry['tags'] as $tag)
-                                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $tagStyles[$tag] ?? '' }}">
+                                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $tagStyles[$tag] ?? '' }}">
                                                             {{ $tagLabels[$tag] ?? $tag }}
                                                         </span>
                                                     @endforeach

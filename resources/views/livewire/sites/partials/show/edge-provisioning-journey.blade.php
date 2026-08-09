@@ -4,19 +4,19 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-forest">{{ __('Edge deployment') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-forest">{{ __('Edge deployment') }}</p>
                         @if ($edgeJourneyHasFailed)
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-red-800 ring-1 ring-red-200">
                                 <x-heroicon-s-x-mark class="h-3 w-3" />
                                 {{ __('Failed') }}
                             </span>
                         @elseif ($edgeJourneyIsDone)
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                 <x-heroicon-s-check class="h-3 w-3" />
                                 {{ __('Live') }}
                             </span>
                         @else
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                 <x-heroicon-o-arrow-path class="h-3 w-3 animate-spin" />
                                 {{ __('Building') }}
                             </span>
@@ -76,12 +76,12 @@
                      that never made it into the deployment row. --}}
                 <div class="rounded-2xl border border-red-300 bg-white/80 px-4 py-3 text-xs">
                     <div class="flex items-start justify-between gap-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">{{ __('Last error') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-red-700">{{ __('Last error') }}</p>
                         <button
                             type="button"
                             x-data="{ copied: false }"
                             x-on:click="navigator.clipboard.writeText(@js($edgeProvisioningError)); copied = true; setTimeout(() => copied = false, 1500)"
-                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
                         >
                             <span x-show="!copied">{{ __('Copy') }}</span>
                             <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
@@ -115,7 +115,7 @@
                     <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge summary') }}</h3>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                     x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($edgeLiveUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
                     class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4"
                 >
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Live URL') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Live URL') }}</p>
                     <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-xs text-emerald-950">
                         <a
                             href="{{ $edgeLiveUrl }}"

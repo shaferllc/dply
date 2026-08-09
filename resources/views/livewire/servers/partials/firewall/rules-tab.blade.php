@@ -44,10 +44,10 @@
                                 @endforeach
                             </select>
                             @if ($chain === 'incoming' && $current === 'allow')
-                                <p class="mt-1 text-[11px] text-amber-700">{{ __('Allow-incoming defeats the firewall — only use if you\'re managing inbound separately.') }}</p>
+                                <p class="mt-1 text-xs text-amber-700">{{ __('Allow-incoming defeats the firewall — only use if you\'re managing inbound separately.') }}</p>
                             @endif
                             @if ($chain === 'outgoing' && $current === 'deny')
-                                <p class="mt-1 text-[11px] text-amber-700">{{ __('Deny-outgoing breaks DNS, package updates, and most app traffic — add explicit allow rules for everything you need.') }}</p>
+                                <p class="mt-1 text-xs text-amber-700">{{ __('Deny-outgoing breaks DNS, package updates, and most app traffic — add explicit allow rules for everything you need.') }}</p>
                             @endif
                         </div>
                     @endforeach
@@ -69,10 +69,10 @@
                                 <option value="{{ $lvl }}" @selected($loggingLevel === $lvl)>{{ ucfirst($lvl) }}</option>
                             @endforeach
                         </select>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('off · low (UFW default — blocked only) · medium (+ accepted) · high (+ invalid) · full (everything).') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('off · low (UFW default — blocked only) · medium (+ accepted) · high (+ invalid) · full (everything).') }}</p>
                     </div>
                 </div>
-                <p class="mt-3 text-[11px] text-brand-mist">{{ __('Changes are written to /etc/default/ufw and /etc/ufw/ufw.conf on Apply and take effect on ufw --force enable.') }}</p>
+                <p class="mt-3 text-xs text-brand-mist">{{ __('Changes are written to /etc/default/ufw and /etc/ufw/ufw.conf on Apply and take effect on ufw --force enable.') }}</p>
             </div>
         </details>
 
@@ -241,7 +241,7 @@
                          a failure — which is why these two states get a row and
                          the never-applied case rides the count pill instead. --}}
                     @if ($lastApplyLog)
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-6 py-1.5 text-[11px] sm:px-8">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-6 py-1.5 text-xs sm:px-8">
                             @if ($lastApplyLog->status === 'success')
                                 <x-heroicon-o-check-circle class="h-3 w-3 shrink-0 text-emerald-600" aria-hidden="true" />
                                 <span class="text-brand-moss">{{ __('applied :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}</span>
@@ -415,7 +415,7 @@
                                         autocomplete="off"
                                     />
                                 </div>
-                                <div class="inline-flex h-8 items-center rounded-lg border border-brand-ink/10 bg-white p-0.5 text-[11px] font-semibold" role="group" aria-label="{{ __('Filter by action') }}">
+                                <div class="inline-flex h-8 items-center rounded-lg border border-brand-ink/10 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="{{ __('Filter by action') }}">
                                     @foreach (['' => __('All'), 'allow' => __('Allow'), 'deny' => __('Deny'), 'limit' => __('Limit')] as $key => $label)
                                         <button
                                             type="button"
@@ -430,7 +430,7 @@
                                 </div>
                             </div>
                             @if ($hasActiveFilter)
-                                <button type="button" wire:click="clearRuleFilter" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                <button type="button" wire:click="clearRuleFilter" class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline">
                                     <x-heroicon-o-x-circle class="h-4 w-4" />
                                     {{ __('Clear · :n / :m matching', ['n' => $filteredCount, 'm' => $server->firewallRules->count()]) }}
                                 </button>
@@ -486,7 +486,7 @@
                                             <td class="px-3 py-2.5 capitalize">{{ $fr->action }}</td>
                                             <td class="px-3 py-2.5">
                                                 @if (! empty($fr->app_profile))
-                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss" title="{{ __('UFW application profile') }}">
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs uppercase tracking-wide text-brand-moss" title="{{ __('UFW application profile') }}">
                                                         app
                                                     </span>
                                                 @else
@@ -503,7 +503,7 @@
                                             <td class="max-w-[12rem] truncate px-3 py-2.5 font-mono text-xs" title="{{ $fr->source }}{{ ! empty($fr->iface) ? ' · '.$fr->iface_direction.' on '.$fr->iface : '' }}">
                                                 {{ $fr->source }}
                                                 @if (! empty($fr->iface))
-                                                    <span class="mt-0.5 block text-[10px] uppercase tracking-wide text-brand-mist">
+                                                    <span class="mt-0.5 block text-2xs uppercase tracking-wide text-brand-mist">
                                                         {{ $fr->iface_direction ?: 'in' }} on <span class="text-brand-ink/80">{{ $fr->iface }}</span>
                                                     </span>
                                                 @endif

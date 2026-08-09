@@ -24,7 +24,7 @@
             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $tabs[$tab] }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 @switch($tab)
@@ -59,7 +59,7 @@
                 wire:click="setTab('{{ $key }}')"
             >
                 {{ $label }}
-                <span class="ml-1 text-[10px] text-brand-moss/60">{{ $tabCounts[$key] }}</span>
+                <span class="ml-1 text-2xs text-brand-moss/60">{{ $tabCounts[$key] }}</span>
             </x-server-workspace-tab>
         @endforeach
     </x-server-workspace-tablist>
@@ -112,7 +112,7 @@
                         <span wire:loading wire:target="sendTestRequest">{{ __('Invoking…') }}</span>
                     </button>
                 </div>
-                <p class="mt-2 text-[11px] text-brand-moss/60">{{ __('A test invocation runs the function once and is billed like any invocation.') }}</p>
+                <p class="mt-2 text-xs text-brand-moss/60">{{ __('A test invocation runs the function once and is billed like any invocation.') }}</p>
             @endif
         </div>
 
@@ -150,7 +150,7 @@
             </div>
         @else
             <p class="text-xs text-brand-moss/60">{{ __(':n lines from recent invocations, oldest first.', ['n' => count($runtimeLines)]) }}</p>
-            <pre class="max-h-[28rem] overflow-auto rounded-lg bg-brand-ink p-4 text-[11px] leading-relaxed text-brand-cream">{{ implode("\n", $runtimeLines) }}</pre>
+            <pre class="max-h-[28rem] overflow-auto rounded-lg bg-brand-ink p-4 text-xs leading-relaxed text-brand-cream">{{ implode("\n", $runtimeLines) }}</pre>
         @endif
 
     {{-- ── Deploy logs ─────────────────────────────────────────────────── --}}
@@ -172,13 +172,13 @@
                              trips the "interactive element within a summary" a11y warning). --}}
                         <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}"
                            wire:navigate
-                           class="absolute right-3 top-3 z-10 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss hover:bg-brand-sand"
+                           class="absolute right-3 top-3 z-10 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs text-brand-moss hover:bg-brand-sand"
                            title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                         <details>
                             <summary class="cursor-pointer list-none">
                                 <div class="flex flex-wrap items-center gap-2 text-xs">
                                     <span @class([
-                                        'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                                        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold',
                                         'bg-brand-forest/15 text-brand-forest' => $deployment->status === \App\Models\SiteDeployment::STATUS_SUCCESS,
                                         'bg-rose-100 text-rose-700' => $deployment->status === \App\Models\SiteDeployment::STATUS_FAILED,
                                         'bg-brand-sand text-brand-moss' => ! in_array($deployment->status, [\App\Models\SiteDeployment::STATUS_SUCCESS, \App\Models\SiteDeployment::STATUS_FAILED], true),
@@ -188,7 +188,7 @@
                                         <span class="text-brand-moss/60">· {{ $deployment->trigger }}</span>
                                     @endif
                                     @if ($deployment->git_sha)
-                                        <span class="font-mono text-[11px] text-brand-moss/60">· {{ \Illuminate\Support\Str::limit($deployment->git_sha, 8, '') }}</span>
+                                        <span class="font-mono text-xs text-brand-moss/60">· {{ \Illuminate\Support\Str::limit($deployment->git_sha, 8, '') }}</span>
                                     @endif
                                 </div>
                             </summary>
@@ -204,19 +204,19 @@
                                             @endphp
                                             <li class="flex items-start gap-2 text-xs">
                                                 <span @class([
-                                                    'mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                                                    'mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-3xs font-bold',
                                                     'bg-brand-forest/15 text-brand-forest' => $stepOk,
                                                     'bg-rose-100 text-rose-700' => $stepFailed,
                                                     'bg-brand-sand text-brand-moss' => ! $stepOk && ! $stepFailed,
                                                 ])>{{ $stepOk ? '✓' : ($stepFailed ? '✗' : '·') }}</span>
                                                 <div class="min-w-0 flex-1">
-                                                    <p class="text-[11px] text-brand-ink">{{ $step['label'] ?? __('Step') }}</p>
+                                                    <p class="text-xs text-brand-ink">{{ $step['label'] ?? __('Step') }}</p>
                                                     @if (! empty($step['detail']))
-                                                        <p class="break-all font-mono text-[10px] text-brand-moss/70">{{ $step['detail'] }}</p>
+                                                        <p class="break-all font-mono text-2xs text-brand-moss/70">{{ $step['detail'] }}</p>
                                                     @endif
                                                 </div>
                                                 @if ($stepDuration > 0)
-                                                    <span class="font-mono text-[10px] text-brand-moss/50">{{ $stepDuration }}ms</span>
+                                                    <span class="font-mono text-2xs text-brand-moss/50">{{ $stepDuration }}ms</span>
                                                 @endif
                                             </li>
                                         @endforeach
@@ -225,8 +225,8 @@
 
                                 @if ($rawOutput !== '')
                                     <div>
-                                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Deploy output') }}</p>
-                                        <pre class="mt-1 max-h-64 overflow-auto rounded-lg bg-brand-ink p-3 text-[11px] leading-relaxed text-brand-cream">{{ $rawOutput }}</pre>
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Deploy output') }}</p>
+                                        <pre class="mt-1 max-h-64 overflow-auto rounded-lg bg-brand-ink p-3 text-xs leading-relaxed text-brand-cream">{{ $rawOutput }}</pre>
                                     </div>
                                 @elseif (count($serverlessSteps) === 0)
                                     <p class="text-xs text-brand-moss/60">{{ __('No step detail or output captured for this deploy.') }}</p>

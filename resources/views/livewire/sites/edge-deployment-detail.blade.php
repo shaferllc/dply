@@ -30,22 +30,22 @@
                     :note="__('Build log, stable aliases, and deploy-specific detail.')"
                 >
                     <x-slot:actions>
-                        <span class="max-w-[10rem] truncate font-mono text-[10px] text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</span>
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
+                        <span class="max-w-[10rem] truncate font-mono text-2xs text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</span>
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $depBadge }}">
                             {{ str_replace('_', ' ', (string) $deployment->status) }}
                         </span>
                         @if ($isActiveDeployment)
-                            <span class="inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
+                            <span class="inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
                                 {{ __('Production') }}
                             </span>
                         @endif
                         @if ($deployment->pruned_at)
-                            <span class="inline-flex rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pruned') }}</span>
+                            <span class="inline-flex rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pruned') }}</span>
                         @endif
                         <a
                             href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
                             wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
                         >
                             <x-heroicon-o-arrow-left class="h-3.5 w-3.5 opacity-70" />
                             {{ __('All deploys') }}
@@ -55,7 +55,7 @@
                                 <button
                                     type="button"
                                     wire:click="confirmRollbackEdgeDeployment('{{ $deployment->id }}')"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
                                 >
                                     <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
                                     {{ __('Roll back') }}
@@ -105,7 +105,7 @@
                     {{-- Only fields the deploys list does not already show. --}}
                     <section class="border-b border-brand-ink/10">
                         <div class="px-5 py-3 sm:px-6">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('More detail') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('More detail') }}</p>
                         </div>
                         <dl class="divide-y divide-brand-ink/8 border-t border-brand-ink/8 px-5 text-sm sm:px-6">
                             @if (! empty($commitMeta['subject']))
@@ -162,7 +162,7 @@
                 @elseif ($tab === 'aliases')
                     <section>
                         <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stable per-deploy aliases') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stable per-deploy aliases') }}</p>
                             <p class="mt-0.5 text-xs text-brand-moss">{{ __('These hostnames always route to this deployment — even after production moves on.') }}</p>
                         </div>
                         @if ($deploymentAliases === [])
@@ -184,7 +184,7 @@
                                             <div class="flex shrink-0 items-center gap-2" x-data="{ copied: false }">
                                                 <button
                                                     type="button"
-                                                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1.5 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                                     @click="navigator.clipboard.writeText(@js('https://'.$alias)); copied = true; setTimeout(() => copied = false, 2000)"
                                                 >
                                                     <x-heroicon-o-clipboard class="h-4 w-4" />
@@ -193,7 +193,7 @@
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1.5 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                                     @click="navigator.clipboard.writeText(@js($alias)); copied = true; setTimeout(() => copied = false, 2000)"
                                                 >
                                                     <span x-show="!copied">{{ __('Copy host') }}</span>
@@ -218,7 +218,7 @@
                             ])
                             @if (! str_contains((string) $deployment->failure_reason, 'dply config lint failed'))
                                 <div class="mt-3 rounded-lg border border-rose-200/60 bg-rose-50/50 px-3 py-2.5 dark:border-rose-900/30 dark:bg-rose-950/20">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-700 dark:text-rose-300">{{ __('Failure') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-rose-700 dark:text-rose-300">{{ __('Failure') }}</p>
                                     <p class="mt-1 break-words font-mono text-xs leading-relaxed text-rose-900 dark:text-rose-200">{{ $deployment->failure_reason }}</p>
                                 </div>
                             @endif
@@ -233,11 +233,11 @@
 
                     <section class="border-b border-brand-ink/10">
                         <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-6">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
                                 {{ $isInProgress ? __('Archived build log') : __('Build log') }}
                             </p>
                             @if (! $isInProgress && $buildLog !== null && $buildLog !== '')
-                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">{{ number_format(strlen($buildLog)) }} bytes</span>
+                                <span class="text-2xs uppercase tracking-wide text-brand-mist">{{ number_format(strlen($buildLog)) }} bytes</span>
                             @endif
                         </div>
                         @if ($buildLog === null || $buildLog === '')

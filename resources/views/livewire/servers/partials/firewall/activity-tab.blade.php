@@ -38,29 +38,29 @@
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <span @class([
-                                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                                        'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                                                         'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
                                                         'bg-rose-50 text-rose-800 ring-rose-200' => ! $isSuccess,
                                                     ])>
                                                         {{ $isSuccess ? __('Applied') : __('Failed') }}
                                                     </span>
-                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss" title="{{ $log->rules_hash ?? '—' }}">
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs text-brand-moss" title="{{ $log->rules_hash ?? '—' }}">
                                                         <x-heroicon-m-hashtag class="h-3 w-3" />
                                                         {{ $log->rules_hash ? substr($log->rules_hash, 0, 12) : '—' }}
                                                     </span>
-                                                    <span class="inline-flex items-center gap-1 text-[11px] text-brand-mist">
+                                                    <span class="inline-flex items-center gap-1 text-xs text-brand-mist">
                                                         {{ trans_choice('{0} 0 rules|{1} :count rule|[2,*] :count rules', (int) $log->rule_count, ['count' => (int) $log->rule_count]) }}
                                                     </span>
                                                     @if ($log->source)
-                                                        <span class="inline-flex items-center rounded-md border border-brand-ink/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss">{{ $log->source }}</span>
+                                                        <span class="inline-flex items-center rounded-md border border-brand-ink/10 px-1.5 py-0.5 font-mono text-2xs uppercase tracking-wide text-brand-moss">{{ $log->source }}</span>
                                                     @endif
-                                                    <span class="ml-auto text-[11px] text-brand-mist" title="{{ $log->created_at?->toIso8601String() }}">{{ $log->created_at?->diffForHumans() }}</span>
+                                                    <span class="ml-auto text-xs text-brand-mist" title="{{ $log->created_at?->toIso8601String() }}">{{ $log->created_at?->diffForHumans() }}</span>
                                                 </div>
                                                 @if ($log->user)
-                                                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('by :name', ['name' => $log->user->name ?? $log->user->email]) }}</p>
+                                                    <p class="mt-1 text-xs text-brand-mist">{{ __('by :name', ['name' => $log->user->name ?? $log->user->email]) }}</p>
                                                 @endif
                                                 @if (count($logLines) > 0)
-                                                    <p class="mt-1 truncate font-mono text-[11px] text-brand-moss">{{ $logLines[count($logLines) - 1] }}</p>
+                                                    <p class="mt-1 truncate font-mono text-xs text-brand-moss">{{ $logLines[count($logLines) - 1] }}</p>
                                                 @endif
                                             </div>
                                             <span class="ml-2 mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-mist transition-transform group-open:rotate-180">
@@ -69,7 +69,7 @@
                                         </summary>
                                         @if (count($logLines) > 0)
                                             <div class="border-t border-brand-ink/8 bg-brand-sand/15 px-4 py-3 sm:px-5">
-                                                <pre class="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100">@foreach ($logLines as $line){{ $line }}
+                                                <pre class="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100">@foreach ($logLines as $line){{ $line }}
 @endforeach</pre>
                                             </div>
                                         @endif
@@ -99,7 +99,7 @@
                                     </button>
                                 </div>
                             @elseif ($activity_visible >= \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE)
-                                <p class="pt-2 text-center text-[11px] italic text-brand-mist">
+                                <p class="pt-2 text-center text-xs italic text-brand-mist">
                                     {{ __('Showing the most recent :n events. Older history lives in audit logs.', ['n' => \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE]) }}
                                 </p>
                             @endif

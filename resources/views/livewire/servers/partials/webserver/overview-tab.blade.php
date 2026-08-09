@@ -22,7 +22,7 @@
                 >
                     @if ($activeUnit !== null)
                         <x-slot:actions>
-                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $activePill['classes'] }}">
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-xs font-medium ring-1 ring-brand-ink/10 {{ $activePill['classes'] }}">
                                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $activePill['dot'] }}"></span>
                                 {{ $activePill['label'] }}
                             </span>
@@ -56,9 +56,9 @@
                             <div class="bg-white px-4 py-3 sm:px-5">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
                                         @if ($header['sub'] !== '')
-                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ $header['sub'] }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-mist">{{ $header['sub'] }}</p>
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-1.5">
@@ -88,8 +88,8 @@
                             <div class="bg-brand-sand/15 px-4 py-3 sm:px-5">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
                                     </div>
                                     <div class="flex flex-wrap gap-1.5">
                                         @foreach ($activeCliTools as [$actionKey, $dangerous])

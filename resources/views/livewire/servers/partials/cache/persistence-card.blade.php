@@ -41,7 +41,7 @@
         <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach (['Last RDB save', 'RDB rules', 'AOF', 'AOF rewrite'] as $label)
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
                     <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
                 </div>
             @endforeach
@@ -50,7 +50,7 @@
         {{-- Status grid: 4 tiles summarising current state at-a-glance. --}}
         <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last RDB save') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last RDB save') }}</dt>
                 <dd class="mt-1 text-sm font-semibold text-brand-ink">
                     @if ($rdbLastSave)
                         <span title="{{ $rdbLastSave->toDateTimeString() }}">{{ $rdbLastSave->diffForHumans() }}</span>
@@ -59,27 +59,27 @@
                     @endif
                 </dd>
                 @if ($bgsaveInProgress)
-                    <p class="mt-1 text-[11px] font-semibold text-sky-700">{{ __('BGSAVE in progress…') }}</p>
+                    <p class="mt-1 text-xs font-semibold text-sky-700">{{ __('BGSAVE in progress…') }}</p>
                 @endif
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('RDB rules') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('RDB rules') }}</dt>
                 <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ count($schedule) }} {{ trans_choice('{1}rule|[2,*]rules', count($schedule)) }}</dd>
                 @if ($schedule === [])
-                    <p class="mt-1 text-[11px] text-amber-700">{{ __('RDB snapshots disabled') }}</p>
+                    <p class="mt-1 text-xs text-amber-700">{{ __('RDB snapshots disabled') }}</p>
                 @endif
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('AOF') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('AOF') }}</dt>
                 <dd class="mt-1 text-sm font-semibold {{ $aofEnabled ? 'text-emerald-700' : 'text-brand-ink' }}">
                     {{ $aofEnabled === null ? '—' : ($aofEnabled ? __('Enabled') : __('Disabled')) }}
                 </dd>
                 @if ($aofEnabled && $aofBytes !== null && $aofBytes > 0)
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ \Illuminate\Support\Number::fileSize($aofBytes) }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ \Illuminate\Support\Number::fileSize($aofBytes) }}</p>
                 @endif
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last AOF rewrite') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last AOF rewrite') }}</dt>
                 <dd class="mt-1 text-sm font-semibold text-brand-ink">
                     @if ($aofRewriteAt)
                         <span title="{{ $aofRewriteAt->toDateTimeString() }}">{{ $aofRewriteAt->diffForHumans() }}</span>
@@ -139,7 +139,7 @@
                     wire:loading.attr="disabled"
                     wire:target="saveRdbSchedule"
                 ></textarea>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Space-separated <seconds> <changes> pairs. "3600 1" = snapshot after 1 change in 3600s. Leave blank to disable RDB snapshots.') }}</p>
+                <p class="mt-1 text-xs text-brand-mist">{{ __('Space-separated <seconds> <changes> pairs. "3600 1" = snapshot after 1 change in 3600s. Leave blank to disable RDB snapshots.') }}</p>
                 <x-input-error :messages="$errors->get('rdb_save_schedule')" class="mt-1" />
             </div>
             <div class="mt-3 flex flex-wrap gap-2">

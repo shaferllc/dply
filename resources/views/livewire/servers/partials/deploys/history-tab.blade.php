@@ -2,7 +2,7 @@
 <div>
     <div class="flex flex-wrap items-end justify-between gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deployment history') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deployment history') }}</p>
             <p class="mt-0.5 text-xs text-brand-moss">
                 {{ trans_choice('{0} No deployments yet|{1} :count deployment|[2,*] :count deployments', $deployments->total(), ['count' => $deployments->total()]) }}
             </p>
@@ -76,7 +76,7 @@
                             {{-- Headline: status + site + when + duration --}}
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $isFailed,
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $isRunning,
@@ -93,7 +93,7 @@
                                     <span class="text-xs text-brand-moss" title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
                                 @endif
                                 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
-                                    <span class="font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
+                                    <span class="font-mono text-2xs text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
                                 @endif
 
                                 @if ($duration !== null)
@@ -106,10 +106,10 @@
 
                             {{-- Meta row: trigger + commit + phases --}}
                             <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployment->trigger ?: '—' }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployment->trigger ?: '—' }}</span>
 
                                 @if ($deployment->git_sha)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-sage ring-1 ring-inset ring-brand-ink/10" title="{{ $deployment->git_sha }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 font-mono text-xs font-semibold text-brand-sage ring-1 ring-inset ring-brand-ink/10" title="{{ $deployment->git_sha }}">
                                         <x-heroicon-m-code-bracket class="h-3 w-3" aria-hidden="true" />
                                         {{ \Illuminate\Support\Str::limit($deployment->git_sha, 7, '') }}
                                     </span>
@@ -118,7 +118,7 @@
                                 @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
                                     @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                         <span @class([
-                                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
+                                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
                                             'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->phaseOk($phase),
                                             'bg-rose-50 text-rose-800 ring-rose-200' => ! $deployment->phaseOk($phase),
                                         ])>{{ $phase }}</span>
@@ -132,15 +132,15 @@
                             @if ($isSkipped)
                                 <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                                     @if ($deployment->isDeployWindowBlocked())
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-900 ring-1 ring-inset ring-amber-200">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-amber-900 ring-1 ring-inset ring-amber-200">
                                             <x-heroicon-m-no-symbol class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Deploy window') }}
                                         </span>
                                         @if ($deployment->skip_rule_summary)
-                                            <span class="text-[11px] font-medium text-brand-ink">{{ __('blocked by :rule', ['rule' => $deployment->skip_rule_summary]) }}</span>
+                                            <span class="text-xs font-medium text-brand-ink">{{ __('blocked by :rule', ['rule' => $deployment->skip_rule_summary]) }}</span>
                                         @endif
                                     @elseif ($deployment->isBillingBlocked())
-                                        <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700 ring-1 ring-inset ring-rose-200">{{ __('Billing') }}</span>
+                                        <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-rose-700 ring-1 ring-inset ring-rose-200">{{ __('Billing') }}</span>
                                     @endif
                                 </div>
                                 @if ($deployment->log_output)
@@ -150,7 +150,7 @@
 
                             {{-- Footer: deploy id --}}
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <span class="font-mono text-[10px] text-brand-mist">{{ $deployment->id }}</span>
+                                <span class="font-mono text-2xs text-brand-mist">{{ $deployment->id }}</span>
                             </div>
                         </div>
 

@@ -64,18 +64,18 @@
                     >
                         <x-slot:actions>
                             <a href="{{ route('profile.notification-channels') }}" wire:navigate
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-bell class="h-3.5 w-3.5 shrink-0" />
                                 {{ __('My channels') }}
                             </a>
                             @if ($server->organization_id)
                                 <a href="{{ route('organizations.notification-channels', $server->organization_id) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-building-office-2 class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Organization channels') }}
                                 </a>
                                 <a href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-adjustments-horizontal class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Advanced assignment') }}
                                 </a>
@@ -94,7 +94,7 @@
                     </div>
 
                     <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                        <p class="text-[11px] text-brand-mist">{{ __('Each channel routes its own events. Removing = untick; channels not shown here are never changed.') }}</p>
+                        <p class="text-xs text-brand-mist">{{ __('Each channel routes its own events. Removing = untick; channels not shown here are never changed.') }}</p>
                         <x-primary-button type="button" wire:click="saveServerNotificationSubscriptions" wire:loading.attr="disabled" wire:target="saveServerNotificationSubscriptions">
                             <span wire:loading.remove wire:target="saveServerNotificationSubscriptions">{{ __('Save subscriptions') }}</span>
                             <span wire:loading wire:target="saveServerNotificationSubscriptions">{{ __('Saving…') }}</span>
@@ -121,7 +121,7 @@
                         @if ($server->organization_id)
                             <x-slot:actions>
                                 <a href="{{ route('organizations.automation', $server->organization_id) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Manage in Automation') }}
                                 </a>

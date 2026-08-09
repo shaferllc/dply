@@ -33,7 +33,7 @@
                 class="ml-1 font-mono text-brand-moss hover:text-brand-ink transition-colors cursor-pointer"
                 title="{{ __('Copy reference') }}">{{ $dplyRef }}</button>
         </p>
-        <p class="text-[11px] text-brand-mist/80 {{ $dplyDetail ? 'mb-4' : 'mb-8' }}">{{ __('Quote this reference to support to help us find what happened.') }}</p>
+        <p class="text-xs text-brand-mist/80 {{ $dplyDetail ? 'mb-4' : 'mb-8' }}">{{ __('Quote this reference to support to help us find what happened.') }}</p>
     @endif
 
     @if ($dplyDetail)
@@ -43,11 +43,11 @@
             </summary>
             <div class="space-y-2 border-t border-brand-ink/10 px-4 py-3">
                 <p class="break-words font-mono text-xs leading-relaxed text-brand-ink">{{ $dplyDetail['message'] }}</p>
-                <p class="font-mono text-[11px] text-brand-mist">{{ class_basename($dplyDetail['class']) }} · {{ $dplyDetail['file'] }}:{{ $dplyDetail['line'] }}</p>
+                <p class="font-mono text-xs text-brand-mist">{{ class_basename($dplyDetail['class']) }} · {{ $dplyDetail['file'] }}:{{ $dplyDetail['line'] }}</p>
                 <button
                     type="button"
                     onclick="navigator.clipboard && navigator.clipboard.writeText(@js($dplyDetail['message'].' ('.$dplyDetail['class'].' at '.$dplyDetail['file'].':'.$dplyDetail['line'].')'))"
-                    class="text-[11px] font-semibold text-brand-moss hover:text-brand-ink"
+                    class="text-xs font-semibold text-brand-moss hover:text-brand-ink"
                 >
                     {{ __('Copy details') }}
                 </button>

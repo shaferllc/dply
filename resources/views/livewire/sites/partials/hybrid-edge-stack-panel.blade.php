@@ -14,7 +14,7 @@
     >
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300">{{ __('Hybrid Edge stack') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300">{{ __('Hybrid Edge stack') }}</p>
                 <h2 class="mt-1 text-base font-semibold text-brand-ink">
                     @if ($stackStatus === 'complete')
                         {{ __('Edge hybrid app ready') }}
@@ -39,17 +39,17 @@
                 </p>
             </div>
             @if ($stackStatus === 'awaiting_origin' || $stackStatus === 'edge_provisioning')
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">
                     <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
                     {{ __('In progress') }}
                 </span>
             @elseif ($stackStatus === 'complete')
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                     <x-heroicon-s-check class="h-4 w-4" aria-hidden="true" />
                     {{ __('Complete') }}
                 </span>
             @elseif ($stackStatus === 'failed')
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
                     <x-heroicon-s-x-mark class="h-4 w-4" aria-hidden="true" />
                     {{ __('Failed') }}
                 </span>

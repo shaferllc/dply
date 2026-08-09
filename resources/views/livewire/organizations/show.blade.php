@@ -117,21 +117,21 @@
                 <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="{{ __('Organization at a glance') }}">
                     <x-fleet-stat :label="__('Plan')">
                         <p class="mt-2 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Org-wide subscription') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Fleet')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->servers_count }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('server|servers', $organization->servers_count) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('server|servers', $organization->servers_count) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->sites_count }} {{ trans_choice('site|sites', $organization->sites_count) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ $organization->sites_count }} {{ trans_choice('site|sites', $organization->sites_count) }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('People')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">
+                        <p class="mt-1 text-xs text-brand-mist">
                             {{ $organization->teams->count() }} {{ trans_choice('team|teams', $organization->teams->count()) }}
                             @if ($organization->invitations->count() > 0)
                                 · {{ $organization->invitations->count() }} {{ trans_choice('pending|pending', $organization->invitations->count()) }}
@@ -141,9 +141,9 @@
                     <x-fleet-stat :label="__('Automation')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->apiTokens->count() }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('API token|API tokens', $organization->apiTokens->count()) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('API token|API tokens', $organization->apiTokens->count()) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->notificationWebhookDestinations->count() }} {{ trans_choice('webhook|webhooks', $organization->notificationWebhookDestinations->count()) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ $organization->notificationWebhookDestinations->count() }} {{ trans_choice('webhook|webhooks', $organization->notificationWebhookDestinations->count()) }}</p>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -155,7 +155,7 @@
                         <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Navigate') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Navigate') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization sections') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Jump straight to the surface you need — billing, people, channels, credentials, and automation.') }}</p>
                     </div>
@@ -176,7 +176,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $link['label'] }}</p>
-                                    <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ $link['description'] }}</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $link['description'] }}</p>
                                 </div>
                             </a>
                         </li>

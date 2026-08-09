@@ -6,26 +6,30 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('cli install script is served with injected base url', function (): void {
+test('cli install script injects the request origin not app url', function (): void {
     config(['app.url' => 'https://dplyi.test']);
 
-    $response = $this->get(route('cli.install'));
+    $response = $this->get('https://dply.test/cli/install.sh');
 
     $response->assertOk();
     $response->assertHeader('Content-Type', 'text/plain; charset=utf-8');
     expect($response->getContent())
         ->toContain('#!/usr/bin/env bash')
-        ->toContain('https://dplyi.test')
+        ->toContain('DEFAULT_BASE_URL="https://dply.test"')
         ->toContain('tarball')
-        ->not->toContain('__DPLY_DEFAULT_BASE_URL__');
+        ->not->toContain('__DPLY_DEFAULT_BASE_URL__')
+        ->not->toContain('DEFAULT_BASE_URL="https://dplyi.test"');
 });
 
-test('cli version json is served', function (): void {
-    $response = $this->get(route('cli.version'));
+test('cli version json uses the request origin', function (): void {
+    config(['app.url' => 'https://dplyi.test']);
+
+    $response = $this->get('https://dply.test/cli/version.json');
 
     $response->assertOk();
     $response->assertJsonPath('name', '@dply/cli');
-    $response->assertJsonStructure(['version', 'install_url', 'package_url']);
+    $response->assertJsonPath('install_url', 'https://dply.test/cli/install.sh');
+    $response->assertJsonPath('package_url', 'https://dply.test/cli/dply-cli.tgz');
 });
 
 test('cli package tarball is served', function (): void {
@@ -46,13 +50,13 @@ test('cli package tarball is served', function (): void {
     expect($listing)->toContain('package/src/instance-defaults.json');
 });
 
-test('cli package tarball bakes app url as default base', function (): void {
+test('cli package tarball bakes the request origin as default base', function (): void {
     config([
         'app.url' => 'https://dplyi.test',
         'cli.default_base_url' => 'https://dplyi.test',
     ]);
 
-    $response = $this->get(route('cli.package'));
+    $response = $this->get('https://dply.test/cli/dply-cli.tgz');
     $response->assertOk();
 
     $tmp = tempnam(sys_get_temp_dir(), 'dply-cli-defaults-');
@@ -66,5 +70,5 @@ test('cli package tarball bakes app url as default base', function (): void {
     expect(is_file($defaultsPath))->toBeTrue();
     /** @var array{baseUrl?: string} $defaults */
     $defaults = json_decode((string) file_get_contents($defaultsPath), true, 512, JSON_THROW_ON_ERROR);
-    expect($defaults['baseUrl'] ?? null)->toBe('https://dplyi.test');
+    expect($defaults['baseUrl'] ?? null)->toBe('https://dply.test');
 });

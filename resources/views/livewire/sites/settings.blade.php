@@ -44,7 +44,7 @@
                 :icon="\Illuminate\Support\Str::after($sectionHeader['icon'], 'heroicon-o-')"
             >
                 @if ($headerRoleLabel !== null)
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
                           title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
                         @if ($headerIsDeployer)
                             <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
@@ -529,7 +529,7 @@
                                 <p class="mt-1 text-xs leading-5 text-amber-900">{{ $quick_ssl_reachability['error'] }}</p>
                             @endif
                         </div>
-                        <button type="button" wire:click="recheckQuickDomainSslReachability" wire:loading.attr="disabled" wire:target="recheckQuickDomainSslReachability" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <button type="button" wire:click="recheckQuickDomainSslReachability" wire:loading.attr="disabled" wire:target="recheckQuickDomainSslReachability" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                             <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="recheckQuickDomainSslReachability" aria-hidden="true" />
                             {{ __('Re-check') }}
                         </button>

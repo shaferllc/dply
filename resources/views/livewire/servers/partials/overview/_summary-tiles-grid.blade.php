@@ -76,7 +76,7 @@
             wire:navigate
             class="block rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md"
         >
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['label'] }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['label'] }}</p>
             <p class="mt-0.5 flex items-baseline gap-1.5">
                 <span @class([
                     'truncate font-semibold text-brand-ink',
@@ -84,10 +84,10 @@
                     'text-sm' => ! ($tile['mono'] ?? false),
                 ])>{{ $tile['value'] }}</span>
                 @if (! empty($tile['unit']))
-                    <span class="text-[11px] text-brand-moss">{{ $tile['unit'] }}</span>
+                    <span class="text-xs text-brand-moss">{{ $tile['unit'] }}</span>
                 @endif
             </p>
-            <p class="mt-0.5 truncate text-[11px] {{ $tile['meta_class'] ?? 'text-brand-moss' }}">{{ $tile['meta'] }}</p>
+            <p class="mt-0.5 truncate text-xs {{ $tile['meta_class'] ?? 'text-brand-moss' }}">{{ $tile['meta'] }}</p>
         </a>
     @endforeach
 </div>

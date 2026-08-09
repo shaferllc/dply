@@ -27,18 +27,18 @@
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span class="text-sm font-semibold text-brand-ink">{{ $label }}</span>
                                 @if ($log->user)
-                                    <span class="text-[11px] text-brand-mist">{{ $log->user->name }}</span>
+                                    <span class="text-xs text-brand-mist">{{ $log->user->name }}</span>
                                 @endif
                             </div>
                             @if ($log->new_values)
                                 <details class="mt-1">
-                                    <summary class="cursor-pointer text-[11px] font-medium text-brand-sage hover:underline">{{ __('Details') }}</summary>
-                                    <pre class="mt-1 max-h-36 overflow-auto rounded-lg bg-zinc-950 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-zinc-300">{{ json_encode($log->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                    <summary class="cursor-pointer text-xs font-medium text-brand-sage hover:underline">{{ __('Details') }}</summary>
+                                    <pre class="mt-1 max-h-36 overflow-auto rounded-lg bg-zinc-950 px-2.5 py-2 font-mono text-xs leading-relaxed text-zinc-300">{{ json_encode($log->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                 </details>
                             @endif
                         </div>
                         <time
-                            class="shrink-0 text-[11px] text-brand-mist"
+                            class="shrink-0 text-xs text-brand-mist"
                             datetime="{{ $log->created_at->toIso8601String() }}"
                             title="{{ $log->created_at->toDayDateTimeString() }}"
                         >{{ $log->created_at->diffForHumans() }}</time>

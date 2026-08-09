@@ -18,7 +18,7 @@
 <aside class="space-y-4 pb-24 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
         <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-5 py-3.5 dark:border-brand-mist/15">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
             <p class="mt-1 truncate text-sm font-semibold text-brand-ink">{{ $appLabel }}</p>
         </div>
         <dl class="divide-y divide-brand-ink/8 text-sm dark:divide-brand-mist/15">
@@ -27,7 +27,7 @@
                 <dd class="min-w-0 text-end font-mono text-xs text-brand-ink dark:text-brand-cream">
                     <span class="block truncate">{{ $repoLabel }}</span>
                     @if (trim((string) $branch) !== '')
-                        <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Branch') }} {{ $branch }}</span>
+                        <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Branch') }} {{ $branch }}</span>
                     @endif
                 </dd>
             </div>
@@ -35,7 +35,7 @@
                 <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Build') }}</dt>
                 <dd class="min-w-0 text-end text-xs font-semibold text-brand-ink dark:text-brand-cream">
                     <span class="block truncate font-mono font-normal">{{ $buildCommand !== '' ? $buildCommand : __('Detected / default') }}</span>
-                    <span class="mt-0.5 block text-[11px] font-normal text-brand-moss">
+                    <span class="mt-0.5 block text-xs font-normal text-brand-moss">
                         {{ __('Output') }} {{ $outputDir !== '' ? $outputDir : 'dist' }}
                     </span>
                 </dd>
@@ -57,7 +57,7 @@
                     <p class="text-lg font-semibold tracking-tight text-brand-ink">
                         ${{ number_format($platformFee, 2) }}<span class="text-sm font-medium text-brand-moss">/mo</span>
                     </p>
-                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                    <p class="mt-0.5 text-xs text-brand-moss">
                         @if ($runtimeMode === 'ssr')
                             {{ __('Worker SSR platform fee. Previews free.') }}
                         @elseif ($edgeUsageBillingEnabled)

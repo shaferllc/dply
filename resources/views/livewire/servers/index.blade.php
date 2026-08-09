@@ -112,7 +112,7 @@
                                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                 <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision infrastructure.') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     {{ __('This fleet can show guidance and empty states, but you will need a connected provider before you can provision cloud infrastructure from the workspace.') }}

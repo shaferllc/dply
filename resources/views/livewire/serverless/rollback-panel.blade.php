@@ -4,7 +4,7 @@
             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rollback') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rollback') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent artifacts') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Re-deploy a previous build without rebuilding — use it to revert a bad deploy.') }}</p>
         </div>
@@ -23,7 +23,7 @@
                         <p class="text-sm font-semibold text-brand-ink">
                             {{ __('Revision :rev', ['rev' => $entry['revision_id'] ?? '—']) }}
                             @if ($index === 0)
-                                <span class="ml-1 inline-flex items-center rounded-md bg-brand-forest/15 px-2 py-0.5 text-[11px] font-semibold text-brand-forest">{{ __('Live') }}</span>
+                                <span class="ml-1 inline-flex items-center rounded-md bg-brand-forest/15 px-2 py-0.5 text-xs font-semibold text-brand-forest">{{ __('Live') }}</span>
                             @endif
                         </p>
                         <p class="mt-0.5 text-xs text-brand-moss">

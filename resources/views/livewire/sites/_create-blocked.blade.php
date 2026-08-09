@@ -17,7 +17,7 @@
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Cannot create site') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Cannot create site') }}</p>
                 <h1 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Site creation is blocked') }}</h1>
                 <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $siteCreateBlockedReason }}</p>
             </div>

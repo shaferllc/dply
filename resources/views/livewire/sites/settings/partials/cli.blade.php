@@ -32,7 +32,7 @@
     <div class="px-4 py-5 sm:px-6">
         @if ($isProductionMirror)
             <div class="mb-3 flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-950 ring-1 ring-inset ring-amber-200">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-inset ring-amber-200">
                     <x-heroicon-s-exclamation-triangle class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Production API — :host', ['host' => $productionConnection?->hostLabel() ?: 'Production']) }}
                 </span>
@@ -48,7 +48,7 @@
             :intro="__('Install once, then run these from your machine. Sessions: Profile → CLI.')"
             :commands="$localCommands"
         />
-        <p class="mt-3 font-mono text-[11px] text-brand-mist">
+        <p class="mt-3 font-mono text-xs text-brand-mist">
             {{ $site->id }}
             <span class="mx-1.5 text-brand-mist/50" aria-hidden="true">·</span>
             {{ $site->slug }}

@@ -13,7 +13,7 @@
         <ol class="flex flex-wrap items-center gap-2 sm:gap-3">
             <li class="flex items-center gap-2 sm:gap-3">
                 <a href="{{ route('servers.create', ['edit' => 1]) }}" wire:navigate class="flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 transition-colors hover:border-emerald-400 hover:bg-emerald-100">
-                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400 bg-emerald-500 text-[11px] text-white">
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400 bg-emerald-500 text-xs text-white">
                         <x-heroicon-o-check class="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
                     {{ __('Type & name') }}
@@ -22,7 +22,7 @@
             </li>
             <li>
                 <span aria-current="step" class="flex items-center gap-2 rounded-full border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900">
-                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500 bg-white text-[11px] text-sky-700">2</span>
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500 bg-white text-xs text-sky-700">2</span>
                     {{ __('Scan & import') }}
                 </span>
             </li>
@@ -52,7 +52,7 @@
                          modal opens on the account you were about to add. --}}
                     <x-add-provider-credential-link
                         :provider="$provider !== '' ? $provider : null"
-                        class="!inline-flex !h-6 !shrink-0 !items-center !gap-1 !whitespace-nowrap !rounded-md !border !border-brand-ink/15 !bg-white !px-2 !text-[11px] !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
+                        class="!inline-flex !h-6 !shrink-0 !items-center !gap-1 !whitespace-nowrap !rounded-md !border !border-brand-ink/15 !bg-white !px-2 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
                     >
                         <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                         {{ __('Connect account') }}
@@ -116,7 +116,7 @@
             @endif
 
             @if ($scanError !== '')
-                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-brand-ink/10 bg-rose-50/60 px-4 py-2.5 text-[11px] text-rose-800 sm:px-5">
+                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-brand-ink/10 bg-rose-50/60 px-4 py-2.5 text-xs text-rose-800 sm:px-5">
                     <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ $scanError }}
                 </p>
@@ -155,7 +155,7 @@
                             >
                                 <p @class(['shrink-0 text-xs font-semibold', $isImported ? 'text-brand-mist' : 'text-brand-ink'])>{{ $row['name'] ?: __('(unnamed)') }}</p>
                                 <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-brand-mist">
+                                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-xs text-brand-mist">
                                     <span>{{ $row['public_ipv4'] ?: '—' }}</span>
                                     @if ($row['private_ipv4'])
                                         <span class="flex items-center gap-1">
@@ -171,7 +171,7 @@
                                     @endif
                                 </div>
                                 @if ($row['status'])
-                                    <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone($row['status']) }}">{{ $row['status'] }}</span>
+                                    <span class="shrink-0 text-2xs font-semibold uppercase tracking-wide {{ $statusTone($row['status']) }}">{{ $row['status'] }}</span>
                                 @endif
                                 @if ($isImported)
                                     {{-- "Already in dply" only says a row exists.
@@ -181,7 +181,7 @@
                                     @php $verdict = $reachability[$row['provider_id']] ?? null; @endphp
                                     @if ($verdict !== null)
                                         <span @class([
-                                            'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[10px] font-semibold ring-1',
+                                            'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-2xs font-semibold ring-1',
                                             'bg-emerald-50 text-emerald-700 ring-emerald-200' => $verdict['ok'],
                                             'bg-rose-50 text-rose-700 ring-rose-200' => ! $verdict['ok'],
                                         ])
@@ -196,7 +196,7 @@
                                             @endif
                                         </span>
                                     @else
-                                        <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                        <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
                                             <x-heroicon-m-check class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             {{ __('In dply') }}
                                         </span>
@@ -206,7 +206,7 @@
                                         wire:click="checkReachability('{{ $row['provider_id'] }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="checkReachability('{{ $row['provider_id'] }}')"
-                                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="checkReachability('{{ $row['provider_id'] }}')" class="inline-flex items-center gap-1">
                                             <x-heroicon-m-signal class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -218,7 +218,7 @@
                                         </span>
                                     </button>
                                     @if ($row['server_id'])
-                                        <a href="{{ route('servers.overview', ['server' => $row['server_id']]) }}" wire:navigate class="shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">
+                                        <a href="{{ route('servers.overview', ['server' => $row['server_id']]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">
                                             {{ __('Open') }}
                                         </a>
                                     @endif
@@ -226,7 +226,7 @@
                                     <button
                                         type="button"
                                         wire:click="openAdopt('{{ $row['provider_id'] }}')"
-                                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
                                     >
                                         <x-heroicon-m-arrow-down-tray class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('Import') }}
@@ -237,7 +237,7 @@
                                      refused on port 22" is the useful part and
                                      doesn't fit in a pill. --}}
                                 @if ($isImported && ($reachability[$row['provider_id']] ?? null) !== null && ! $reachability[$row['provider_id']]['ok'])
-                                    <p class="flex w-full items-start gap-1.5 text-[11px] text-rose-800">
+                                    <p class="flex w-full items-start gap-1.5 text-xs text-rose-800">
                                         <x-heroicon-m-arrow-turn-down-right class="mt-px h-3 w-3 shrink-0 text-rose-400" aria-hidden="true" />
                                         <span class="min-w-0">{{ $reachability[$row['provider_id']]['message'] }}</span>
                                         {{-- A red verdict needs somewhere to go: the same key
@@ -245,7 +245,7 @@
                                         <button
                                             type="button"
                                             wire:click="openRepair('{{ $row['provider_id'] }}')"
-                                            class="ml-auto inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-rose-700"
+                                            class="ml-auto inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-rose-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700"
                                         >
                                             <x-heroicon-m-wrench-screwdriver class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             {{ __('Fix access') }}
@@ -258,7 +258,7 @@
                 @endif
 
                 @if ($importedCount > 0)
-                    <p class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2 text-[11px] text-brand-mist sm:px-5">
+                    <p class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2 text-xs text-brand-mist sm:px-5">
                         {{ trans_choice('{1} :count server is already managed by dply.|[2,*] :count servers are already managed by dply.', $importedCount, ['count' => $importedCount]) }}
                     </p>
                 @endif
@@ -283,7 +283,7 @@
                     class="border-b border-brand-ink/10"
                 >
                     <x-slot:actions>
-                        <button type="button" wire:click="closeAdopt" class="inline-flex h-6 shrink-0 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                        <button type="button" wire:click="closeAdopt" class="inline-flex h-6 shrink-0 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             {{ __('Cancel') }}
                         </button>
                     </x-slot:actions>
@@ -368,7 +368,7 @@
                                     </span>
                                     <span class="min-w-0 flex-1">
                                         <span class="block text-xs font-semibold text-brand-ink">{{ $option['title'] }}</span>
-                                        <span class="mt-0.5 block text-[11px] leading-relaxed text-brand-moss">{{ $option['body'] }}</span>
+                                        <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $option['body'] }}</span>
                                     </span>
                                     <x-heroicon-s-check-circle @class([
                                         'h-4 w-4 shrink-0 transition-colors',
@@ -386,7 +386,7 @@
                              check, in one panel hanging off the picker. --}}
                         <div class="mt-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3">
                             @if ($adoptKeySource === 'existing')
-                                <label for="adopt-key-server" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Borrow the key from') }}</label>
+                                <label for="adopt-key-server" class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Borrow the key from') }}</label>
                                 <select
                                     id="adopt-key-server"
                                     wire:model.live="adoptKeyServerId"
@@ -408,7 +408,7 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('adoptKeyServerId')" class="mt-1" />
                             @elseif ($adoptKeySource === 'paste')
-                                <label for="adopt-key-paste" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Private key') }}</label>
+                                <label for="adopt-key-paste" class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Private key') }}</label>
                                 <textarea
                                     id="adopt-key-paste"
                                     wire:model="adoptSshPrivateKey"
@@ -418,7 +418,7 @@
                                 ></textarea>
                                 <x-input-error :messages="$errors->get('adoptSshPrivateKey')" class="mt-1" />
                             @else
-                                <p class="flex gap-1.5 text-[11px] leading-relaxed text-brand-moss">
+                                <p class="flex gap-1.5 text-xs leading-relaxed text-brand-moss">
                                     <x-heroicon-m-information-circle class="mt-px h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                     <span>{{ __('The public half appears after import so you can add it to the host. No provider API can install it for you — keys are only injected when a machine is created.') }}</span>
                                 </p>
@@ -434,7 +434,7 @@
                                         wire:click="testConnection"
                                         wire:loading.attr="disabled"
                                         wire:target="testConnection"
-                                        class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                        class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="testConnection" class="inline-flex items-center gap-1.5">
                                             <x-heroicon-m-signal class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -448,7 +448,7 @@
 
                                     @if ($probeResult !== null)
                                         <p @class([
-                                            'inline-flex min-w-0 items-start gap-1.5 text-[11px]',
+                                            'inline-flex min-w-0 items-start gap-1.5 text-xs',
                                             'text-emerald-700' => $probeResult['ok'],
                                             'text-rose-800' => ! $probeResult['ok'],
                                         ])>
@@ -460,7 +460,7 @@
                                             <span class="min-w-0">{{ $probeResult['message'] }}</span>
                                         </p>
                                     @else
-                                        <span class="text-[11px] text-brand-mist">{{ __('Optional — checks dply can actually log in before the server is created.') }}</span>
+                                        <span class="text-xs text-brand-mist">{{ __('Optional — checks dply can actually log in before the server is created.') }}</span>
                                     @endif
                                 </div>
                             @endif
@@ -468,7 +468,7 @@
                     </fieldset>
 
                     @if ($adoptError !== '')
-                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-800">
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
                             <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ $adoptError }}
                         </p>
@@ -502,7 +502,7 @@
                     class="border-b border-brand-ink/10"
                 >
                     <x-slot:actions>
-                        <button type="button" wire:click="dismissGeneratedKey" class="inline-flex h-6 shrink-0 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                        <button type="button" wire:click="dismissGeneratedKey" class="inline-flex h-6 shrink-0 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             {{ __('Dismiss') }}
                         </button>
                     </x-slot:actions>
@@ -511,7 +511,7 @@
                 <ol class="divide-y divide-brand-ink/10">
                     <li class="px-4 py-3 sm:px-5">
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-sage/20 text-[10px] font-semibold text-brand-forest">1</span>
+                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-sage/20 text-2xs font-semibold text-brand-forest">1</span>
                             <p class="text-xs font-semibold text-brand-ink">{{ __('Run this on the server, as a user that can write to :user’s authorized_keys', ['user' => $adoptSshUser ?: 'root']) }}</p>
                         </div>
                         <div class="relative mt-1.5">
@@ -520,10 +520,10 @@
                             {{-- Bottom padding, not right: the command is one long
                                  line, so a button parked over its right edge sits
                                  on top of the text as it scrolls under it. --}}
-                            <pre class="overflow-x-auto rounded-lg bg-brand-ink px-3 pb-9 pt-2 font-mono text-[11px] leading-relaxed text-brand-cream">{{ $installCommand }}</pre>
+                            <pre class="overflow-x-auto rounded-lg bg-brand-ink px-3 pb-9 pt-2 font-mono text-xs leading-relaxed text-brand-cream">{{ $installCommand }}</pre>
                             <button
                                 type="button"
-                                class="absolute bottom-1.5 right-1.5 inline-flex h-6 items-center gap-1 rounded-md bg-brand-cream px-2 text-[10px] font-semibold text-brand-ink shadow-sm transition hover:bg-white"
+                                class="absolute bottom-1.5 right-1.5 inline-flex h-6 items-center gap-1 rounded-md bg-brand-cream px-2 text-2xs font-semibold text-brand-ink shadow-sm transition hover:bg-white"
                                 @click="navigator.clipboard.writeText(@js($installCommand)); copied = true; setTimeout(() => copied = false, 1500)"
                             >
                                 <x-heroicon-m-clipboard class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -532,9 +532,9 @@
                         </div>
                     </li>
                     <li class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 sm:px-5">
-                        <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-sage/20 text-[10px] font-semibold text-brand-forest">2</span>
+                        <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-sage/20 text-2xs font-semibold text-brand-forest">2</span>
                         <p class="min-w-0 flex-1 text-xs text-brand-moss">{{ __('Open the server — dply will connect on the next task it runs.') }}</p>
-                        <a href="{{ $adoptedServerUrl }}" wire:navigate class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                        <a href="{{ $adoptedServerUrl }}" wire:navigate class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
                             {{ __('Open server') }}
                             <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                         </a>

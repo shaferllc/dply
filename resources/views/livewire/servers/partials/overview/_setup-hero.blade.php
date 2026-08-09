@@ -8,7 +8,7 @@
 
     <div class="relative max-w-4xl">
         <div class="flex flex-wrap items-center gap-3">
-            <span class="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sand/90">
+            <span class="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-brand-sand/90">
                 <span class="inline-flex h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(252,211,77,0.16)]"></span>
                 {{ __('Setup in progress') }}
             </span>
@@ -43,7 +43,7 @@
             </div>
 
             <div class="mt-6 max-w-3xl rounded-2xl border border-white/10 bg-white/95 p-5 text-brand-ink shadow-[0_20px_70px_rgba(12,18,15,0.16)]">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Next step') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Next step') }}</p>
                 <p class="mt-1.5 text-base font-semibold tracking-tight text-brand-ink">{{ __('Open the setup journey') }}</p>
                 <p class="mt-1 text-sm leading-6 text-brand-moss">
                     {{ __('Watch live progress, inspect current output, and re-run installation from a clean tracked setup task if needed.') }}

@@ -201,7 +201,7 @@
                         @endif
 
                         <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
-                            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-mist">
+                            <p class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-mist">
                                 <x-heroicon-m-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 <span class="font-mono tabular-nums text-brand-moss">{{ count($apply_preview_lines) }}</span>
                                 {{ trans_choice('command|commands', count($apply_preview_lines)) }}

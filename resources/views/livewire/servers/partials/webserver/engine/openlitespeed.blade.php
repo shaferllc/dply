@@ -17,7 +17,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadOlsVhostsConfig"
                                     title="{{ __('Reload from server') }}"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsVhostsConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -34,7 +34,7 @@
                         {{-- The "edits get overwritten" caveat is the operative fact
                              here, so it's a full-width strip under the head rather
                              than a pill buried in the prose. --}}
-                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
                             <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Edits here are overwritten the next time you Apply the matching Site (or switch webserver). Use the Site workspace for durable changes.') }}
                         </p>
@@ -45,7 +45,7 @@
                         @endif
                         @if ($ols_vhosts_error)
                             <div class="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
-                                <pre class="whitespace-pre-wrap break-words font-mono text-[11px]">{{ $ols_vhosts_error }}</pre>
+                                <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $ols_vhosts_error }}</pre>
                             </div>
                         @endif
 
@@ -58,7 +58,7 @@
                                 'loadingText' => __('Reading vhost configs…'),
                             ])
                         @else
-                            <p class="text-[11px] text-brand-moss">{{ __('Values below are as read from the server.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Values below are as read from the server.') }}</p>
                         @endif
                         </div>
                     </div>
@@ -101,26 +101,26 @@
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $vhostName }}</span>
                                                 @if (! empty($identity['unreadable']))
-                                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">unreadable</span>
+                                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-700">unreadable</span>
                                                 @endif
                                                 @if (! empty($identity['domains']))
-                                                    <span class="text-[11px] text-brand-mist">{{ implode(', ', array_slice($identity['domains'], 0, 3)) }}@if (count($identity['domains']) > 3) +{{ count($identity['domains']) - 3 }} @endif</span>
+                                                    <span class="text-xs text-brand-mist">{{ implode(', ', array_slice($identity['domains'], 0, 3)) }}@if (count($identity['domains']) > 3) +{{ count($identity['domains']) - 3 }} @endif</span>
                                                 @endif
                                             </span>
                                             @if (! empty($identity['conf_path']))
-                                                <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ $identity['conf_path'] }}</span>
+                                                <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ $identity['conf_path'] }}</span>
                                             @endif
                                         </span>
                                     </button>
 
                                     <div x-show="expanded" x-cloak class="mt-5 space-y-5">
                                         @if (! empty($identity['unreadable']))
-                                            <div class="rounded-md bg-rose-50/60 px-3 py-2 text-[11px] text-rose-900">
+                                            <div class="rounded-md bg-rose-50/60 px-3 py-2 text-xs text-rose-900">
                                                 {{ __('Could not read this vhost\'s vhconf.conf. Defaults shown — saving will create the file or overwrite it.') }}
                                             </div>
                                         @endif
                                         @if (! empty($identity['vh_root']))
-                                            <p class="text-[11px] text-brand-mist">
+                                            <p class="text-xs text-brand-mist">
                                                 <span class="font-semibold">{{ __('vhRoot') }}</span>
                                                 <span class="font-mono">{{ $identity['vh_root'] }}</span>
                                             </p>
@@ -228,7 +228,7 @@
                                     type="button"
                                     wire:click="openAddOlsListenerForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Add listener') }}
@@ -239,7 +239,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadOlsListenersConfig"
                                     title="{{ __('Reload from server') }}"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsListenersConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -259,7 +259,7 @@
                         @endif
                         @if ($ols_listeners_error)
                             <div class="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
-                                <pre class="whitespace-pre-wrap break-words font-mono text-[11px]">{{ $ols_listeners_error }}</pre>
+                                <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $ols_listeners_error }}</pre>
                             </div>
                         @endif
 
@@ -291,7 +291,7 @@
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest"
                                             required
                                         />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('e.g. `*:443`, `127.0.0.1:8080`, `0.0.0.0:7080`.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('e.g. `*:443`, `127.0.0.1:8080`, `0.0.0.0:7080`.') }}</span>
                                     </label>
                                     <label class="block sm:col-span-2">
                                         <span class="inline-flex items-center gap-2">
@@ -304,7 +304,7 @@
                                             />
                                             <span class="text-sm font-medium text-brand-ink">{{ __('TLS / HTTPS listener') }}</span>
                                         </span>
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('When on, OLS terminates TLS using keyFile + certFile below.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('When on, OLS terminates TLS using keyFile + certFile below.') }}</span>
                                     </label>
                                     @if (($ols_listeners_new['secure'] ?? '0') === '1')
                                         <label class="block">
@@ -411,18 +411,18 @@
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $listenerName }}</span>
                                                 @if ($isSecure)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-700">
                                                         <x-heroicon-o-lock-closed class="h-3 w-3" /> TLS
                                                     </span>
                                                 @else
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">HTTP</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">HTTP</span>
                                                 @endif
                                                 @if ($isManaged)
-                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">dply</span>
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-700">dply</span>
                                                 @endif
                                             </span>
                                             @if (! empty($identity['address']))
-                                                <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ $identity['address'] }}</span>
+                                                <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ $identity['address'] }}</span>
                                             @endif
                                         </span>
                                     </button>
@@ -434,14 +434,14 @@
                                                     type="button"
                                                     wire:click="openConfirmActionModal('removeOlsListener', ['{{ $listenerName }}'], @js(__('Remove listener: :name', ['name' => $listenerName])), @js(__('Remove the `:name` listener? Sites mapped to this listener stop serving immediately on the bound port.', ['name' => $listenerName])), @js(__('Remove')), true)"
                                                     @disabled($isDeployer || $actionInFlight)
-                                                    class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     <x-heroicon-o-trash class="h-4 w-4" />
                                                     {{ __('Remove') }}
                                                 </button>
                                             </div>
                                         @else
-                                            <p class="rounded-md bg-amber-50/60 px-3 py-2 text-[11px] text-amber-900">
+                                            <p class="rounded-md bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
                                                 {{ __('Managed by dply — the switch flow / provisioner re-emits this listener on reconcile. Edits to tunables persist between reconciles; removal is blocked.') }}
                                             </p>
                                         @endif
@@ -490,8 +490,8 @@
 
                                         @if (! empty($mapEntries))
                                             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
-                                                <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vhost mappings (read-only — managed by site provisioning)') }}</p>
-                                                <ul class="mt-2 space-y-1 font-mono text-[11px] text-brand-ink">
+                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vhost mappings (read-only — managed by site provisioning)') }}</p>
+                                                <ul class="mt-2 space-y-1 font-mono text-xs text-brand-ink">
                                                     @foreach ($mapEntries as $mapEntry)
                                                         <li>{{ $mapEntry }}</li>
                                                     @endforeach
@@ -546,7 +546,7 @@
                                     type="button"
                                     wire:click="openAddOlsExtAppForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Add ExtApp') }}
@@ -557,7 +557,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadOlsExtAppsConfig"
                                     title="{{ __('Reload from server') }}"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsExtAppsConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -591,7 +591,7 @@
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest"
                                             required
                                         />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Letters, digits, and `_ . -` only.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Letters, digits, and `_ . -` only.') }}</span>
                                     </label>
                                     <label class="block">
                                         <span class="block text-xs font-medium text-brand-ink">{{ __('Type') }}</span>
@@ -613,7 +613,7 @@
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest"
                                             required
                                         />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Unix socket or `host:port`. e.g. uds://tmp/lshttpd/my-app.sock or 127.0.0.1:9000.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Unix socket or `host:port`. e.g. uds://tmp/lshttpd/my-app.sock or 127.0.0.1:9000.') }}</span>
                                     </label>
                                     <label class="block">
                                         <span class="block text-xs font-medium text-brand-ink">{{ __('Binary path (optional)') }}</span>
@@ -623,7 +623,7 @@
                                             placeholder="/usr/local/lsws/lsphp83/bin/lsphp"
                                             class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest"
                                         />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Required for lsapi/fcgi when OLS spawns the worker. Leave blank for proxy.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Required for lsapi/fcgi when OLS spawns the worker. Leave blank for proxy.') }}</span>
                                     </label>
                                 </div>
 
@@ -714,18 +714,18 @@
                                             <span class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ $appName }}</span>
                                                 @if (! empty($identity['type']))
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $identity['type'] }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $identity['type'] }}</span>
                                                 @endif
                                             </span>
                                             @if (! empty($identity['address']))
-                                                <span class="mt-0.5 block truncate text-[11px] font-mono text-brand-mist">{{ $identity['address'] }}</span>
+                                                <span class="mt-0.5 block truncate text-xs font-mono text-brand-mist">{{ $identity['address'] }}</span>
                                             @endif
                                         </span>
                                     </button>
 
                                     <div x-show="expanded" x-cloak class="mt-5 space-y-5">
                                         @if (! empty($identity['path']))
-                                            <p class="text-[11px] text-brand-mist">
+                                            <p class="text-xs text-brand-mist">
                                                 <span class="font-semibold">{{ __('Binary path') }}</span>
                                                 <span class="font-mono">{{ $identity['path'] }}</span>
                                             </p>
@@ -737,14 +737,14 @@
                                                     type="button"
                                                     wire:click="openConfirmActionModal('removeOlsExtApp', ['{{ $appName }}'], @js(__('Remove ExtApp: :name', ['name' => $appName])), @js(__('Remove the `:name` extprocessor block? Any vhost still referencing it will fail to load on next reload.', ['name' => $appName])), @js(__('Remove')), true)"
                                                     @disabled($isDeployer || $actionInFlight)
-                                                    class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     <x-heroicon-o-trash class="h-4 w-4" />
                                                     {{ __('Remove') }}
                                                 </button>
                                             </div>
                                         @else
-                                            <p class="rounded-md bg-brand-sand/30 px-3 py-2 text-[11px] text-brand-mist">
+                                            <p class="rounded-md bg-brand-sand/30 px-3 py-2 text-xs text-brand-mist">
                                                 {{ __('Managed by dply. Adjust this PHP version via the PHP workspace; remove the PHP version there to delete this block.') }}
                                             </p>
                                         @endif
@@ -848,7 +848,7 @@
                                     wire:click="loadOlsModulesConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadOlsModulesConfig"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsModulesConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -912,14 +912,14 @@
                                             type="button"
                                             wire:click="setOlsModulesFilter('{{ $filterKey }}')"
                                             @class([
-                                                'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition',
+                                                'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition',
                                                 'border-brand-forest bg-brand-forest text-brand-cream' => $ols_modules_filter === $filterKey,
                                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $ols_modules_filter !== $filterKey,
                                             ])
                                         >
                                             {{ $filterLabel }}
                                             @if ($filterKey !== 'all')
-                                                <span class="text-[10px] opacity-70">{{ count(array_filter($ols_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
+                                                <span class="text-2xs opacity-70">{{ count(array_filter($ols_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -928,7 +928,7 @@
 
                             <div class="mt-4 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                                 <table class="w-full text-left text-sm">
-                                    <thead class="bg-brand-sand/30 text-[11px] uppercase tracking-wide text-brand-mist">
+                                    <thead class="bg-brand-sand/30 text-xs uppercase tracking-wide text-brand-mist">
                                         <tr>
                                             <th class="px-4 py-2 font-medium">{{ __('Module') }}</th>
                                             <th class="px-4 py-2 font-medium">{{ __('Type') }}</th>
@@ -942,23 +942,23 @@
                                             <tr>
                                                 <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $mod['name'] }}</td>
                                                 <td class="px-4 py-2 text-xs">
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
                                                 </td>
                                                 <td class="px-4 py-2 text-xs text-brand-moss">
                                                     @if ($mod['on_disk'])
-                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('.so present') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('.so present') }}</span>
                                                     @else
-                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('built-in') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold text-brand-moss">{{ __('built-in') }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-2 text-xs">
                                                     @if ($mod['enabled'])
-                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('registered') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('registered') }}</span>
                                                     @else
-                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('not registered') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold text-brand-moss">{{ __('not registered') }}</span>
                                                     @endif
                                                     @if ($mod['protected'])
-                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700" title="{{ __('Managed on the Cache tab — disable is blocked here.') }}">{{ __('protected') }}</span>
+                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-700" title="{{ __('Managed on the Cache tab — disable is blocked here.') }}">{{ __('protected') }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-2 text-right">
@@ -966,7 +966,7 @@
                                                         <button
                                                             type="button"
                                                             wire:click="setEngineSubtab('cache')"
-                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-medium text-brand-forest hover:bg-brand-sand/40"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-forest hover:bg-brand-sand/40"
                                                         >
                                                             {{ __('Open Cache tab') }}
                                                         </button>
@@ -975,7 +975,7 @@
                                                             type="button"
                                                             wire:click="openConfirmActionModal('toggleOlsModule', ['{{ $mod['name'] }}', false], @js(__('Disable module: :name', ['name' => $mod['name']])), @js(__('Remove the `module :name` block from httpd_config.conf? OpenLiteSpeed reloads after the change and the config reverts automatically if `lshttpd -t` fails.', ['name' => $mod['name']])), @js(__('Disable')), true)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-no-symbol class="h-3 w-3" />
                                                             {{ __('Disable') }}
@@ -985,7 +985,7 @@
                                                             type="button"
                                                             wire:click="openConfirmActionModal('toggleOlsModule', ['{{ $mod['name'] }}', true], @js(__('Enable module: :name', ['name' => $mod['name']])), @js(__('Register `module :name` in httpd_config.conf with starter parameters? OpenLiteSpeed reloads after the change and the config reverts automatically if `lshttpd -t` fails.', ['name' => $mod['name']])), @js(__('Enable')), false)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-power class="h-3 w-3" />
                                                             {{ __('Enable') }}
@@ -1049,7 +1049,7 @@
                             <h3 class="shrink-0 text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('OpenLiteSpeed cache module') }}</h3>
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
                             <span
-                                class="min-w-0 flex-1 truncate text-[11px] text-brand-mist"
+                                class="min-w-0 flex-1 truncate text-xs text-brand-mist"
                                 title="{{ __('Server-level LSCache settings written into /usr/local/lsws/conf/httpd_config.conf. Save validates with `lshttpd -t` and reloads the daemon; a failed validate auto-restores the previous file.') }}"
                             >{{ __('Server-level LSCache directives. Save validates with `lshttpd -t` and reloads.') }}</span>
                         </button>
@@ -1060,7 +1060,7 @@
                             wire:target="loadOlsCacheConfig"
                             x-show="expanded"
                             title="{{ __('Reload from server') }}"
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadOlsCacheConfig" class="inline-flex">
                                 <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -1078,7 +1078,7 @@
                             wire:target="confirmActionModal, purgeOlsLscacheConfirmed"
                             x-show="expanded"
                             @disabled($isDeployer || $actionInFlight || ! $opsReady)
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Purge all LSCache') }}
@@ -1093,7 +1093,7 @@
                     @endif
                     @if ($ols_cache_error)
                         <div class="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
-                            <pre class="whitespace-pre-wrap break-words font-mono text-[11px]">{{ $ols_cache_error }}</pre>
+                            <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $ols_cache_error }}</pre>
                         </div>
                     @endif
 

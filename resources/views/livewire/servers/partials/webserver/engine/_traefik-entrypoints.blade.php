@@ -39,10 +39,10 @@
                         @php $locked = in_array($epName, \App\Services\Servers\TraefikEntrypointsConfig::LOCKED_NAMES, true); @endphp
                         <form wire:submit.prevent="saveTraefikEntrypoint(@js($epName))" class="rounded-xl border border-brand-ink/10 p-4" wire:key="traefik-ep-{{ $epName }}">
                             <div class="flex flex-wrap items-center justify-between gap-2">
-                                <p class="font-mono text-sm font-semibold">{{ $epName }} @if ($locked)<span class="text-[10px] font-normal text-brand-moss">({{ __('dply core') }})</span>@endif</p>
+                                <p class="font-mono text-sm font-semibold">{{ $epName }} @if ($locked)<span class="text-2xs font-normal text-brand-moss">({{ __('dply core') }})</span>@endif</p>
                                 @if (! $locked)
                                     <button type="button" wire:click="openConfirmActionModal('removeTraefikEntrypoint', [@js($epName)], @js(__('Remove entry point')), @js(__('Remove :name from traefik.yml and restart Traefik?', ['name' => $epName])), @js(__('Remove')), true)"
-                                        class="text-[11px] font-medium text-rose-800">{{ __('Remove') }}</button>
+                                        class="text-xs font-medium text-rose-800">{{ __('Remove') }}</button>
                                 @endif
                             </div>
                             <label class="mt-3 block max-w-md">

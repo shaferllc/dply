@@ -506,13 +506,13 @@
                                 <x-heroicon-o-link class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
                                 {{ $hostname }}
                             </span>
-                            <button type="button" wire:click="removeDomain({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                            <button type="button" wire:click="removeDomain({{ $i }})" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                         </li>
                     @endforeach
                 </ul>
                 <div x-show="open" x-collapse>
                     <div class="border-t border-brand-ink/8 bg-brand-cream/20 px-4 py-3 dark:border-brand-mist/15 dark:bg-zinc-800/40">
-                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add domain') }}</label>
+                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add domain') }}</label>
                         <div class="mt-1.5 flex flex-wrap gap-2">
                             <input
                                 type="text"
@@ -554,7 +554,7 @@
 
                 <div x-show="open" x-collapse>
                     <div class="border-t border-brand-ink/8 px-4 py-3 dark:border-brand-mist/15">
-                        <label for="canvas_region" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</label>
+                        <label for="canvas_region" class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</label>
                         <select id="canvas_region" wire:model.live="region" class="dply-input mt-1.5 block w-full text-sm">
                             @foreach ($regions as $r)
                                 <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
@@ -569,7 +569,7 @@
                         <button type="button" x-on:click="open = ! open" x-on:pointerdown.stop class="flex w-full items-center justify-between gap-2 px-3 pt-3 pb-2 text-left">
                             <div class="flex items-center gap-2 text-sm text-brand-ink dark:text-brand-cream">
                                 <span class="font-semibold">{{ __('App') }}</span>
-                                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-900 dark:text-brand-cream">
+                                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5 text-xs font-medium text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-900 dark:text-brand-cream">
                                     <x-heroicon-o-globe-alt class="h-3 w-3" aria-hidden="true" />
                                     {{ __('Web') }}
                                 </span>
@@ -639,21 +639,21 @@
                                     </button>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('App name') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('App name') }}</label>
                                     <x-text-input wire:model="name" type="text" class="mt-1 block w-full text-sm" placeholder="acme-api" />
                                 </div>
                                 @if ($mode === 'source')
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('GitHub repo') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('GitHub repo') }}</label>
                                         <x-text-input wire:model.blur="repo" type="text" class="mt-1 block w-full font-mono text-xs" placeholder="acme/api" />
                                     </div>
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Branch') }}</label>
+                                            <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Branch') }}</label>
                                             <x-text-input wire:model="branch" type="text" class="mt-1 block w-full font-mono text-xs" placeholder="main" />
                                         </div>
                                         <div>
-                                            <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dockerfile') }}</label>
+                                            <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dockerfile') }}</label>
                                             <x-text-input wire:model="dockerfile_path" type="text" class="mt-1 block w-full font-mono text-xs" placeholder="auto" />
                                         </div>
                                     </div>
@@ -663,21 +663,21 @@
                                     </label>
                                 @else
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Image') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Image') }}</label>
                                         <x-text-input wire:model="image" type="text" class="mt-1 block w-full font-mono text-xs" placeholder="ghcr.io/acme/api:v1" />
                                     </div>
                                 @endif
                                 <div class="grid grid-cols-3 gap-2">
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</label>
                                         <x-text-input wire:model="port" type="number" min="1" max="65535" class="mt-1 block w-full font-mono text-xs" />
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Instances') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Instances') }}</label>
                                         <x-text-input wire:model="instances" type="number" min="1" max="50" class="mt-1 block w-full font-mono text-xs" />
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
                                         <select wire:model.live="size_tier" class="dply-input mt-1 block w-full text-xs">
                                             <optgroup label="{{ __('Basic') }}">
                                                 <option value="small">Small</option>
@@ -718,26 +718,26 @@
                         <div x-show="open" x-collapse>
                             <div class="space-y-2 border-t border-brand-ink/8 bg-white/60 px-3 py-3 dark:border-brand-mist/15 dark:bg-zinc-900/60">
                                 @unless ($backendSupportsWorkers)
-                                    <p class="rounded-md bg-brand-gold/10 px-2.5 py-1.5 text-[11px] text-brand-ink">
+                                    <p class="rounded-md bg-brand-gold/10 px-2.5 py-1.5 text-xs text-brand-ink">
                                         {{ __('Workers need a DigitalOcean account.') }}
                                     </p>
                                 @else
                                     @foreach ($workers as $i => $worker)
                                         <div class="rounded-lg border border-brand-ink/10 bg-white p-2 dark:border-brand-mist/20 dark:bg-zinc-800/40">
                                             <div class="flex items-center justify-between gap-2">
-                                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $worker['type'] === 'scheduler' ? __('Scheduler') : __('Worker') }}</span>
-                                                <button type="button" wire:click="removeWorker({{ $i }})" class="text-[10px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $worker['type'] === 'scheduler' ? __('Scheduler') : __('Worker') }}</span>
+                                                <button type="button" wire:click="removeWorker({{ $i }})" class="text-2xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                             </div>
-                                            <input type="text" wire:model="workers.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-[11px]" placeholder="worker-1">
-                                            <input type="text" wire:model="workers.{{ $i }}.command" class="dply-input mt-1 block w-full font-mono text-[11px]" placeholder="php artisan queue:work" @disabled($worker['type'] === 'scheduler')>
+                                            <input type="text" wire:model="workers.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="worker-1">
+                                            <input type="text" wire:model="workers.{{ $i }}.command" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="php artisan queue:work" @disabled($worker['type'] === 'scheduler')>
                                         </div>
                                     @endforeach
                                     <div class="flex flex-wrap gap-2">
-                                        <button type="button" wire:click="addWorker('worker')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
+                                        <button type="button" wire:click="addWorker('worker')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                             <x-heroicon-o-plus class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Queue worker') }}
                                         </button>
-                                        <button type="button" wire:click="addWorker('scheduler')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink disabled:opacity-50 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream" @disabled($this->hasScheduler())>
+                                        <button type="button" wire:click="addWorker('scheduler')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink disabled:opacity-50 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream" @disabled($this->hasScheduler())>
                                             <x-heroicon-o-clock class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Scheduler') }}
                                         </button>
@@ -811,14 +811,14 @@
                     <div x-show="open" x-collapse>
                         <div class="space-y-3 border-t border-brand-ink/8 px-4 py-3 dark:border-brand-mist/15">
                             <div>
-                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
+                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
                                 <input type="text" wire:model.blur="databases.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="postgres-1">
                                 <x-input-error :messages="$errors->get('databases.'.$i.'.name')" class="mt-1" />
                             </div>
 
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Mode') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Mode') }}</label>
                                     <select wire:model.live="databases.{{ $i }}.mode" class="dply-input mt-1 block w-full text-xs">
                                         @if ($backendSupportsManagedDatabases ?? true)
                                             <option value="create">{{ __('Create new') }}</option>
@@ -828,7 +828,7 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env prefix') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env prefix') }}</label>
                                     <input type="text" wire:model.blur="databases.{{ $i }}.env_prefix" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="DB">
                                     <x-input-error :messages="$errors->get('databases.'.$i.'.env_prefix')" class="mt-1" />
                                 </div>
@@ -836,7 +836,7 @@
 
                             @if ($rowMode === 'attach')
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</label>
                                     <select wire:model="databases.{{ $i }}.cloud_database_id" class="dply-input mt-1 block w-full text-xs">
                                         <option value="">{{ __('— select —') }}</option>
                                         @foreach ($attachableDatabases as $existing)
@@ -848,38 +848,38 @@
                             @elseif ($rowMode === 'external')
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</label>
                                         <select wire:model.live="databases.{{ $i }}.engine" class="dply-input mt-1 block w-full text-xs">
                                             <option value="postgres">Postgres</option>
                                             <option value="mysql">MySQL</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</label>
                                         <input type="text" wire:model.blur="databases.{{ $i }}.host" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="db.example.com" autocomplete="off">
                                         <x-input-error :messages="$errors->get('databases.'.$i.'.host')" class="mt-1" />
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</label>
                                         <input type="number" wire:model.blur="databases.{{ $i }}.port" class="dply-input mt-1 block w-full font-mono text-xs" min="1" max="65535">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</label>
                                         <input type="text" wire:model.blur="databases.{{ $i }}.database" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="off">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</label>
                                         <input type="text" wire:model.blur="databases.{{ $i }}.username" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="off">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</label>
                                         <input type="password" wire:model.blur="databases.{{ $i }}.password" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="new-password">
                                     </div>
                                 </div>
                             @else
                                 <div class="grid grid-cols-3 gap-2">
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</label>
                                         <select wire:model.live="databases.{{ $i }}.engine" class="dply-input mt-1 block w-full text-xs">
                                             <option value="postgres">Postgres</option>
                                             <option value="mysql">MySQL</option>
@@ -887,7 +887,7 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</label>
                                         <select wire:model="databases.{{ $i }}.size" class="dply-input mt-1 block w-full text-xs">
                                             <option value="small">small</option>
                                             <option value="medium">medium</option>
@@ -895,7 +895,7 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</label>
                                         <input type="text" wire:model.blur="databases.{{ $i }}.version" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="17">
                                     </div>
                                 </div>
@@ -957,14 +957,14 @@
                     <div x-show="open" x-collapse>
                         <div class="space-y-3 border-t border-brand-ink/8 px-4 py-3 dark:border-brand-mist/15">
                             <div>
-                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
+                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
                                 <input type="text" wire:model.blur="buckets.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="bucket-1">
                                 <x-input-error :messages="$errors->get('buckets.'.$i.'.name')" class="mt-1" />
                             </div>
 
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Backend') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Backend') }}</label>
                                     <select wire:model.live="buckets.{{ $i }}.backend" class="dply-input mt-1 block w-full text-xs">
                                         <option value="digitalocean_spaces">DO Spaces</option>
                                         <option value="aws_s3">AWS S3</option>
@@ -972,16 +972,16 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env prefix') }}</label>
+                                    <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Env prefix') }}</label>
                                     <input type="text" wire:model.blur="buckets.{{ $i }}.env_prefix" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="S3">
                                     <x-input-error :messages="$errors->get('buckets.'.$i.'.env_prefix')" class="mt-1" />
                                 </div>
                             </div>
 
                             <div>
-                                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</label>
+                                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</label>
                                 <input type="text" wire:model.blur="buckets.{{ $i }}.region" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="nyc3">
-                                <p class="mt-1 text-[10px] text-brand-mist">{{ __('Defaults to the app region. Override per bucket if you need a different one.') }}</p>
+                                <p class="mt-1 text-2xs text-brand-mist">{{ __('Defaults to the app region. Override per bucket if you need a different one.') }}</p>
                             </div>
                         </div>
                     </div>
@@ -996,7 +996,7 @@
                  its tile flips $database_mode and the card materializes on
                  the next render. --}}
             <aside class="w-56 shrink-0 rounded-2xl border border-brand-ink/10 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:border-brand-mist/20 dark:bg-zinc-900/70">
-                <p class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Add resources') }}</p>
+                <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Add resources') }}</p>
                 <div class="space-y-2">
                     {{-- One palette tile per database engine. Each click
                          adds a NEW row to $databases — multiple per engine
@@ -1026,7 +1026,7 @@
                             </span>
                             <span class="min-w-0 flex-1">
                                 <span class="block text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $tile['label'] }}</span>
-                                <span class="block text-[11px] text-brand-moss">{{ $tile['desc'] }}</span>
+                                <span class="block text-xs text-brand-moss">{{ $tile['desc'] }}</span>
                             </span>
                             <x-heroicon-m-plus class="h-4 w-4 text-brand-mist group-hover:text-brand-forest" aria-hidden="true" />
                         </button>
@@ -1047,12 +1047,12 @@
                         </span>
                         <span class="min-w-0 flex-1">
                             <span class="block text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ __('Add bucket') }}</span>
-                            <span class="block text-[11px] text-brand-moss">{{ __('Object storage (DO Spaces)') }}</span>
+                            <span class="block text-xs text-brand-moss">{{ __('Object storage (DO Spaces)') }}</span>
                         </span>
                         <x-heroicon-m-plus class="h-4 w-4 text-brand-mist group-hover:text-brand-forest" aria-hidden="true" />
                     </button>
                 </div>
-                <p class="px-2 pt-3 text-[10px] leading-relaxed text-brand-mist">
+                <p class="px-2 pt-3 text-2xs leading-relaxed text-brand-mist">
                     {{ __('Click to drop a node on the canvas. Drag it where you want it.') }}
                 </p>
             </aside>
@@ -1062,7 +1062,7 @@
         <div class="relative mt-10">
             <div class="flex items-center gap-3">
                 <div class="h-px flex-1 bg-brand-ink/10 dark:bg-brand-mist/15"></div>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Advanced configuration') }}</span>
+                <span class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Advanced configuration') }}</span>
                 <div class="h-px flex-1 bg-brand-ink/10 dark:bg-brand-mist/15"></div>
             </div>
 
@@ -1079,7 +1079,7 @@
                     <div x-show="open" x-collapse>
                         <div class="border-t border-brand-ink/8 px-4 py-3 dark:border-brand-mist/15">
                             <textarea wire:model="env_file_content" rows="5" class="dply-input block w-full font-mono text-xs" placeholder="APP_ENV=production&#10;LOG_LEVEL=info"></textarea>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('One KEY=value per line.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('One KEY=value per line.') }}</p>
                         </div>
                     </div>
                 </section>
@@ -1107,15 +1107,15 @@
                             @if ($autoscaling_enabled)
                                 <div class="grid grid-cols-3 gap-2">
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Min') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Min') }}</label>
                                         <input type="number" min="1" max="50" wire:model="autoscaling_min" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Max') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Max') }}</label>
                                         <input type="number" min="1" max="50" wire:model="autoscaling_max" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CPU %') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('CPU %') }}</label>
                                         <input type="number" min="1" max="100" wire:model="autoscaling_cpu_percent" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                 </div>
@@ -1147,19 +1147,19 @@
                             @if ($health_check_enabled)
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path') }}</label>
                                         <input type="text" wire:model="health_check_path" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="/healthz">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Period (s)') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Period (s)') }}</label>
                                         <input type="number" min="1" wire:model="health_check_period_seconds" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Timeout (s)') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Timeout (s)') }}</label>
                                         <input type="number" min="1" wire:model="health_check_timeout_seconds" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Threshold') }}</label>
+                                        <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Threshold') }}</label>
                                         <input type="number" min="1" wire:model="health_check_failure_threshold" class="dply-input mt-1 block w-full font-mono text-xs">
                                     </div>
                                 </div>
@@ -1183,7 +1183,7 @@
                     <div x-show="open" x-collapse>
                         <div class="space-y-3 border-t border-brand-ink/8 px-4 py-3 dark:border-brand-mist/15">
                             @unless ($backendSupportsDeployTasks)
-                                <p class="rounded-md bg-brand-gold/10 px-2.5 py-1.5 text-[11px] text-brand-ink">
+                                <p class="rounded-md bg-brand-gold/10 px-2.5 py-1.5 text-xs text-brand-ink">
                                     {{ __('Deploy tasks need a DigitalOcean account.') }}
                                 </p>
                             @else
@@ -1197,28 +1197,28 @@
                                 @foreach ($deploy_tasks as $i => $task)
                                     <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 p-2 dark:border-brand-mist/20 dark:bg-zinc-800/40">
                                         <div class="flex items-center justify-between gap-2">
-                                            <select wire:model="deploy_tasks.{{ $i }}.trigger" class="dply-input block w-32 text-[11px]">
+                                            <select wire:model="deploy_tasks.{{ $i }}.trigger" class="dply-input block w-32 text-xs">
                                                 <option value="pre_deploy">pre_deploy</option>
                                                 <option value="post_deploy">post_deploy</option>
                                                 <option value="failed_deploy">failed_deploy</option>
                                                 <option value="manual">manual</option>
                                             </select>
-                                            <button type="button" wire:click="removeDeployTask({{ $i }})" class="text-[10px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                                            <button type="button" wire:click="removeDeployTask({{ $i }})" class="text-2xs font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
                                         </div>
-                                        <input type="text" wire:model="deploy_tasks.{{ $i }}.name" class="dply-input mt-1.5 block w-full font-mono text-[11px]" placeholder="task name">
-                                        <input type="text" wire:model="deploy_tasks.{{ $i }}.command" class="dply-input mt-1.5 block w-full font-mono text-[11px]" placeholder="command">
+                                        <input type="text" wire:model="deploy_tasks.{{ $i }}.name" class="dply-input mt-1.5 block w-full font-mono text-xs" placeholder="task name">
+                                        <input type="text" wire:model="deploy_tasks.{{ $i }}.command" class="dply-input mt-1.5 block w-full font-mono text-xs" placeholder="command">
                                     </div>
                                 @endforeach
                                 <div class="flex flex-wrap gap-2">
-                                    <button type="button" wire:click="addDeployTask('pre_deploy')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
+                                    <button type="button" wire:click="addDeployTask('pre_deploy')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                         <x-heroicon-o-plus class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Pre') }}
                                     </button>
-                                    <button type="button" wire:click="addDeployTask('post_deploy')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
+                                    <button type="button" wire:click="addDeployTask('post_deploy')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                         <x-heroicon-o-plus class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Post') }}
                                     </button>
-                                    <button type="button" wire:click="addDeployTask('manual')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
+                                    <button type="button" wire:click="addDeployTask('manual')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                         <x-heroicon-o-plus class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Manual') }}
                                     </button>
@@ -1248,7 +1248,7 @@
                                 <span class="flex-1 text-brand-moss">
                                     {{ __('Restart loop') }}
                                     @if ($alert_restart_count_enabled)
-                                        <input type="number" min="1" max="100" wire:model="alert_restart_count_value" class="dply-input ms-2 inline-block w-16 font-mono text-[11px]">
+                                        <input type="number" min="1" max="100" wire:model="alert_restart_count_value" class="dply-input ms-2 inline-block w-16 font-mono text-xs">
                                         <span class="text-brand-mist">{{ __('in 5m') }}</span>
                                     @endif
                                 </span>
@@ -1258,7 +1258,7 @@
                                 <span class="flex-1 text-brand-moss">
                                     {{ __('CPU sustained') }}
                                     @if ($alert_cpu_enabled)
-                                        <input type="number" min="1" max="100" wire:model="alert_cpu_value" class="dply-input ms-2 inline-block w-16 font-mono text-[11px]">
+                                        <input type="number" min="1" max="100" wire:model="alert_cpu_value" class="dply-input ms-2 inline-block w-16 font-mono text-xs">
                                         <span class="text-brand-mist">% {{ __('for 5m') }}</span>
                                     @endif
                                 </span>
@@ -1268,7 +1268,7 @@
                                 <span class="flex-1 text-brand-moss">
                                     {{ __('Memory sustained') }}
                                     @if ($alert_mem_enabled)
-                                        <input type="number" min="1" max="100" wire:model="alert_mem_value" class="dply-input ms-2 inline-block w-16 font-mono text-[11px]">
+                                        <input type="number" min="1" max="100" wire:model="alert_mem_value" class="dply-input ms-2 inline-block w-16 font-mono text-xs">
                                         <span class="text-brand-mist">% {{ __('for 5m') }}</span>
                                     @endif
                                 </span>

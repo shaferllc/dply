@@ -26,7 +26,7 @@
             <button
                 type="button"
                 x-on:click="copy()"
-                class="shrink-0 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $copyButtonClass }}"
+                class="shrink-0 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide {{ $copyButtonClass }}"
                 :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy message') }}'"
             >
                 <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" />

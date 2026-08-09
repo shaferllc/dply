@@ -7,7 +7,7 @@
     <section class="border-b border-brand-ink/10">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
             <div class="min-w-0">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('GitHub') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('GitHub') }}</p>
                 <p class="mt-0.5 text-sm font-semibold text-brand-ink">
                     {{ $edgeGithubWebhookConnected ? __('Auto-deploy connected') : __('Auto-deploy off') }}
                 </p>
@@ -44,7 +44,7 @@
 
         <div class="space-y-3 px-5 py-4 sm:px-6">
             <label class="block text-sm">
-                <span class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Linked GitHub account') }}</span>
+                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Linked GitHub account') }}</span>
                 <select
                     wire:model.live="buildForm.edge_webhook_account_id"
                     class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900"
@@ -58,7 +58,7 @@
                 </select>
             </label>
             @unless ($edgeGithubWebhookConnected)
-                <x-quick-deploy-oauth-hint provider="github" class="text-[11px] leading-relaxed text-brand-mist" />
+                <x-quick-deploy-oauth-hint provider="github" class="text-xs leading-relaxed text-brand-mist" />
             @endunless
         </div>
     </section>
@@ -67,7 +67,7 @@
 @if (! $site->isEdgePreview())
     <section class="border-b border-brand-ink/10">
         <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy hooks') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy hooks') }}</p>
             <p class="mt-0.5 text-xs text-brand-moss">{{ __('POST URLs for CMS publish → redeploy.') }}</p>
         </div>
 
@@ -75,16 +75,16 @@
             <div class="border-b border-emerald-300/60 bg-emerald-50 px-5 py-3 text-sm text-emerald-950 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100 sm:px-6">
                 <p class="font-semibold">{{ __('Copy this URL now — it won’t be shown again.') }}</p>
                 <div class="mt-2 flex flex-wrap items-center gap-2" x-data="{ copied: false }">
-                    <code class="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-[11px] text-brand-ink shadow-sm dark:bg-zinc-900">{{ $edge_just_minted_deploy_hook_url }}</code>
+                    <code class="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm dark:bg-zinc-900">{{ $edge_just_minted_deploy_hook_url }}</code>
                     <button
                         type="button"
-                        class="rounded-lg border border-emerald-300/60 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-900"
+                        class="rounded-lg border border-emerald-300/60 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-900"
                         @click="navigator.clipboard.writeText(@js($edge_just_minted_deploy_hook_url)); copied = true; setTimeout(() => copied = false, 2000)"
                     >
                         <span x-show="!copied">{{ __('Copy') }}</span>
                         <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                     </button>
-                    <button type="button" wire:click="dismissEdgeDeployHookUrl" class="text-[11px] font-semibold text-emerald-900 hover:underline dark:text-emerald-200">{{ __('Dismiss') }}</button>
+                    <button type="button" wire:click="dismissEdgeDeployHookUrl" class="text-xs font-semibold text-emerald-900 hover:underline dark:text-emerald-200">{{ __('Dismiss') }}</button>
                 </div>
             </div>
         @endif
@@ -92,7 +92,7 @@
         @can('update', $site)
             <form wire:submit.prevent="mintEdgeDeployHook" class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                 <label class="min-w-[14rem] flex-1">
-                    <span class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Name') }}</span>
+                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Name') }}</span>
                     <input
                         type="text"
                         wire:model="edge_new_deploy_hook_name"
@@ -120,7 +120,7 @@
                     <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6" wire:key="edge-hook-{{ $hook->id }}">
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-brand-ink">{{ $hook->name }}</p>
-                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss">
+                            <p class="mt-0.5 font-mono text-xs text-brand-moss">
                                 {{ $hook->token_prefix }}…
                                 @if ($hook->last_used_at)
                                     · {{ $hook->last_used_at->diffForHumans() }}
@@ -154,11 +154,11 @@
 
         <div class="space-y-5 border-t border-brand-ink/10 px-5 py-5 sm:px-6" x-data="{ copiedHook: false, copiedSecret: false }">
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Manual webhook') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Manual webhook') }}</p>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Use this if you register the GitHub webhook yourself.') }}</p>
                 <div class="mt-3 space-y-3">
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Payload URL') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Payload URL') }}</p>
                         <div class="mt-1.5 flex flex-wrap items-center gap-2">
                             <input type="text" readonly value="{{ $site->edgeGithubHookUrl() }}" class="block min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-brand-sand/20 px-3 py-2 font-mono text-xs text-brand-ink" onclick="this.select()" />
                             <button
@@ -173,7 +173,7 @@
                     </div>
                     @if ($site->webhook_secret)
                         <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Secret') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Secret') }}</p>
                             <div class="mt-1.5 flex flex-wrap items-center gap-2">
                                 <input type="password" readonly value="{{ $site->webhook_secret }}" class="block min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-brand-sand/20 px-3 py-2 font-mono text-xs text-brand-ink" onclick="this.select()" />
                                 <button
@@ -192,7 +192,7 @@
 
             @if ($site->organization)
                 <div class="border-t border-brand-ink/10 pt-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Succeeded / failed Edge deploys use org notification channels.') }}</p>
                     <a
                         href="{{ route('organizations.notification-channels', $site->organization) }}"

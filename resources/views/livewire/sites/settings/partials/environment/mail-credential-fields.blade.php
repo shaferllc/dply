@@ -69,7 +69,7 @@
             <div class="sm:col-span-2">
                 <x-input-label for="binding_mail_endpoint" :value="__('API endpoint')" />
                 <x-text-input id="binding_mail_endpoint" wire:model="bindingForm.endpoint" class="mt-1 block w-full font-mono text-sm" placeholder="api.mailgun.net" />
-                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Use api.eu.mailgun.net for EU-region domains.') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Use api.eu.mailgun.net for EU-region domains.') }}</p>
             </div>
         </div>
     @elseif ($mailProvider === 'postmark')
@@ -135,13 +135,13 @@
                             <option value="{{ $cfDomain }}">{{ $cfDomain }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Your from-address must be on this verified domain.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Your from-address must be on this verified domain.') }}</p>
                 </div>
 
                 <ol class="space-y-2">
                     @foreach ($this->cloudflareEmailSteps() as $cfIndex => $cfStep)
                         <li class="flex gap-2.5 text-xs text-brand-ink">
-                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-forest text-[11px] font-semibold text-brand-cream">{{ $cfIndex + 1 }}</span>
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-forest text-xs font-semibold text-brand-cream">{{ $cfIndex + 1 }}</span>
                             <span><span class="font-semibold">{{ $cfStep->title }}.</span> {{ $cfStep->body }}</span>
                         </li>
                     @endforeach
@@ -154,7 +154,7 @@
                         {{ __('Check DNS records') }}
                     </button>
                     @if ($cfEmailRecords !== [])
-                        <div class="flex flex-wrap gap-2 text-[11px] font-semibold">
+                        <div class="flex flex-wrap gap-2 text-xs font-semibold">
                             @foreach (['spf' => 'SPF', 'dkim' => 'DKIM', 'dmarc' => 'DMARC'] as $cfKey => $cfLabel)
                                 <span @class([
                                     'inline-flex items-center gap-1 rounded-full px-2.5 py-1',
@@ -184,9 +184,9 @@
                         </button>
                     </div>
                     @if ($cfEmailVerified)
-                        <p class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700"><x-heroicon-s-check-circle class="h-3.5 w-3.5" /> {{ __('Verified — Cloudflare accepted a real send from this domain.') }}</p>
+                        <p class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><x-heroicon-s-check-circle class="h-3.5 w-3.5" /> {{ __('Verified — Cloudflare accepted a real send from this domain.') }}</p>
                     @elseif ($cfEmailVerifyError !== null)
-                        <p class="text-[11px] font-semibold text-rose-700">{{ $cfEmailVerifyError }}</p>
+                        <p class="text-xs font-semibold text-rose-700">{{ $cfEmailVerifyError }}</p>
                     @endif
                 </div>
             </div>

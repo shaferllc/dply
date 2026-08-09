@@ -45,7 +45,7 @@
 @if ($hasAttention)
     <section class="dply-card overflow-hidden p-0">
         <header class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Needs attention') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Needs attention') }}</p>
         </header>
         <div class="divide-y divide-brand-ink/8">
             @if ($insightsRow)
@@ -119,7 +119,7 @@
 @if ($hasInfo)
     <section class="dply-card overflow-hidden p-0">
         <header class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Info') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Info') }}</p>
         </header>
         <div class="divide-y divide-brand-ink/8">
             @if ($costRow)

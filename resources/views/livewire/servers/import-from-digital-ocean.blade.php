@@ -23,7 +23,7 @@
         <div class="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div class="max-w-2xl space-y-4">
                 <div class="flex flex-wrap items-center gap-3">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#0080FF]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066CC] ring-1 ring-[#0080FF]/20">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#0080FF]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#0066CC] ring-1 ring-[#0080FF]/20">
                         <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                         {{ __('Recover servers') }}
                     </span>
@@ -53,7 +53,7 @@
                             <x-heroicon-s-check-circle class="h-4 w-4 text-brand-forest" aria-hidden="true" />
                         @else
                             <span @class([
-                                'flex h-5 w-5 items-center justify-center rounded-full text-[10px]',
+                                'flex h-5 w-5 items-center justify-center rounded-full text-2xs',
                                 'bg-white/20 text-white' => $step['active'],
                                 'bg-brand-sand/60 text-brand-moss' => ! $step['active'],
                             ])>{{ $loop->iteration }}</span>
@@ -75,7 +75,7 @@
         {{-- Sidebar guide --}}
         <aside class="space-y-4 lg:sticky lg:top-24">
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('How recovery works') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('How recovery works') }}</p>
                 <ol class="mt-4 space-y-4 text-sm text-brand-moss">
                     <li class="flex gap-3">
                         <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#0080FF]/10 text-xs font-bold text-[#0066CC]">1</span>
@@ -95,15 +95,15 @@
             @if ($hasDroplets)
                 <dl class="grid grid-cols-3 gap-2 rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
                     <div class="text-center">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Found') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Found') }}</dt>
                         <dd class="mt-1 text-xl font-semibold tabular-nums text-brand-ink">{{ $dropletStats['total'] }}</dd>
                     </div>
                     <div class="text-center">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Ready') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Ready') }}</dt>
                         <dd class="mt-1 text-xl font-semibold tabular-nums text-brand-forest">{{ $dropletStats['available'] }}</dd>
                     </div>
                     <div class="text-center">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('In dply') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('In dply') }}</dt>
                         <dd class="mt-1 text-xl font-semibold tabular-nums text-brand-mist">{{ $dropletStats['imported'] }}</dd>
                     </div>
                 </dl>
@@ -119,7 +119,7 @@
                         <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DigitalOcean account') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Pick the credential whose droplets you want to discover.') }}
@@ -232,7 +232,7 @@
                                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Droplets') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Droplets') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Droplets in account') }}</h2>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     {{ __('Found :count droplet(s). Already-imported droplets are disabled.', ['count' => $dropletStats['total']]) }}
@@ -281,14 +281,14 @@
                                         <p class="mt-2 font-mono text-xs text-brand-moss">{{ $d['_public_ipv4'] ?? '—' }}</p>
                                     </div>
                                     @if ($alreadyImported)
-                                        <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-ink/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">
+                                        <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-ink/5 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">
                                             <x-heroicon-s-check class="h-3 w-3" aria-hidden="true" />
                                             {{ __('In dply') }}
                                         </span>
                                     @endif
                                 </div>
 
-                                <dl class="mt-4 grid grid-cols-3 gap-2 text-[11px]">
+                                <dl class="mt-4 grid grid-cols-3 gap-2 text-xs">
                                     <div class="rounded-lg bg-brand-sand/30 px-2 py-1.5">
                                         <dt class="font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
                                         <dd class="mt-0.5 font-mono text-brand-ink">{{ $d['region']['slug'] ?? '—' }}</dd>
@@ -386,7 +386,7 @@
                 <div class="border-b border-brand-ink/10 bg-gradient-to-r from-[#0080FF]/10 via-white to-brand-cream/40 px-6 py-5">
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066CC]">{{ __('Adopt droplet') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066CC]">{{ __('Adopt droplet') }}</p>
                             <h3 class="mt-1 text-xl font-semibold text-brand-ink">{{ $modalDroplet['name'] ?? __('Droplet') }}</h3>
                             <p class="mt-1 font-mono text-xs text-brand-moss">{{ $modalDroplet['_public_ipv4'] ?? '—' }}</p>
                         </div>

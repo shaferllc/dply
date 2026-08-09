@@ -21,7 +21,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-3 py-2 sm:px-5">{{ __('Type') }}</th>
                         <th class="px-3 py-2">{{ __('Total') }}</th>
@@ -57,19 +57,19 @@
     />
     <div class="flex flex-wrap gap-2 px-4 py-3.5 sm:px-5">
         @if (is_array($serviceActions['docker_image_prune'] ?? null))
-            <button type="button" wire:click="confirmDockerImagePrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100">
+            <button type="button" wire:click="confirmDockerImagePrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100">
                 <x-heroicon-m-sparkles class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ $serviceActions['docker_image_prune']['label'] }}
             </button>
         @endif
         @if (is_array($serviceActions['docker_volume_prune'] ?? null))
-            <button type="button" wire:click="confirmDockerVolumePrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100">
+            <button type="button" wire:click="confirmDockerVolumePrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100">
                 <x-heroicon-m-sparkles class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ $serviceActions['docker_volume_prune']['label'] }}
             </button>
         @endif
         @if (is_array($serviceActions['docker_system_prune'] ?? null))
-            <button type="button" wire:click="confirmDockerSystemPrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[11px] font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100">
+            <button type="button" wire:click="confirmDockerSystemPrune" class="inline-flex h-7 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100">
                 <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ $serviceActions['docker_system_prune']['label'] }}
             </button>

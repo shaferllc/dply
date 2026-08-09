@@ -72,7 +72,7 @@
                                 {{ $report->typeLabel() }}
                                 @if ($report->severity)
                                     <span @class([
-                                        'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+                                        'rounded px-1.5 py-0.5 text-2xs font-semibold uppercase',
                                         'bg-red-100 text-red-700' => $report->isHighPriority(),
                                         'bg-brand-sand/70 text-brand-moss' => ! $report->isHighPriority(),
                                     ])>{{ $report->severityLabel() }}</span>
@@ -119,7 +119,7 @@
                         <div class="min-w-0">
                             <div class="flex items-center gap-2">
                                 <h2 class="text-lg font-semibold text-brand-ink">{{ $selected->title }}</h2>
-                                <span class="rounded bg-brand-sand/70 px-1.5 py-0.5 text-[11px] font-semibold text-brand-moss">{{ $selected->reference }}</span>
+                                <span class="rounded bg-brand-sand/70 px-1.5 py-0.5 text-xs font-semibold text-brand-moss">{{ $selected->reference }}</span>
                             </div>
                             <p class="mt-0.5 text-xs text-brand-moss">
                                 {{ $selected->typeLabel() }}@if ($selected->severityLabel()) · {{ $selected->severityLabel() }} @endif
@@ -178,7 +178,7 @@
                                 @if (! empty($context['console']))
                                     <div>
                                         <h3 class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Console errors') }} ({{ count($context['console']) }})</h3>
-                                        <div class="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-brand-cream">
+                                        <div class="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-brand-cream">
                                             @foreach ($context['console'] as $entry)
                                                 <div class="flex gap-2">
                                                     <span @class([

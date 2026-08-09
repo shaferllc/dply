@@ -130,7 +130,7 @@
                                             ['label' => __('Cold starts'), 'value' => $fnSummary['cold_rate'].'%'],
                                         ] as $stat)
                                             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
-                                                <dt class="text-[10px] font-medium uppercase tracking-wide text-brand-moss/70">{{ $stat['label'] }}</dt>
+                                                <dt class="text-2xs font-medium uppercase tracking-wide text-brand-moss/70">{{ $stat['label'] }}</dt>
                                                 <dd class="mt-0.5 text-lg font-bold text-brand-ink">{{ $stat['value'] }}</dd>
                                             </div>
                                         @endforeach
@@ -144,13 +144,13 @@
                                             ['title' => __('Cold-start rate %'), 'series' => $functionStats['series']['cold_rate'], 'color' => 'text-brand-gold', 'fmt' => 'percent', 'ymax' => 100],
                                         ] as $chart)
                                             <div>
-                                                <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $chart['title'] }}</p>
+                                                <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $chart['title'] }}</p>
                                                 <x-metrics-line-chart :series="$chart['series']" :yMax="$chart['ymax']" :colorClass="$chart['color']" :format="$chart['fmt']" heightClass="h-24" />
                                             </div>
                                         @endforeach
                                     </div>
 
-                                    <p class="text-[11px] text-brand-moss/60">
+                                    <p class="text-xs text-brand-moss/60">
                                         {{ __(':tick ticks · :test test · :web web in this window.', ['tick' => $fnSummary['by_source']['tick'], 'test' => $fnSummary['by_source']['test'], 'web' => $fnSummary['by_source']['web']]) }}
                                         <button type="button" wire:click="refreshStats" class="ml-1 font-semibold text-brand-sage hover:underline">{{ __('Refresh') }}</button>
                                     </p>
@@ -174,7 +174,7 @@
                         >
                             <x-slot:actions>
                                 @if ($resolvedBaseUrl !== null)
-                                    <span class="inline-flex items-center rounded-md bg-white px-2 py-1 font-mono text-[11px] text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $hostnameDisplay }}</span>
+                                    <span class="inline-flex items-center rounded-md bg-white px-2 py-1 font-mono text-xs text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $hostnameDisplay }}</span>
                                 @endif
                                 <button
                                     type="button"
@@ -214,12 +214,12 @@
                                         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
                                             <div class="min-w-0">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $style['bg'] }} {{ $style['text'] }} {{ $style['ring'] }}">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $style['bg'] }} {{ $style['text'] }} {{ $style['ring'] }}">
                                                         <span class="h-1.5 w-1.5 rounded-full {{ $style['dot'] }}"></span>
                                                         {{ $style['label'] }}
                                                     </span>
                                                     <p class="text-sm font-medium text-brand-ink">{{ $m->label }}</p>
-                                                    <span class="inline-flex items-center rounded bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $m->isSslCheck() ? __('SSL') : __('HTTP') }}</span>
+                                                    <span class="inline-flex items-center rounded bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $m->isSslCheck() ? __('SSL') : __('HTTP') }}</span>
                                                     <span class="truncate font-mono text-xs text-brand-moss" title="{{ $hostnameDisplay }}{{ $m->normalizedPath() }}">{{ $hostnameDisplay }}{{ $m->isSslCheck() ? '' : ($m->normalizedPath() ?: '/') }}</span>
                                                 </div>
                                                 {{-- Region folded into the result line: it was its own line for one
@@ -378,7 +378,7 @@
                         </div>
 
                         <div class="space-y-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Assertions (optional)') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Assertions (optional)') }}</p>
 
                             <div>
                                 <x-input-label for="uptime-expected-status" :value="__('Expected status code')" />

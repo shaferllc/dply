@@ -95,18 +95,18 @@
             <table class="w-full min-w-[36rem] border-collapse text-sm">
                 <thead>
                     <tr class="border-b border-brand-ink/10 bg-brand-sand/20 text-left">
-                        <th class="sticky left-0 z-10 bg-brand-sand/20 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Key') }}</th>
+                        <th class="sticky left-0 z-10 bg-brand-sand/20 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Key') }}</th>
                         @foreach ($columns as $col)
                             <th class="px-4 py-2.5 align-bottom">
                                 <div class="flex items-center gap-1.5">
                                     <span class="text-xs font-semibold text-brand-ink">{{ $col['label'] }}</span>
                                     @if ($col['is_main'])
-                                        <span class="rounded bg-brand-forest/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('This site') }}</span>
+                                        <span class="rounded bg-brand-forest/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('This site') }}</span>
                                     @elseif ($col['role'])
-                                        <span class="rounded bg-brand-ink/5 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-moss">{{ $col['role'] }}</span>
+                                        <span class="rounded bg-brand-ink/5 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-brand-moss">{{ $col['role'] }}</span>
                                     @endif
                                     @if ($col['syncing'])
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-medium text-brand-moss">
+                                        <span class="inline-flex items-center gap-1 text-2xs font-medium text-brand-moss">
                                             <x-heroicon-m-arrow-path class="h-3 w-3 animate-spin" aria-hidden="true" />
                                             {{ __('reading') }}
                                         </span>
@@ -155,7 +155,7 @@
         </div>
     @endif
 
-    <div class="border-t border-brand-ink/5 px-5 py-2.5 text-[11px] text-brand-mist sm:px-6">
+    <div class="border-t border-brand-ink/5 px-5 py-2.5 text-xs text-brand-mist sm:px-6">
         {{ __('Compared from dply\'s encrypted cache. Use “Read live from workers” to re-read each box over SSH.') }}
     </div>
 </section>

@@ -33,29 +33,29 @@
         ])
 
         <div class="mb-5 rounded-2xl border border-brand-ink/10 bg-white px-4 py-4 dark:bg-zinc-900/40 sm:px-5">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('What happens when a limit is hit') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('What happens when a limit is hit') }}</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Block (429)') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Block (429)') }}</p>
                     <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Plain “Too Many Requests”') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Edge returns HTTP 429 with Retry-After. Good for APIs, bots, and scrapers — no interactive page.') }}</p>
-                    <div class="mt-3 rounded-lg border border-brand-ink/10 bg-zinc-900 px-3 py-2 font-mono text-[11px] text-zinc-100">
+                    <div class="mt-3 rounded-lg border border-brand-ink/10 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-100">
                         HTTP/1.1 429 Too Many Requests<br>
                         Retry-After: 60<br>
                         <span class="text-zinc-400">Too Many Requests</span>
                     </div>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Challenge') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Challenge') }}</p>
                     <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Bot check interstitial') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Edge serves a verify page on the same URL. Passing the check lets that request through. Needs Bot protection enabled with keys.') }}</p>
                     @if ($botProtectionReady)
-                        <p class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest">
+                        <p class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-forest">
                             <x-heroicon-m-check-circle class="h-3.5 w-3.5" aria-hidden="true" />
                             {{ __('Bot protection is ready') }}
                         </p>
                     @else
-                        <p class="mt-2 text-[11px] font-medium text-amber-800 dark:text-amber-200">
+                        <p class="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
                             {{ __('Bot protection keys missing — Challenge will act like Block until you configure them.') }}
                         </p>
                     @endif
@@ -78,7 +78,7 @@
             </label>
 
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Rules') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Rules') }}</p>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('First matching path wins for that request. Example: 60 requests / 60 seconds on /api/* ≈ one request per second average per IP.') }}</p>
             </div>
 
@@ -96,17 +96,17 @@
                         <div>
                             <x-input-label :value="__('Path pattern')" />
                             <x-text-input wire:model="rules.{{ $i }}.path" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="/api/*" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('e.g. /api/* · /login · /*') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('e.g. /api/* · /login · /*') }}</p>
                         </div>
                         <div>
                             <x-input-label :value="__('Max requests')" />
                             <x-text-input wire:model="rules.{{ $i }}.limit" type="number" min="1" class="mt-1 block w-full text-sm" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Per IP in the window') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Per IP in the window') }}</p>
                         </div>
                         <div>
                             <x-input-label :value="__('Window (seconds)')" />
                             <x-text-input wire:model="rules.{{ $i }}.window_seconds" type="number" min="1" class="mt-1 block w-full text-sm" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Counter resets after this many seconds') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Counter resets after this many seconds') }}</p>
                         </div>
                         <div>
                             <x-input-label :value="__('When exceeded')" />
@@ -114,7 +114,7 @@
                                 <option value="block">{{ __('Block (429)') }}</option>
                                 <option value="challenge">{{ __('Challenge (bot check)') }}</option>
                             </select>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Challenge needs Bot protection') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Challenge needs Bot protection') }}</p>
                         </div>
                     </div>
                 </div>

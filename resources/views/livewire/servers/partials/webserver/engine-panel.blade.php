@@ -96,9 +96,9 @@
          for a real switch. Dashed + amber so it never reads as product chrome. --}}
     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-dashed border-amber-300/70 bg-amber-50/60 px-3 py-2 sm:px-4">
         <x-heroicon-o-beaker class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-        <span class="shrink-0 text-[11px] font-semibold text-amber-900">{{ __('Local preview') }}</span>
+        <span class="shrink-0 text-xs font-semibold text-amber-900">{{ __('Local preview') }}</span>
         <span class="h-4 w-px shrink-0 bg-amber-300/60" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-amber-900/80">
+        <p class="min-w-0 flex-1 text-xs leading-relaxed text-amber-900/80">
             @if ($isPanelPreview)
                 {{ __(':engine is not the active engine. Panels render read-only — every control is disabled and no data is read from the server.', ['engine' => $info['label']]) }}
             @else
@@ -109,7 +109,7 @@
             type="button"
             wire:click="toggleEnginePanelPreview"
             @class([
-                'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold shadow-sm transition',
+                'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-semibold shadow-sm transition',
                 'border border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200' => $isPanelPreview,
                 'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isPanelPreview,
             ])

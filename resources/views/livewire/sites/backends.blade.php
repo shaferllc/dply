@@ -38,11 +38,11 @@
             <div class="dply-card p-6">
                 <div class="grid gap-4 sm:grid-cols-3">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Substrate') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Substrate') }}</p>
                         <p class="mt-1 text-sm font-semibold text-brand-ink">{{ $substrateLabel }}</p>
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Load balancer') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Load balancer') }}</p>
                         <p class="mt-1 text-sm font-semibold text-brand-ink">
                             @if ($lb)
                                 {{ ucfirst($lb->status) }}
@@ -52,7 +52,7 @@
                         </p>
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Public IP') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Public IP') }}</p>
                         <p class="mt-1 text-sm font-semibold text-brand-ink">{{ $lb?->public_ipv4 ?: '—' }}</p>
                     </div>
                 </div>
@@ -70,7 +70,7 @@
             <div class="dply-card overflow-hidden">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-brand-ink/10 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                        <tr class="border-b border-brand-ink/10 text-left text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                             <th class="px-5 py-3">{{ __('Server') }}</th>
                             <th class="px-5 py-3">{{ __('Role') }}</th>
                             <th class="px-5 py-3">{{ __('State') }}</th>
@@ -97,7 +97,7 @@
                                             type="button"
                                             wire:click="removeBackend('{{ $backend->id }}')"
                                             wire:confirm="{{ __('Remove this backend? It is drained from the load balancer and its server is destroyed. This cannot be undone.') }}"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Remove') }}
@@ -122,7 +122,7 @@
 
             @unless ($enabled)
                 <div class="mt-5">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Load balancer type') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Load balancer type') }}</p>
                     <div class="mt-2 grid gap-2.5 sm:grid-cols-2">
                         <label @class([
                             'flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors',

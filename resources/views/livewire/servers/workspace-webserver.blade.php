@@ -45,7 +45,7 @@
         />
 
         @if ($isDeployer)
-            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
                 <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('Deployer role.') }}</span>
                 {{ __('Deployers can view this page but cannot run SSH actions or switch the webserver.') }}
@@ -53,7 +53,7 @@
         @endif
 
         @if (! $opsReady)
-            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
                 <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Provisioning and SSH must be ready before webserver actions or switching can run.') }}
             </p>
@@ -78,7 +78,7 @@
                     <span class="inline-flex items-center gap-2">
                         {{ __('Change') }}
                         @if ($inflightSwitch)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700">
                                 <x-spinner variant="forest" />
                                 {{ __('Working') }}
                             </span>
@@ -105,16 +105,16 @@
                         <span class="inline-flex items-center gap-2">
                             {{ $info['label'] }}
                             @if ($inflightSwitch && $switchTargetWebserver === $key)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700">
                                     <x-spinner variant="forest" />
                                     {{ __('Working') }}
                                 </span>
                             @elseif ($isActiveEngine)
-                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Active') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('Active') }}</span>
                             @elseif (! empty($info['coming_soon']))
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                             @elseif ($preflight->isBlocked($server, $key))
-                                <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-700">{{ __('Unavailable') }}</span>
                             @endif
                         </span>
                     </x-server-workspace-tab>

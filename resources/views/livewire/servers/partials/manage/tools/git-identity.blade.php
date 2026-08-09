@@ -25,11 +25,11 @@
             @endif
         </span>
         @if ($opsReady && ! $isDeployer)
-            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss ring-1 ring-brand-ink/10 transition group-open:hidden group-hover:text-brand-ink group-hover:ring-brand-sage/35">
+            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss ring-1 ring-brand-ink/10 transition group-open:hidden group-hover:text-brand-ink group-hover:ring-brand-sage/35">
                 <x-heroicon-o-pencil-square class="h-3 w-3 shrink-0" aria-hidden="true" />
                 {{ __('Click to edit') }}
             </span>
-            <span class="hidden shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest group-open:inline-flex">
+            <span class="hidden shrink-0 items-center gap-1 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-forest group-open:inline-flex">
                 <x-heroicon-o-pencil-square class="h-3 w-3 shrink-0" aria-hidden="true" />
                 {{ __('Editing') }}
             </span>
@@ -102,7 +102,7 @@
                     {{ __('Use Dply default') }}
                 </button>
             </div>
-            <p class="text-[11px] leading-relaxed text-brand-moss">
+            <p class="text-xs leading-relaxed text-brand-moss">
                 {{ __('Used for git commits as the deploy user. Default: :name &lt;:email&gt;.', [
                     'name' => $gitDefaults['name'] ?? '—',
                     'email' => $gitDefaults['email'] ?? '—',

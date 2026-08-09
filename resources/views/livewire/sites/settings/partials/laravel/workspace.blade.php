@@ -113,13 +113,13 @@
                         @foreach ($presetCategories as $category => $commands)
                             @if (is_array($commands) && $commands !== [])
                                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2 sm:px-6">
-                                    <dt class="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $category }}</dt>
+                                    <dt class="w-24 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $category }}</dt>
                                     <dd class="flex min-w-0 flex-wrap gap-1.5">
                                         @foreach ($commands as $cmd)
                                             <button
                                                 type="button"
                                                 wire:click='runLaravelArtisanPreset(@json($cmd))'
-                                                class="inline-flex rounded-md bg-brand-forest px-2 py-0.5 font-mono text-[11px] font-medium text-white hover:bg-brand-forest/90"
+                                                class="inline-flex rounded-md bg-brand-forest px-2 py-0.5 font-mono text-xs font-medium text-white hover:bg-brand-forest/90"
                                             >
                                                 {{ $cmd }}
                                             </button>
@@ -150,7 +150,7 @@
                     </div>
                     <div class="px-5 py-4 sm:px-6">
                         @if (! empty($laravel_artisan_discovery['ok']))
-                            <ul class="max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] text-brand-ink">
+                            <ul class="max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs text-brand-ink">
                                 @foreach (array_slice($laravel_artisan_discovery['commands'] ?? [], 0, 400) as $row)
                                     <li class="py-0.5">{{ $row['name'] ?? '' }}@if (! empty($row['description']))<span class="text-brand-moss"> — {{ $row['description'] }}</span>@endif</li>
                                 @endforeach

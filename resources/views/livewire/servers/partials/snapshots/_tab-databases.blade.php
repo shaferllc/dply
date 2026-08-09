@@ -66,7 +66,7 @@
                     </x-primary-button>
                 </form>
                 @unless ($opsReady)
-                    <p class="mt-3 text-[11px] text-amber-700">{{ __('This server is still provisioning — snapshots unlock once it is ready.') }}</p>
+                    <p class="mt-3 text-xs text-amber-700">{{ __('This server is still provisioning — snapshots unlock once it is ready.') }}</p>
                 @endunless
             @endif
         </div>
@@ -95,7 +95,7 @@
             @else
                 <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="bg-brand-sand/40 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/40 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-3 py-2">{{ __('Taken') }}</th>
                                 <th class="px-3 py-2">{{ __('Site') }}</th>
@@ -122,19 +122,19 @@
                                     <td class="px-3 py-2 font-medium text-brand-ink">{{ $snap->site?->name ?: $snap->site?->slug ?: '—' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ str($snap->reason)->replace('_', ' ')->ucfirst() }}</td>
                                     <td class="px-3 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $snapStatusClass($snap->status) }}">{{ $snap->status }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $snapStatusClass($snap->status) }}">{{ $snap->status }}</span>
                                         @if ($snap->status === \App\Models\Snapshot::STATUS_FAILED && $snap->error_message)
-                                            <p class="mt-1 max-w-xs truncate text-[11px] text-rose-700" title="{{ $snap->error_message }}">{{ $snap->error_message }}</p>
+                                            <p class="mt-1 max-w-xs truncate text-xs text-rose-700" title="{{ $snap->error_message }}">{{ $snap->error_message }}</p>
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-ink">{{ $snap->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $snap->bytes) : '—' }}</td>
                                     <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-moss" @if ($snapCostTitle) title="{{ $snapCostTitle }}" @endif>{{ $snapCost ?? '—' }}</td>
                                     <td class="px-3 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $whereClass }}">{{ $snap->destination === \App\Models\Snapshot::DESTINATION_S3 ? __('S3') : __('Disk') }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $whereClass }}">{{ $snap->destination === \App\Models\Snapshot::DESTINATION_S3 ? __('S3') : __('Disk') }}</span>
                                     </td>
                                     <td class="px-3 py-2 text-right">
                                         @if ($isPending)
-                                            <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+                                            <span class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
                                                 <x-spinner size="sm" />
                                                 {{ __('Taking…') }}
                                             </span>
@@ -144,7 +144,7 @@
                                                     <button
                                                         type="button"
                                                         wire:click="openConfirmActionModal('restoreSiteSnapshot', ['{{ $snap->id }}'], @js(__('Restore snapshot')), @js(__('Restore this snapshot? It OVERWRITES the live database for this site and cannot be undone.')), @js(__('Restore')), true)"
-                                                        class="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
+                                                        class="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
                                                         title="{{ __('Restore (destructive)') }}"
                                                     >
                                                         <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" aria-hidden="true" />

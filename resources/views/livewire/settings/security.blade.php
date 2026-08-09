@@ -76,27 +76,27 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-xl border px-4 py-3 {{ $postureTile }}">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Posture') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Posture') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         <span class="inline-block h-2 w-2 rounded-full {{ $postureDot }}" aria-hidden="true"></span>
                         <span class="text-sm font-semibold text-brand-ink">{{ $postureLabel }}</span>
                     </dd>
-                    <p class="mt-1 truncate text-[11px] text-brand-moss" title="{{ $postureSub }}">{{ $postureSub }}</p>
+                    <p class="mt-1 truncate text-xs text-brand-moss" title="{{ $postureSub }}">{{ $postureSub }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Passkeys') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Passkeys') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $passkeyCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('registered|registered', $passkeyCount) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('registered|registered', $passkeyCount) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Device PIN / fingerprint') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Device PIN / fingerprint') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $twoFactorOn,
                     'border-amber-200 bg-amber-50' => ! $twoFactorOn,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('2FA') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2FA') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         @if ($twoFactorOn)
                             <x-heroicon-m-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
@@ -106,7 +106,7 @@
                             <span class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</span>
                         @endif
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Authenticator code') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Authenticator code') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
@@ -121,7 +121,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use a long, random password and store it in a password manager. Saving here only updates the fields below.') }}</p>
                 </div>
-                <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                     <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Saved') }}
                 </p>
@@ -182,7 +182,7 @@
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sign in with your device PIN, fingerprint, or a security key. Multiple passkeys per account are supported.') }}</p>
                 </div>
                 @if ($passkeyCount > 0)
-                    <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
+                    <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
                 @endif
             </div>
             <div class="px-5 py-5 sm:px-6">
@@ -210,7 +210,7 @@
                         {{ __('Add a passkey') }}
                     </button>
                 </div>
-                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Optional — helps you recognize this passkey in the list below.') }}</p>
+                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Optional — helps you recognize this passkey in the list below.') }}</p>
                 <p id="dply-passkey-register-error" class="mt-2 hidden text-sm text-red-700" role="alert"></p>
             </div>
 
@@ -241,7 +241,7 @@
                                     class="block w-full max-w-md border-0 bg-transparent p-0 text-sm font-semibold text-brand-ink focus:ring-0"
                                     placeholder="{{ __('Passkey name') }}"
                                 />
-                                <p class="text-[11px] text-brand-mist">{{ __('Added :time', ['time' => $cred->created_at->diffForHumans()]) }}</p>
+                                <p class="text-xs text-brand-mist">{{ __('Added :time', ['time' => $cred->created_at->diffForHumans()]) }}</p>
                                 @error('passkeyAliases.'.$cred->getKey())
                                     <p class="text-xs text-red-600">{{ $message }}</p>
                                 @enderror
@@ -249,7 +249,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('removePasskey', @js([(string) $cred->getKey()]), @js(__('Remove passkey')), @js(__('Remove this passkey? You\'ll need another way to sign in if it was your only method.')), @js(__('Remove')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Remove') }}
@@ -272,7 +272,7 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link GitHub, GitLab, or Bitbucket so you can sign in with the same account you use for Git.') }}</p>
                     </div>
                     @if ($linkedOAuth > 0)
-                        <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
+                        <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
                     @endif
                 </div>
                 <div class="space-y-3 px-5 py-5 sm:px-6">
@@ -287,7 +287,7 @@
                                     <x-oauth-provider-icon :provider="$p['id']" />
                                     {{ $p['name'] }}
                                     @if ($linked->isNotEmpty())
-                                        <span class="ms-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest">
+                                        <span class="ms-1 inline-flex items-center gap-1 text-xs font-medium text-brand-forest">
                                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
                                             {{ trans_choice(':n linked|:n linked', $linked->count(), ['n' => $linked->count()]) }}
                                         </span>
@@ -311,7 +311,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="openConfirmActionModal('unlinkOAuthAccount', [{{ $account->id }}], @js(__('Unlink account')), @js(__('Unlink this account? You can link it again later from this page.')), @js(__('Unlink')), true)"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                             >
                                                 <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Unlink') }}
@@ -337,7 +337,7 @@
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Require a code from your authenticator app when signing in. A stolen password alone won\'t reach your account.') }}</p>
                 </div>
                 <span @class([
-                    'shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1',
+                    'shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1',
                     'bg-brand-sage/15 text-brand-forest ring-brand-sage/20' => $twoFactorOn,
                     'bg-amber-50 text-amber-900 ring-amber-200' => ! $twoFactorOn,
                 ])>

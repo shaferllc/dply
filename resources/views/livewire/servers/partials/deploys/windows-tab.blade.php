@@ -65,7 +65,7 @@
                     <div>
                         <x-input-label for="policy_timezone" :value="__('Timezone')" />
                         <x-text-input id="policy_timezone" wire:model="policy_timezone" class="mt-1 block w-full max-w-xs" />
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Deny windows are evaluated in this timezone.') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Deny windows are evaluated in this timezone.') }}</p>
                         <x-input-error :messages="$errors->get('policy_timezone')" class="mt-1" />
                     </div>
                     <div>
@@ -79,8 +79,8 @@
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h3 class="text-xs font-semibold text-brand-ink">{{ __('Deny windows') }}</h3>
                         <div class="flex gap-1.5">
-                            <button type="button" wire:click="applyWeekendFreezePreset" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">{{ __('Weekend freeze preset') }}</button>
-                            <button type="button" wire:click="addDenyRule" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <button type="button" wire:click="applyWeekendFreezePreset" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">{{ __('Weekend freeze preset') }}</button>
+                            <button type="button" wire:click="addDenyRule" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                                 {{ __('Add rule') }}
                             </button>
@@ -91,10 +91,10 @@
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5" wire:key="deny-rule-{{ $index }}">
                             <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
                                 <div class="min-w-[12rem] flex-1">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Days') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Days') }}</p>
                                     <div class="mt-1 flex flex-wrap gap-1">
                                         @foreach ($dayOptions as $day)
-                                            <label class="inline-flex items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-1.5 py-0.5 text-[11px]">
+                                            <label class="inline-flex items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-1.5 py-0.5 text-xs">
                                                 <input type="checkbox" value="{{ $day }}" wire:model="deny_rules.{{ $index }}.days" class="h-3 w-3 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
                                                 {{ $dayLabels[$day] ?? strtoupper($day) }}
                                             </label>
@@ -102,18 +102,18 @@
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start') }}</p>
                                     <input type="time" wire:model="deny_rules.{{ $index }}.start" class="mt-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                                 </div>
                                 <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('End') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('End') }}</p>
                                     <input type="time" wire:model="deny_rules.{{ $index }}.end" class="mt-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                                 </div>
-                                <button type="button" wire:click="removeDenyRule({{ $index }})" class="ml-auto text-[11px] font-semibold text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
+                                <button type="button" wire:click="removeDenyRule({{ $index }})" class="ml-auto text-xs font-semibold text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
                             </div>
                         </div>
                     @empty
-                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-[11px] text-brand-moss">
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss">
                             <x-heroicon-m-calendar-days class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                             {{ __('No deny rules — deploys are never blocked by schedule until you add one.') }}
                         </p>
@@ -146,7 +146,7 @@
             @else
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="bg-brand-sand/20 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">
+                        <thead class="bg-brand-sand/20 text-left text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">
                             <tr>
                                 <th scope="col" class="px-4 py-1.5 sm:px-5">{{ __('Schedule') }}</th>
                                 <th scope="col" class="px-3 py-1.5">{{ __('Days') }}</th>
@@ -164,14 +164,14 @@
                                     <td class="px-3 py-1.5 font-mono tabular-nums">
                                         {{ $row['end'] }}
                                         @if ($row['overnight'])
-                                            <span class="ms-1 text-[10px] font-semibold uppercase text-brand-mist">{{ __('overnight') }}</span>
+                                            <span class="ms-1 text-2xs font-semibold uppercase text-brand-mist">{{ __('overnight') }}</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-1.5 sm:px-5">
                                         @if ($row['active_now'])
-                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('Blocking') }}</span>
+                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('Blocking') }}</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Idle') }}</span>
+                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Idle') }}</span>
                                         @endif
                                     </td>
                                 </tr>

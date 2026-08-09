@@ -97,8 +97,8 @@
                             <div class="mt-3 overflow-hidden rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/95 to-white">
                                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100/80 px-4 py-3">
                                     <div class="min-w-0">
-                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Preview build') }}</p>
-                                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss">
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Preview build') }}</p>
+                                        <p class="mt-0.5 font-mono text-xs text-brand-moss">
                                             @if ($pendingSha !== '')
                                                 {{ __('Preview from commit :sha', ['sha' => $pendingSha]) }}
                                             @else
@@ -132,16 +132,16 @@
 
                                 <div class="border-t border-indigo-100/80 px-4 py-2.5 space-y-1.5">
                                     @if ($isPropagating && ! $journey['edgeJourneyHasFailed'])
-                                        <p class="text-[11px] text-brand-moss">
+                                        <p class="text-xs text-brand-moss">
                                             {{ __('Build finished — propagating to edge. Create unlocks once the URL is safe to open.') }}
                                         </p>
                                     @else
-                                        <p class="text-[11px] text-brand-moss">
+                                        <p class="text-xs text-brand-moss">
                                             {{ __('Live build output below. Auto-refreshes; Create unlocks once the URL is safe to open.') }}
                                         </p>
                                     @endif
                                     @if (\App\Modules\Edge\Support\FakeEdgeProvision::enabled())
-                                        <p class="text-[11px] text-amber-800 dark:text-amber-200">
+                                        <p class="text-xs text-amber-800 dark:text-amber-200">
                                             {{ __('Local Fake Edge: the preview URL must resolve to this app (e.g. *.edge.test / *.dply.test via Valet). Public on-dply.site hostnames hit Cloudflare and will not see this build.') }}
                                         </p>
                                     @endif
@@ -151,7 +151,7 @@
                     @elseif ($edge_deploy_commit_branch !== null)
                         <p class="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-brand-moss">
                             <span>{{ __('Will preview from branch') }}</span>
-                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-ink">
                                 {{ $edge_deploy_commit_branch }}
                                 <button type="button" wire:click="$set('edge_deploy_commit_branch', null)" class="text-brand-mist hover:text-brand-ink" title="{{ __('Clear branch override.') }}">
                                     <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
@@ -239,20 +239,20 @@
                         <p class="font-mono text-sm font-medium text-brand-ink">
                             {{ $previewBranch }}
                             @if ($previewRefKind === 'tag')
-                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{{ __('Tag') }}</span>
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{{ __('Tag') }}</span>
                             @elseif ($previewRefKind === 'branch')
-                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">{{ __('Branch tip') }}</span>
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">{{ __('Branch tip') }}</span>
                             @endif
                             @if (is_int($previewPrNumber) || (is_string($previewPrNumber) && $previewPrNumber !== ''))
                                 <span class="ms-1 text-xs font-normal text-brand-moss">· PR #{{ $previewPrNumber }}</span>
                             @elseif ($previewKind === \App\Modules\Edge\Actions\CreateEdgePreviewSite::KIND_ADHOC && $previewHeadSha !== '')
-                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">{{ __('Ad-hoc') }}</span>
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">{{ __('Ad-hoc') }}</span>
                                 <span class="ms-1 text-xs font-normal text-brand-moss">· {{ substr($previewHeadSha, 0, 7) }}</span>
                             @endif
                             @if ($previewFailed)
-                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{{ __('Failed') }}</span>
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{{ __('Failed') }}</span>
                             @elseif (! $previewIsLive && ! $rowIsPending)
-                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{{ __('Building') }}</span>
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{{ __('Building') }}</span>
                             @endif
                         </p>
                         @if ($previewCommitSubject !== '')
@@ -334,7 +334,7 @@
                                 </button>
                             </div>
                             @if ($previewIsLive)
-                                <div x-data="{ pct: {{ $currentSplitPct }} }" class="flex items-center gap-2 text-[11px] text-brand-moss">
+                                <div x-data="{ pct: {{ $currentSplitPct }} }" class="flex items-center gap-2 text-xs text-brand-moss">
                                     <label for="{{ $splitInputName }}" class="inline-flex items-center gap-1" title="{{ __('Route a % of production traffic to this preview (sticky via cookie).') }}">
                                         <x-heroicon-o-beaker class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Split') }}
@@ -344,19 +344,19 @@
                                         type="number"
                                         min="0" max="99" step="1"
                                         x-model.number="pct"
-                                        class="w-14 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 font-mono text-[11px] text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                                        class="w-14 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
                                     <span>%</span>
                                     <button
                                         type="button"
                                         x-on:click="$wire.saveEdgeSplitTraffic('{{ $preview->id }}', pct, true)"
-                                        class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900">
+                                        class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900">
                                         {{ $splitTargetsThisPreview ? __('Update') : __('Apply') }}
                                     </button>
                                     @if ($splitTargetsThisPreview)
                                         <button
                                             type="button"
                                             x-on:click="pct = 0; $wire.saveEdgeSplitTraffic('{{ $preview->id }}', 0, true)"
-                                            class="text-[10px] font-semibold uppercase tracking-wide text-rose-700 hover:underline dark:text-rose-400">
+                                            class="text-2xs font-semibold uppercase tracking-wide text-rose-700 hover:underline dark:text-rose-400">
                                             {{ __('Off') }}
                                         </button>
                                     @endif
@@ -371,7 +371,7 @@
                                     @php
                                         $replay = ($latestReplays ?? collect())->get((string) $preview->id);
                                     @endphp
-                                    <div class="w-full max-w-md space-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss">
+                                    <div class="w-full max-w-md space-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <span class="inline-flex items-center gap-1 font-semibold text-brand-ink">
                                                 <x-heroicon-o-arrow-path class="h-3 w-3" aria-hidden="true" />
@@ -382,7 +382,7 @@
                                                 wire:click="queueEdgeDeployReplay('{{ $preview->id }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="queueEdgeDeployReplay('{{ $preview->id }}')"
-                                                class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                                class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                             >
                                                 {{ __('Run sample') }}
                                             </button>

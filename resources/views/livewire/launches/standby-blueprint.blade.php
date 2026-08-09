@@ -40,9 +40,9 @@
                                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $item['summary'] }}</p>
                                         </div>
                                         @if ($item['available'])
-                                            <span class="rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Ready') }}</span>
+                                            <span class="rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Ready') }}</span>
                                         @else
-                                            <span class="rounded-full bg-brand-ink/5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Needs setup') }}</span>
+                                            <span class="rounded-full bg-brand-ink/5 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Needs setup') }}</span>
                                         @endif
                                     </div>
                                     @if (! $item['available'] && $item['unavailable_reason'])

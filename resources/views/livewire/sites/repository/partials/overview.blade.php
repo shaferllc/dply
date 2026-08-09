@@ -12,14 +12,14 @@
                     </h2>
                     {{-- Provider is real information, not an eyebrow — keep it as a pill. --}}
                     @if ($providerKind !== '')
-                        <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">{{ ucfirst($providerKind) }}</span>
+                        <span class="rounded-full bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">{{ ucfirst($providerKind) }}</span>
                     @endif
                 </div>
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                         {{ __('Deploy branch:') }}
                         <code class="font-mono text-brand-ink">{{ $currentBranch }}</code>
                         @if ($branchInUse !== $currentBranch)
-                            <span class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-900">{{ __('viewing :ref', ['ref' => $branchInUse]) }}</span>
+                            <span class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-amber-900">{{ __('viewing :ref', ['ref' => $branchInUse]) }}</span>
                         @endif
                     </p>
             </div>
@@ -76,7 +76,7 @@
                         <li class="grid grid-cols-[1fr_auto] gap-4 py-3 first:pt-0 last:pb-0" wire:key="overview-commit-{{ $commit['sha'] }}">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <code class="rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink">{{ $commit['short_sha'] }}</code>
+                                    <code class="rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-ink">{{ $commit['short_sha'] }}</code>
                                 </div>
                                 <p class="mt-1 truncate text-sm font-medium text-brand-ink">{{ $commit['message'] }}</p>
                                 <p class="mt-0.5 truncate text-xs text-brand-moss">
@@ -100,7 +100,7 @@
             @if (! empty($overviewCommits['account']['label']))
                 {{-- Which linked identity answered this read — so a wrong-token
                      404 is self-evident instead of looking like a missing repo. --}}
-                <p class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-3 text-[11px] text-brand-moss">
+                <p class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-3 text-xs text-brand-moss">
                     <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     <span>{{ __('Read using :label', ['label' => $overviewCommits['account']['label']]) }}</span>
                     @if (! empty($overviewCommits['account']['kind']))

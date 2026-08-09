@@ -39,7 +39,8 @@
             background: #fef2f2;
             color: #991b1b;
             border: 1px solid #fecaca;
-            font-size: 11px;
+            font-size: 10px; /* text-2xs */
+            line-height: 1rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.16em;
@@ -54,7 +55,8 @@
             margin: 1.25rem 0;
         }
         .block .label {
-            font-size: 10px;
+            font-size: 10px; /* text-2xs */
+            line-height: 1rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.14em;
@@ -63,7 +65,7 @@
         }
         code, .mono {
             font-family: 'JetBrains Mono', 'SF Mono', Menlo, ui-monospace, monospace;
-            font-size: 12px;
+            font-size: 12px; /* text-xs */
             background: rgba(31, 36, 33, 0.05);
             padding: 0.1rem 0.35rem;
             border-radius: 4px;
@@ -73,12 +75,12 @@
         ol li { margin-bottom: 0.85rem; }
         ol li strong { color: #1f2421; }
         .stack {
-            font-size: 11px;
+            font-size: 12px; /* text-xs */
             color: #8b9a90;
             margin-top: 1.25rem;
             line-height: 1.5;
         }
-        .stack code { font-size: 10px; }
+        .stack code { font-size: 12px; }
     </style>
 </head>
 <body>

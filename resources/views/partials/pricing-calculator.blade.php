@@ -53,7 +53,7 @@
                         @click="servers = {{ $preset['servers'] }}; edge = {{ $surfaceAvailable['edge'] ? $preset['edge'] : 0 }}; cloud = {{ $surfaceAvailable['cloud'] ? $preset['cloud'] : 0 }}; serverless = {{ $surfaceAvailable['serverless'] ? $preset['serverless'] : 0 }}"
                         class="inline-flex flex-col items-start rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors text-left">
                     <span class="text-xs font-semibold text-brand-ink">{{ $preset['label'] }}</span>
-                    <span class="text-[10px] text-brand-moss/80">{{ $preset['hint'] }}</span>
+                    <span class="text-2xs text-brand-moss/80">{{ $preset['hint'] }}</span>
                 </button>
             @endforeach
             <button type="button"
@@ -106,7 +106,7 @@
                         <div class="flex items-center gap-2">
                             <span class="text-sm text-brand-ink">{{ $row['label'] }}</span>
                             @if ($comingSoon)
-                                <span class="shrink-0 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Coming soon') }}</span>
+                                <span class="shrink-0 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Coming soon') }}</span>
                             @endif
                         </div>
                         <div class="text-xs text-brand-moss"><span x-text="fmt({{ $row['priceVar'] }})"></span> {{ $row['unit'] }} / mo</div>

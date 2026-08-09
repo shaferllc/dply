@@ -64,7 +64,7 @@ YAML;
                     <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                 </button>
             </div>
-            <pre class="overflow-x-auto px-4 py-4 font-mono text-[11px] leading-relaxed text-brand-ink">{{ trim($dplyRoutingYamlExample) }}</pre>
+            <pre class="overflow-x-auto px-4 py-4 font-mono text-xs leading-relaxed text-brand-ink">{{ trim($dplyRoutingYamlExample) }}</pre>
         </div>
 
         <div class="overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-sand/15 dark:border-brand-mist/20 dark:bg-zinc-900/40" x-data="{ copied: false }">
@@ -83,7 +83,7 @@ YAML;
                     <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                 </button>
             </div>
-            <pre class="overflow-x-auto px-4 py-4 font-mono text-[11px] leading-relaxed text-brand-ink">{{ trim($dplyFullYamlExample) }}</pre>
+            <pre class="overflow-x-auto px-4 py-4 font-mono text-xs leading-relaxed text-brand-ink">{{ trim($dplyFullYamlExample) }}</pre>
         </div>
     </div>
 

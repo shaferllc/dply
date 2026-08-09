@@ -41,28 +41,28 @@
                         'border-brand-sage/30 bg-brand-sage/8' => $orgTotal > 0,
                         'border-brand-ink/10 bg-white/80' => $orgTotal === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Workspaces') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Workspaces') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgTotal }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('total') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('total') }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('You belong to') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('You belong to') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $rollupMembers }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('person|people', $rollupMembers) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('person|people', $rollupMembers) }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all orgs') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Across all orgs') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Footprint') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Footprint') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $rollupServers + $rollupSites }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('resources') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('resources') }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ $rollupServers }} {{ trans_choice('server|servers', $rollupServers) }} · {{ $rollupSites }} {{ trans_choice('site|sites', $rollupSites) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ $rollupServers }} {{ trans_choice('server|servers', $rollupServers) }} · {{ $rollupSites }} {{ trans_choice('site|sites', $rollupSites) }}</p>
                     </div>
                 </dl>
             </x-slot:stats>
@@ -147,13 +147,13 @@
                                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                             <a href="{{ route('organizations.show', $org) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">{{ $org->name }}</a>
                                             @if ($isCurrent)
-                                                <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">
+                                                <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">
                                                     <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                                                     {{ __('Current') }}
                                                 </span>
                                             @endif
                                         </div>
-                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                                             <span class="inline-flex items-center gap-1">
                                                 <x-heroicon-m-user-group class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                                 <span class="font-mono tabular-nums text-brand-ink">{{ $org->users_count }}</span>

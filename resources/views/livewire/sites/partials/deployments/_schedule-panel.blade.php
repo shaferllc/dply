@@ -37,9 +37,9 @@
                         ]) title="{{ $schedule->is_active ? __('Active') : __('Paused') }}"></span>
                         <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $schedule->cron_expression }}</code>
                         @if ($cronDesc = $schedule->cronDescription())
-                            <span class="truncate text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                            <span class="truncate text-xs text-brand-mist">{{ $cronDesc }}</span>
                         @endif
-                        <span class="truncate text-[11px] text-brand-mist">
+                        <span class="truncate text-xs text-brand-mist">
                             @if ($schedule->last_run_at)
                                 {{ __('last run :time', ['time' => $schedule->last_run_at->diffForHumans()]) }}
                             @else
@@ -48,14 +48,14 @@
                         </span>
                     </div>
                     <div class="flex shrink-0 items-center gap-1.5">
-                        <button type="button" wire:click="runDeploymentScheduleNow('{{ $schedule->id }}')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40" title="{{ __('Run this deploy now') }}">
+                        <button type="button" wire:click="runDeploymentScheduleNow('{{ $schedule->id }}')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40" title="{{ __('Run this deploy now') }}">
                             <x-heroicon-o-rocket-launch class="h-4 w-4" />
                             {{ __('Run now') }}
                         </button>
-                        <button type="button" wire:click="toggleDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40">
+                        <button type="button" wire:click="toggleDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40">
                             {{ $schedule->is_active ? __('Pause') : __('Resume') }}
                         </button>
-                        <button type="button" wire:click="deleteDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50" title="{{ __('Remove schedule') }}">
+                        <button type="button" wire:click="deleteDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50" title="{{ __('Remove schedule') }}">
                             <x-heroicon-o-trash class="h-4 w-4" />
                         </button>
                     </div>
@@ -63,7 +63,7 @@
             @endforeach
         </ul>
     @elseif (! $show_add_schedule_form)
-        <p class="mt-2 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-[11px] text-brand-mist">
+        <p class="mt-2 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-xs text-brand-mist">
             {{ __('No schedules yet — add one to deploy this branch on a recurring cadence.') }}
         </p>
     @endif

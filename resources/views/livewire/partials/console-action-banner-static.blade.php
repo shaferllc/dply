@@ -309,7 +309,7 @@
                             <p class="mt-0.5 text-xs text-brand-mist">{{ __('Started :time', ['time' => $run->started_at->diffForHumans()]) }}{{ $run->finished_at ? ' — '.__('finished :time', ['time' => $run->finished_at->diffForHumans()]) : '' }}</p>
                         @endif
                     </div>
-                    <span class="shrink-0 rounded-full bg-brand-ink/10 px-2 py-0.5 font-mono text-[10px] text-brand-moss">{{ count($lines) }} {{ trans_choice('line|lines', count($lines)) }}</span>
+                    <span class="shrink-0 rounded-full bg-brand-ink/10 px-2 py-0.5 font-mono text-2xs text-brand-moss">{{ count($lines) }} {{ trans_choice('line|lines', count($lines)) }}</span>
                 </div>
                 <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                     <div class="relative" x-data="{ copied: false, copy() { navigator.clipboard.writeText(this.$refs.out.innerText).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">

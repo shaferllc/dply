@@ -259,8 +259,8 @@
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     @foreach ($extSections as $section)
                         <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
-                            <div class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
-                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
+                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
                         </div>
                     @endforeach
                 </div>
@@ -269,7 +269,7 @@
             <div class="mt-8 border-t border-brand-ink/10 pt-8">
                 <h4 class="text-sm font-semibold text-brand-ink">{{ __('Extended snapshot') }}</h4>
                 <pre
-                    class="mt-3 max-h-64 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink whitespace-pre-wrap break-all"
+                    class="mt-3 max-h-64 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre-wrap break-all"
                 >{{ $extSnap }}</pre>
             </div>
         @endif

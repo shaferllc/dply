@@ -17,7 +17,7 @@
     >
         @if ($row ?? null)
             <x-slot:actions>
-                <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-2 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                     <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Installed on this server') }}
                 </span>
@@ -35,17 +35,17 @@
     ]" />
 
     <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5">
-        <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-brand-moss">
+        <p class="min-w-0 flex-1 text-xs leading-relaxed text-brand-moss">
             <span class="font-semibold text-brand-ink">{{ __('Best for:') }}</span>
             {{ $info['best_for'] }}
         </p>
         <div class="flex shrink-0 flex-wrap items-center gap-1.5">
-            <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+            <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                 <x-heroicon-m-globe-alt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Homepage') }}
                 <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
             </a>
-            <a href="{{ $info['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+            <a href="{{ $info['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                 <x-heroicon-m-book-open class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Documentation') }}
                 <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />

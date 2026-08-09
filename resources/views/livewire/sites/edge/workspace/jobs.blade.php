@@ -62,17 +62,17 @@
                                 <div class="min-w-0">
                                     <span class="font-mono text-xs font-semibold text-brand-ink">env.{{ $binding['name'] ?? '—' }}</span>
                                     @if (($binding['source'] ?? '') === 'repo')
-                                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-brand-moss">{{ __('Repo') }}</span>
+                                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs uppercase text-brand-moss">{{ __('Repo') }}</span>
                                     @endif
-                                    <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $binding['value'] ?? '' }}</p>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-mist">{{ $binding['value'] ?? '' }}</p>
                                 </div>
                                 @if (($binding['name'] ?? '') === $default_queue)
-                                    <span class="text-[11px] font-semibold text-brand-forest">{{ __('Default') }}</span>
+                                    <span class="text-xs font-semibold text-brand-forest">{{ __('Default') }}</span>
                                 @elseif ($managedDelivery)
                                     <button
                                         type="button"
                                         wire:click="useQueueBinding(@js($binding['name'] ?? ''))"
-                                        class="text-[11px] font-semibold text-brand-sage hover:underline"
+                                        class="text-xs font-semibold text-brand-sage hover:underline"
                                     >
                                         {{ __('Use as default') }}
                                     </button>
@@ -101,7 +101,7 @@
         focusable
     >
         <div class="shrink-0 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Bindings') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Bindings') }}</p>
             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Queue bindings') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Create or attach a Cloudflare Queue, then use its binding name as the default below. Applies on the next deploy.') }}</p>
         </div>
@@ -115,7 +115,7 @@
 
             @can('update', $site)
                 <form wire:submit.prevent="addQueueBinding" class="space-y-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add queue binding') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add queue binding') }}</p>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="jobs-binding-name" :value="__('Binding name')" />
@@ -127,7 +127,7 @@
                                 placeholder="JOBS"
                                 autocomplete="off"
                             />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Becomes env.NAME in your worker.') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Becomes env.NAME in your worker.') }}</p>
                             @error('new_name') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -157,7 +157,7 @@
             @endcan
 
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dashboard queues') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dashboard queues') }}</p>
                 @if ($dashboardQueueBindings === [])
                     <p class="mt-2 text-sm text-brand-moss">{{ __('None yet — add one above.') }}</p>
                 @else
@@ -167,11 +167,11 @@
                             <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2" wire:key="jobs-binding-{{ $index }}-{{ $entry['name'] }}">
                                 <div class="min-w-0">
                                     <p class="font-mono text-sm text-brand-ink">env.{{ $entry['name'] }}</p>
-                                    <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $entry['value'] }}</p>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-mist">{{ $entry['value'] }}</p>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     @if ($entry['name'] !== $default_queue)
-                                        <button type="button" wire:click="useQueueBinding(@js($entry['name']))" class="text-[11px] font-semibold text-brand-sage hover:underline">
+                                        <button type="button" wire:click="useQueueBinding(@js($entry['name']))" class="text-xs font-semibold text-brand-sage hover:underline">
                                             {{ __('Use as default') }}
                                         </button>
                                     @endif
@@ -179,7 +179,7 @@
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('removeBinding', @js([$index]), @js(__('Detach binding')), @js(__('Detach :name? The queue and its data stay in place.', ['name' => $entry['name']])), @js(__('Detach')), true)"
-                                            class="text-[11px] font-semibold text-rose-700 hover:text-rose-900 dark:text-rose-400"
+                                            class="text-xs font-semibold text-rose-700 hover:text-rose-900 dark:text-rose-400"
                                         >
                                             {{ __('Detach') }}
                                         </button>
@@ -196,17 +196,17 @@
             @endphp
             @if ($repoQueues->isNotEmpty())
                 <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('From repo') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('From repo') }}</p>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Read-only — declare in wrangler.toml and redeploy.') }}</p>
                     <ul class="mt-2 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
                         @foreach ($repoQueues as $entry)
                             <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                                 <div>
                                     <span class="font-mono text-sm text-brand-ink">env.{{ $entry['name'] }}</span>
-                                    <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $entry['value'] ?? '' }}</p>
+                                    <p class="mt-0.5 font-mono text-xs text-brand-mist">{{ $entry['value'] ?? '' }}</p>
                                 </div>
                                 @if (($entry['name'] ?? '') !== $default_queue)
-                                    <button type="button" wire:click="useQueueBinding(@js($entry['name'] ?? ''))" class="text-[11px] font-semibold text-brand-sage hover:underline">
+                                    <button type="button" wire:click="useQueueBinding(@js($entry['name'] ?? ''))" class="text-xs font-semibold text-brand-sage hover:underline">
                                         {{ __('Use as default') }}
                                     </button>
                                 @endif

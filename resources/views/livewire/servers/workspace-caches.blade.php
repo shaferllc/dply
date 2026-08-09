@@ -91,7 +91,7 @@
                                     type="button"
                                     aria-label="{{ __('Workspace actions') }}"
                                     aria-haspopup="true"
-                                    class="inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                    class="inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
                                     <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Actions') }}</span>
                                     <span wire:loading wire:target="refreshCacheCapabilities" class="inline-flex items-center gap-1">
@@ -170,19 +170,19 @@
                             </span>
                             {{ $engineLabels[$engine] }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! $row)
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                             @elseif ($row)
                                 @if ($isInFlight)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700">
                                         <x-spinner variant="forest" />
                                         {{ __('Working') }}
                                     </span>
                                 @elseif ($row->status === \App\Models\ServerCacheService::STATUS_FAILED)
-                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('Failed') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold text-rose-700">{{ __('Failed') }}</span>
                                 @elseif ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
-                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Running') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('Running') }}</span>
                                 @else
-                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ ucfirst($row->status) }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-700">{{ ucfirst($row->status) }}</span>
                                 @endif
                             @endif
                         </span>

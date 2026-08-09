@@ -20,12 +20,12 @@
                     <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Branch, remote URL, and Git provider context. Changing the URL updates what Dply clones.') }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                         <span class="inline-flex items-center gap-1">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ $providerLabel }}
@@ -166,7 +166,7 @@
                     <p class="text-sm font-medium text-brand-ink">{{ __('Public deploy key') }}</p>
                     <span class="text-xs text-brand-mist">{{ __('Add to your Git provider') }}</span>
                 </div>
-                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $site->git_deploy_key_public }}</pre>
+                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $site->git_deploy_key_public }}</pre>
             </div>
         @endif
     </section>
@@ -197,12 +197,12 @@
                     <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Auto-deploy when new commits land. Choose webhook delivery (provider push) or poll delivery (dply checks Git on a short schedule).') }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                         @if ($quick_deploy_enabled_ui)
                             <span class="inline-flex items-center gap-1">
                                 <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
@@ -221,7 +221,7 @@
                         @endif
                     </div>
 
-                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-[11px] leading-relaxed text-brand-mist" />
+                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-xs leading-relaxed text-brand-mist" />
 
                     <details class="group mt-3 max-w-2xl rounded-lg border border-brand-ink/10 bg-white">
                         <summary class="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-brand-ink marker:content-none [&::-webkit-details-marker]:hidden">
@@ -230,7 +230,7 @@
                                 {{ __('Other ways to trigger a deploy') }}
                             </span>
                         </summary>
-                        <ul class="space-y-1.5 border-t border-brand-ink/10 px-3 py-2 text-[11px] leading-relaxed text-brand-moss">
+                        <ul class="space-y-1.5 border-t border-brand-ink/10 px-3 py-2 text-xs leading-relaxed text-brand-moss">
                             <li><span class="font-semibold text-brand-ink">{{ __('CLI') }}</span> — <code class="font-mono">dply deploy --follow</code></li>
                             <li><span class="font-semibold text-brand-ink">{{ __('API') }}</span> — <code class="font-mono">POST /api/v1/sites/{{ $site->id }}/deploy</code></li>
                             <li><span class="font-semibold text-brand-ink">{{ __('Signed hook') }}</span> — {{ __('POST the webhook URL with') }} <code class="font-mono">X-Dply-Signature</code></li>
@@ -315,7 +315,7 @@
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Group sites that share a repository so one push or coordinated manual deploy can update multiple destinations.') }}
@@ -323,7 +323,7 @@
                 </div>
             </div>
             @if ($repoGroup)
-                <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
+                <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-brand-sand/40 px-2.5 py-1 text-xs font-semibold text-brand-moss">
                     <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                     {{ trans_choice('{1} :count site|[2,*] :count sites', $repoGroup->sites->count(), ['count' => $repoGroup->sites->count()]) }}
                 </span>
@@ -344,7 +344,7 @@
                             <li class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                                 <span class="text-brand-ink">{{ $gs->name }}</span>
                                 @if ((string) $gs->id === (string) $repoGroup->leader_site_id)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         <x-heroicon-m-star class="h-3 w-3" />
                                         {{ __('leader') }}
                                     </span>
@@ -424,7 +424,7 @@
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Atomic deploys can verify HTTP health before traffic switches. Failed deployments also trigger notification subscriptions when configured.') }}
@@ -450,7 +450,7 @@
                     <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook URL') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook URL') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy webhook URL') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Used by Quick deploy webhook delivery and signed hooks. Providers send signed POST payloads (GitHub/GitLab) or X-Dply-Signature. Restrict which IPs may call it with the allow list below.') }}
@@ -461,14 +461,14 @@
 
         <div class="space-y-4 px-6 py-6 sm:px-8">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Webhook URL') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Webhook URL') }}</p>
                 <div class="mt-2 flex items-stretch overflow-hidden rounded-lg border border-brand-ink/15 bg-white">
-                    <p class="flex-1 break-all px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $deployHookUrl }}</p>
+                    <p class="flex-1 break-all px-3 py-2 font-mono text-xs leading-relaxed text-brand-ink">{{ $deployHookUrl }}</p>
                     <button
                         type="button"
                         x-data="{ copied: false }"
                         x-on:click="navigator.clipboard.writeText(@js($deployHookUrl)); copied = true; setTimeout(() => copied = false, 2000)"
-                        class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
                         <x-heroicon-m-clipboard-document class="h-4 w-4" />
                         <span x-show="!copied">{{ __('Copy') }}</span>
@@ -480,7 +480,7 @@
             @if ($revealed_webhook_secret)
                 <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                     <p class="text-sm font-semibold text-amber-900">{{ __('Copy your new secret now:') }}</p>
-                    <pre class="mt-2 overflow-x-auto rounded-lg border border-amber-200 bg-white p-3 font-mono text-[11px] leading-relaxed text-amber-900">{{ $revealed_webhook_secret }}</pre>
+                    <pre class="mt-2 overflow-x-auto rounded-lg border border-amber-200 bg-white p-3 font-mono text-xs leading-relaxed text-amber-900">{{ $revealed_webhook_secret }}</pre>
                 </div>
             @else
                 <p class="text-xs text-brand-moss">{{ __('Secret is stored encrypted. Rotate to update the provider hook when Quick deploy is enabled.') }}</p>
@@ -509,7 +509,7 @@
             </div>
 
             <div class="border-t border-brand-ink/10 pt-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
                 <form wire:submit="saveWebhookSecurity" class="mt-2 space-y-3">
                     <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
                     <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
@@ -532,7 +532,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
                     <h2 class="mt-0.5 text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900/80">
                         {{ __('Remove the deployed repository tree on the server without deleting this site in Dply.') }}

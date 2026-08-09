@@ -46,7 +46,7 @@
                     @click="previewCounts = {{ json_encode($preset['counts']) }}"
                     class="inline-flex flex-col items-start rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors text-left">
                 <span class="text-xs font-semibold text-brand-ink">{{ $preset['label'] }}</span>
-                <span class="text-[10px] text-brand-moss/80">{{ $preset['hint'] }}</span>
+                <span class="text-2xs text-brand-moss/80">{{ $preset['hint'] }}</span>
             </button>
         @endforeach
         <button type="button"

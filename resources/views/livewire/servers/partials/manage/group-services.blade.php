@@ -92,7 +92,7 @@
         @else
             <div class="mt-6 overflow-hidden rounded-xl border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                    <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                    <thead class="bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                         <tr>
                             <th class="px-4 py-2 font-semibold">{{ __('Status') }}</th>
                             <th class="px-4 py-2 font-semibold">{{ __('Unit') }}</th>
@@ -116,7 +116,7 @@
                             @endphp
                             <tr>
                                 <td class="px-4 py-2">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $pill['classes'] }}">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {{ $pill['classes'] }}">
                                         <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
                                         {{ $pill['label'] }}
                                     </span>
@@ -124,7 +124,7 @@
                                 <td class="px-4 py-2">
                                     <p class="font-mono text-xs text-brand-ink">{{ $unitName }}</p>
                                     @if ($standbyReason)
-                                        <p class="mt-1 text-[11px] leading-snug text-amber-900/90">{{ $standbyReason }}</p>
+                                        <p class="mt-1 text-xs leading-snug text-amber-900/90">{{ $standbyReason }}</p>
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-xs text-brand-moss">{{ $formatSince($u['active_enter_at'] ?? null) }}</td>
@@ -138,13 +138,13 @@
                                                     <button
                                                         type="button"
                                                         wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), false)"
-                                                        class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                        class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                     >{{ $action['label'] }}</button>
                                                 @endif
                                             @endforeach
                                         </div>
                                     @else
-                                        <span class="text-[11px] text-brand-mist">—</span>
+                                        <span class="text-xs text-brand-mist">—</span>
                                     @endif
                                 </td>
                             </tr>

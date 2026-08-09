@@ -94,12 +94,12 @@
                 <dl class="grid grid-cols-1 gap-2 {{ count($summaryStats) === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3' }}">
                     @foreach ($summaryStats as $stat)
                         <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                                 <span class="truncate">{{ $stat['label'] }}</span>
                             </dt>
                             <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $stat['hint'] }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ $stat['hint'] }}</p>
                         </div>
                     @endforeach
                 </dl>
@@ -182,7 +182,7 @@
                         <x-slot name="content">
                             <div class="space-y-3">
                                 <div>
-                                    <label for="projects_label" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Label') }}</label>
+                                    <label for="projects_label" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Label') }}</label>
                                     <x-select id="projects_label" wire:model.live="labelFilter" class="mt-1.5 w-full">
                                         <option value="">{{ __('All labels') }}</option>
                                         @foreach ($labels as $label)
@@ -191,7 +191,7 @@
                                     </x-select>
                                 </div>
                                 <div>
-                                    <label for="projects_role" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('My role') }}</label>
+                                    <label for="projects_role" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('My role') }}</label>
                                     <x-select id="projects_role" wire:model.live="roleFilter" class="mt-1.5 w-full">
                                         <option value="">{{ __('Any role') }}</option>
                                         @foreach ($workspaceRoles as $role)

@@ -104,28 +104,28 @@
                             <span class="inline-block h-2 w-2 rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
                             <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
                         </p>
-                        <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
+                        <p class="mt-1 truncate text-xs text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Servers')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('billable') }}</span>
                         </p>
                         @if ($this->excludedServers->isNotEmpty())
-                            <p class="mt-1 text-[11px] text-brand-mist">+{{ $this->excludedServers->count() }} {{ __('excluded') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">+{{ $this->excludedServers->count() }} {{ __('excluded') }}</p>
                         @else
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Counting toward plan') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Counting toward plan') }}</p>
                         @endif
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Current bill')">
                         <p class="mt-2 flex items-baseline gap-1">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
-                            <span class="text-[11px] text-brand-moss">/{{ __('mo') }}</span>
+                            <span class="text-xs text-brand-moss">/{{ __('mo') }}</span>
                         </p>
                         @if ($this->subscriptionInterval === 'year')
-                            <p class="mt-1 text-[11px] text-brand-mist">${{ number_format($this->yearlyTotalCents / 100, 0) }}/{{ __('yr') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">${{ number_format($this->yearlyTotalCents / 100, 0) }}/{{ __('yr') }}</p>
                         @else
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $intervalLabel }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ $intervalLabel }}</p>
                         @endif
                     </x-fleet-stat>
                 </dl>
@@ -206,11 +206,11 @@
                             <x-heroicon-o-gift class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled products') }}</h3>
                         </div>
                         <span @class([
-                            'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide',
+                            'shrink-0 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide',
                             'bg-brand-forest/10 text-brand-forest' => $bundleActive,
                             'bg-amber-100 text-amber-800' => ! $bundleActive,
                         ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
@@ -238,7 +238,7 @@
                         <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
                     </div>
@@ -270,7 +270,7 @@
                             <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
                         </div>
@@ -280,13 +280,13 @@
                             <div>
                                 <x-input-label for="org_invoice_email" :value="__('Invoice email')" />
                                 <x-text-input id="org_invoice_email" wire:model="invoice_email" type="email" class="mt-1 block w-full" autocomplete="email" />
-                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
+                                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
                                 <x-input-error class="mt-2" :messages="$errors->get('invoice_email')" />
                             </div>
                             <div>
                                 <x-input-label for="org_vat_number" :value="__('VAT number')" />
                                 <x-text-input id="org_vat_number" wire:model="vat_number" type="text" class="mt-1 block w-full" placeholder="NL123456789B01" autocomplete="off" />
-                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
+                                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
                                 <x-input-error class="mt-2" :messages="$errors->get('vat_number')" />
                             </div>
                         </div>
@@ -302,7 +302,7 @@
                                     <option value="{{ $code }}">{{ $label }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
+                            <p class="mt-1.5 text-xs text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
                             <x-input-error class="mt-2" :messages="$errors->get('billing_currency')" />
                         </div>
                         <div>
@@ -314,7 +314,7 @@
                                 class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
                                 placeholder="{{ __('Legal name, address, and other details to show on invoices') }}"
                             ></textarea>
-                            <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
+                            <p class="mt-1.5 text-xs text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
                             <x-input-error class="mt-2" :messages="$errors->get('billing_details')" />
                         </div>
                         <div class="flex items-center justify-end border-t border-brand-ink/10 pt-4">
@@ -345,7 +345,7 @@
                             @endif
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
                         </div>
@@ -389,7 +389,7 @@
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
                         </div>
@@ -409,7 +409,7 @@
                                 <li class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
                                     <div class="min-w-0">
                                         <p class="text-sm font-semibold text-brand-ink">{{ $invoice->date()->toFormattedDateString() }}</p>
-                                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss tabular-nums">{{ $invoice->total() }}</p>
+                                        <p class="mt-0.5 font-mono text-xs text-brand-moss tabular-nums">{{ $invoice->total() }}</p>
                                     </div>
                                     @if ($hosted)
                                         <a href="{{ $hosted }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-brand-sage hover:text-brand-ink">

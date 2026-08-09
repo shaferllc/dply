@@ -75,7 +75,7 @@
                         >
                             {{ __('Sources') }}
                             @if (($summary['source_count'] ?? 0) > 0)
-                                <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
+                                <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
                             @endif
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>

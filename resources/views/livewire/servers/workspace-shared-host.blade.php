@@ -58,7 +58,7 @@
                         <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                             @switch($report['overall'] ?? 'ok')
                                 @case('critical') {{ __('Contention needs attention') }} @break
@@ -108,13 +108,13 @@
             <x-server-workspace-tab id="sh-tab-budgets" icon="heroicon-o-bell-alert" :active="$shared_host_tab === 'budgets'" wire:click="setSharedHostTab('budgets')">
                 {{ __('Budgets') }}
                 @if ($breachCount > 0)
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-amber-200/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ $breachCount }}</span>
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-amber-200/90 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-amber-900">{{ $breachCount }}</span>
                 @endif
             </x-server-workspace-tab>
             <x-server-workspace-tab id="sh-tab-contention" icon="heroicon-o-clock" :active="$shared_host_tab === 'contention'" wire:click="setSharedHostTab('contention')">
                 {{ __('Contention') }}
                 @if ($eventCount > 0)
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ $eventCount }}</span>
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-brand-moss">{{ $eventCount }}</span>
                 @endif
             </x-server-workspace-tab>
             <x-server-workspace-tab id="sh-tab-notifications" icon="heroicon-o-bell" :active="$shared_host_tab === 'notifications'" wire:click="setSharedHostTab('notifications')">

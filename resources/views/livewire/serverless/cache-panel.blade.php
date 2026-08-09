@@ -4,7 +4,7 @@
             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cache') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cache') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed Redis') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A DigitalOcean Managed Redis cluster, wired in as this function\'s cache store.') }}</p>
         </div>

@@ -117,18 +117,18 @@
                                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $previewSite]) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">
                                     {{ $previewSite->name }}
                                 </a>
-                                <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $toneBadge[$status['tone']] }}">
+                                <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $toneBadge[$status['tone']] }}">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $toneDot[$status['tone']] }}"></span>
                                     {{ $status['label'] }}
                                 </span>
                                 @if ($sslActive)
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700" title="{{ __('SSL certificate active') }}">
+                                    <span class="inline-flex items-center gap-1 text-2xs font-medium text-emerald-700" title="{{ __('SSL certificate active') }}">
                                         <x-heroicon-m-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('SSL') }}
                                     </span>
                                 @endif
                             </div>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                 @if ($domain)
                                     <a href="https://{{ $domain }}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center gap-1 truncate font-mono text-brand-moss hover:text-brand-sage hover:underline">
                                         <span class="truncate">{{ $domain }}</span>
@@ -145,12 +145,12 @@
 
                     <div class="flex shrink-0 flex-col items-end gap-1 text-right">
                         @if ($deployStatus)
-                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $toneBadge[$deployTone] }}">
+                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $toneBadge[$deployTone] }}">
                                 {{ str($deployStatus)->headline() }}
                             </span>
                         @endif
                         @if ($deployTime)
-                            <span class="text-[11px] text-brand-mist">
+                            <span class="text-xs text-brand-mist">
                                 {{ $deployTime->diffForHumans() }}
                                 @if ($deploySha)
                                     <span class="text-brand-mist/50"> · </span>
@@ -158,14 +158,14 @@
                                 @endif
                             </span>
                         @else
-                            <span class="text-[11px] text-brand-mist">{{ __('No deploys yet') }}</span>
+                            <span class="text-xs text-brand-mist">{{ __('No deploys yet') }}</span>
                         @endif
                         @feature('surface.fleet')
                             @if ($deployStatus === 'failed' && ops_copilot_active())
                                 <a
                                     href="{{ route('fleet.copilot', ['site' => $previewSite->id]) }}"
                                     wire:navigate
-                                    class="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 hover:bg-violet-100"
+                                    class="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800 hover:bg-violet-100"
                                 >
                                     <x-heroicon-o-sparkles class="h-3 w-3" aria-hidden="true" />
                                     {{ __('Copilot') }}

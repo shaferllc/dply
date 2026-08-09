@@ -78,7 +78,7 @@
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">
                     {{ __('Firewall rules') }}
-                    <span class="ms-1 font-mono text-[10px] text-brand-mist">{{ count($firewallRules) }}</span>
+                    <span class="ms-1 font-mono text-2xs text-brand-mist">{{ count($firewallRules) }}</span>
                 </h3>
                 @if ($firewallRules === [])
                     <p class="mt-1 text-xs text-brand-mist">{{ __('None — the new server keeps its provisioning defaults.') }}</p>
@@ -113,7 +113,7 @@
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">
                     {{ __('Daemons') }}
-                    <span class="ms-1 font-mono text-[10px] text-brand-mist">{{ count($programs) }}</span>
+                    <span class="ms-1 font-mono text-2xs text-brand-mist">{{ count($programs) }}</span>
                 </h3>
                 @if ($programs === [])
                     <p class="mt-1 text-xs text-brand-mist">{{ __('None captured.') }}</p>

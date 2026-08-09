@@ -11,7 +11,7 @@
     >
         @if (($report['releases']['sites_over_keep'] ?? 0) > 0)
             <x-slot:actions>
-                <span class="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-amber-100 px-2 text-[11px] font-semibold text-amber-900">
+                <span class="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-amber-100 px-2 text-xs font-semibold text-amber-900">
                     {{ trans_choice(':count over keep|:count over keep', (int) $report['releases']['sites_over_keep'], ['count' => (int) $report['releases']['sites_over_keep']]) }}
                 </span>
             </x-slot:actions>

@@ -25,7 +25,7 @@
             <h3 class="text-base font-semibold text-slate-900">{{ __('Preflight and cost preview') }}</h3>
             <p class="mt-1 text-sm text-slate-600">{{ $preflight['summary'] ?? '' }}</p>
         </div>
-        <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
+        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ring-1 {{ $preflightBadgeClasses }}">
             {{ match ($preflight['status'] ?? 'blocked') {
                 'ready' => __('Ready'),
                 'warning' => __('Needs review'),

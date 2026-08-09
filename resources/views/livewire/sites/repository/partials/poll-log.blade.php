@@ -77,9 +77,9 @@
     <div class="space-y-2.5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Poll log') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Poll log') }}</p>
                 @if ($pollLog !== [])
-                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                    <p class="mt-0.5 text-xs text-brand-moss">
                         {{ trans_choice('{1} :count recent check|[2,*] :count recent checks', count($pollLog), ['count' => count($pollLog)]) }}
                     </p>
                 @endif
@@ -90,7 +90,7 @@
                     wire:click="checkQuickDeployPollNow"
                     wire:loading.attr="disabled"
                     wire:target="checkQuickDeployPollNow"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/70 disabled:cursor-wait disabled:opacity-60"
+                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-brand-sand/40 px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/70 disabled:cursor-wait disabled:opacity-60"
                 >
                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="checkQuickDeployPollNow" />
                     <span wire:loading.remove wire:target="checkQuickDeployPollNow">{{ __('Check now') }}</span>
@@ -102,7 +102,7 @@
         @if ($hasAuthIssue)
             <div class="flex items-start gap-2.5 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5">
                 <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                <div class="min-w-0 text-[11px] leading-relaxed text-amber-950">
+                <div class="min-w-0 text-xs leading-relaxed text-amber-950">
                     <p class="font-semibold text-amber-950">
                         @if ($authIsNoAccount)
                             {{ __('Poll needs a linked source-control account') }}
@@ -131,7 +131,7 @@
                 <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-sand/40 text-brand-mist ring-1 ring-brand-ink/10">
                     <x-heroicon-o-clock class="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
-                <p class="text-[11px] leading-relaxed text-brand-moss">
+                <p class="text-xs leading-relaxed text-brand-moss">
                     {{ __('No checks yet — waiting for the next poll tick, or use Check now.') }}
                 </p>
             </div>
@@ -158,16 +158,16 @@
                         $count = (int) ($entry['_count'] ?? 1);
                         $isAuthRow = $entryIsAuthIssue($entry);
                     @endphp
-                    <li class="flex gap-3 px-0 py-2 text-[11px] leading-snug">
+                    <li class="flex gap-3 px-0 py-2 text-xs leading-snug">
                         <span class="w-[6.5rem] shrink-0 tabular-nums text-brand-mist">{{ $atLabel ?? '—' }}</span>
                         <div class="min-w-0 flex-1 space-y-0.5">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                <span class="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset {{ $style }}">{{ $label }}</span>
+                                <span class="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 ring-inset {{ $style }}">{{ $label }}</span>
                                 @if ($shaShort)
-                                    <span class="font-mono text-[11px] text-brand-ink">{{ $shaShort }}</span>
+                                    <span class="font-mono text-xs text-brand-ink">{{ $shaShort }}</span>
                                 @endif
                                 @if ($count > 1)
-                                    <span class="text-[10px] font-medium text-brand-mist">×{{ $count }}</span>
+                                    <span class="text-2xs font-medium text-brand-mist">×{{ $count }}</span>
                                 @endif
                             </div>
                             @if ($msg !== '' && ! ($hasAuthIssue && $isAuthRow))

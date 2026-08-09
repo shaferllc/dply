@@ -43,32 +43,32 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Keys') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Keys') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalKeys }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $totalKeys) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('saved|saved', $totalKeys) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('On your account') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('On your account') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $autoProvisionCount > 0,
                     'border-brand-ink/10 bg-white/80' => $autoProvisionCount === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Auto-deploy') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Auto-deploy') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $autoProvisionCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('key|keys', $autoProvisionCount) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('key|keys', $autoProvisionCount) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('On every new server') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('On every new server') }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Reachable') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Reachable') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $reachableServers }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('server|servers', $reachableServers) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('server|servers', $reachableServers) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Deploy targets') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Deploy targets') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
@@ -82,7 +82,7 @@
                             <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="max-w-3xl">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a BYO server') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Before you create a BYO server') }}</p>
                             <h3 class="mt-1 text-base font-semibold text-brand-ink">{{ __('Add at least one SSH key to your profile first') }}</h3>
                             <p class="mt-2 text-sm leading-6 text-brand-moss">
                                 {{ __('Add a key from the modal here, optionally enable "Always provision to new servers," then return to the BYO server form.') }}
@@ -93,9 +93,9 @@
                                 <li>3. {{ __('Turn on "Always provision to new servers" if this key should be added automatically.') }}</li>
                                 <li>4. {{ __('Save the key, then return to create your BYO server.') }}</li>
                             </ol>
-                            <p class="mt-3 text-[11px] text-brand-mist">
+                            <p class="mt-3 text-xs text-brand-mist">
                                 {{ __('Need help generating a key? Run') }}
-                                <code class="rounded bg-brand-sand/70 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink">ssh-keygen -t ed25519 -C "you@example.com"</code>
+                                <code class="rounded bg-brand-sand/70 px-1.5 py-0.5 font-mono text-xs text-brand-ink">ssh-keygen -t ed25519 -C "you@example.com"</code>
                                 {{ __('in your terminal, then paste the contents of your .pub file here.') }}
                             </p>
                         </div>
@@ -169,13 +169,13 @@
                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                 <span class="truncate text-sm font-semibold text-brand-ink">{{ $key->name }}</span>
                                 @if ($key->provision_on_new_servers)
-                                    <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">
                                         <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Auto') }}
                                     </span>
                                 @endif
                             </div>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ $key->provision_on_new_servers
                                     ? __('Added automatically to new servers.')
                                     : __('Manual deploy only — push to specific servers when needed.') }}
@@ -195,7 +195,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('deleteKey', ['{{ $key->id }}'], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Delete') }}
@@ -236,7 +236,7 @@
                         <input type="checkbox" wire:model.boolean="edit_provision_on_new_servers" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                         <span class="min-w-0">
                             <span class="text-sm font-medium text-brand-ink">{{ __('Always provision to new servers') }}</span>
-                            <span class="mt-0.5 block text-[11px] leading-relaxed text-brand-moss">{{ __('Newly created servers automatically receive this key.') }}</span>
+                            <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Newly created servers automatically receive this key.') }}</span>
                         </span>
                     </label>
                 </div>
@@ -275,8 +275,8 @@
                 </div>
                 <div class="px-6 py-5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Servers') }}</p>
-                        <button type="button" wire:click="$set('deploy_server_ids', {{ json_encode($servers->pluck('id')->values()->all()) }})" class="text-[11px] font-semibold text-brand-sage hover:text-brand-ink">{{ __('Select all') }}</button>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Servers') }}</p>
+                        <button type="button" wire:click="$set('deploy_server_ids', {{ json_encode($servers->pluck('id')->values()->all()) }})" class="text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Select all') }}</button>
                     </div>
                     <div class="mt-2 max-h-56 overflow-y-auto rounded-xl border border-brand-ink/10 divide-y divide-brand-ink/10">
                         @foreach ($servers as $server)
@@ -285,7 +285,7 @@
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate text-sm font-semibold text-brand-ink">{{ $server->name }}</span>
                                     @if ($server->ip_address)
-                                        <span class="block truncate font-mono text-[11px] text-brand-mist">{{ $server->ip_address }}</span>
+                                        <span class="block truncate font-mono text-xs text-brand-mist">{{ $server->ip_address }}</span>
                                     @endif
                                 </span>
                             </label>

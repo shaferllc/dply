@@ -15,12 +15,12 @@
                 <span class="h-2.5 w-2.5 rounded-full bg-amber-300"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
             </div>
-            <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-600">{{ $title }}</p>
+            <p class="font-mono text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">{{ $title }}</p>
         </div>
 
         <div class="flex items-center gap-3">
             @if ($meta)
-                <p class="font-mono text-[11px] text-slate-500">{{ $meta }}</p>
+                <p class="font-mono text-xs text-slate-500">{{ $meta }}</p>
             @endif
 
             @if ($linkHref && $linkLabel)

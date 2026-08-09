@@ -39,10 +39,10 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <code class="font-mono text-sm text-brand-ink">{{ $branch['name'] }}</code>
                             @if ($branch['name'] === $currentBranch)
-                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900">{{ __('deploy branch') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-emerald-900">{{ __('deploy branch') }}</span>
                             @endif
                             @if (! empty($branch['is_default']))
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('default') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('default') }}</span>
                             @endif
                         </div>
                         <p class="mt-0.5 text-xs text-brand-moss">

@@ -20,7 +20,7 @@
             <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
         </span>
         <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply diagnosed this failure') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply diagnosed this failure') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $d->headline }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $d->detail }}</p>
 
@@ -38,7 +38,7 @@
                                     ])>
                                     <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Repair on server') }}
-                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
+                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
                                 </button>
                                 @break
 
@@ -51,7 +51,7 @@
                                     ])>
                                     <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Attach a database') }}
-                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
+                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
                                 </button>
                                 @break
 
@@ -64,7 +64,7 @@
                                     ])>
                                     <x-heroicon-o-variable class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Inject DB_* settings') }}
-                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
+                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
                                 </button>
                                 @break
 
@@ -83,7 +83,7 @@
                     @endforeach
                 </div>
             @else
-                <p class="mt-3 text-[11px] text-brand-mist">{{ __('You don’t have permission to change this site’s database or environment. Ask an operator on this organization to apply a fix.') }}</p>
+                <p class="mt-3 text-xs text-brand-mist">{{ __('You don’t have permission to change this site’s database or environment. Ask an operator on this organization to apply a fix.') }}</p>
             @endif
         </div>
     </div>
@@ -101,7 +101,7 @@
                 <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
                 {{ $this->deployment->isResumable() ? __('Apply & retry from release') : __('Apply & re-deploy') }}
             </button>
-            <p class="text-[11px] text-brand-mist">
+            <p class="text-xs text-brand-mist">
                 @if ($retryReady)
                     {{ $this->deployment->isResumable()
                         ? __('Re-runs the deploy from the release phase, reusing the build that already succeeded.')
@@ -158,7 +158,7 @@
                         </select>
                         <x-input-error :messages="$errors->get('new_db_engine')" class="mt-1" />
                     </div>
-                    <p class="rounded-lg bg-brand-sand/30 px-3 py-2 text-[11px] text-brand-moss">
+                    <p class="rounded-lg bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                         {{ __('A user and password are generated automatically and written to your .env as DB_*. The .env is pushed to the server so the retry can connect.') }}
                     </p>
 
@@ -191,7 +191,7 @@
                 <label class="{{ $labelCls }}" for="fix_inject_env">{{ __('Environment variables') }}</label>
                 <textarea id="fix_inject_env" wire:model="inject_env" rows="7"
                     class="{{ $inputCls }} font-mono text-xs leading-relaxed" spellcheck="false"></textarea>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('One KEY=value per line. Existing variables with the same key are overwritten.') }}</p>
+                <p class="mt-1 text-xs text-brand-mist">{{ __('One KEY=value per line. Existing variables with the same key are overwritten.') }}</p>
                 <x-input-error :messages="$errors->get('inject_env')" class="mt-1" />
             </div>
 

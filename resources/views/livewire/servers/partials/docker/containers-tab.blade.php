@@ -16,7 +16,7 @@
                 wire:loading.attr="disabled"
                 wire:target="loadContainers"
                 title="{{ __('Refresh') }}"
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-50"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-50"
             >
                 <span wire:loading.remove wire:target="loadContainers" class="inline-flex">
                     <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -62,12 +62,12 @@
                 </span>
                 <div class="min-w-0 flex-1 basis-64">
                     <p class="text-xs font-semibold text-rose-900">{{ __('Could not list containers') }}</p>
-                    <p class="mt-0.5 break-words text-[11px] leading-relaxed text-rose-800">{{ $containersError }}</p>
+                    <p class="mt-0.5 break-words text-xs leading-relaxed text-rose-800">{{ $containersError }}</p>
                 </div>
                 <button
                     type="button"
                     wire:click="setWorkspaceTab('overview')"
-                    class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-2.5 text-[11px] font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50"
+                    class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-2.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50"
                 >
                     {{ __('Open Overview') }}
                     <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -86,7 +86,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-3 py-2 sm:px-5">{{ __('Name') }}</th>
                         <th class="px-3 py-2">{{ __('Image') }}</th>
@@ -109,7 +109,7 @@
                             <td class="px-3 py-2 sm:px-5">
                                 <div class="font-mono text-xs text-brand-ink">{{ $name }}</div>
                                 @if ($linkedSite)
-                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline">
                                         <x-heroicon-o-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('Site: :name', ['name' => $linkedSite['name']]) }}
                                     </a>
@@ -117,25 +117,25 @@
                             </td>
                             <td class="max-w-[10rem] truncate px-3 py-2 font-mono text-xs text-brand-moss" title="{{ $imageRef }}">{{ $imageRef }}</td>
                             <td class="px-3 py-2 text-brand-moss">{{ $row['status'] }}</td>
-                            <td class="max-w-[8rem] truncate px-3 py-2 font-mono text-[11px] text-brand-moss" title="{{ $row['ports'] ?? '' }}">{{ $row['ports'] ?? '—' }}</td>
+                            <td class="max-w-[8rem] truncate px-3 py-2 font-mono text-xs text-brand-moss" title="{{ $row['ports'] ?? '' }}">{{ $row['ports'] ?? '—' }}</td>
                             <td class="px-3 py-2 text-right">
                                 <div class="inline-flex flex-wrap justify-end gap-1.5">
-                                    <button type="button" wire:click="openContainerShell(@js($ref), @js($name))" @disabled(! $running) class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">{{ __('Shell') }}</button>
+                                    <button type="button" wire:click="openContainerShell(@js($ref), @js($name))" @disabled(! $running) class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">{{ __('Shell') }}</button>
                                     @feature('workspace.run')
                                         @if ($running)
-                                            <a href="{{ route('servers.run', ['server' => $server, 'container' => $ref, 'container_name' => $name]) }}" wire:navigate class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-forest transition hover:bg-brand-sand/40">{{ __('Run') }}</a>
+                                            <a href="{{ route('servers.run', ['server' => $server, 'container' => $ref, 'container_name' => $name]) }}" wire:navigate class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-forest transition hover:bg-brand-sand/40">{{ __('Run') }}</a>
                                         @endif
                                     @endfeature
-                                    <button type="button" wire:click="openContainerExec(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Exec') }}</button>
-                                    <button type="button" wire:click="openContainerLogs(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
-                                    <button type="button" wire:click="openContainerInspect(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Inspect') }}</button>
+                                    <button type="button" wire:click="openContainerExec(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Exec') }}</button>
+                                    <button type="button" wire:click="openContainerLogs(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                    <button type="button" wire:click="openContainerInspect(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Inspect') }}</button>
                                     @if (! $running)
-                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_start', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Start') }}</button>
+                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_start', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Start') }}</button>
                                     @else
-                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_stop', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Stop') }}</button>
-                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_restart', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Restart') }}</button>
+                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_stop', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Stop') }}</button>
+                                        <button type="button" wire:click="confirmDockerContainerAction('docker_container_restart', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Restart') }}</button>
                                     @endif
-                                    <button type="button" wire:click="confirmDockerContainerAction('docker_container_rm', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold text-rose-800 transition hover:bg-rose-100">{{ __('Remove') }}</button>
+                                    <button type="button" wire:click="confirmDockerContainerAction('docker_container_rm', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100">{{ __('Remove') }}</button>
                                 </div>
                             </td>
                         </tr>

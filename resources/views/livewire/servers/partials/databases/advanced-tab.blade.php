@@ -11,7 +11,7 @@
         />
         <div class="px-4 py-3.5 sm:px-5">
         @if (count($mysqlOnlyOnServer) > 0)
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('MySQL') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MySQL') }}</p>
             <ul class="mt-1.5 space-y-1.5">
                 @foreach ($mysqlOnlyOnServer as $n)
                     <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-2.5 py-1.5 text-[13px]">
@@ -28,7 +28,7 @@
             </ul>
         @endif
         @if (count($mariadbOnlyOnServer ?? []) > 0)
-            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('MariaDB') }}</p>
+            <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MariaDB') }}</p>
             <ul class="mt-1.5 space-y-1.5">
                 @foreach ($mariadbOnlyOnServer as $n)
                     <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-2.5 py-1.5 text-[13px]">
@@ -45,7 +45,7 @@
             </ul>
         @endif
         @if (count($pgOnlyOnServer) > 0)
-            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PostgreSQL') }}</p>
+            <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('PostgreSQL') }}</p>
             <ul class="mt-1.5 space-y-1.5">
                 @foreach ($pgOnlyOnServer as $n)
                     <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-2.5 py-1.5 text-[13px]">
@@ -62,7 +62,7 @@
             </ul>
         @endif
         @if (count($mongoOnlyOnServer ?? []) > 0)
-            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('MongoDB') }}</p>
+            <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MongoDB') }}</p>
             <ul class="mt-1.5 space-y-1.5">
                 @foreach ($mongoOnlyOnServer as $n)
                     <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-2.5 py-1.5 text-[13px]">
@@ -73,7 +73,7 @@
             </ul>
         @endif
         @if (count($clickhouseOnlyOnServer ?? []) > 0)
-            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('ClickHouse') }}</p>
+            <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('ClickHouse') }}</p>
             <ul class="mt-1.5 space-y-1.5">
                 @foreach ($clickhouseOnlyOnServer as $n)
                     <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-2.5 py-1.5 text-[13px]">

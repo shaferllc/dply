@@ -32,15 +32,15 @@
                 <x-heroicon-o-share class="h-4 w-4" />
             </span>
             <p class="text-xs font-semibold text-brand-ink">{{ __('No access paths to map yet.') }}</p>
-            <p class="text-[11px] text-brand-moss">{{ __('Once authorized keys are synced, their accounts and workloads appear here.') }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Once authorized keys are synced, their accounts and workloads appear here.') }}</p>
         </div>
     @else
         <div class="px-4 py-4 sm:px-5" x-data="{ hot: null }">
             {{-- Column headers --}}
             <div class="mb-2 grid grid-cols-3 gap-2 text-center">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['sources'] }}</p>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['accounts'] }}</p>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['workloads'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['sources'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['accounts'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['workloads'] }}</p>
             </div>
 
             <div class="relative w-full" style="height: {{ $map['height'] }}px;">
@@ -82,7 +82,7 @@
                             :class="hot === '{{ $node['id'] }}' ? 'border-brand-forest ring-2 ring-brand-forest/30' : 'border-brand-ink/10'"
                         >
                             <p class="truncate text-xs font-semibold text-brand-ink">{{ $node['label'] }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ trans_choice('{1} :count key|[2,*] :count keys', $node['count'], ['count' => $node['count']]) }}
                             </p>
                         </div>
@@ -120,7 +120,7 @@
                                     @endunless
                                 </div>
                             </div>
-                            <p class="mt-0.5 truncate text-[11px] text-brand-mist">
+                            <p class="mt-0.5 truncate text-xs text-brand-mist">
                                 {{ trans_choice('{0} no keys|{1} :count key|[2,*] :count keys', $node['key_count'], ['count' => $node['key_count']]) }}
                                 @if ($node['uid'] !== null)
                                     · <span class="font-mono">UID {{ $node['uid'] }}</span>
@@ -142,7 +142,7 @@
                             :class="hot === '{{ $node['id'] }}' ? 'border-brand-forest ring-2 ring-brand-forest/30' : 'border-brand-ink/10'"
                         >
                             <p class="truncate text-xs font-semibold text-brand-ink">{{ $node['label'] }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ trans_choice('{1} :count total|[2,*] :count total', $node['total'], ['count' => $node['total']]) }}
                             </p>
                         </div>

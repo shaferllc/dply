@@ -43,7 +43,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h4 class="text-sm font-semibold text-brand-ink">{{ $meta['label'] }}</h4>
                             @if ($installed)
-                                <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Installed') }}</span>
+                                <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('Installed') }}</span>
                             @endif
                         </div>
                         <p class="mt-1 text-sm text-brand-moss">{{ $meta['description'] }}</p>

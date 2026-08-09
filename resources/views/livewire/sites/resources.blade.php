@@ -82,11 +82,11 @@
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</span>
-                                <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
-                                <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $pool->status }}</span>
+                                <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
+                                <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $pool->status }}</span>
                             </div>
                             @if ($primary)
-                                <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-[11px] font-semibold text-brand-forest hover:underline">{{ __('Scale / manage') }} →</a>
+                                <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Scale / manage') }} →</a>
                             @endif
                         </div>
                         <ul class="mt-2 divide-y divide-brand-ink/8">
@@ -95,9 +95,9 @@
                                     <span class="flex items-center gap-2 min-w-0">
                                         <x-heroicon-o-server class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                         <span class="truncate font-medium text-brand-ink">{{ $member->name }}</span>
-                                        <span class="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide {{ $member->isPoolPrimary() ? 'bg-violet-100 text-violet-800' : 'bg-brand-sand/60 text-brand-moss' }}">{{ $member->isPoolPrimary() ? __('primary') : __('replica') }}</span>
+                                        <span class="rounded px-1 py-0.5 text-3xs font-semibold uppercase tracking-wide {{ $member->isPoolPrimary() ? 'bg-violet-100 text-violet-800' : 'bg-brand-sand/60 text-brand-moss' }}">{{ $member->isPoolPrimary() ? __('primary') : __('replica') }}</span>
                                     </span>
-                                    <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</span>
+                                    <span class="shrink-0 font-mono text-2xs text-brand-mist">{{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</span>
                                 </li>
                             @endforeach
                         </ul>
@@ -130,17 +130,17 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="font-semibold text-sm text-brand-ink">{{ $worker['name'] }}</span>
-                                    <span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $worker['active'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">{{ $worker['active'] ? __('active') : __('inactive') }}</span>
-                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $worker['type'] }}</span>
-                                    <span class="text-[10px] text-brand-moss">{{ $worker['source'] }} · ×{{ $worker['instances'] }}</span>
+                                    <span class="rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $worker['active'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">{{ $worker['active'] ? __('active') : __('inactive') }}</span>
+                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $worker['type'] }}</span>
+                                    <span class="text-2xs text-brand-moss">{{ $worker['source'] }} · ×{{ $worker['instances'] }}</span>
                                     @if ($worker['off_box'])
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800" title="{{ __('Runs on a worker server on the same private network') }}">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800" title="{{ __('Runs on a worker server on the same private network') }}">
                                             <x-heroicon-o-server class="h-3 w-3" aria-hidden="true" />
                                             {{ $worker['server_name'] }}
                                         </span>
                                     @endif
                                 </div>
-                                <div class="mt-1 font-mono text-[11px] text-brand-ink break-all">{{ $worker['command'] }}</div>
+                                <div class="mt-1 font-mono text-xs text-brand-ink break-all">{{ $worker['command'] }}</div>
                             </div>
                         </div>
                     </li>
@@ -172,20 +172,20 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="font-semibold text-sm text-brand-ink">{{ $db->name }}</span>
-                                    <span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColors[$db->status] ?? 'bg-slate-200 text-slate-700' }}">{{ $db->status }}</span>
-                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $db->engine }}</span>
-                                    <span class="text-[10px] text-brand-moss">{{ $db->size }}</span>
+                                    <span class="rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusColors[$db->status] ?? 'bg-slate-200 text-slate-700' }}">{{ $db->status }}</span>
+                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $db->engine }}</span>
+                                    <span class="text-2xs text-brand-moss">{{ $db->size }}</span>
                                 </div>
                                 <div class="mt-1 flex flex-wrap gap-1">
                                     @foreach ($db->connectionEnvKeys() as $key)
-                                        <span class="rounded bg-brand-sand/30 px-1.5 py-0.5 text-[10px] font-mono text-brand-ink">{{ $key }}</span>
+                                        <span class="rounded bg-brand-sand/30 px-1.5 py-0.5 text-2xs font-mono text-brand-ink">{{ $key }}</span>
                                     @endforeach
                                 </div>
                             </div>
                             <button type="button"
                                 wire:click="detachDatabase('{{ $db->id }}')"
                                 wire:confirm="{{ __('Detach :name? DB env vars will be removed and the site will redeploy.', ['name' => $db->name]) }}"
-                                class="text-[11px] font-semibold text-rose-700 hover:underline">
+                                class="text-xs font-semibold text-rose-700 hover:underline">
                                 {{ __('Detach') }}
                             </button>
                         </div>
@@ -218,16 +218,16 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="font-semibold text-sm text-brand-ink">{{ $worker->name }}</span>
-                                    <span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusColors[$worker->status] ?? 'bg-slate-200 text-slate-700' }}">{{ $worker->status }}</span>
-                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $worker->type }}</span>
-                                    <span class="text-[10px] text-brand-moss">{{ $worker->size }} · ×{{ $worker->effectiveInstanceCount() }}</span>
+                                    <span class="rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusColors[$worker->status] ?? 'bg-slate-200 text-slate-700' }}">{{ $worker->status }}</span>
+                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $worker->type }}</span>
+                                    <span class="text-2xs text-brand-moss">{{ $worker->size }} · ×{{ $worker->effectiveInstanceCount() }}</span>
                                 </div>
-                                <div class="mt-1 font-mono text-[11px] text-brand-ink break-all">{{ $worker->effectiveCommand() }}</div>
+                                <div class="mt-1 font-mono text-xs text-brand-ink break-all">{{ $worker->effectiveCommand() }}</div>
                             </div>
                             <button type="button"
                                 wire:click="detachWorker('{{ $worker->id }}')"
                                 wire:confirm="{{ __('Remove :name?', ['name' => $worker->name]) }}"
-                                class="text-[11px] font-semibold text-rose-700 hover:underline">
+                                class="text-xs font-semibold text-rose-700 hover:underline">
                                 {{ __('Remove') }}
                             </button>
                         </div>
@@ -261,7 +261,7 @@
                                 <div class="text-sm font-semibold text-brand-ink">{{ __('Database (attach existing)') }}</div>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Pick a managed DB already in this organization.') }}</p>
                                 @if ($this->attachableDatabases->isEmpty())
-                                    <p class="mt-2 text-[10px] uppercase tracking-wide text-brand-mist">{{ __('No detachable databases') }}</p>
+                                    <p class="mt-2 text-2xs uppercase tracking-wide text-brand-mist">{{ __('No detachable databases') }}</p>
                                 @endif
                             </button>
                             <button type="button" wire:click="openAttach('database-new')" class="rounded-lg border border-brand-ink/10 p-4 text-left hover:bg-brand-sand/30">
@@ -276,7 +276,7 @@
                                 <div class="text-sm font-semibold text-brand-ink">{{ __('Scheduler') }}</div>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Runs `php artisan schedule:work` on a single pinned instance.') }}</p>
                                 @if ($this->hasScheduler())
-                                    <p class="mt-2 text-[10px] uppercase tracking-wide text-brand-mist">{{ __('Already attached') }}</p>
+                                    <p class="mt-2 text-2xs uppercase tracking-wide text-brand-mist">{{ __('Already attached') }}</p>
                                 @endif
                             </button>
                         </div>

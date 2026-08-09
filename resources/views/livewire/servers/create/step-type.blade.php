@@ -23,7 +23,7 @@
                     <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Creating the dply server for :label', ['label' => $migrationSourceLabel]) }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Walk through the wizard to provision the destination server. Once it is ready, your selected sites migrate automatically — code, env, databases, crons, and SSL.') }}
@@ -64,7 +64,7 @@
                         'border-brand-sage/30 bg-brand-sage/8' => filled($form->mode),
                         'border-brand-ink/10 bg-white' => ! filled($form->mode),
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Mode') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Mode') }}</dt>
                         <dd class="truncate text-xs font-semibold text-brand-ink">
                             {{ match ($form->mode) { 'provider' => __('Provider'), 'custom' => __('Custom (BYO)'), 'import' => __('Scan & import'), default => __('Not set') } }}
                         </dd>
@@ -75,7 +75,7 @@
                             'border-brand-sage/30 bg-brand-sage/8' => filled($form->name),
                             'border-brand-ink/10 bg-white' => ! filled($form->name),
                         ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</dt>
                             <dd class="truncate font-mono text-xs font-semibold text-brand-ink">{{ filled($form->name) ? $form->name : '—' }}</dd>
                         </div>
                     @endif
@@ -97,7 +97,7 @@
                     class="border-b border-brand-ink/10"
                 >
                     <x-slot:actions>
-                        <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                        <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </x-slot:actions>
                 </x-workspace-panel-head>
                 <div class="px-4 py-3.5 sm:px-5">
@@ -137,12 +137,12 @@
                             <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Provision with a provider') }}</span>
                             <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('We talk to DigitalOcean, AWS, Hetzner, Vultr, Linode and friends, then bring up a fresh VM ready for your stack.') }}</span>
                             <div class="mt-3 flex flex-wrap gap-1.5">
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('AWS') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vultr') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Linode') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('+3 more') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('AWS') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vultr') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Linode') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('+3 more') }}</span>
                             </div>
                         </button>
 
@@ -177,9 +177,9 @@
                             <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Custom server (BYO)') }}</span>
                             <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Bring your own machine: dply connects over SSH and treats it like any other host. No cloud APIs.') }}</span>
                             <div class="mt-3 flex flex-wrap gap-1.5">
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('SSH key auth') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Bare metal') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Existing VPS') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('SSH key auth') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Bare metal') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Existing VPS') }}</span>
                             </div>
                         </button>
 
@@ -217,10 +217,10 @@
                             <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Scan & import existing') }}</span>
                             <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Like custom, but we read it from the provider API: dply lists the machines on your account that it does not manage yet.') }}</span>
                             <div class="mt-3 flex flex-wrap gap-1.5">
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Linode') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vultr') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Linode') }}</span>
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vultr') }}</span>
                             </div>
                         </button>
                     </div>
@@ -269,7 +269,7 @@
                 </div>
             </section>
             @else
-                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                     <x-heroicon-m-tag class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     {{ __('The name comes from the provider — you can change it when you pick the machine on the next step.') }}
                 </p>

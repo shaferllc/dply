@@ -2,7 +2,7 @@
     @if (! $edgeIsPreviewChild)
         <section id="edge-previews-protection" class="scroll-mt-24 border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Protection') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Protection') }}</p>
                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Gate preview URLs. Production stays public.') }}</p>
             </div>
             <form

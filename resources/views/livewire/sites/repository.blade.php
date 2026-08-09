@@ -47,7 +47,7 @@
                                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('No repository connected') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     @if ($site->canRechooseApp())

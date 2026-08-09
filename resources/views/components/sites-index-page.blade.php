@@ -57,7 +57,7 @@
             <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 @foreach ($summaryStats as $stat)
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                        <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                             <span class="truncate">{{ $stat['label'] }}</span>
                         </dt>
@@ -127,7 +127,7 @@
                     <x-slot name="content">
                         <div class="space-y-3">
                             <div>
-                                <label for="sites_status" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
+                                <label for="sites_status" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
                                 <x-select id="sites_status" wire:model.live="statusFilter" class="mt-1.5 w-full">
                                     @foreach ($statusOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
@@ -135,7 +135,7 @@
                                 </x-select>
                             </div>
                             <div>
-                                <label for="sites_sort" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Order by') }}</label>
+                                <label for="sites_sort" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Order by') }}</label>
                                 <x-select id="sites_sort" wire:model.live="sort" class="mt-1.5 w-full">
                                     @foreach ($sortOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>

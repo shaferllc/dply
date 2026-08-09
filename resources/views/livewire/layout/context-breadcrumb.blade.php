@@ -15,7 +15,7 @@
 >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3">
         <nav class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-1 sm:gap-y-2" aria-label="{{ __('Workspace context') }}">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-brand-moss sm:hidden">{{ __('You are working in') }}</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-brand-moss sm:hidden">{{ __('You are working in') }}</span>
 
             <div class="relative flex flex-wrap items-center gap-x-2 gap-y-2 min-w-0">
                 {{-- Organization switcher --}}
@@ -31,7 +31,7 @@
                             {{ \App\Livewire\Layout\ContextBreadcrumb::initials($currentOrg->name ?? __('Org')) }}
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
                             <span class="block truncate text-sm font-semibold text-brand-ink">{{ $currentOrg->name ?? __('None') }}</span>
                         </span>
                         <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss group-hover:text-brand-ink" aria-hidden="true" />
@@ -49,7 +49,7 @@
                         class="absolute left-0 z-50 mt-2 w-[min(100vw-2rem,20rem)] dply-dropdown-panel py-2"
                         role="listbox"
                     >
-                        <p class="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch organization') }}</p>
+                        <p class="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch organization') }}</p>
                         <ul class="max-h-64 overflow-y-auto px-2">
                             @foreach ($organizations as $org)
                                 <li>
@@ -119,7 +119,7 @@
                             <div class="flex items-center gap-2.5 rounded-xl border border-dashed border-brand-ink/15 bg-white/50 px-2.5 py-2 text-sm text-brand-moss">
                                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/80 text-xs font-bold text-brand-moss">—</span>
                                 <span class="min-w-0">
-                                    <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
                                     <a href="{{ route('organizations.show', $currentOrg) }}" wire:navigate class="block truncate font-medium text-brand-sage hover:text-brand-ink">{{ __('No teams yet — set up on the org page') }}</a>
                                 </span>
                             </div>
@@ -139,7 +139,7 @@
                                     @endif
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
                                     <span class="block truncate text-sm font-semibold text-brand-ink">
                                         {{ $currentTeam?->name ?? __('All teams') }}
                                     </span>
@@ -159,7 +159,7 @@
                                 class="absolute left-0 z-50 mt-2 w-[min(100vw-2rem,20rem)] dply-dropdown-panel py-2 sm:left-auto sm:right-0"
                                 role="listbox"
                             >
-                                <p class="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch team') }}</p>
+                                <p class="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch team') }}</p>
                                 <ul class="max-h-64 overflow-y-auto px-2">
                                     <li>
                                         <button

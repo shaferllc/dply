@@ -74,12 +74,13 @@
         @apply flex items-start gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 transition-colors hover:border-brand-ink/20;
     }
 
+    /* xs keeps h-6 (compact inline); sm is h-7. Both use text-xs (12px). */
     .dply-btn-xs {
-        @apply h-6 px-2 text-[11px];
+        @apply h-6 px-2 text-xs leading-none;
     }
 
     .dply-btn-sm {
-        @apply h-7 px-2.5 text-xs;
+        @apply h-7 px-2.5 text-xs leading-none;
     }
 
     /* Tones. Outline is the default for secondary work; ghost for tertiary
@@ -105,9 +106,9 @@
         @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink;
     }
 
-    /* Inline token: an env key, a prefix filter, a count. */
+    /* Inline token: an env key, a prefix filter, a count. Micro label scale. */
     .dply-chip {
-        @apply inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold;
+        @apply inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold leading-none;
     }
 
     /* Global "this button is talking to the server" affordance, toggled by

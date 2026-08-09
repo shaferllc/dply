@@ -129,7 +129,7 @@
                         <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                             <span>{{ __('Selected plan') }}</span>
                             @if ($selectedSizeCard && $recommendedSizeCard && $selectedSizeCard['value'] === $recommendedSizeCard['value'])
-                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
                             @endif
                         </div>
                         @if ($selectedSizeCard)
@@ -190,7 +190,7 @@
                                                         default => 'bg-slate-100 text-slate-600 ring-slate-200',
                                                     };
                                                 @endphp
-                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $recBadgeClass }}">
+                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] ring-1 {{ $recBadgeClass }}">
                                                     {{ $rawSize['recommendation']['label'] }}
                                                 </span>
                                             @endif
@@ -204,7 +204,7 @@
                                             <p class="mt-1.5 text-xs leading-relaxed text-slate-500">{{ $rawSize['recommendation']['detail'] }}</p>
                                         @endif
                                         @if ($sizeCard['value'] !== $sizeCard['name'])
-                                            <div class="mt-1 truncate text-[11px] text-slate-400">{{ $sizeCard['value'] }}</div>
+                                            <div class="mt-1 truncate text-xs text-slate-400">{{ $sizeCard['value'] }}</div>
                                         @endif
                                     </div>
                                     <div class="shrink-0 text-right">

@@ -52,7 +52,7 @@
     @else
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <tr>
                         <th class="px-4 py-3">{{ __('Name') }}</th>
                         <th class="px-4 py-3">{{ __('Engine') }}</th>
@@ -95,7 +95,7 @@
                             <td class="px-4 py-3 text-slate-700">{{ ucfirst((string) $database->size) }}</td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $database->region ?: '—' }}</td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $statusBadge }}">{{ $statusLabel }}</span>
                             </td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $database->sites_count }}</td>
                             <td class="px-4 py-3 text-right">

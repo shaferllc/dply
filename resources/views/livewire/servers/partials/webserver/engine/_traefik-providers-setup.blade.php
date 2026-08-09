@@ -26,7 +26,7 @@
             @if ($traefik_providers_loaded && $traefik_providers_configured !== [])
                 <ul class="mt-4 flex flex-wrap gap-2">
                     @foreach ($traefik_providers_configured as $prov)
-                        <li class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/50 px-2.5 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-brand-ink/10">
+                        <li class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/50 px-2.5 py-1 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
                             <span class="font-semibold">{{ $prov['label'] }}</span>
                             <span class="text-brand-moss">{{ $prov['summary'] }}</span>
                         </li>

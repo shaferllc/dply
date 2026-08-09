@@ -24,7 +24,7 @@
                     default => 'MySQL',
                 };
 
-                $rowBtn = 'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50';
+                $rowBtn = 'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50';
             @endphp
             <x-workspace-table-row
                 wire:key="server-db-{{ $db->id }}"
@@ -36,11 +36,11 @@
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <h4 class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</h4>
-                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                             <x-heroicon-m-circle-stack class="h-3 w-3 text-brand-moss" aria-hidden="true" />
                             {{ $engineLabel }}
                         </span>
-                        <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                        <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                             @if ($db->engine === 'sqlite')
                                 <x-heroicon-m-document class="h-3 w-3 text-brand-moss" aria-hidden="true" />
                                 {{ __('file-based') }}
@@ -51,10 +51,10 @@
                         </span>
                     </div>
                     @if ($db->engine === 'sqlite' && filled($db->host))
-                        <p class="mt-0.5 break-all font-mono text-[11px] text-brand-mist">{{ $db->host }}</p>
+                        <p class="mt-0.5 break-all font-mono text-xs text-brand-mist">{{ $db->host }}</p>
                     @endif
                     @if (filled($db->description))
-                        <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ $db->description }}</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $db->description }}</p>
                     @endif
                 </div>
 

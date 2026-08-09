@@ -11,7 +11,7 @@
             {{ __('Invocation URLs') }}
         </h3>
         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Origin skips the edge (no redirects/headers/CORS). Use as a fallback only.') }}">
+        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Origin skips the edge (no redirects/headers/CORS). Use as a fallback only.') }}">
             {{ __('Public addresses · origin skips edge proxy') }}
         </p>
     </div>
@@ -35,14 +35,14 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-1.5">
                             <span class="text-xs font-semibold text-brand-ink">{{ $entry['label'] }}</span>
-                            <span class="inline-flex items-center rounded-full {{ $scopeClasses }} px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]">{{ $entry['scope'] }}</span>
+                            <span class="inline-flex items-center rounded-full {{ $scopeClasses }} px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.12em]">{{ $entry['scope'] }}</span>
                         </div>
-                        <code class="mt-0.5 block break-all font-mono text-[11px] text-brand-moss">{{ $entry['url'] }}</code>
+                        <code class="mt-0.5 block break-all font-mono text-xs text-brand-moss">{{ $entry['url'] }}</code>
                     </div>
                     <button
                         type="button"
                         x-on:click="navigator.clipboard.writeText(@js($entry['url'])); copied = true; setTimeout(() => copied = false, 1500)"
-                        class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
                         <span x-show="!copied">{{ __('Copy') }}</span>
@@ -62,7 +62,7 @@
             <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
         </span>
     </summary>
-    <ul class="space-y-1 border-t border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 pl-8 text-[11px] leading-relaxed text-brand-moss sm:px-4 sm:pl-9">
+    <ul class="space-y-1 border-t border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 pl-8 text-xs leading-relaxed text-brand-moss sm:px-4 sm:pl-9">
         <li>{{ __('Edge requests: redirects → CORS preflight → upstream → response decoration.') }}</li>
         <li>{{ __('Origin URL bypasses dply — useful for ops debugging.') }}</li>
         <li>{{ __('Custom domains appear only after DNS status is ready on Domains.') }}</li>

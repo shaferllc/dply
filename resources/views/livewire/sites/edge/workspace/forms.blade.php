@@ -52,7 +52,7 @@
             </label>
 
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 dark:bg-brand-sand/10 sm:px-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Click to add a starter endpoint (path + honeypot). Set Email to, then Save.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($examples as $example)
@@ -76,26 +76,26 @@
                         <div>
                             <x-input-label :value="__('Path')" />
                             <x-text-input wire:model.live="endpoints.{{ $i }}.path" type="text" class="mt-1 block w-full font-mono text-sm" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('POST path on your Edge hostname, e.g. /contact or /api/support.') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('POST path on your Edge hostname, e.g. /contact or /api/support.') }}</p>
                         </div>
                         <div>
                             <x-input-label :value="__('Email to')" />
                             <x-text-input wire:model="endpoints.{{ $i }}.to_email" type="email" class="mt-1 block w-full text-sm" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Inbox that receives each submission (org mail must be configured).') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Inbox that receives each submission (org mail must be configured).') }}</p>
                         </div>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label :value="__('Honeypot field')" />
                             <x-text-input wire:model.live="endpoints.{{ $i }}.honeypot" type="text" class="mt-1 block w-full font-mono text-sm" @disabled(! $managedDelivery) />
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Hidden input name in your HTML. If filled, the Worker drops the POST as spam.') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Hidden input name in your HTML. If filled, the Worker drops the POST as spam.') }}</p>
                         </div>
                         <div class="pt-1">
                             <label class="flex items-start gap-2 text-sm text-brand-ink">
                                 <input type="checkbox" wire:model.live="endpoints.{{ $i }}.require_turnstile" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage" @disabled(! $managedDelivery) />
                                 <span>
                                     <span class="font-medium">{{ __('Require bot check') }}</span>
-                                    <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Needs Bot protection keys. Form must include a Turnstile token (cf-turnstile-response).') }}</span>
+                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Needs Bot protection keys. Form must include a Turnstile token (cf-turnstile-response).') }}</span>
                                 </span>
                             </label>
                         </div>
@@ -132,7 +132,7 @@
         focusable
     >
         <div class="shrink-0 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('HTML example') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('HTML example') }}</p>
             <p class="mt-1 text-sm text-brand-moss">
                 {{ __('Built from your first endpoint') }}
                 @if ($liveHostname)
@@ -153,7 +153,7 @@
                     <span x-cloak x-show="copied">{{ __('Copied') }}</span>
                 </button>
             </div>
-            <pre class="overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink dark:bg-zinc-950"><code>{{ $sampleHtml }}</code></pre>
+            <pre class="overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink dark:bg-zinc-950"><code>{{ $sampleHtml }}</code></pre>
         </div>
         <div class="flex shrink-0 items-center justify-end border-t border-brand-ink/10 px-5 py-3 sm:px-6">
             <button
@@ -187,7 +187,7 @@
                         <dd class="text-brand-moss">{{ $repoEndpointCount }}</dd>
                     @endif
                 </dl>
-                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
+                <p class="mt-2 text-xs text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
             @else
                 <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
             @endif

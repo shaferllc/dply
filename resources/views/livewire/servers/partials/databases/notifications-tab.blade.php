@@ -23,7 +23,7 @@
             <a
                 href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
                 wire:navigate
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 {{ __('Manage in Settings') }}
                 <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -31,7 +31,7 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    <p class="border-b border-brand-ink/10 px-4 py-2.5 text-[11px] leading-relaxed text-brand-moss sm:px-5">
+    <p class="border-b border-brand-ink/10 px-4 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-5">
         {{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever a database is created or removed, an engine is installed or removed, or a database user is created or removed — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}
     </p>
 
@@ -57,7 +57,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             @foreach ($subs as $sub)
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="db-notif-sub-{{ $sub->id }}">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="db-notif-sub-{{ $sub->id }}">
                                     {{ $notifEventLabels[$sub->event_key] ?? $sub->event_key }}
                                     <button
                                         type="button"
@@ -76,7 +76,7 @@
     </div>
 
     <div class="border-t border-brand-ink/10 px-4 py-3.5 sm:px-5">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
         <form wire:submit="addDatabaseNotificationSubscription" class="mt-3 space-y-3">
             <div class="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -103,7 +103,7 @@
                             <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                             {{ __('Create a channel') }}
                         </button>
-                        <span class="text-[10px] text-brand-mist">·</span>
+                        <span class="text-2xs text-brand-mist">·</span>
                         <a href="{{ route('profile.notification-channels') }}" class="text-xs text-brand-mist hover:text-brand-ink" wire:navigate>
                             {{ __('Manage all in Settings →') }}
                         </a>

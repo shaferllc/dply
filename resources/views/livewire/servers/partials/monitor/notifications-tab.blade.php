@@ -13,7 +13,7 @@
         :note="__('Bind channels to server events — stale metrics and threshold breaches.')"
     >
         <x-slot:actions>
-            <a href="{{ route('servers.notifications', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+            <a href="{{ route('servers.notifications', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                 {{ __('Manage') }}
                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
             </a>
@@ -44,7 +44,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             @foreach ($subs as $sub)
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="monitor-notif-sub-{{ $sub->id }}">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="monitor-notif-sub-{{ $sub->id }}">
                                     {{ $serverEventLabels[$sub->event_key] ?? $sub->event_key }}
                                     @if (! $isDeployer)
                                         <button
@@ -66,7 +66,7 @@
 
     @if (! $isDeployer)
         <div class="border-t border-brand-ink/10 px-3 py-2.5 sm:px-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add subscription') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add subscription') }}</p>
             <form wire:submit="addServerNotificationSubscription" class="mt-4 space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -95,7 +95,7 @@
                                 <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Create new channel') }}
                             </button>
-                            <span class="text-[10px] text-brand-mist">·</span>
+                            <span class="text-2xs text-brand-mist">·</span>
                             <a
                                 href="{{ route('profile.notification-channels') }}"
                                 class="text-xs text-brand-mist hover:text-brand-ink"
@@ -140,15 +140,15 @@
         <h4 class="text-sm font-semibold text-brand-ink">{{ __('Routing summary') }}</h4>
         <dl class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Server routes') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Server routes') }}</dt>
                 <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['server_routes'] }}</dd>
             </div>
             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Project routes') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Project routes') }}</dt>
                 <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['project_routes'] }}</dd>
             </div>
             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Available channels') }}</dt>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Available channels') }}</dt>
                 <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $assignableChannels->count() }}</dd>
             </div>
         </dl>

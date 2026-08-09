@@ -14,7 +14,7 @@
             {{ __('Error alerts') }}
         </h3>
         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Route a channel (email, Slack, Discord, webhook…) to this site’s error stream.') }}">
+        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Route a channel (email, Slack, Discord, webhook…) to this site’s error stream.') }}">
             {{ __('Route a channel (email, Slack, Discord, webhook…) to this site’s error stream.') }}
         </p>
         <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="ml-auto shrink-0 whitespace-nowrap">
@@ -46,11 +46,11 @@
                 <li class="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4" wire:key="errors-notif-ch-{{ $channelId }}">
                     <div class="min-w-0">
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $channel?->label ?? __('(deleted channel)') }}</p>
-                        <p class="text-[11px] text-brand-moss">{{ ucfirst((string) ($channel?->type ?? '—')) }}</p>
+                        <p class="text-xs text-brand-moss">{{ ucfirst((string) ($channel?->type ?? '—')) }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5">
                         @foreach ($subs as $sub)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="errors-notif-sub-{{ $sub->id }}">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="errors-notif-sub-{{ $sub->id }}">
                                 {{ $notifEventLabels[$sub->event_key] ?? $sub->event_key }}
                                 <button
                                     type="button"
@@ -68,7 +68,7 @@
 
     {{-- Add subscription --}}
     <div class="px-3 py-3 sm:px-4">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
         <form wire:submit="addErrorsNotificationSubscription" class="mt-2.5 space-y-3">
             <div class="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -95,7 +95,7 @@
                             <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                             {{ __('Create a channel') }}
                         </button>
-                        <span class="text-[10px] text-brand-mist">·</span>
+                        <span class="text-2xs text-brand-mist">·</span>
                         <a href="{{ route('profile.notification-channels') }}" class="text-xs text-brand-mist hover:text-brand-ink" wire:navigate>
                             {{ __('Manage all in Settings →') }}
                         </a>

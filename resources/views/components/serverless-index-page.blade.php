@@ -50,7 +50,7 @@
 
     @unless ($serverlessEnabled)
         <div class="dply-card relative p-8 text-center">
-            <span class="absolute end-6 top-6 inline-flex rounded-full bg-brand-sand/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+            <span class="absolute end-6 top-6 inline-flex rounded-full bg-brand-sand/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                 {{ __('Coming soon') }}
             </span>
             <span class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-xl border border-brand-ink/10 bg-white text-brand-ink shadow-sm">
@@ -99,7 +99,7 @@
                     <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         @foreach ($summaryStats as $stat)
                             <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                                     <span class="truncate">{{ $stat['label'] }}</span>
                                 </dt>
@@ -193,7 +193,7 @@
                     <section class="border-b border-brand-ink/10 px-5 py-8 sm:px-6" aria-labelledby="serverless-empty-heading">
                         <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                             <div class="min-w-0 max-w-2xl">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Get started') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Get started') }}</p>
                                 <h2 id="serverless-empty-heading" class="mt-1.5 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">
                                     {{ __('No apps yet') }}
                                 </h2>

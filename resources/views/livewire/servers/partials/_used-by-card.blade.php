@@ -33,7 +33,7 @@
             <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                     <thead class="bg-brand-cream/40">
-                        <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
                             <th class="px-3 py-2">{{ __('Site') }}</th>
                             <th class="px-3 py-2">{{ __('Server') }}</th>
                             @if ($showResource)
@@ -53,9 +53,9 @@
                                 <td class="px-3 py-2">
                                     <span class="text-brand-moss">{{ $row['server_name'] }}</span>
                                     @if ($row['is_remote'])
-                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
                                     @else
-                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local') }}</span>
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local') }}</span>
                                     @endif
                                 </td>
                                 @if ($showResource)
@@ -84,7 +84,7 @@
                                         <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-xs font-semibold text-brand-mist">{{ __('Not checked') }}</span>
                                     @endif
                                     @if (! empty($row['checked_at']))
-                                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Checked :ago', ['ago' => \Illuminate\Support\Carbon::parse($row['checked_at'])->diffForHumans()]) }}</p>
+                                        <p class="mt-1 text-xs text-brand-mist">{{ __('Checked :ago', ['ago' => \Illuminate\Support\Carbon::parse($row['checked_at'])->diffForHumans()]) }}</p>
                                     @endif
                                 </td>
                             </tr>

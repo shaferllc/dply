@@ -62,9 +62,9 @@
         <div class="px-4 py-6 sm:px-6" x-data="{ hot: null }">
             {{-- Column headers --}}
             <div class="mb-3 grid grid-cols-3 gap-2 text-center">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['left'] }}</p>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['mid'] }}</p>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['right'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['left'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['mid'] }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['right'] }}</p>
             </div>
 
             <div class="relative w-full" style="height: {{ $map['height'] }}px;">
@@ -112,10 +112,10 @@
                             >
                                 <p class="truncate {{ ($node['mono'] ?? false) ? 'font-mono' : '' }} text-xs font-semibold text-brand-ink">{{ $node['label'] }}</p>
                                 @if (($node['sub'] ?? '') !== '')
-                                    <p class="mt-0.5 truncate {{ ($node['mono'] ?? false) ? 'font-mono' : '' }} text-[11px] text-brand-mist">{{ $node['sub'] }}</p>
+                                    <p class="mt-0.5 truncate {{ ($node['mono'] ?? false) ? 'font-mono' : '' }} text-xs text-brand-mist">{{ $node['sub'] }}</p>
                                 @endif
                                 @if (($node['detail'] ?? null) !== null && $node['detail'] !== '')
-                                    <p class="mt-0.5 flex items-center gap-1 truncate text-[11px] font-medium text-amber-700">
+                                    <p class="mt-0.5 flex items-center gap-1 truncate text-xs font-medium text-amber-700">
                                         <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         <span class="truncate font-mono">{{ $node['detail'] }}</span>
                                     </p>

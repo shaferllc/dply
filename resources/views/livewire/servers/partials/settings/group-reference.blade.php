@@ -54,7 +54,7 @@
                         </form>
                     @else
                         @if ($note->pinned)
-                            <div class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">
+                            <div class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">
                                 <x-heroicon-s-bookmark class="h-3 w-3" aria-hidden="true" />
                                 {{ __('Pinned') }}
                             </div>

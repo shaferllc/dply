@@ -162,7 +162,7 @@
                         <button
                             type="button"
                             wire:click="openDisableModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
                         >
                             <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('End maintenance') }}
@@ -181,7 +181,7 @@
                     ['label' => __('Excluded'), 'value' => $summary['skipped'] ?? 0],
                 ] as $stat)
                     <div class="bg-white px-3 py-2">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
                         <p class="mt-0.5 font-mono text-sm font-semibold tabular-nums text-brand-ink">{{ number_format((int) $stat['value']) }}</p>
                     </div>
                 @endforeach
@@ -215,7 +215,7 @@
                 <div class="px-5 py-3 sm:px-6">
                     @if ($recurringWindow->enabled())
                         <p @class([
-                            'mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
+                            'mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1',
                             $recurringWindow->containsNow() ? $tonePalette['emerald'] : $tonePalette['mist'],
                         ])>
                             @if ($recurringWindow->containsNow())
@@ -332,7 +332,7 @@
                         <a
                             href="{{ route('servers.patches', $server) }}"
                             wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             {{ __('Patch advisor') }}
                         </a>
@@ -347,7 +347,7 @@
             @else
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                        <thead class="bg-brand-sand/20 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">
+                        <thead class="bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">
                             <tr>
                                 <th scope="col" class="px-6 py-3">{{ __('Site') }}</th>
                                 <th scope="col" class="px-4 py-3">{{ __('Hostname') }}</th>
@@ -363,7 +363,7 @@
                                     <td class="px-4 py-3.5 font-mono text-xs text-brand-moss">{{ $row['primary_hostname'] }}</td>
                                     <td class="px-4 py-3.5">
                                         <span @class([
-                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1',
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1',
                                             $statusTone($row['status']),
                                         ])>
                                             {{ $row['status_label'] }}
@@ -408,7 +408,7 @@
                         {{ __('Provisioning and SSH must be ready, and you need server-management permission, to run these operations.') }}
                     </p>
                 @elseif ($recurringWindow->enabled() && ! $recurringWindow->containsNow())
-                    <p class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                    <p class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">
                         <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Outside the preferred maintenance window — disruptive actions may be better scheduled.') }}
                     </p>
@@ -416,7 +416,7 @@
 
                 @foreach ($operationGroups as $group)
                     <div wire:key="maint-ops-{{ \Illuminate\Support\Str::slug($group['title']) }}">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __($group['title']) }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __($group['title']) }}</p>
                         <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
                             <table class="w-full table-auto text-xs">
                                 <tbody class="divide-y divide-brand-ink/10">
@@ -426,7 +426,7 @@
                                                 <div class="flex items-center gap-2">
                                                     <span class="font-semibold text-brand-ink">{{ $action['label'] }}</span>
                                                     @if ($action['danger'])
-                                                        <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
+                                                        <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
                                                     @endif
                                                 </div>
                                                 @if ($action['description'] !== '')
@@ -460,7 +460,7 @@
                      site recreate can shadow a live site's vhost and silently keep
                      it on the maintenance page — this removes them and reloads. --}}
                 <div wire:key="maint-ops-vhost-hygiene">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webserver hygiene') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webserver hygiene') }}</p>
                     <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
                         <table class="w-full table-auto text-xs">
                             <tbody class="divide-y divide-brand-ink/10">

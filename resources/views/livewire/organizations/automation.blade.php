@@ -41,16 +41,16 @@
                     <x-fleet-stat :label="__('API tokens')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $tokensCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('token|tokens', $tokensCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('token|tokens', $tokensCount) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('For CI & automation') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('For CI & automation') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Webhooks')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $enabledWebhooks }}</span>
-                            <span class="text-[11px] text-brand-moss">/ {{ $webhooksCount }} {{ __('active') }}</span>
+                            <span class="text-xs text-brand-moss">/ {{ $webhooksCount }} {{ __('active') }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Outbound destinations') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Outbound destinations') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat
                         :label="__('Deploy emails')"
@@ -67,7 +67,7 @@
                                 <span class="text-sm font-semibold text-brand-mist">{{ __('Off') }}</span>
                             @endif
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Deploy-finish mail') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Deploy-finish mail') }}</p>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -86,7 +86,7 @@
                         <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                     </div>
@@ -125,7 +125,7 @@
                         <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                     </div>
@@ -165,7 +165,7 @@
                         <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                     </div>
@@ -194,7 +194,7 @@
                         <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                     </div>
@@ -283,7 +283,7 @@
                             <li wire:key="org-api-token-{{ $apiToken->id }}" class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $apiToken->name }}</p>
-                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
                                         <span class="font-mono text-brand-mist">{{ $apiToken->token_prefix }}…</span>
                                         @if ($apiToken->last_used_at)
                                             <span class="text-brand-mist">·</span>
@@ -316,7 +316,7 @@
                         <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                     </div>
@@ -351,10 +351,10 @@
                     </div>
 
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Event subscriptions') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Event subscriptions') }}</p>
                         <div class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
                             <div>
-                                <p class="text-[11px] font-medium text-brand-moss">{{ __('Deploys') }}</p>
+                                <p class="text-xs font-medium text-brand-moss">{{ __('Deploys') }}</p>
                                 <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Success') }}</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Failed') }}</label>
@@ -363,14 +363,14 @@
                                 </div>
                             </div>
                             <div>
-                                <p class="text-[11px] font-medium text-brand-moss">{{ __('Uptime') }}</p>
+                                <p class="text-xs font-medium text-brand-moss">{{ __('Uptime') }}</p>
                                 <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_down" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor down') }}</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_recovered" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor recovered') }}</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_degraded" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor degraded') }}</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_ssl_expiring" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('SSL certificate expiring') }}</label>
                                 </div>
-                                <p class="mt-3 text-[11px] font-medium text-brand-moss">{{ __('Insights') }} <span class="text-brand-mist">{{ __('(org-wide only)') }}</span></p>
+                                <p class="mt-3 text-xs font-medium text-brand-moss">{{ __('Insights') }} <span class="text-brand-mist">{{ __('(org-wide only)') }}</span></p>
                                 <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Opened') }}</label>
                                     <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Resolved') }}</label>
@@ -409,9 +409,9 @@
                                 <div class="min-w-0 flex-1">
                                     <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $hook->name }}</span>
-                                        <span class="rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-moss">{{ $hook->driver }}</span>
+                                        <span class="rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-brand-moss">{{ $hook->driver }}</span>
                                         <span @class([
-                                            'inline-flex items-center gap-1 text-[11px] font-medium',
+                                            'inline-flex items-center gap-1 text-xs font-medium',
                                             'text-brand-forest' => $hook->enabled,
                                             'text-brand-mist' => ! $hook->enabled,
                                         ])>
@@ -424,7 +424,7 @@
                                         </span>
                                     </p>
                                     @if ($hook->site_id)
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Scoped to site #:id', ['id' => $hook->site_id]) }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-mist">{{ __('Scoped to site #:id', ['id' => $hook->site_id]) }}</p>
                                     @endif
                                 </div>
                                 <div class="flex shrink-0 items-center gap-3">

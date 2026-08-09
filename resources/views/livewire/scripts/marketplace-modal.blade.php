@@ -11,11 +11,11 @@
                         <x-heroicon-o-book-open class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script presets') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script presets') }}</p>
                         <div class="mt-0.5 flex items-center gap-2">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Add a script') }}</h2>
                             @if ($webserver !== '')
-                                <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ ucfirst($webserver) }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ ucfirst($webserver) }}</span>
                             @endif
                         </div>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Clone a starter into your organization’s scripts, then run it from Scripts or Server commands.') }}</p>

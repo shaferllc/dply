@@ -9,7 +9,7 @@
             <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Soft budgets') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Soft budgets') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Fairness thresholds per site') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Alert when a site exceeds its share of attributable CPU or memory. Routed through notification channels subscribed to Shared host alerts.') }}</p>
         </div>
@@ -42,7 +42,7 @@
 
             <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                    <thead class="bg-brand-sand/30 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-sage">
+                    <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-sage">
                         <tr>
                             <th class="px-4 py-3">{{ __('Site') }}</th>
                             <th class="px-4 py-3">{{ __('Max CPU share %') }}</th>

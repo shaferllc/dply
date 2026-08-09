@@ -18,7 +18,7 @@
         <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 sm:p-4">
             <div class="flex flex-wrap items-start justify-between gap-2">
                 <div class="min-w-0">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Use in code') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Use in code') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                         {{ __('Add :file (or middleware.ts at the repo root). Cron triggers run on that Worker after deploy — not in the dashboard alone.', ['file' => 'src/middleware.ts']) }}
                     </p>
@@ -53,10 +53,10 @@ export default {
 
         <div class="mt-5 flex flex-wrap items-baseline justify-between gap-2">
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Schedules') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Schedules') }}</p>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('UTC cron expressions. Applied on the next deploy.') }}</p>
             </div>
-            <span wire:loading.inline-flex wire:target="addCron,removeCron,confirmActionModal" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+            <span wire:loading.inline-flex wire:target="addCron,removeCron,confirmActionModal" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
                 <x-spinner size="sm" variant="muted" />
                 {{ __('Saving…') }}
             </span>
@@ -89,7 +89,7 @@ export default {
         @can('update', $site)
             <form wire:submit.prevent="addCron" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                 <div>
-                    <label for="new-schedule" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedule') }}</label>
+                    <label for="new-schedule" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedule') }}</label>
                     <input
                         id="new-schedule"
                         type="text"
@@ -101,7 +101,7 @@ export default {
                     @error('new_schedule') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label for="new-handler" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Handler') }}</label>
+                    <label for="new-handler" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Handler') }}</label>
                     <input
                         id="new-handler"
                         type="text"
@@ -123,7 +123,7 @@ export default {
             <span class="inline-flex items-center gap-2">
                 {{ __('Advanced') }}
                 @if ($repoCrons !== [])
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                         {{ count($repoCrons) }}
                     </span>
                 @endif
@@ -133,7 +133,7 @@ export default {
 
         <div class="space-y-4 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                 <a
                     href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
                     class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline"
@@ -152,7 +152,7 @@ export default {
                         </li>
                     @endforeach
                 </ul>
-                <p class="text-[11px] text-brand-mist">{{ __('Repo schedules are read-only here. Dashboard rows merge with them on deploy.') }}</p>
+                <p class="text-xs text-brand-mist">{{ __('Repo schedules are read-only here. Dashboard rows merge with them on deploy.') }}</p>
             @else
                 <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
             @endif
@@ -176,7 +176,7 @@ crons:
         focusable
     >
         <div class="shrink-0 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Use in code') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Use in code') }}</p>
             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Middleware cron handler') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">
                 {{ __('1) Commit middleware. 2) Add schedules above (or in dply.yaml). 3) Redeploy. Cloudflare invokes scheduled() on each match.') }}

@@ -10,7 +10,7 @@
                     <p class="mt-0.5 text-xs text-brand-moss">{{ __('Install, default, and uninstall language runtimes for the deploy user.') }}</p>
                 </div>
             </div>
-            <span class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 {{ $misePresent ? $tonePalette['sky'] : $tonePalette['mist'] }}">
+            <span class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 {{ $misePresent ? $tonePalette['sky'] : $tonePalette['mist'] }}">
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusBadgeDot($misePresent ? 'sky' : 'mist') }}"></span>
                 {{ $misePresent ? __('Installed') : __('Not detected') }}
             </span>
@@ -18,7 +18,7 @@
 
         <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
             <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
                 <dd class="mt-0.5 font-mono text-brand-ink">{{ $miseVersion ?? '—' }}</dd>
             </div>
             @if ($heroTool['docs_url'])
@@ -130,9 +130,9 @@
                                             <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition group-open:rotate-90" aria-hidden="true" />
                                             <span class="text-sm font-semibold text-brand-ink">{{ $catalog['label'] }}</span>
                                             @if ($active)
-                                                <span class="font-mono text-[11px] text-brand-moss">{{ $active }}</span>
+                                                <span class="font-mono text-xs text-brand-moss">{{ $active }}</span>
                                             @elseif ($hasVersions)
-                                                <span class="text-[11px] text-brand-mist">{{ trans_choice(':count version|:count versions', count($versions), ['count' => count($versions)]) }}</span>
+                                                <span class="text-xs text-brand-mist">{{ trans_choice(':count version|:count versions', count($versions), ['count' => count($versions)]) }}</span>
                                             @endif
                                         </div>
                                         @if ($isMiseBusy)
@@ -154,7 +154,7 @@
                                             <span>{{ __('mise: not installed.') }}</span>
                                         @endif
                                         @if ($systemPresent)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-medium text-brand-ink">
                                                 {{ __('system') }}: <span class="font-mono">{{ $systemVersion ?? '—' }}</span>
                                             </span>
                                         @endif
@@ -220,7 +220,7 @@
                                                         {{ __('Queuing…') }}
                                                     </span>
                                                 </button>
-                                                <button type="button" wire:click="loadMiseAvailableVersions('{{ $runtime }}')" class="text-[11px] text-brand-mist hover:text-brand-ink">
+                                                <button type="button" wire:click="loadMiseAvailableVersions('{{ $runtime }}')" class="text-xs text-brand-mist hover:text-brand-ink">
                                                     <x-heroicon-o-arrow-path class="h-3 w-3" aria-hidden="true" />
                                                 </button>
                                             </form>
@@ -243,19 +243,19 @@
                                                 @endphp
                                                 <span
                                                     @class([
-                                                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
                                                         'border-brand-forest/20 bg-brand-sage/15 text-brand-forest' => $isActive,
                                                         'border-brand-ink/15 bg-white text-brand-ink' => ! $isActive,
                                                     ])
                                                 >
                                                     <span class="font-mono">{{ $v }}</span>
                                                     @if ($isActive)
-                                                        <span class="text-[10px] uppercase tracking-wide opacity-80">{{ __('default') }}</span>
+                                                        <span class="text-2xs uppercase tracking-wide opacity-80">{{ __('default') }}</span>
                                                     @elseif ($opsReady && ! $isDeployer && ! $isMiseBusy)
                                                         <button
                                                             type="button"
                                                             wire:click="openConfirmActionModal('miseSetRuntimeDefault', ['{{ $runtime }}', @js($v)], @js(__('Set :v as default', ['v' => $v])), @js($confirmDefault), @js(__('Set :runtime default to :v', ['runtime' => $catalog['label'], 'v' => $v])), false)"
-                                                            class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink/70 hover:text-brand-ink"
+                                                            class="text-2xs font-semibold uppercase tracking-wide text-brand-ink/70 hover:text-brand-ink"
                                                         >
                                                             {{ __('set default') }}
                                                         </button>
@@ -296,7 +296,7 @@
                                                     {{ __('Uninstall') }}
                                                 </button>
                                                 @if ($active !== null)
-                                                    <p class="w-full text-[11px] text-brand-mist">{{ __('The global default cannot be uninstalled until you set a different default.') }}</p>
+                                                    <p class="w-full text-xs text-brand-mist">{{ __('The global default cannot be uninstalled until you set a different default.') }}</p>
                                                 @endif
                                             </form>
                                         @endif

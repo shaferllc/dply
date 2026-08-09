@@ -22,11 +22,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default API origin baked into hosted CLI tarballs (and install.sh)
+    | Fallback API origin for offline / non-HTTP pack builds
     |--------------------------------------------------------------------------
     |
-    | Falls back to APP_URL so local Valet/Herd installs default to dplyi.test
-    | when that is your APP_URL. Override with DPLY_CLI_DEFAULT_BASE_URL.
+    | Live /cli/install.sh and /cli/dply-cli.tgz bake the *request* origin
+    | (the host that was curled). This config is only used when building a
+    | package without a request (tests, artisan). Override with
+    | DPLY_CLI_DEFAULT_BASE_URL; otherwise APP_URL.
     |
     */
     'default_base_url' => rtrim((string) env('DPLY_CLI_DEFAULT_BASE_URL', env('APP_URL', 'https://dply.dev')), '/'),

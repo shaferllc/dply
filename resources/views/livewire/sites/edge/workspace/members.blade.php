@@ -18,7 +18,7 @@
     @can('manageMembers', $site)
         <form wire:submit="addMember" class="grid gap-3 border-b border-brand-ink/10 px-5 py-4 sm:grid-cols-[minmax(14rem,1fr)_10rem_auto] sm:items-end sm:px-6">
             <label class="block min-w-0">
-                <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Member') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Member') }}</span>
                 <select wire:model="member_user_id" class="mt-1.5 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900">
                     <option value="">{{ __('Select…') }}</option>
                     @foreach ($eligibleUsers as $user)
@@ -28,7 +28,7 @@
                 <x-input-error :messages="$errors->get('member_user_id')" class="mt-1" />
             </label>
             <label class="block">
-                <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Role') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Role') }}</span>
                 <select wire:model="member_role" class="mt-1.5 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900">
                     @foreach ($roleOptions as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>

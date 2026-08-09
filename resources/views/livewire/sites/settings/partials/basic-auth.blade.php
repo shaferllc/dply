@@ -64,7 +64,7 @@
                         <x-heroicon-o-x-circle class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</p>
                     </div>
-                    <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">{{ __('No gate — visitors reach the app directly.') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('No gate — visitors reach the app directly.') }}</p>
                 </button>
                 <button
                     type="button"
@@ -79,7 +79,7 @@
                         <x-heroicon-o-lock-closed class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('HTTP basic auth') }}</p>
                     </div>
-                    <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">{{ __('Browser popup, multiple users, optional path prefixes.') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Browser popup, multiple users, optional path prefixes.') }}</p>
                 </button>
                 <button
                     type="button"
@@ -96,7 +96,7 @@
                         <x-heroicon-o-key class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Password gate') }}</p>
                     </div>
-                    <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                         @if ($supportsFormGate)
                             {{ __('Styled login page + cookie — no browser basic-auth dialog.') }}
                         @else
@@ -126,7 +126,7 @@
                             type="button"
                             x-data=""
                             x-on:click.prevent="$dispatch('open-modal', 'add-form-gate-modal')"
-                            class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-sage"
+                            class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-sage"
                         >
                             <x-heroicon-m-plus class="h-3.5 w-3.5" />
                             {{ __('Add') }}
@@ -137,7 +137,7 @@
                                 wire:click="disableFormGatePassword"
                                 wire:loading.attr="disabled"
                                 wire:target="disableFormGatePassword"
-                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <x-heroicon-o-x-circle class="h-3.5 w-3.5" wire:loading.remove wire:target="disableFormGatePassword" />
                                 <x-spinner wire:loading wire:target="disableFormGatePassword" size="sm" />
@@ -169,7 +169,7 @@
                                             wire:click="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')" />
                                             <x-spinner wire:loading wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')" size="sm" />
@@ -227,7 +227,7 @@
                                                 @endif
                                             </p>
                                             @if (! empty($entry['user_agent']))
-                                                <p class="mt-0.5 truncate text-[11px] text-brand-mist">{{ $entry['user_agent'] }}</p>
+                                                <p class="mt-0.5 truncate text-xs text-brand-mist">{{ $entry['user_agent'] }}</p>
                                             @endif
                                         </div>
                                         <div class="flex shrink-0 items-center gap-2">
@@ -261,7 +261,7 @@
                             >
                                 <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4">
                                     <div>
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login detail') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login detail') }}</p>
                                         <p class="mt-0.5 text-base font-semibold text-brand-ink" x-text="selected?.label"></p>
                                     </div>
                                     <button type="button" @click="selected = null" class="rounded-lg p-1.5 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
@@ -273,7 +273,7 @@
                                         <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Time') }}</dt>
                                         <dd class="min-w-0 text-right text-xs text-brand-ink">
                                             <span x-text="selected?.at_human"></span>
-                                            <span class="block text-[10px] text-brand-mist" x-text="selected?.at_full"></span>
+                                            <span class="block text-2xs text-brand-mist" x-text="selected?.at_full"></span>
                                         </dd>
                                     </div>
                                     <template x-if="selected?.ip">
@@ -297,12 +297,12 @@
                                     <template x-if="selected?.credential_id">
                                         <div class="flex items-center justify-between gap-4 py-3">
                                             <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Credential ID') }}</dt>
-                                            <dd class="font-mono text-[10px] text-brand-mist" x-text="selected?.credential_id"></dd>
+                                            <dd class="font-mono text-2xs text-brand-mist" x-text="selected?.credential_id"></dd>
                                         </div>
                                     </template>
                                 </dl>
                                 <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3">
-                                    <p class="text-[11px] text-brand-moss">{{ __('Recorded on the server at the time of gate authentication.') }}</p>
+                                    <p class="text-xs text-brand-moss">{{ __('Recorded on the server at the time of gate authentication.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -393,7 +393,7 @@
                         wire:click="syncBasicAuthFromServer"
                         wire:loading.attr="disabled"
                         wire:target="syncBasicAuthFromServer"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                         title="{{ __('Scan the server for .htpasswd files inside this site\'s repo and import any users we don\'t already track.') }}"
                     >
                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="syncBasicAuthFromServer" />
@@ -406,7 +406,7 @@
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'add-basic-auth-modal')"
-                        class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                        class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                     >
                         <x-heroicon-o-plus class="h-3.5 w-3.5" />
                         {{ __('Add') }}
@@ -556,8 +556,8 @@
                                 <span x-show="copiedHeader" x-cloak>{{ __('Copied') }}</span>
                             </button>
                         </div>
-                        <p class="mt-1 break-all font-mono text-[11px] text-brand-moss" x-text="authHeader"></p>
-                        <p class="mt-1 text-[11px] text-brand-moss">
+                        <p class="mt-1 break-all font-mono text-xs text-brand-moss" x-text="authHeader"></p>
+                        <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Standard HTTP Basic auth — base64 of username:password. Drop into curl -H or a proxy config to verify the credential.') }}
                         </p>
                     </div>
@@ -654,7 +654,7 @@
                                     <x-heroicon-m-folder class="h-3.5 w-3.5 text-brand-moss" />
                                     <span class="font-mono font-semibold text-brand-ink">{{ $pathKey }}</span>
                                     @if ($pathKey === '/')
-                                        <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('whole site') }}</span>
+                                        <span class="rounded-full bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('whole site') }}</span>
                                     @endif
                                     <span class="text-brand-mist">·</span>
                                     <span class="text-brand-moss">{{ trans_choice('{1} :count user|[2,*] :count users', $usersForPath->count(), ['count' => $usersForPath->count()]) }}</span>
@@ -663,26 +663,26 @@
                                 {{-- Per-path test snippet: copy a curl one-liner. Keeps PASSWORD as
                                      a literal placeholder so we never put a secret in the DOM. --}}
                                 <details class="ml-auto" x-data="{ copied: false }">
-                                    <summary class="cursor-pointer list-none text-[11px] font-medium text-brand-sage hover:underline">
+                                    <summary class="cursor-pointer list-none text-xs font-medium text-brand-sage hover:underline">
                                         <span class="inline-flex items-center gap-1">
                                             <x-heroicon-m-command-line class="h-3 w-3" />
                                             {{ __('Test') }}
                                         </span>
                                     </summary>
                                     <div class="mt-2 w-full max-w-2xl rounded-lg border border-brand-ink/10 bg-brand-cream/60 p-3">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Verify with curl — replace PASSWORD with the credential') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Verify with curl — replace PASSWORD with the credential') }}</p>
                                         <div class="mt-1.5 flex items-start gap-2">
-                                            <code class="block flex-1 break-all font-mono text-[11px] leading-relaxed text-brand-ink">{{ $testCurl }}</code>
+                                            <code class="block flex-1 break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $testCurl }}</code>
                                             <button
                                                 type="button"
-                                                class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                                class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                                                 @click="navigator.clipboard.writeText(@js($testCurl)); copied = true; setTimeout(() => copied = false, 1800)"
                                             >
                                                 <span x-show="!copied">{{ __('Copy') }}</span>
                                                 <span x-show="copied" x-cloak class="text-emerald-700">{{ __('Copied') }}</span>
                                             </button>
                                         </div>
-                                        <p class="mt-2 text-[10px] text-brand-moss">{{ __('Expect 401 without credentials and 200 with the right user/password.') }}</p>
+                                        <p class="mt-2 text-2xs text-brand-moss">{{ __('Expect 401 without credentials and 200 with the right user/password.') }}</p>
                                     </div>
                                 </details>
                             </div>
@@ -699,7 +699,7 @@
                                                 <p class="flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
                                                     <span class="{{ $pending ? 'line-through' : '' }}">{{ $authUser->username }}</span>
                                                     @if ($pending)
-                                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/60">
+                                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/60">
                                                             <x-spinner variant="forest" size="sm" />
                                                             {{ __('Removing') }}
                                                         </span>
@@ -710,7 +710,7 @@
                                                              surprise file (something outside .dply/basic-auth) without
                                                              scrolling through SSH output. --}}
                                                         <span
-                                                            class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70"
+                                                            class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70"
                                                             title="{{ __('Imported from :path', ['path' => $authUser->source_file_path]) }}"
                                                         >
                                                             <x-heroicon-m-magnifying-glass class="h-3 w-3" />
@@ -722,7 +722,7 @@
                                                              entries get this chip until the operator rotates the password
                                                              (which regenerates a bcrypt hash). --}}
                                                         <span
-                                                            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70"
+                                                            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70"
                                                             title="{{ __('Caddy can only enforce bcrypt hashes — click Rotate to regenerate this credential.') }}"
                                                         >
                                                             <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
@@ -730,7 +730,7 @@
                                                         </span>
                                                     @endif
                                                 </p>
-                                                <p class="mt-0.5 text-[11px] text-brand-mist">
+                                                <p class="mt-0.5 text-xs text-brand-mist">
                                                     @if ($pending)
                                                         {{ __('Marked :time — drops at the end of the running webserver apply.', ['time' => $authUser->pending_removal_at?->diffForHumans() ?? '—']) }}
                                                     @elseif ($authUser->updated_at && $authUser->updated_at->ne($authUser->created_at))
@@ -740,7 +740,7 @@
                                                     @endif
                                                     @if ($authUser->isDiscoveredFromServer())
                                                         <span class="text-brand-mist/70">·</span>
-                                                        <span class="font-mono text-[10px] text-brand-mist">{{ $authUser->source_file_path }}</span>
+                                                        <span class="font-mono text-2xs text-brand-mist">{{ $authUser->source_file_path }}</span>
                                                     @endif
                                                 </p>
                                             </div>
@@ -760,7 +760,7 @@
                                                     host: @js($primaryHost),
                                                 })"
                                                 @disabled($pending)
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="{{ __('Generate a new password and reveal it once') }}"
                                             >
                                                 <x-heroicon-o-arrow-path class="h-4 w-4" />

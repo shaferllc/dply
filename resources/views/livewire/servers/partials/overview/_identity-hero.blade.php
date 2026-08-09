@@ -27,7 +27,7 @@
     // had — general-tab.blade.php literally describes its grid as mirroring
     // "the server hero facts card", so the two had drifted apart.
     $factCell = 'bg-white px-4 py-2.5 transition-colors hover:bg-brand-sand/[0.15] sm:px-5';
-    $factLabel = 'text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist';
+    $factLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
     $factValue = 'mt-1 truncate text-sm font-medium text-brand-ink';
 
     $heroFacts = [
@@ -125,12 +125,12 @@
                 <span class="{{ $factLabel }} mr-1">{{ __('Stack') }}</span>
                 @if ($installedStack->database)
                     <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
-                        {{ str($installedStack->database)->headline() }}@if ($installedStack->databaseVersion)<span class="ml-1 font-mono text-[11px] text-brand-moss">{{ $installedStack->databaseVersion }}</span>@endif
+                        {{ str($installedStack->database)->headline() }}@if ($installedStack->databaseVersion)<span class="ml-1 font-mono text-xs text-brand-moss">{{ $installedStack->databaseVersion }}</span>@endif
                     </span>
                 @endif
                 @if ($installedStack->phpVersion)
                     <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
-                        PHP <span class="ml-1 font-mono text-[11px] text-brand-moss">{{ $installedStack->phpVersion }}</span>
+                        PHP <span class="ml-1 font-mono text-xs text-brand-moss">{{ $installedStack->phpVersion }}</span>
                     </span>
                 @endif
                 @if ($installedStack->webserver)

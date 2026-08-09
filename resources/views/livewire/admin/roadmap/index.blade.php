@@ -13,7 +13,7 @@
             <x-server-workspace-tab :active="$tab === 'suggestions'" icon="heroicon-o-light-bulb" wire:click="setTab('suggestions')">
                 {{ __('Suggestions') }}
                 @if ($newSuggestionCount > 0)
-                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $newSuggestionCount }}</span>
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $newSuggestionCount }}</span>
                 @endif
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
@@ -65,7 +65,7 @@
                                         @if ($item->sourceSuggestions->isNotEmpty())
                                             <p class="mt-1 text-xs text-brand-sage">{{ __('From :count suggestion(s)', ['count' => $item->sourceSuggestions->count()]) }}</p>
                                         @endif
-                                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide">
+                                        <div class="mt-2 flex flex-wrap items-center gap-2 text-2xs font-semibold uppercase tracking-wide">
                                             @if ($item->areaLabel())
                                                 <span class="rounded-full bg-brand-sand/80 px-2 py-0.5 text-brand-moss">{{ $item->areaLabel() }}</span>
                                             @endif
@@ -143,11 +143,11 @@
     @else
         <div class="mb-6 flex flex-wrap items-end gap-3">
             <div class="min-w-[12rem] flex-1">
-                <label for="suggestion-search" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
+                <label for="suggestion-search" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
                 <input id="suggestion-search" type="search" wire:model.live.debounce.300ms="suggestionSearch" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm" placeholder="{{ __('Title, email, or name…') }}" />
             </div>
             <div class="min-w-[10rem]">
-                <label for="suggestion-status" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</label>
+                <label for="suggestion-status" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</label>
                 <select id="suggestion-status" wire:model.live="suggestionStatusFilter" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
                     <option value="">{{ __('All statuses') }}</option>
                     @foreach ($suggestionStatusLabels as $statusKey => $statusLabel)
@@ -175,7 +175,7 @@
                             <td class="px-3 py-2 font-medium text-brand-ink">
                                 {{ $suggestion->title }}
                                 @if ($suggestion->promotedRoadmapItem)
-                                    <p class="mt-1 text-[11px] font-normal text-brand-sage">{{ __('Promoted → :title', ['title' => $suggestion->promotedRoadmapItem->title]) }}</p>
+                                    <p class="mt-1 text-xs font-normal text-brand-sage">{{ __('Promoted → :title', ['title' => $suggestion->promotedRoadmapItem->title]) }}</p>
                                 @endif
                             </td>
                             <td class="px-3 py-2 text-brand-moss">
@@ -183,7 +183,7 @@
                             </td>
                             <td class="px-3 py-2">
                                 <span @class([
-                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                    'inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                     'bg-brand-rust/15 text-brand-rust' => $suggestion->status === \App\Models\RoadmapSuggestion::STATUS_NEW,
                                     'bg-brand-sage/15 text-brand-forest' => $suggestion->status === \App\Models\RoadmapSuggestion::STATUS_REVIEWED,
                                     'bg-brand-sand text-brand-moss' => $suggestion->status === \App\Models\RoadmapSuggestion::STATUS_DECLINED,
@@ -411,26 +411,26 @@
                     <div class="space-y-4 text-sm">
                         <dl class="divide-y divide-brand-ink/8 rounded-xl border border-brand-ink/10 bg-brand-sand/15">
                             <div class="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5">
-                                <dt class="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Title') }}</dt>
+                                <dt class="w-28 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Title') }}</dt>
                                 <dd class="min-w-0 flex-1 text-brand-ink">{{ $viewingSuggestion->title }}</dd>
                             </div>
                             <div class="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5">
-                                <dt class="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('From') }}</dt>
+                                <dt class="w-28 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('From') }}</dt>
                                 <dd class="min-w-0 flex-1 text-brand-ink">{{ $viewingSuggestion->name ?? '—' }} · {{ $viewingSuggestion->email }}</dd>
                             </div>
                             <div class="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5">
-                                <dt class="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</dt>
+                                <dt class="w-28 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</dt>
                                 <dd class="min-w-0 flex-1 text-brand-ink">{{ $viewingSuggestion->statusLabel() }}</dd>
                             </div>
                             @if ($viewingSuggestion->promotedRoadmapItem)
                                 <div class="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5">
-                                    <dt class="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Roadmap item') }}</dt>
+                                    <dt class="w-28 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Roadmap item') }}</dt>
                                     <dd class="min-w-0 flex-1 text-brand-ink">{{ $viewingSuggestion->promotedRoadmapItem->title }}</dd>
                                 </div>
                             @endif
                         </dl>
                         <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Description') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Description') }}</p>
                             <p class="mt-2 whitespace-pre-wrap leading-relaxed text-brand-moss">{{ $viewingSuggestion->description }}</p>
                         </div>
                         <div>

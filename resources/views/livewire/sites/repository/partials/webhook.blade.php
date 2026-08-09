@@ -36,7 +36,7 @@
                         @endif
                     </p>
                     @if ($connectionQuickDeploy && $isPoll)
-                        <p class="mt-1 text-[11px] text-brand-moss">
+                        <p class="mt-1 text-xs text-brand-moss">
                             @if ($pollCheckedLabel)
                                 {{ __('Last checked :when', ['when' => $pollCheckedLabel]) }}
                             @else
@@ -47,7 +47,7 @@
                             @endif
                         </p>
                     @elseif ($connectionQuickDeploy && $isWebhook)
-                        <p class="mt-1 text-[11px] text-brand-moss">
+                        <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Provider push hooks deploy this site automatically.') }}
                         </p>
                     @endif
@@ -118,15 +118,15 @@
 
             @if ($connectionDeployHookUrl)
                 <div class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webhook URL') }}</p>
-                    <p class="mt-1 break-all font-mono text-[11px] text-brand-moss">{{ $connectionDeployHookUrl }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webhook URL') }}</p>
+                    <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $connectionDeployHookUrl }}</p>
                 </div>
             @endif
 
             @if (! $connectionQuickDeploy || $isWebhook)
-                <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="text-[11px] leading-relaxed text-brand-mist" />
+                <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="text-xs leading-relaxed text-brand-mist" />
             @else
-                <p class="text-[11px] leading-relaxed text-brand-mist">
+                <p class="text-xs leading-relaxed text-brand-mist">
                     {{ __('Poll delivery uses your linked source-control account to read the deploy branch tip every couple of minutes. No inbound provider webhook is required.') }}
                 </p>
             @endif
@@ -147,7 +147,7 @@
                         {{ __('Other ways to trigger a deploy') }}
                     </span>
                 </summary>
-                <ul class="space-y-2 border-t border-brand-ink/10 px-3 py-2.5 text-[11px] leading-relaxed text-brand-moss">
+                <ul class="space-y-2 border-t border-brand-ink/10 px-3 py-2.5 text-xs leading-relaxed text-brand-moss">
                     <li>
                         <span class="font-semibold text-brand-ink">{{ __('CLI') }}</span>
                         — <code class="font-mono text-brand-ink">dply deploy --follow</code>

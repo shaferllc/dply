@@ -8,7 +8,7 @@
 
     <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div class="space-y-1.5">
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">
                 <x-heroicon-o-rocket-launch class="h-3 w-3" aria-hidden="true" />
                 {{ __('Deploy') }}
             </span>
@@ -75,15 +75,15 @@
             </div>
             <dl class="mt-4 grid gap-4 text-xs sm:grid-cols-3">
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created') }}</dt>
                     <dd class="mt-0.5 font-mono text-brand-ink">{{ $deployment['created_at'] ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Started') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Started') }}</dt>
                     <dd class="mt-0.5 font-mono text-brand-ink">{{ $deployment['started_at'] ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Finished') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Finished') }}</dt>
                     <dd class="mt-0.5 font-mono text-brand-ink">{{ $deployment['phase_last_updated_at'] ?? '—' }}</dd>
                 </div>
             </dl>
@@ -93,7 +93,7 @@
         @if ($steps !== [])
             <div class="dply-card mb-5 overflow-hidden">
                 <header class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-3.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Pipeline') }}</span>
+                    <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Pipeline') }}</span>
                 </header>
                 <ol class="divide-y divide-brand-ink/10">
                     @foreach ($steps as $step)
@@ -129,14 +129,14 @@
         @if ($services !== [] || $workers !== [] || $jobs !== [])
             <div class="dply-card mb-5 overflow-hidden">
                 <header class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-3.5">
-                    <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Components') }}</span>
+                    <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Components') }}</span>
                 </header>
                 <ul class="divide-y divide-brand-ink/10 text-sm">
                     @foreach (['services' => __('Service'), 'workers' => __('Worker'), 'jobs' => __('Job')] as $key => $label)
                         @foreach (${$key} as $component)
                             <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
                                 <div class="flex items-center gap-3 min-w-0">
-                                    <span class="rounded-full bg-brand-cream/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ $label }}</span>
+                                    <span class="rounded-full bg-brand-cream/70 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ $label }}</span>
                                     <span class="truncate font-medium text-brand-ink">{{ $component['name'] ?? '—' }}</span>
                                 </div>
                                 <span class="font-mono text-xs text-brand-mist">{{ $component['source_commit_hash'] ?? $component['source_image_digest'] ?? '—' }}</span>
@@ -149,10 +149,10 @@
 
         {{-- Raw payload (collapsed by default) --}}
         <details class="dply-card overflow-hidden">
-            <summary class="cursor-pointer border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-3.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+            <summary class="cursor-pointer border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-3.5 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
                 {{ __('Raw DO response') }}
             </summary>
-            <pre class="max-h-96 overflow-auto bg-slate-900 p-4 font-mono text-[10px] leading-5 text-slate-100">{{ json_encode($deployment, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+            <pre class="max-h-96 overflow-auto bg-slate-900 p-4 font-mono text-2xs leading-5 text-slate-100">{{ json_encode($deployment, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
         </details>
     @else
         <p class="text-sm text-brand-moss">{{ __('Loading deployment…') }}</p>

@@ -13,7 +13,7 @@
     <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-7">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fairness Advisor') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fairness Advisor') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What to do next') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss">{{ $advisor['summary'] ?? '' }}</p>
             </div>
@@ -35,7 +35,7 @@
 
     @if ($llmNarrative ?? null)
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('AI summary') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('AI summary') }}</p>
             <p class="mt-2 text-sm leading-relaxed text-brand-ink">{{ $llmNarrative }}</p>
         </div>
     @elseif ($llmRun?->isPending())
@@ -49,7 +49,7 @@
             <article class="rounded-2xl border p-4 ring-1 {{ $tone }}">
                 <div class="flex flex-wrap items-center gap-2">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ $recommendation['title'] }}</h3>
-                    <span class="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="rounded-full bg-white/80 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                         {{ $recommendation['confidence'] ?? 'medium' }}
                     </span>
                 </div>

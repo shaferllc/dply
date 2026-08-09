@@ -35,7 +35,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                <thead class="bg-brand-sand/20 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">
+                <thead class="bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">
                     <tr>
                         <th scope="col" class="px-4 py-2">{{ __('Source') }}</th>
                         <th scope="col" class="px-4 py-2">{{ __('Group') }}</th>
@@ -50,18 +50,18 @@
                             <td class="px-4 py-2">
                                 <div class="font-medium text-brand-ink">{{ $row['label'] }}</div>
                                 @if ($row['path'])
-                                    <div class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $row['path'] }}</div>
+                                    <div class="mt-0.5 font-mono text-xs text-brand-mist">{{ $row['path'] }}</div>
                                 @endif
                             </td>
                             <td class="px-4 py-2 text-brand-moss">{{ $row['group_label'] }}</td>
                             <td class="px-4 py-2 font-mono text-brand-moss">{{ $row['type'] }}</td>
                             <td class="px-4 py-2">
                                 @if ($row['active'])
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tonePalette['emerald'] }}">{{ __('Active') }}</span>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 {{ $tonePalette['emerald'] }}">{{ __('Active') }}</span>
                                 @elseif ($row['ssh_required'] && (! $opsReady || $isDeployer))
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('SSH blocked') }}</span>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('SSH blocked') }}</span>
                                 @else
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Available') }}</span>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Available') }}</span>
                                 @endif
                             </td>
                             <td class="px-4 py-2 text-right">

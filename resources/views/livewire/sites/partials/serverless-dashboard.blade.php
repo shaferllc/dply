@@ -38,7 +38,7 @@
             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Serverless') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Serverless') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('HTTP-triggered function on DigitalOcean Functions.') }}</p>
         </div>
@@ -102,7 +102,7 @@
                         default => 'bg-amber-100 text-amber-900',
                     };
                 @endphp
-                <span class="inline-flex items-center rounded-full {{ $dnsBadge }} px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]">{{ $dnsStatus }}</span>
+                <span class="inline-flex items-center rounded-full {{ $dnsBadge }} px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em]">{{ $dnsStatus }}</span>
                 <span class="ml-1">{{ __('DNS') }}</span>
                 @if ($customDomainCount > 0)
                     <span class="mx-1.5 text-brand-mist">·</span>
@@ -145,7 +145,7 @@
 <div class="dply-card mt-6 p-6 sm:p-8">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Cost estimate') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Cost estimate') }}</p>
             <h2 class="mt-1 text-lg font-bold text-brand-ink">≈ ${{ number_format($costEstimate['total'], 2) }}{{ __('/mo') }}</h2>
         </div>
     </div>

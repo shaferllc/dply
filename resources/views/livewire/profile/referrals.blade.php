@@ -50,36 +50,36 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Referred') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Referred') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $total }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('person|people', $total) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('person|people', $total) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Signed up with your link') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Signed up with your link') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $converted > 0,
                     'border-brand-ink/10 bg-white/80' => $converted === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Converted') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Converted') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $converted }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('reward|rewards', $converted) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('reward|rewards', $converted) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Reached Pro') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Reached Pro') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-amber-200 bg-amber-50' => $pending > 0,
                     'border-brand-ink/10 bg-white/80' => $pending === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pending') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pending') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $pending }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('upgrade|upgrades', $pending) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('upgrade|upgrades', $pending) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Awaiting Pro') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Awaiting Pro') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
@@ -96,7 +96,7 @@
                 </div>
             </div>
             <div class="px-5 py-5 sm:px-6">
-                <label for="referral-url" class="block text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('URL') }}</label>
+                <label for="referral-url" class="block text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('URL') }}</label>
                 <div class="mt-1 flex flex-col gap-3 sm:flex-row sm:items-stretch">
                     <input
                         id="referral-url"
@@ -135,7 +135,7 @@
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('People who signed up via your link. Rewards apply when their org upgrades to Pro.') }}</p>
                 </div>
                 @if ($total > 0)
-                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $total }}</span>
+                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $total }}</span>
                 @endif
             </div>
 
@@ -169,15 +169,15 @@
                             </span>
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-semibold text-brand-ink">{{ $ref->name }}</p>
-                                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $ref->email }}</p>
+                                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $ref->email }}</p>
                             </div>
                             @if ($converted)
-                                <span class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest" title="{{ __('Converted :date', ['date' => $ref->referral_converted_at->timezone($ref->timezone ?: config('app.timezone'))->toFormattedDateString()]) }}">
+                                <span class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest" title="{{ __('Converted :date', ['date' => $ref->referral_converted_at->timezone($ref->timezone ?: config('app.timezone'))->toFormattedDateString()]) }}">
                                     <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     {{ __('Reward eligible') }}
                                 </span>
                             @else
-                                <span class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                                <span class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">
                                     <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     {{ __('Pro pending') }}
                                 </span>

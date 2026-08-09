@@ -242,7 +242,7 @@
                                                 @else
                                                     <x-heroicon-o-arrow-trending-up class="h-4 w-4 text-brand-mist" />
                                                 @endif
-                                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $refLabel }}</span>
+                                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $refLabel }}</span>
                                                 <span class="font-mono text-sm text-brand-ink">{{ $branch !== '' ? $branch : __('—') }}</span>
                                             </div>
                                             <button
@@ -261,7 +261,7 @@
                                         @if ($refPickerOpen)
                                             <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
                                                 <div class="flex items-center justify-between gap-2 border-b border-brand-ink/10 px-3 py-2">
-                                                    <div class="inline-flex rounded-md border border-brand-ink/15 bg-brand-sand/20 p-0.5 text-[11px] font-semibold">
+                                                    <div class="inline-flex rounded-md border border-brand-ink/15 bg-brand-sand/20 p-0.5 text-xs font-semibold">
                                                         @foreach ([
                                                             'branches' => __('Branches'),
                                                             'tags' => __('Tags'),
@@ -334,11 +334,11 @@
                                                                         <div class="min-w-0 flex-1">
                                                                             <p class="truncate font-mono text-xs text-brand-ink">{{ $row['label'] ?? '' }}</p>
                                                                             @if (! empty($row['meta']))
-                                                                                <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $row['meta'] }}</p>
+                                                                                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $row['meta'] }}</p>
                                                                             @endif
                                                                         </div>
                                                                         @if (! empty($row['sha']))
-                                                                            <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ substr($row['sha'], 0, 7) }}</span>
+                                                                            <span class="shrink-0 font-mono text-2xs text-brand-mist">{{ substr($row['sha'], 0, 7) }}</span>
                                                                         @endif
                                                                     </button>
                                                                 </li>
@@ -533,7 +533,7 @@
                                         @endif
                                         <x-text-input id="origin_url" wire:model.live="form.origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.example.com" required />
                                         @if ($suggestedHybridOriginUrl !== '' && $form->origin_url === $suggestedHybridOriginUrl)
-                                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
+                                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-xs font-medium text-brand-forest dark:text-brand-sage">
                                                 <x-heroicon-o-sparkles class="h-4 w-4" />
                                                 {{ __('Auto-filled from Cloud app') }}
                                             </p>

@@ -87,7 +87,7 @@
                          tile-cards and reads as one decision rather than
                          three separate ones. --}}
                     <fieldset>
-                        <legend class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Timing') }}</legend>
+                        <legend class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Timing') }}</legend>
                         @php
                             $modes = [
                                 'now' => ['label' => __('Now'), 'icon' => 'heroicon-o-bolt'],
@@ -106,7 +106,7 @@
                                 </label>
                             @endforeach
                         </div>
-                        <p class="mt-2 text-[11px] text-brand-mist">
+                        <p class="mt-2 text-xs text-brand-mist">
                             @switch($removeMode)
                                 @case('in_30')
                                     {{ __('Removal runs in 30 minutes. Cancel anytime from the workspace before then.') }}
@@ -122,7 +122,7 @@
 
                     @if ($removeMode === 'scheduled')
                         <div class="space-y-2">
-                            <label for="scheduled-removal-date" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Removal date') }}</label>
+                            <label for="scheduled-removal-date" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Removal date') }}</label>
                             <input
                                 id="scheduled-removal-date"
                                 type="date"
@@ -131,9 +131,9 @@
                                 class="block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
                             />
                             <div class="flex flex-wrap gap-1.5">
-                                <button type="button" wire:click="applyRemovalDatePreset('tomorrow')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('Tomorrow') }}</button>
-                                <button type="button" wire:click="applyRemovalDatePreset('week')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('In a week') }}</button>
-                                <button type="button" wire:click="applyRemovalDatePreset('month')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('In a month') }}</button>
+                                <button type="button" wire:click="applyRemovalDatePreset('tomorrow')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('Tomorrow') }}</button>
+                                <button type="button" wire:click="applyRemovalDatePreset('week')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('In a week') }}</button>
+                                <button type="button" wire:click="applyRemovalDatePreset('month')" class="rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:border-red-200 hover:bg-red-50/50">{{ __('In a month') }}</button>
                             </div>
                             @error('scheduledRemovalDate')
                                 <p class="text-xs text-red-700">{{ $message }}</p>
@@ -145,7 +145,7 @@
                          single reassurance line when everything is clean. --}}
                     @if (is_array($summary))
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Impact') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Impact') }}</p>
                             @if ($impactItems === [])
                                 <div class="mt-2 inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-800">
                                     <x-heroicon-m-check-circle class="h-4 w-4" aria-hidden="true" />
@@ -162,7 +162,7 @@
                                         </li>
                                     @endforeach
                                 </ul>
-                                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Provider:') }} <span class="font-medium text-brand-moss">{{ $summary['provider_label'] }}</span></p>
+                                <p class="mt-2 text-xs text-brand-mist">{{ __('Provider:') }} <span class="font-medium text-brand-moss">{{ $summary['provider_label'] }}</span></p>
                             @endif
                         </div>
                     @endif
@@ -180,7 +180,7 @@
                          right value being a click away keeps the safeguard
                          from devolving into a wrong-server typo. --}}
                     <div class="space-y-2">
-                        <label for="delete-confirm-name" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                        <label for="delete-confirm-name" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                             {{ __('Type the server name to confirm') }}
                         </label>
                         <div class="flex items-center gap-2">
@@ -200,7 +200,7 @@
                                     </svg>
                                 </span>
                             </button>
-                            <span x-show="copied" x-cloak class="text-[11px] font-semibold text-emerald-700" aria-live="polite">{{ __('Copied — paste below') }}</span>
+                            <span x-show="copied" x-cloak class="text-xs font-semibold text-emerald-700" aria-live="polite">{{ __('Copied — paste below') }}</span>
                         </div>
                         <input
                             id="delete-confirm-name"

@@ -73,7 +73,7 @@
                         <button
                             type="button"
                             wire:click="jumpTo('/')"
-                            class="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 font-mono text-[11px] text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
+                            class="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
                         >
                             <x-spinner size="sm" class="h-3 w-3" wire:loading wire:target="jumpTo('/')" />
                             /
@@ -81,12 +81,12 @@
                         @foreach ($crumbs as $i => $crumb)
                             <span class="shrink-0 select-none text-brand-mist" aria-hidden="true">/</span>
                             @if ($i === count($crumbs) - 1)
-                                <span class="inline-flex h-5 max-w-[14rem] shrink-0 items-center truncate rounded bg-brand-ink/8 px-1.5 font-mono text-[11px] font-semibold text-brand-ink" aria-current="page">{{ $crumb['name'] }}</span>
+                                <span class="inline-flex h-5 max-w-[14rem] shrink-0 items-center truncate rounded bg-brand-ink/8 px-1.5 font-mono text-xs font-semibold text-brand-ink" aria-current="page">{{ $crumb['name'] }}</span>
                             @else
                                 <button
                                     type="button"
                                     wire:click="jumpTo('{{ $crumb['path'] }}')"
-                                    class="inline-flex h-5 max-w-[10rem] shrink-0 items-center gap-1 truncate rounded px-1.5 font-mono text-[11px] text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
+                                    class="inline-flex h-5 max-w-[10rem] shrink-0 items-center gap-1 truncate rounded px-1.5 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
                                 >
                                     <x-spinner size="sm" class="h-3 w-3" wire:loading wire:target="jumpTo('{{ $crumb['path'] }}')" />
                                     {{ $crumb['name'] }}
@@ -105,7 +105,7 @@
                                     wire:click="jumpTo('{{ $qj }}')"
                                     title="{{ __('Jump to :path', ['path' => $qj]) }}"
                                     @class([
-                                        'inline-flex h-6 items-center gap-1 rounded-md px-2 font-mono text-[11px] transition-colors',
+                                        'inline-flex h-6 items-center gap-1 rounded-md px-2 font-mono text-xs transition-colors',
                                         'bg-brand-ink/8 font-semibold text-brand-ink' => $path === $qj,
                                         'text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink' => $path !== $qj,
                                     ])
@@ -132,12 +132,12 @@
                             type="text"
                             wire:model.live.debounce.300ms="filter"
                             placeholder="{{ __('Filter… *.conf') }}"
-                            class="h-7 w-full rounded-lg border border-brand-ink/10 bg-white py-1 pe-2.5 ps-8 font-mono text-[11px] leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:outline-none focus:ring-1 focus:ring-brand-forest"
+                            class="h-7 w-full rounded-lg border border-brand-ink/10 bg-white py-1 pe-2.5 ps-8 font-mono text-xs leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:outline-none focus:ring-1 focus:ring-brand-forest"
                         >
                     </label>
 
                     <span @class([
-                        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 font-mono text-[11px] font-semibold shadow-sm',
+                        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 font-mono text-xs font-semibold shadow-sm',
                         'border-red-200 bg-red-50 text-red-700' => $viewAsRoot,
                         'border-brand-ink/10 bg-white text-brand-ink' => ! $viewAsRoot,
                     ])>
@@ -151,7 +151,7 @@
                             type="button"
                             wire:click="toggleViewAsRoot"
                             @class([
-                                'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold shadow-sm transition-colors',
+                                'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold shadow-sm transition-colors',
                                 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' => $viewAsRoot,
                                 'border-brand-ink/10 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $viewAsRoot,
                             ])
@@ -164,7 +164,7 @@
             </div>
 
             @if ($opsReady && $viewAsRoot)
-                <p class="mt-1 text-[11px] leading-snug text-red-700">
+                <p class="mt-1 text-xs leading-snug text-red-700">
                     {{ __('Browsing as root. Every toggle is recorded in the activity feed.') }}
                 </p>
             @endif
@@ -271,7 +271,7 @@
                                                 @if ($entryDownloadUrl)
                                                     <a
                                                         href="{{ $entryDownloadUrl }}"
-                                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
+                                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
                                                     >
                                                         <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0" />
                                                         {{ __('Download') }}
@@ -316,7 +316,7 @@
                     <div class="min-w-0">
                         <p class="break-all font-mono text-xs font-semibold text-brand-ink">{{ $viewingPath }}</p>
                         @if ($viewingMime)
-                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ $viewingMime }} · {{ number_format((int) $viewingSize) }} bytes</p>
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ $viewingMime }} · {{ number_format((int) $viewingSize) }} bytes</p>
                         @endif
                     </div>
                     <button type="button" wire:click="closeFileModal" class="shrink-0 text-xs font-semibold text-brand-moss hover:underline">{{ __('Close') }}</button>
@@ -337,7 +337,7 @@
                         {{ __('Binary file — preview unavailable. Use Download.') }}
                     </div>
                 @else
-                    <pre class="max-h-[65vh] overflow-auto rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3 text-[11px] leading-relaxed text-brand-ink"><code>{{ $viewingContent }}</code></pre>
+                    <pre class="max-h-[65vh] overflow-auto rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3 text-xs leading-relaxed text-brand-ink"><code>{{ $viewingContent }}</code></pre>
                 @endif
             </div>
         </x-modal>

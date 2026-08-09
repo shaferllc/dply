@@ -14,24 +14,24 @@
         <span class="text-sm font-semibold text-brand-ink">{{ $t['label'] }}</span>
     </div>
     @if ($attached)
-        <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
     @else
-        <span class="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-semibold text-brand-moss group-hover:text-brand-forest">
+        <span class="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand-moss group-hover:text-brand-forest">
             <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add') }}
         </span>
     @endif
 </div>
 
 @if ($attached && $envKeys !== [])
-    <p class="truncate font-mono text-[10px] text-brand-mist" title="{{ implode(', ', $envKeys) }}">
+    <p class="truncate font-mono text-2xs text-brand-mist" title="{{ implode(', ', $envKeys) }}">
         {{ collect($envKeys)->take(4)->implode(' · ') }}{{ count($envKeys) > 4 ? ' …' : '' }}
     </p>
 @elseif (! $attached)
-    <p class="text-[11px] leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
+    <p class="text-xs leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
 @endif
 
 @if ($needsRedis)
-    <p class="inline-flex w-fit items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+    <p class="inline-flex w-fit items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
         <x-heroicon-o-exclamation-triangle class="h-3 w-3" /> {{ __('needs Redis') }}
     </p>
 @endif

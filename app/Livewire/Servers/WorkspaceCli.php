@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
+use App\Support\Cli\DplyCliCommandCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -33,8 +34,13 @@ class WorkspaceCli extends Component
 
     public function render(): View
     {
+        $catalog = DplyCliCommandCatalog::forServer($this->server->id);
+
         return view('livewire.servers.workspace-cli', [
             'server' => $this->server,
+            'cliGroups' => $catalog['groups'],
+            'cliEntries' => $catalog['entries'],
+            'cliTotal' => $catalog['total'],
         ]);
     }
 }

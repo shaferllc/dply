@@ -39,36 +39,36 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hosts') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hosts') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $providersWithAny }}</span>
-                        <span class="text-[11px] text-brand-moss">/ {{ count($providers) }} {{ __('linked') }}</span>
+                        <span class="text-xs text-brand-moss">/ {{ count($providers) }} {{ __('linked') }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('GitHub, GitLab, Bitbucket') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('GitHub, GitLab, Bitbucket') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $totalOAuth > 0,
                     'border-brand-ink/10 bg-white/80' => $totalOAuth === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('OAuth') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('OAuth') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalOAuth }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('account|accounts', $totalOAuth) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('account|accounts', $totalOAuth) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Browser sign-in flow') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Browser sign-in flow') }}</p>
                 </div>
                 <div @class([
                     'rounded-xl border px-4 py-3',
                     'border-violet-200 bg-violet-50' => $totalPats > 0,
                     'border-brand-ink/10 bg-white/80' => $totalPats === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalPats }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('PAT|PATs', $totalPats) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('PAT|PATs', $totalPats) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Self-hosted + machine users') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Self-hosted + machine users') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
@@ -122,7 +122,7 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link an OAuth account or paste a personal access token for self-hosted hosts and machine-user workflows.') }}</p>
                     </div>
                     @if ($hasAny)
-                        <span class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                        <span class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
                             <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                             {{ $providerLinkedCount }}
                         </span>
@@ -155,7 +155,7 @@
                     <div class="space-y-4 border-t border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6">
                         <div>
                             <p class="text-sm font-semibold text-brand-ink">{{ __('Add a :name personal access token', ['name' => $provider['name']]) }}</p>
-                            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                                 @if ($provider['id'] === 'github')
                                     {{ __('Classic PATs need repo and admin:repo_hook scopes. Fine-grained tokens need Contents (Read), Metadata (Read), and Webhooks (Read & Write) for the target repositories.') }}
                                 @elseif ($provider['id'] === 'gitlab')
@@ -189,7 +189,7 @@
                                     placeholder="{{ $provider['id'] === 'github' ? 'https://github.example.com/api/v3' : 'https://gitlab.example.com' }}"
                                 />
                                 @error('patApiBaseUrl') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Leave blank for the public :host host.', ['host' => $provider['host']]) }}</p>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank for the public :host host.', ['host' => $provider['host']]) }}</p>
                             </div>
                         @endif
 
@@ -217,15 +217,15 @@
                             <li wire:key="sc-oauth-{{ $account->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                        <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('OAuth') }}</span>
+                                        <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('OAuth') }}</span>
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $account->nickname ?? '—' }}</span>
                                         @if ($editingId === (string) $account->id)
                                             <x-text-input wire:model="editLabel" class="block w-full max-w-xs text-xs" placeholder="{{ __('Label (optional)') }}" />
                                         @elseif ($account->label)
-                                            <span class="inline-flex items-center rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-medium text-brand-moss">{{ $account->label }}</span>
+                                            <span class="inline-flex items-center rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-medium text-brand-moss">{{ $account->label }}</span>
                                         @endif
                                     </div>
-                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                         <span>{{ __('Added :time', ['time' => $account->created_at?->diffForHumans() ?? '—']) }}</span>
                                         {{-- Health stamped by the daily credential check — OAuth
                                              tokens die exactly like PATs; the fix is a reconnect. --}}
@@ -258,7 +258,7 @@
                                             <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Unlink') }}
                                         </button>
@@ -271,15 +271,15 @@
                             <li wire:key="sc-pat-{{ $pat->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                        <span class="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">{{ __('PAT') }}</span>
+                                        <span class="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-700">{{ __('PAT') }}</span>
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $pat->nickname ?? '—' }}</span>
                                         @if ($editingPatId === (string) $pat->id)
                                             <x-text-input wire:model="editPatLabel" class="block w-full max-w-xs text-xs" placeholder="{{ __('Label (optional)') }}" />
                                         @elseif ($pat->label)
-                                            <span class="inline-flex items-center rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-medium text-brand-moss">{{ $pat->label }}</span>
+                                            <span class="inline-flex items-center rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-medium text-brand-moss">{{ $pat->label }}</span>
                                         @endif
                                     </div>
-                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                         <span>{{ __('Added :time', ['time' => $pat->created_at?->diffForHumans() ?? '—']) }}</span>
                                         @if ($pat->validation_error)
                                             <span class="text-brand-mist">·</span>
@@ -319,9 +319,9 @@
                                     @if ($editingPatId === (string) $pat->id)
                                         <div class="mt-2 max-w-md space-y-1">
                                             <x-text-input wire:model="editPatToken" type="password" autocomplete="off" class="block w-full text-xs font-mono" placeholder="{{ __('Paste a new token to replace the stored one (optional)') }}" />
-                                            <p class="text-[11px] text-brand-mist">{{ __('Replacing here keeps every site that uses this token working — no re-linking needed.') }}</p>
+                                            <p class="text-xs text-brand-mist">{{ __('Replacing here keeps every site that uses this token working — no re-linking needed.') }}</p>
                                             @error('editPatToken')
-                                                <p class="text-[11px] font-medium text-rose-600">{{ $message }}</p>
+                                                <p class="text-xs font-medium text-rose-600">{{ $message }}</p>
                                             @enderror
                                         </div>
                                     @endif
@@ -349,7 +349,7 @@
                                             <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Remove') }}
                                         </button>

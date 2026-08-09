@@ -85,7 +85,7 @@
                             <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Deploy console') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Deploy console') }}</p>
                             <h2 id="deploy-console-title" class="mt-0.5 truncate text-lg font-semibold tracking-tight text-brand-ink">
                                 @if ($this->watchedInProgress)
                                     {{ trans_choice('Deploying :n site|Deploying :n sites', $watchedCount, ['n' => $watchedCount]) }}
@@ -127,7 +127,7 @@
 
                 @if (is_array($focusRow) && ($focusRow['server'] || $focusRow['branch'] || $focusRow['short_sha'] || ($focusRow['in_progress'] ?? false)))
                     <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-3.5 py-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
                             @if ($focusRow['in_progress'] ?? false)
                                 {{ __('Deploying now') }}
                             @else
@@ -137,7 +137,7 @@
                         <dl class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             @if ($focusRow['server'] || ($focusRow['name'] ?? null))
                                 <div class="min-w-0">
-                                    <dt class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Server') }}</dt>
+                                    <dt class="text-2xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Server') }}</dt>
                                     <dd class="mt-0.5 truncate text-xs font-semibold text-brand-ink">
                                         {{ $focusRow['server'] ?? '—' }}
                                         @if ($focusRow['server_ip'] ?? null)
@@ -145,14 +145,14 @@
                                         @endif
                                     </dd>
                                     @if ($watchedCount > 1 && ($focusRow['name'] ?? null))
-                                        <dd class="mt-0.5 truncate text-[11px] text-brand-moss">{{ __('Site: :name', ['name' => $focusRow['name']]) }}</dd>
+                                        <dd class="mt-0.5 truncate text-xs text-brand-moss">{{ __('Site: :name', ['name' => $focusRow['name']]) }}</dd>
                                     @elseif ($watchedCount === 1 && ($focusRow['name'] ?? null) && ($focusRow['server'] ?? null) !== ($focusRow['name'] ?? null))
-                                        <dd class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $focusRow['name'] }}</dd>
+                                        <dd class="mt-0.5 truncate text-xs text-brand-moss">{{ $focusRow['name'] }}</dd>
                                     @endif
                                 </div>
                             @endif
                             <div class="min-w-0">
-                                <dt class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Branch & commit') }}</dt>
+                                <dt class="text-2xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Branch & commit') }}</dt>
                                 <dd class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-ink">
                                     @if ($focusRow['branch'] ?? null)
                                         <span class="inline-flex items-center gap-1 font-mono font-semibold">
@@ -207,7 +207,7 @@
                         <button
                             type="button"
                             wire:click="showRecent"
-                            class="text-[11px] font-semibold text-brand-forest hover:underline"
+                            class="text-xs font-semibold text-brand-forest hover:underline"
                         >
                             {{ __('View active & recent') }}
                         </button>
@@ -232,7 +232,7 @@
             </div>
 
             <footer class="shrink-0 border-t border-brand-ink/10 bg-white px-5 py-3 sm:px-6">
-                <div class="flex items-center justify-between gap-3 text-[11px] text-brand-moss">
+                <div class="flex items-center justify-between gap-3 text-xs text-brand-moss">
                     <div class="flex min-w-0 items-center gap-3">
                         @if ($this->watchedInProgress)
                             <span class="inline-flex items-center gap-1.5 font-medium text-brand-ink">

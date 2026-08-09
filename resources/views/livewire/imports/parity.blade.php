@@ -184,7 +184,7 @@
                                     <li class="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50/60 px-3 py-1.5">
                                         <span class="font-mono text-xs text-amber-900">{{ $added['domain'] ?? '—' }}</span>
                                         @if (! empty($added['site_type']))
-                                            <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">{{ $added['site_type'] }}</span>
+                                            <span class="rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">{{ $added['site_type'] }}</span>
                                         @endif
                                     </li>
                                 @endforeach

@@ -21,7 +21,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-3 py-2 sm:px-5">{{ __('Project') }}</th>
                         <th class="px-3 py-2">{{ __('Status') }}</th>
@@ -40,20 +40,20 @@
                             <td class="px-3 py-2 sm:px-5">
                                 <div class="font-mono text-xs text-brand-ink">{{ $project }}</div>
                                 @if ($linkedSite)
-                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline">
                                         <x-heroicon-o-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('Site: :name', ['name' => $linkedSite['name']]) }}
                                     </a>
                                 @endif
                             </td>
                             <td class="px-3 py-2 text-brand-moss">{{ $row['status'] }}</td>
-                            <td class="max-w-md truncate px-4 py-3 font-mono text-[11px] text-brand-moss" title="{{ $config }}">{{ $config }}</td>
+                            <td class="max-w-md truncate px-4 py-3 font-mono text-xs text-brand-moss" title="{{ $config }}">{{ $config }}</td>
                             <td class="px-3 py-2 text-right">
                                 <div class="inline-flex flex-wrap justify-end gap-1.5">
-                                    <button type="button" wire:click="openComposeLogs(@js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
-                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_up', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Up') }}</button>
-                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_restart', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Restart') }}</button>
-                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_down', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold text-rose-800 transition hover:bg-rose-100">{{ __('Down') }}</button>
+                                    <button type="button" wire:click="openComposeLogs(@js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_up', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Up') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_restart', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Restart') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_down', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100">{{ __('Down') }}</button>
                                 </div>
                             </td>
                         </tr>

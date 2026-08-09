@@ -59,7 +59,7 @@
                         wire:loading.attr="disabled"
                         wire:target="{{ $caddyModulesBusyTargets }}"
                         @disabled($isDeployer || $actionInFlight)
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                         {{ __('Add plugin') }}
@@ -69,7 +69,7 @@
                         wire:click="refreshCaddyModulesInventory"
                         wire:loading.attr="disabled"
                         wire:target="{{ $caddyModulesBusyTargets }}"
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex">
                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
@@ -193,12 +193,12 @@
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <p class="font-medium text-brand-ink">{{ $plugin['label'] }}</p>
                                                 @if ($plugin['compiled'] ?? false)
-                                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 ring-1 ring-emerald-200">{{ __('Compiled') }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-800 ring-1 ring-emerald-200">{{ __('Compiled') }}</span>
                                                 @elseif ($caddy_modules_loaded)
-                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">{{ __('Pending rebuild') }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-900 ring-1 ring-amber-200">{{ __('Pending rebuild') }}</span>
                                                 @endif
                                             </div>
-                                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss">
+                                            <p class="mt-0.5 font-mono text-xs text-brand-moss">
                                                 {{ $plugin['path'] }}{{ ($plugin['version'] ?? '') !== '' ? '@'.$plugin['version'] : '' }}
                                             </p>
                                             @if (($plugin['description'] ?? '') !== '')
@@ -206,17 +206,17 @@
                                             @endif
                                             @if (($plugin['module_ids'] ?? []) !== [])
                                                 <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Module IDs') }}</span>
+                                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Module IDs') }}</span>
                                                     @foreach (array_slice($plugin['module_ids'], 0, 4) as $moduleId)
-                                                        <span class="inline-flex rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[10px] text-brand-ink ring-1 ring-brand-ink/10">{{ $moduleId }}</span>
+                                                        <span class="inline-flex rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-2xs text-brand-ink ring-1 ring-brand-ink/10">{{ $moduleId }}</span>
                                                     @endforeach
                                                     @if (count($plugin['module_ids']) > 4)
-                                                        <span class="text-[10px] text-brand-mist">{{ __('+:count more', ['count' => count($plugin['module_ids']) - 4]) }}</span>
+                                                        <span class="text-2xs text-brand-mist">{{ __('+:count more', ['count' => count($plugin['module_ids']) - 4]) }}</span>
                                                     @endif
                                                 </div>
                                             @endif
                                             @if (($plugin['repo'] ?? '') !== '' || ($plugin['docs_url'] ?? '') !== '')
-                                                <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                                                <div class="mt-2 flex flex-wrap items-center gap-3 text-xs">
                                                     @if (($plugin['repo'] ?? '') !== '')
                                                         <a href="{{ $plugin['repo'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-medium text-brand-forest underline-offset-2 hover:underline">
                                                             <x-heroicon-o-code-bracket-square class="h-4 w-4" aria-hidden="true" />
@@ -238,7 +238,7 @@
                                             wire:loading.attr="disabled"
                                             wire:target="{{ $caddyModulesBusyTargets }}"
                                             @disabled($isDeployer || $actionInFlight || $caddyModulesBuilding)
-                                            class="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50/40 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            class="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50/40 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
@@ -300,7 +300,7 @@
                                     wire:target="{{ $caddyModulesBusyTargets }}"
                                     @disabled($isDeployer || $actionInFlight || $caddyModulesBuilding)
                                     title="{{ $catalogMeta['description'] ?? '' }}"
-                                    class="inline-flex items-center gap-1 rounded-full border border-brand-ink/15 bg-white px-3 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex items-center gap-1 rounded-full border border-brand-ink/15 bg-white px-3 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <x-heroicon-o-plus class="h-3 w-3" />
                                     {{ $catalogMeta['label'] ?? $catalogPath }}
@@ -377,23 +377,23 @@
                                         @endif
                                     </p>
                                 @else
-                                    <p class="text-[11px] text-brand-mist">{{ __(':count module package(s) available to add', ['count' => count($caddy_modules_browse_packages)]) }}</p>
+                                    <p class="text-xs text-brand-mist">{{ __(':count module package(s) available to add', ['count' => count($caddy_modules_browse_packages)]) }}</p>
                                     <ul class="max-h-96 divide-y divide-brand-ink/10 overflow-auto rounded-lg border border-brand-ink/10 bg-white">
                                         @foreach ($caddy_modules_browse_packages as $browsePackage)
                                             <li class="flex flex-wrap items-start justify-between gap-3 px-4 py-3" wire:key="caddy-browse-{{ md5($browsePackage['path']) }}">
                                                 <div class="min-w-0 flex-1">
                                                     <p class="font-medium text-brand-ink">{{ $browsePackage['label'] }}</p>
-                                                    <p class="mt-0.5 font-mono text-[11px] text-brand-moss">{{ $browsePackage['path'] }}</p>
+                                                    <p class="mt-0.5 font-mono text-xs text-brand-moss">{{ $browsePackage['path'] }}</p>
                                                     @if ($browsePackage['description'] !== '')
                                                         <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $browsePackage['description'] }}</p>
                                                     @endif
                                                     @if (($browsePackage['module_ids'] ?? []) !== [])
-                                                        <p class="mt-1 text-[10px] text-brand-mist">{{ __('Module IDs: :ids', ['ids' => implode(', ', array_slice($browsePackage['module_ids'], 0, 3)).(count($browsePackage['module_ids']) > 3 ? '…' : '')]) }}</p>
+                                                        <p class="mt-1 text-2xs text-brand-mist">{{ __('Module IDs: :ids', ['ids' => implode(', ', array_slice($browsePackage['module_ids'], 0, 3)).(count($browsePackage['module_ids']) > 3 ? '…' : '')]) }}</p>
                                                     @endif
                                                 </div>
                                                 <div class="flex shrink-0 flex-col items-end gap-1.5">
                                                     @if ($browsePackage['repo'] !== '')
-                                                        <a href="{{ $browsePackage['repo'] }}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-medium text-brand-forest underline-offset-2 hover:underline">{{ __('Repo') }}</a>
+                                                        <a href="{{ $browsePackage['repo'] }}" target="_blank" rel="noopener noreferrer" class="text-2xs font-medium text-brand-forest underline-offset-2 hover:underline">{{ __('Repo') }}</a>
                                                     @endif
                                                     <button
                                                         type="button"
@@ -401,7 +401,7 @@
                                                         wire:loading.attr="disabled"
                                                         wire:target="{{ $caddyModulesBusyTargets }}"
                                                         @disabled($isDeployer || $actionInFlight || $caddyModulesBuilding)
-                                                        class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                                     >
                                                         <x-heroicon-o-plus class="h-3 w-3" />
                                                         {{ __('Review & add') }}
@@ -444,7 +444,7 @@
                                     type="button"
                                     wire:click="setCaddyModulesFilter('{{ $filterKey }}')"
                                     @class([
-                                        'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition',
+                                        'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition',
                                         'border-brand-forest bg-brand-forest text-brand-cream' => $caddy_modules_filter === $filterKey,
                                         'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $caddy_modules_filter !== $filterKey,
                                     ])
@@ -496,7 +496,7 @@
                                             {{ __('No module IDs contain “:query”. Try a shorter search term or clear the filter.', ['query' => $compiledSearch]) }}
                                         @endif
                                     </p>
-                                    <p class="mt-3 text-[11px] tabular-nums text-brand-mist">
+                                    <p class="mt-3 text-xs tabular-nums text-brand-mist">
                                         {{ __('Showing 0 of :total module IDs', ['total' => $compiledTotal]) }}
                                     </p>
                                     @if ($compiledFiltersActive)

@@ -45,7 +45,7 @@
                 <span class="inline-flex items-center gap-2">
                     {{ __('From :file', ['file' => $sourcePath]) }}
                     @if ($hasRepoEnv)
-                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                             {{ count($repoPublic) + count($repoSecret) }}
                         </span>
                     @endif
@@ -60,7 +60,7 @@
                     </p>
                     <a
                         href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                        class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
                         {{ __('Generate :file', ['file' => $sourcePath]) }}
@@ -71,7 +71,7 @@
                     <div class="space-y-3">
                         @if ($repoPublic !== [])
                             <div>
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Public') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Public') }}</p>
                                 <ul class="mt-1.5 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
                                     @foreach ($repoPublic as $name => $value)
                                         <li class="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 font-mono text-xs">
@@ -85,16 +85,16 @@
 
                         @if ($repoSecret !== [])
                             <div>
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Secret names') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Secret names') }}</p>
                                 <ul class="mt-1.5 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
                                     @foreach ($repoSecret as $name)
                                         @php $isMissing = in_array($name, $missingSecrets, true); @endphp
                                         <li class="flex flex-wrap items-center gap-2 px-3 py-2 font-mono text-xs">
                                             <span class="{{ $isMissing ? 'text-rose-700' : 'text-brand-ink' }}">{{ $name }}</span>
                                             @if ($isMissing)
-                                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-900">{{ __('Missing') }}</span>
+                                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-900">{{ __('Missing') }}</span>
                                             @else
-                                                <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ __('Set') }}</span>
+                                                <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ __('Set') }}</span>
                                             @endif
                                         </li>
                                     @endforeach

@@ -36,12 +36,12 @@
         </h2>
 
         @if (filled($count))
-            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $count }}</span>
+            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $count }}</span>
         @endif
 
         @if (filled($note))
             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-            <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ $note }}">{{ $note }}</p>
+            <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ $note }}">{{ $note }}</p>
         @endif
 
         {{-- ml-auto so actions stay right-aligned when there's no note; with a
@@ -63,7 +63,7 @@
                 <x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0 {{ $toneIcon }}" aria-hidden="true" />
                 <h2 @if ($titleId) id="{{ $titleId }}" @endif class="text-sm font-semibold text-brand-ink">{{ $title }}</h2>
                 @if (filled($count))
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
                         {{ $count }}
                     </span>

@@ -191,7 +191,7 @@
                                 @else
                                     <div class="max-h-96 overflow-y-auto rounded-xl border border-brand-ink/10">
                                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                                            <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                                            <thead class="sticky top-0 bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                                                 <tr>
                                                     <th class="w-10 px-3 py-2"><span class="sr-only">{{ __('Select') }}</span></th>
                                                     <th class="px-3 py-2 font-semibold">{{ __('Action') }}</th>
@@ -225,11 +225,11 @@
                                                         <td class="max-w-[12rem] truncate px-3 py-2 font-mono text-xs" title="{{ $row['source'] ?? '' }}">{{ $row['source'] ?? '—' }}</td>
                                                         <td class="px-3 py-2 text-xs">
                                                             @if (! $row['importable'])
-                                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-brand-moss" title="{{ $row['raw'] }}">{{ __('Skipped (unparsed)') }}</span>
+                                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs uppercase tracking-wide text-brand-moss" title="{{ $row['raw'] }}">{{ __('Skipped (unparsed)') }}</span>
                                                             @elseif ($row['already_in_panel'])
-                                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('Already in panel') }}</span>
+                                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('Already in panel') }}</span>
                                                             @else
-                                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">{{ __('New') }}</span>
+                                                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">{{ __('New') }}</span>
                                                             @endif
                                                         </td>
                                                     </tr>

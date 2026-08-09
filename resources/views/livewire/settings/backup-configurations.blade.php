@@ -44,14 +44,14 @@
         icon="heroicon-o-cloud-arrow-up"
     >
         <x-slot:actions>
-            <a href="{{ route('backups.databases') }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+            <a href="{{ route('backups.databases') }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                 {{ __('Backups hub') }}
             </a>
             @if ($showShellAdd)
                 <button
                     type="button"
                     wire:click="openCreateModal"
-                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
+                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Add destination') }}
@@ -62,15 +62,15 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-px bg-brand-ink/5">
                 <div class="bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destinations') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destinations') }}</dt>
                     <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalConfigs }}</dd>
                 </div>
                 <div class="bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
-                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $providersInUse }} <span class="text-[11px] font-normal text-brand-mist">/ {{ $allProviders }}</span></dd>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
+                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $providersInUse }} <span class="text-xs font-normal text-brand-mist">/ {{ $allProviders }}</span></dd>
                 </div>
                 <div class="bg-white px-3 py-2">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
                     <dd class="mt-0.5 truncate text-sm font-semibold text-brand-ink" title="{{ $organization?->name ?? __('Personal') }}">{{ $organization?->name ?? __('Personal') }}</dd>
                 </div>
             </dl>
@@ -191,22 +191,22 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                 <span class="truncate text-sm font-semibold text-brand-ink">{{ $row->name }}</span>
-                                <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $badgeClasses }}">{{ $providerLabel }}</span>
+                                <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $badgeClasses }}">{{ $providerLabel }}</span>
                                 @if ($isEditing)
-                                    <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">
                                         <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
                                         {{ __('Editing') }}
                                     </span>
                                 @endif
                             </div>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Added :time', ['time' => $row->created_at?->diffForHumans() ?? '—']) }}</p>
+                            <p class="mt-0.5 text-xs text-brand-mist">{{ __('Added :time', ['time' => $row->created_at?->diffForHumans() ?? '—']) }}</p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
                             <button type="button" wire:click="startEdit('{{ $row->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
                                 <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Edit') }}
                             </button>
-                            <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                            <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Delete') }}
                             </button>

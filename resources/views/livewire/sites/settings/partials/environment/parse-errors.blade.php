@@ -5,7 +5,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Parse error') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Parse error') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-rose-900">{{ __('The cached .env has parse errors') }}</h3>
                     <ul class="mt-1 list-inside list-disc text-sm text-rose-800">
                         @foreach ($parserErrors as $err)

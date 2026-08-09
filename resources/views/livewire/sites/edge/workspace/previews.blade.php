@@ -28,7 +28,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
             <div class="min-w-0 text-sm">
-                <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auto-deploy') }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auto-deploy') }}</span>
                 <p class="mt-0.5 text-brand-ink">
                     @if ($previewPolicy['enabled'])
                         <span class="font-semibold text-emerald-800 dark:text-emerald-300">{{ __('On') }}</span>
@@ -45,7 +45,7 @@
             </div>
             <a
                 href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
             >
                 {{ __('Edit in :file', ['file' => $sourcePath]) }}
             </a>

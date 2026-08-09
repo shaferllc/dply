@@ -24,12 +24,12 @@
                     <div class="flex min-w-0 items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $bundle['label'] }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ trans_choice('{1} :count entry|[2,*] :count entries', $bundle['entry_count'], ['count' => $bundle['entry_count']]) }}
                             </p>
                         </div>
                         @if ($bundle['applied'])
-                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                                 <x-heroicon-o-check-circle class="h-3 w-3" />
                                 {{ __('Added') }}
                             </span>
@@ -94,11 +94,11 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <h4 class="truncate text-sm font-semibold text-brand-ink">{{ $tpl->name }}</h4>
-                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                 <x-heroicon-m-clock class="h-3 w-3 text-brand-moss" />
                                 {{ $tpl->cron_expression }}
                             </span>
-                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                 <x-heroicon-m-user class="h-3 w-3 text-brand-moss" />
                                 {{ $tpl->user }}
                             </span>

@@ -55,7 +55,7 @@
 
                     <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
                             <dd class="mt-1 font-mono text-sm text-brand-ink">
                                 {{ is_array($traefikVersion) ? ($traefikVersion['Version'] ?? $traefikVersion['version'] ?? '—') : '—' }}
                             </dd>
@@ -69,7 +69,7 @@
                                     $mwCount = is_array($layerData) ? count($layerData['middlewares'] ?? []) : 0;
                                 @endphp
                                 <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $layerLabel }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $layerLabel }}</dt>
                                     <dd class="mt-1 text-sm text-brand-ink tabular-nums">
                                         {{ __(':r routers · :s services', ['r' => $routerCount, 's' => $serviceCount]) }}
                                         @if ($layer === 'http' && $mwCount > 0)
@@ -89,7 +89,7 @@
                                         <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dply dashboard') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dply dashboard') }}</p>
                                         <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Open Traefik admin (signed in)') }}</h4>
                                         <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                                             {{ __('Traefik stays on localhost :9094 on the server. This URL proxies the dashboard and API over SSH — only members of your organization who can view this server can open it.') }}
@@ -137,8 +137,8 @@
                                                 </button>
                                             @endif
                                         </div>
-                                        <p class="mt-2 break-all font-mono text-[11px] text-brand-moss">{{ $traefikDplyDashboardUrl }}</p>
-                                        <p class="mt-2 text-[11px] text-brand-moss">
+                                        <p class="mt-2 break-all font-mono text-xs text-brand-moss">{{ $traefikDplyDashboardUrl }}</p>
+                                        <p class="mt-2 text-xs text-brand-moss">
                                             {{ __('If the dashboard shows a connection error, use Repair API to rewrite traefik.yml to dply defaults (keeps your public web port, restores 127.0.0.1:9094) and restart Traefik. Check the console output if it fails.') }}
                                         </p>
                                     </div>
@@ -146,15 +146,15 @@
                             </div>
                         @endif
                         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5 {{ $traefikDplyDashboardUrl ? '' : 'lg:col-span-2' }}">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Local API (on server)') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Local API (on server)') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Used by dply live-state probes — not reachable from your browser.') }}</p>
-                            <code class="mt-3 block break-all rounded-lg bg-white px-3 py-2 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">http://127.0.0.1:9094/dashboard/</code>
+                            <code class="mt-3 block break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">http://127.0.0.1:9094/dashboard/</code>
                         </div>
                     </div>
 
                     @if ($traefikPublicDashboardUrl)
                         <div class="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 sm:p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-900">{{ __('Public dashboard URL') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-900">{{ __('Public dashboard URL') }}</p>
                             <p class="mt-1 text-xs text-amber-900/90">
                                 {{ __('Exposed on the server\'s web entry point (:80). Anyone who can reach this IP can open the dashboard unless HTTP basic auth is configured below.') }}
                             </p>
@@ -167,7 +167,7 @@
                                 {{ __('Open public dashboard') }}
                                 <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
-                            <code class="mt-2 block break-all rounded-lg bg-white/80 px-3 py-2 font-mono text-[11px] text-brand-ink ring-1 ring-amber-200">{{ $traefikPublicDashboardUrl }}</code>
+                            <code class="mt-2 block break-all rounded-lg bg-white/80 px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-amber-200">{{ $traefikPublicDashboardUrl }}</code>
                         </div>
                     @endif
 
@@ -194,9 +194,9 @@
                                             @php
                                                 $previewPublicPath = rtrim((string) ($traefik_dashboard_form['path'] ?? '/traefik-dashboard'), '/');
                                             @endphp
-                                            <span class="mt-1 block break-all font-mono text-[11px] text-brand-mist">http://{{ $server->ip_address }}{{ $previewPublicPath }}/</span>
+                                            <span class="mt-1 block break-all font-mono text-xs text-brand-mist">http://{{ $server->ip_address }}{{ $previewPublicPath }}/</span>
                                         @else
-                                            <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Public URL appears here after the server has an IP address.') }}</span>
+                                            <span class="mt-1 block text-xs text-brand-mist">{{ __('Public URL appears here after the server has an IP address.') }}</span>
                                         @endif
                                     </label>
                                     <label class="block">
@@ -206,7 +206,7 @@
                                     <label class="block sm:col-span-2">
                                         <span class="text-xs font-medium">{{ __('Basic auth password (optional)') }}</span>
                                         <input type="password" wire:model.lazy="traefik_dashboard_form.password" autocomplete="new-password" class="mt-1 w-full max-w-md rounded-md border-brand-ink/15 text-sm" />
-                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('Leave blank to keep the existing password when updating.') }}</span>
+                                        <span class="mt-1 block text-xs text-brand-mist">{{ __('Leave blank to keep the existing password when updating.') }}</span>
                                     </label>
                                 </div>
                             @endif
@@ -275,7 +275,7 @@
                                 <p class="mt-1 text-sm text-brand-moss">
                                     {{ __('Settings in /etc/traefik/traefik.yml — entry points, providers, API, logging, ACME, and global options per the Traefik static configuration reference.') }}
                                 </p>
-                                <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
+                                <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
                                     <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
                                     {{ __('Static config requires a Traefik RESTART (not reload). Edge briefly drops connections on save.') }}
                                 </p>
@@ -334,7 +334,7 @@
                                                 @foreach ($groupParams as $paramKey => $meta)
                                                     <label class="block">
                                                         <span class="block text-sm font-medium text-brand-ink">{{ __($meta['label']) }}</span>
-                                                        <span class="mt-0.5 block font-mono text-[10px] text-brand-mist">{{ $meta['path'] }}</span>
+                                                        <span class="mt-0.5 block font-mono text-2xs text-brand-mist">{{ $meta['path'] }}</span>
                                                         @if ($meta['type'] === 'bool')
                                                             <span class="mt-2 inline-flex items-center gap-2">
                                                                 <input type="checkbox" value="1"
@@ -444,7 +444,7 @@
                                                 <a
                                                     href="{{ route('servers.configuration', ['server' => $server, 'scope' => 'traefik', 'from' => $traefikConfigFrom, 'return_sub' => 'dynamic', 'file' => $dynFile['path']]) }}"
                                                     wire:navigate
-                                                    class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                    class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                 >
                                                     <x-heroicon-o-pencil-square class="h-3 w-3" />
                                                     {{ __('Edit in Configuration') }}

@@ -36,14 +36,14 @@
                         <div class="flex flex-wrap items-center gap-1.5">
                             <p class="text-sm font-semibold text-brand-ink">{{ $s['label'] }}</p>
                             @if ($satisfied)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-forest">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-1.5 py-0.5 text-2xs font-semibold text-brand-forest">
                                     <x-heroicon-s-check class="h-2.5 w-2.5" />
                                     {{ ($s['has_binding'] ?? false) ? __('Connected') : __('Set via variables') }}
                                 </span>
                             @elseif ($attachable > 0)
                                 {{-- Auto-found: an existing resource of this type is already on
                                      the server and can be linked rather than provisioned anew. --}}
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-forest" title="{{ __('Found on this server') }}">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold text-brand-forest" title="{{ __('Found on this server') }}">
                                     <x-heroicon-s-sparkles class="h-2.5 w-2.5" />
                                     {{ trans_choice('{1} :count found on this server|[2,*] :count found on this server', $attachable, ['count' => $attachable]) }}
                                 </span>
@@ -51,10 +51,10 @@
                         </div>
                         <p class="mt-0.5 text-xs text-brand-moss">{{ $s['description'] }}</p>
                         @if (! empty($s['note']) && ! $satisfied)
-                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ $s['note'] }}</p>
+                            <p class="mt-0.5 text-xs text-brand-mist">{{ $s['note'] }}</p>
                         @endif
                         @if (! empty($s['matched_keys']))
-                            <p class="mt-1 truncate font-mono text-[11px] text-brand-mist" title="{{ implode(', ', $s['matched_keys']) }}">{{ implode(', ', array_slice($s['matched_keys'], 0, 6)) }}{{ count($s['matched_keys']) > 6 ? ', …' : '' }}</p>
+                            <p class="mt-1 truncate font-mono text-xs text-brand-mist" title="{{ implode(', ', $s['matched_keys']) }}">{{ implode(', ', array_slice($s['matched_keys'], 0, 6)) }}{{ count($s['matched_keys']) > 6 ? ', …' : '' }}</p>
                         @endif
                     </div>
                 </div>

@@ -142,8 +142,8 @@
                                         <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="truncate font-mono text-[11px] font-medium text-slate-200">{{ __('Console') }}</p>
-                                        <p class="truncate text-[10px] text-slate-500">{{ __('SSH shell · ` toggles') }}</p>
+                                        <p class="truncate font-mono text-xs font-medium text-slate-200">{{ __('Console') }}</p>
+                                        <p class="truncate text-2xs text-slate-500">{{ __('SSH shell · ` toggles') }}</p>
                                     </div>
                                 </div>
                                 <button

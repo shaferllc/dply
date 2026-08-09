@@ -11,12 +11,12 @@
         <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink">
             <div class="flex items-center justify-between border-b border-white/10 px-4 py-2">
                 <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-sand/80">{{ __('Live build output') }}</span>
+                    <span class="text-2xs font-semibold uppercase tracking-[0.18em] text-brand-sand/80">{{ __('Live build output') }}</span>
                     @if ($polling)
                         <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true"></span>
                     @endif
                 </div>
-                <span class="text-[10px] uppercase tracking-wide text-brand-sand/50">{{ $polling ? __('streaming') : __('finished') }}</span>
+                <span class="text-2xs uppercase tracking-wide text-brand-sand/50">{{ $polling ? __('streaming') : __('finished') }}</span>
             </div>
             {{-- x-data scroll-pin: keeps the pre stuck to the bottom as new chunks land,
                  unless the user has scrolled up to read history (release pin on scroll). --}}

@@ -11,7 +11,7 @@
         : collect();
 
     $panelBody = 'px-5 py-3 sm:px-6';
-    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
+    $fieldHelp = 'mt-1 text-xs text-brand-moss';
     $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
 @endphp
 
@@ -69,7 +69,7 @@
                 <x-fact-row :label="__('Composer auth')" :value="__('Server-level')" :mono="false" tone="muted" />
             </dl>
 
-            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
                 <span class="font-semibold text-brand-ink">{{ __('Extensions') }}</span>
                 {{ __('are server-owned and shared across sites — review them on the server PHP workspace.') }}
             </p>
@@ -179,7 +179,7 @@
         </x-workspace-panel-head>
 
         <div class="{{ $panelBody }} space-y-3">
-            <p class="font-mono text-[11px] text-brand-moss">{{ $site->phpFpmListenSocketPath() }}</p>
+            <p class="font-mono text-xs text-brand-moss">{{ $site->phpFpmListenSocketPath() }}</p>
             <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <x-input-label for="fpm_pm" value="Process manager" class="!text-xs" />
@@ -251,15 +251,15 @@
 
                 <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div>
-                        <label class="text-[11px] font-medium text-brand-moss">{{ __('Server RAM (MB)') }}</label>
+                        <label class="text-xs font-medium text-brand-moss">{{ __('Server RAM (MB)') }}</label>
                         <input type="number" min="0" x-model.number="ram" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" placeholder="2048" />
                     </div>
                     <div>
-                        <label class="text-[11px] font-medium text-brand-moss">{{ __('Reserve (MB)') }}</label>
+                        <label class="text-xs font-medium text-brand-moss">{{ __('Reserve (MB)') }}</label>
                         <input type="number" min="0" x-model.number="reserve" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" />
                     </div>
                     <div>
-                        <label class="text-[11px] font-medium text-brand-moss">{{ __('Per-worker (MB)') }}</label>
+                        <label class="text-xs font-medium text-brand-moss">{{ __('Per-worker (MB)') }}</label>
                         <input type="number" min="1" x-model.number="worker" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" />
                     </div>
                 </div>

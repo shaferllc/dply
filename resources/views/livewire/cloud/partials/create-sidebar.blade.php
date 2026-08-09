@@ -20,7 +20,7 @@
 <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
         <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-5 py-3.5 dark:border-brand-mist/15">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
             <p class="mt-1 truncate text-sm font-semibold text-brand-ink">{{ $appLabel }}</p>
         </div>
         <dl class="divide-y divide-brand-ink/8 text-sm dark:divide-brand-mist/15">
@@ -29,7 +29,7 @@
                 <dd class="min-w-0 text-end font-mono text-xs text-brand-ink dark:text-brand-cream">
                     <span class="block truncate">{{ $sourceLabel }}</span>
                     @if ($mode === 'source' && trim((string) $branch) !== '')
-                        <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Branch') }} {{ $branch }}</span>
+                        <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Branch') }} {{ $branch }}</span>
                     @endif
                 </dd>
             </div>
@@ -49,7 +49,7 @@
 
     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
         <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-5 py-3.5 dark:border-brand-mist/15">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Managed cloud') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Managed cloud') }}</p>
             <p class="mt-1 text-sm font-semibold text-brand-ink">{{ __('From repo or image to live app') }}</p>
         </div>
         <ol class="space-y-0 px-5 py-3.5">
@@ -84,10 +84,10 @@
     </div>
 
     <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Works great with') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Works great with') }}</p>
         <div class="mt-2.5 flex flex-wrap gap-1.5">
             @foreach (['Laravel', 'Node.js', 'Python', 'Go', 'Rails', 'Django', 'Docker'] as $framework)
-                <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-brand-cream/60 px-2 py-0.5 text-[11px] font-semibold text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-sage">
+                <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-brand-cream/60 px-2 py-0.5 text-xs font-semibold text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-sage">
                     {{ $framework }}
                 </span>
             @endforeach
@@ -100,7 +100,7 @@
             $resourceEstimate = $resourceEstimate ?? 0;
             $isAwsAppRunner = ($backend ?? '') === 'aws_app_runner';
         @endphp
-        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Estimated cost') }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Estimated cost') }}</p>
         <p class="mt-1.5 text-3xl font-semibold tracking-tight text-brand-ink">
             ${{ number_format($cloudFee + $resourceEstimate, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
         </p>
@@ -109,9 +109,9 @@
             + {{ $isAwsAppRunner ? __('AWS compute') : __('resources') }} <span class="font-mono text-brand-ink">${{ number_format($resourceEstimate, 2) }}</span>{{ __('/mo') }}.
         </p>
         @if ($isAwsAppRunner)
-            <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('AWS compute is billed by AWS on your account (vCPU + memory × hours). dply bills the platform fee only. Always-on floor; actual may be lower with scale-to-zero idle.') }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-brand-mist">{{ __('AWS compute is billed by AWS on your account (vCPU + memory × hours). dply bills the platform fee only. Always-on floor; actual may be lower with scale-to-zero idle.') }}</p>
         @else
-            <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('Container, workers, and databases scale with size + instances. Previews are free.') }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-brand-mist">{{ __('Container, workers, and databases scale with size + instances. Previews are free.') }}</p>
         @endif
 
         @if (is_string($costPreview['error'] ?? null) && $costPreview['error'] !== '')

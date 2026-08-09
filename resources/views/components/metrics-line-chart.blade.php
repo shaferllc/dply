@@ -150,12 +150,12 @@
         {{-- Tooltip --}}
         <div
             x-show="tip" x-cloak
-            class="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md border border-brand-ink/10 bg-white px-2 py-1 text-[10px] leading-tight text-brand-ink shadow-md"
+            class="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md border border-brand-ink/10 bg-white px-2 py-1 text-2xs leading-tight text-brand-ink shadow-md"
             :style="`left: ${tipX}%`"
         >
             <div class="font-mono whitespace-nowrap" x-text="tip ? formatTime(tip.at) : ''"></div>
             <div class="mt-0.5 font-semibold tabular-nums" x-text="tip ? formatValue(tip.avg) : ''"></div>
-            <div class="text-[9px] text-brand-mist tabular-nums whitespace-nowrap"
+            <div class="text-3xs text-brand-mist tabular-nums whitespace-nowrap"
                  x-text="tip ? `${formatValue(tip.min)} … ${formatValue(tip.max)}` : ''"></div>
         </div>
     @endif

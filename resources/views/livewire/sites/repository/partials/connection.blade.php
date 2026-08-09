@@ -26,7 +26,7 @@
                         'border-amber-200 bg-amber-50 text-amber-900' => $git_ref_kind === 'tag',
                         'border-sky-200 bg-sky-50 text-sky-900' => $git_ref_kind === 'commit',
                     ])>
-                        <span class="text-[10px] font-semibold uppercase tracking-wide">{{ match ($git_ref_kind ?? 'branch') {
+                        <span class="text-2xs font-semibold uppercase tracking-wide">{{ match ($git_ref_kind ?? 'branch') {
                             'tag' => __('Tag'),
                             'commit' => __('Commit'),
                             default => __('Branch'),

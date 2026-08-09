@@ -134,7 +134,7 @@
                                             </span>
                                             <span class="min-w-0 flex-1">
                                                 <span class="block text-xs font-semibold text-brand-ink">{{ $meta['name'] }}</span>
-                                                <span class="mt-0.5 block text-[11px] leading-relaxed text-brand-moss">{{ $meta['desc'] }}</span>
+                                                <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</span>
                                             </span>
                                         </label>
                                     </li>
@@ -177,7 +177,7 @@
                                     <div>
                                         <label class="{{ $labelCls }}" for="bypass_cookies">{{ __('Bypass cookies') }}</label>
                                         <input id="bypass_cookies" type="text" placeholder="phpsessid, laravel_session" wire:model="bypass_cookies_input" class="{{ $inputCls }}">
-                                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Comma or space separated. Requests with these cookies skip the cache.') }}</p>
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Comma or space separated. Requests with these cookies skip the cache.') }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -197,7 +197,7 @@
                                         <label class="{{ $labelCls }}" for="lscache_ttl">{{ __('Default TTL (seconds)') }}</label>
                                         <input id="lscache_ttl" type="number" min="1" wire:model="lscache_ttl" class="{{ $inputCls }}">
                                     </div>
-                                    <p class="text-[11px] text-brand-moss">{{ __('Fine-grained rules: use the webserver-config editor for now.') }}</p>
+                                    <p class="text-xs text-brand-moss">{{ __('Fine-grained rules: use the webserver-config editor for now.') }}</p>
                                 </div>
                             </div>
                         @endif
@@ -215,15 +215,15 @@
                                 <div class="{{ $panelBody }} space-y-2">
                                     <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5">
-                                            <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Fallback object TTL') }}</dt>
+                                            <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Fallback object TTL') }}</dt>
                                             <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ __('120s (server-wide)') }}</dd>
                                         </div>
                                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5">
-                                            <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Per-site TTL') }}</dt>
+                                            <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Per-site TTL') }}</dt>
                                             <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ __('Cache-Control from your app') }}</dd>
                                         </div>
                                     </dl>
-                                    <p class="text-[11px] text-brand-moss">{{ __('Send Cache-Control to control TTL per route. Auth cookies / Authorization bypass the cache. Manage the daemon from server Caches.') }}</p>
+                                    <p class="text-xs text-brand-moss">{{ __('Send Cache-Control to control TTL per route. Auth cookies / Authorization bypass the cache. Manage the daemon from server Caches.') }}</p>
                                 </div>
                             </div>
                         @endif

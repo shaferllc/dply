@@ -47,7 +47,7 @@
             <a
                 href="{{ route('servers.monitor', $server) }}"
                 wire:navigate
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 {{ __('Full metrics') }}
                 <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />

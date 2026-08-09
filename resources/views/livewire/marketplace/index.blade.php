@@ -23,14 +23,14 @@
                 <x-slot:stats>
                     <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <x-heroicon-o-rectangle-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Recipes') }}</span>
                             </dt>
                             <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $catalogTotal }}</dd>
                         </div>
                         <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <x-heroicon-o-funnel class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Showing') }}</span>
                             </dt>
@@ -47,7 +47,7 @@
                             <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                             <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Organization required') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Create or join an organization to import webserver templates and deploy commands.') }}

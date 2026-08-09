@@ -13,12 +13,12 @@
             <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Redirects, rewrites & headers') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only view of routing rules from your repo config. Edit :file in Git — the dashboard cannot change these in v1.', ['file' => $sourcePath]) }}</p>
         </div>
         @if ($config !== null)
-            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                 {{ __('From repo') }}
             </span>
         @endif
@@ -43,7 +43,7 @@
                     <div class="mt-3 overflow-x-auto">
                         <table class="min-w-full text-left text-xs">
                             <thead>
-                                <tr class="border-b border-brand-ink/10 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <tr class="border-b border-brand-ink/10 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <th class="pb-2 pr-4">{{ __('From') }}</th>
                                     <th class="pb-2 pr-4">{{ __('To') }}</th>
                                     <th class="pb-2">{{ __('Status') }}</th>
@@ -69,7 +69,7 @@
                     <div class="mt-3 overflow-x-auto">
                         <table class="min-w-full text-left text-xs">
                             <thead>
-                                <tr class="border-b border-brand-ink/10 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <tr class="border-b border-brand-ink/10 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <th class="pb-2 pr-4">{{ __('From') }}</th>
                                     <th class="pb-2">{{ __('To') }}</th>
                                 </tr>
@@ -97,7 +97,7 @@
                                 @if (is_array($rule['values'] ?? null) && $rule['values'] !== [])
                                     <dl class="mt-2 space-y-1">
                                         @foreach ($rule['values'] as $name => $value)
-                                            <div class="flex flex-wrap gap-x-2 font-mono text-[11px]">
+                                            <div class="flex flex-wrap gap-x-2 font-mono text-xs">
                                                 <dt class="text-brand-mist">{{ $name }}</dt>
                                                 <dd class="min-w-0 break-all text-brand-ink">{{ $value }}</dd>
                                             </div>

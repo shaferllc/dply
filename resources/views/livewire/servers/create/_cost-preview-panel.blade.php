@@ -33,7 +33,7 @@
                         <div class="rounded-xl border border-slate-200 px-3 py-2">
                             <div class="flex items-center justify-between gap-3">
                                 <p class="text-sm font-medium text-slate-900">{{ $extra['label'] ?? '' }}</p>
-                                <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ str((string) ($extra['state'] ?? ''))->replace('_', ' ')->title() }}</span>
+                                <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ str((string) ($extra['state'] ?? ''))->replace('_', ' ')->title() }}</span>
                             </div>
                             <p class="mt-1 text-sm text-slate-600">{{ $extra['detail'] ?? '' }}</p>
                         </div>

@@ -24,7 +24,7 @@
                     <x-heroicon-o-arrow-up-tray class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Promote') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Promote') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview-first promote') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Unlike a straight clone, promote defaults to a managed preview hostname on the destination server so you can validate deploys before touching production DNS.') }}

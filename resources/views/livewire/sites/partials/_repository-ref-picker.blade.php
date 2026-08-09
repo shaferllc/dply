@@ -85,7 +85,7 @@
                             class="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-brand-sand/30 dark:hover:bg-brand-ink/50"
                         >
                             <span @class([
-                                'mt-0.5 inline-flex shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                'mt-0.5 inline-flex shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300' => ($ref['kind'] ?? '') === 'commit',
                                 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300' => ($ref['kind'] ?? '') === 'branch',
                                 'bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300' => ($ref['kind'] ?? '') === 'tag',
@@ -101,7 +101,7 @@
                                 @if (! empty($ref['meta']))
                                     <span class="mt-0.5 block text-xs text-brand-moss">{{ $ref['meta'] }}</span>
                                 @endif
-                                <span class="mt-1 block font-mono text-[11px] text-brand-mist">{{ \Illuminate\Support\Str::limit((string) ($ref['sha'] ?? ''), 12, '') }}</span>
+                                <span class="mt-1 block font-mono text-xs text-brand-mist">{{ \Illuminate\Support\Str::limit((string) ($ref['sha'] ?? ''), 12, '') }}</span>
                             </span>
                         </button>
                     </li>

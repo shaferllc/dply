@@ -24,7 +24,7 @@
                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credentials') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credentials') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Saved in this organization') }}</h3>
             </div>
             <span
@@ -45,13 +45,13 @@
                     <div class="min-w-0 flex-1 space-y-1.5">
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                             <span class="truncate font-semibold text-brand-ink">{{ $cred->name }}</span>
-                            <span class="font-mono text-[11px] uppercase tracking-wide text-brand-mist">{{ $cred->provider }}</span>
+                            <span class="font-mono text-xs uppercase tracking-wide text-brand-mist">{{ $cred->provider }}</span>
                         </div>
                         @if (count($cred->capabilities()))
                             <div class="flex flex-wrap items-center gap-1.5">
                                 @foreach ($cred->capabilities() as $cap)
                                     @php $chip = $capabilityChip($cap); @endphp
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-cream/70 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-cream/70 px-2 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                         <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
                                         {{ $chip['label'] }}
                                     </span>
@@ -782,7 +782,7 @@
                                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Laravel Forge to dply') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
                             </div>
@@ -823,7 +823,7 @@
                                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Ploi to dply') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
                             </div>

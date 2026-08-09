@@ -11,7 +11,7 @@
 
 @php
     $sharedClasses = [
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold leading-none transition',
         'bg-brand-ink text-brand-cream shadow-sm' => $active && $variant !== 'danger' && $subtabKey === null,
         'bg-red-700 text-white shadow-sm' => $active && $variant === 'danger' && $subtabKey === null,
         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active && $variant !== 'danger' && $subtabKey === null,
@@ -54,7 +54,7 @@
                  attribute on every tab that sets wire:click directly. --}}
             {{ $attributesWithoutWireClick->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"
@@ -97,7 +97,7 @@
                  attribute on every tab that sets wire:click directly. --}}
             {{ $attributesWithoutWireClick->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"

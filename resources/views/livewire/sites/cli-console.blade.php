@@ -18,15 +18,15 @@
                 </div>
 
                 <div class="flex min-w-0 items-center gap-2">
-                    <span class="truncate font-mono text-[11px] font-medium text-slate-300">dply · {{ $site->slug }}</span>
+                    <span class="truncate font-mono text-xs font-medium text-slate-300">dply · {{ $site->slug }}</span>
                     @if ($isProductionMirror)
-                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
+                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
                             {{ __('Prod') }}
                         </span>
                     @endif
                 </div>
 
-                <div class="ms-auto flex items-center gap-2 text-[11px]">
+                <div class="ms-auto flex items-center gap-2 text-xs">
                     @if ($cliReady)
                         <span class="inline-flex items-center gap-1.5 text-emerald-300/90">
                             <span class="relative flex h-1.5 w-1.5">
@@ -77,7 +77,7 @@
                             <pre class="whitespace-pre-wrap break-words text-slate-300">{{ $entry['out'] }}</pre>
                         @endif
                         @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                            <p class="text-[11px] text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                            <p class="text-xs text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
                         @endif
                     </div>
                 @endforeach
@@ -114,7 +114,7 @@
                     wire:loading.attr="disabled"
                     wire:target="run"
                     @disabled(! $cliReady)
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     <span wire:loading.remove wire:target="run">{{ __('Run') }}</span>
                     <span wire:loading wire:target="run" class="inline-flex items-center gap-1">
@@ -124,7 +124,7 @@
                 </button>
             </form>
             @if (! $cliReady)
-                <p class="mt-2 font-mono text-[10px] leading-relaxed text-amber-300/90">
+                <p class="mt-2 font-mono text-2xs leading-relaxed text-amber-300/90">
                     {{ __('Expected packages/dply-cli/bin/dply.mjs with Node 18+, or set DPLY_CLI_BINARY in .env.') }}
                 </p>
             @endif
@@ -132,13 +132,13 @@
     </x-console-terminal-shell>
 
     <div class="flex flex-wrap items-center gap-2">
-        <span class="me-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Shortcuts') }}</span>
+        <span class="me-1 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Shortcuts') }}</span>
         @foreach ($presetCommands as $preset)
             <button
                 type="button"
                 wire:click="prefill(@js($preset['command']))"
                 title="dply {{ $preset['command'] }}"
-                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/40 px-2.5 py-1 text-[11px] font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand"
+                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/40 px-2.5 py-1 text-xs font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand"
             >
                 {{ $preset['label'] }}
             </button>

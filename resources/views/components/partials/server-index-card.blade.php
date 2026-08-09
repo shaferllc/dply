@@ -16,7 +16,7 @@
                     <p class="mt-0.5 truncate font-mono text-xs text-brand-moss">{{ $server->ipAddress ?? __('Provisioning…') }}</p>
                 </div>
                 @if ($server->insightsOpen > 0)
-                    <a href="{{ $server->insightsHref ?? $server->manageHref }}" @if ($server->manageExternal || $server->insightsHref === null) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $server->insightsBadgeClass() }}">
+                    <a href="{{ $server->insightsHref ?? $server->manageHref }}" @if ($server->manageExternal || $server->insightsHref === null) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold leading-none {{ $server->insightsBadgeClass() }}">
                         {{ trans_choice(':count insight|:count insights', $server->insightsOpen, ['count' => $server->insightsOpen]) }}
                     </a>
                 @endif
@@ -31,7 +31,7 @@
             @if (count($server->tags) > 0)
                 <div class="flex flex-wrap gap-1">
                     @foreach ($server->tags as $tag)
-                        <button type="button" wire:click="$set('tagFilter', @js($tag))" class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink">{{ $tag }}</button>
+                        <button type="button" wire:click="$set('tagFilter', @js($tag))" class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink">{{ $tag }}</button>
                     @endforeach
                 </div>
             @endif
@@ -73,7 +73,7 @@
                         </a>
                         <span class="max-w-[11rem] truncate font-mono text-xs text-brand-moss sm:max-w-none">{{ $server->ipAddress ?? __('Provisioning…') }}</span>
                         @if ($server->insightsOpen > 0)
-                            <a href="{{ $server->insightsHref ?? $server->manageHref }}" @if ($server->manageExternal || $server->insightsHref === null) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $server->insightsBadgeClass() }}">
+                            <a href="{{ $server->insightsHref ?? $server->manageHref }}" @if ($server->manageExternal || $server->insightsHref === null) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold leading-none {{ $server->insightsBadgeClass() }}">
                                 {{ trans_choice(':count insight|:count insights', $server->insightsOpen, ['count' => $server->insightsOpen]) }}
                             </a>
                         @endif
@@ -105,7 +105,7 @@
             @if (count($server->tags) > 0)
                 <div class="flex flex-wrap gap-1 sm:ps-12">
                     @foreach ($server->tags as $tag)
-                        <button type="button" wire:click="$set('tagFilter', @js($tag))" class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink">{{ $tag }}</button>
+                        <button type="button" wire:click="$set('tagFilter', @js($tag))" class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink">{{ $tag }}</button>
                     @endforeach
                 </div>
             @endif
@@ -116,13 +116,13 @@
 
             @if ($server->isSetupFailed)
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss sm:ps-12">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
                         <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                         {{ __('Setup failed') }}
                     </span>
                     <span class="text-brand-ink">{{ __('Provisioning did not finish — open the journey to see the failing step.') }}</span>
                     @if ($server->journeyHref)
-                        <a href="{{ $server->journeyHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900 sm:ms-auto">
+                        <a href="{{ $server->journeyHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:text-red-900 sm:ms-auto">
                             {{ __('Open journey') }}
                             <x-heroicon-m-arrow-right class="h-3 w-3" />
                         </a>
@@ -134,7 +134,7 @@
                      never coming. --}}
                 @php $adopted = $server->adopted; @endphp
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss sm:ps-12">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-forest ring-1 ring-brand-sage/25">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-forest ring-1 ring-brand-sage/25">
                         @if ($adopted['state'] === 'scanning')
                             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-sage"></span>
                         @else
@@ -145,7 +145,7 @@
                     @if ($adopted['detail'])
                         <span class="min-w-0 text-brand-ink">{{ $adopted['detail'] }}</span>
                     @endif
-                    <a href="{{ $server->manageHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline sm:ms-auto">
+                    <a href="{{ $server->manageHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline sm:ms-auto">
                         {{ __('Review') }}
                         <x-heroicon-m-arrow-right class="h-3 w-3" />
                     </a>
@@ -154,7 +154,7 @@
                 @php $digest = $server->provisioning; @endphp
                 <div class="sm:ps-12">
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
                             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
                             {{ $digest['phase_label'] }}
                         </span>
@@ -168,7 +168,7 @@
                             <span class="tabular-nums">{{ __(':elapsed elapsed', ['elapsed' => $digest['elapsed_human']]) }}</span>
                         @endif
                         @if ($server->journeyHref)
-                            <a href="{{ $server->journeyHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 hover:text-sky-900 sm:ms-auto">
+                            <a href="{{ $server->journeyHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:text-sky-900 sm:ms-auto">
                                 {{ __('Open journey') }}
                                 <x-heroicon-m-arrow-right class="h-3 w-3" />
                             </a>

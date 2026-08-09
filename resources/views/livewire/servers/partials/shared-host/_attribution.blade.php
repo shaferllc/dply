@@ -12,7 +12,7 @@
                 <x-heroicon-o-chart-bar-square class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Site load attribution') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Site load attribution') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                     @if ($range === '7d')
                         {{ __('Peak load over 7 days') }}
@@ -63,7 +63,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-sage">
+                <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-sage">
                     <tr>
                         <th class="px-6 py-3 sm:px-7">{{ __('Site') }}</th>
                         <th class="px-4 py-3">{{ $range === 'current' ? __('CPU') : __('Peak CPU') }}</th>

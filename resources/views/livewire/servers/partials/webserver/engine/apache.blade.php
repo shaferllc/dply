@@ -14,7 +14,7 @@
                                     wire:click="loadApacheModulesConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadApacheModulesConfig"
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadApacheModulesConfig" class="inline-flex">
                                         <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -84,14 +84,14 @@
                                             type="button"
                                             wire:click="setApacheModulesFilter('{{ $filterKey }}')"
                                             @class([
-                                                'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition',
+                                                'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition',
                                                 'border-brand-forest bg-brand-forest text-brand-cream' => $apache_modules_filter === $filterKey,
                                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $apache_modules_filter !== $filterKey,
                                             ])
                                         >
                                             {{ $filterLabel }}
                                             @if ($filterKey !== 'all')
-                                                <span class="text-[10px] opacity-70">{{ count(array_filter($apache_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
+                                                <span class="text-2xs opacity-70">{{ count(array_filter($apache_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -100,7 +100,7 @@
 
                             <div class="mt-4 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                                 <table class="w-full text-left text-sm">
-                                    <thead class="bg-brand-sand/30 text-[11px] uppercase tracking-wide text-brand-mist">
+                                    <thead class="bg-brand-sand/30 text-xs uppercase tracking-wide text-brand-mist">
                                         <tr>
                                             <th class="px-4 py-2 font-medium">{{ __('Module') }}</th>
                                             <th class="px-4 py-2 font-medium">{{ __('Type') }}</th>
@@ -113,27 +113,27 @@
                                             <tr>
                                                 <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $mod['name'] }}</td>
                                                 <td class="px-4 py-2 text-xs">
-                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
                                                 </td>
                                                 <td class="px-4 py-2 text-xs">
                                                     @if ($mod['enabled'])
-                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('enabled') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('enabled') }}</span>
                                                     @else
-                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('disabled') }}</span>
+                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold text-brand-moss">{{ __('disabled') }}</span>
                                                     @endif
                                                     @if ($mod['protected'])
-                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700" title="{{ __('dply provisioner depends on this module — disabling is blocked.') }}">{{ __('protected') }}</span>
+                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-700" title="{{ __('dply provisioner depends on this module — disabling is blocked.') }}">{{ __('protected') }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-2 text-right">
                                                     @if ($mod['protected'] && $mod['enabled'])
-                                                        <span class="text-brand-mist text-[11px]">—</span>
+                                                        <span class="text-brand-mist text-xs">—</span>
                                                     @elseif ($mod['enabled'])
                                                         <button
                                                             type="button"
                                                             wire:click="openConfirmActionModal('toggleApacheModule', ['{{ $mod['name'] }}', false], @js(__('Disable module: :name', ['name' => $mod['name']])), @js(__('Run `a2dismod :name`? Apache reloads after the toggle and the change reverts automatically if `apachectl configtest` fails.', ['name' => $mod['name']])), @js(__('Disable')), true)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-no-symbol class="h-3 w-3" />
                                                             {{ __('Disable') }}
@@ -143,7 +143,7 @@
                                                             type="button"
                                                             wire:click="openConfirmActionModal('toggleApacheModule', ['{{ $mod['name'] }}', true], @js(__('Enable module: :name', ['name' => $mod['name']])), @js(__('Run `a2enmod :name`? Apache reloads after the toggle and the change reverts automatically if `apachectl configtest` fails.', ['name' => $mod['name']])), @js(__('Enable')), false)"
                                                             @disabled($isDeployer || $actionInFlight)
-                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
                                                             <x-heroicon-o-power class="h-3 w-3" />
                                                             {{ __('Enable') }}
@@ -210,13 +210,13 @@
                             />
                             <h3 class="shrink-0 text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Apache global options') }}</h3>
                             @if ($apache_globals_loaded)
-                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
                                     <x-heroicon-m-cpu-chip class="h-3 w-3" aria-hidden="true" /> {{ $apache_globals_mpm }}
                                 </span>
                             @endif
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
                             <span
-                                class="min-w-0 flex-1 truncate text-[11px] text-brand-mist"
+                                class="min-w-0 flex-1 truncate text-xs text-brand-mist"
                                 title="{{ __('Top-level directives in /etc/apache2/apache2.conf — keep-alive, timeouts, server tokens — plus MPM worker tuning inside the active `<IfModule mpm_*_module>` block. Site / module / conf fragments under sites-enabled / mods-enabled / conf-enabled pass through. Save runs `apachectl configtest` and reloads; a failed validate auto-restores the previous file.') }}"
                             >{{ __('Keep-alive, timeouts, server tokens, and MPM worker tuning. Save validates with `apachectl configtest` and reloads.') }}</span>
                         </button>
@@ -233,7 +233,7 @@
                             wire:target="loadApacheGlobalsConfig"
                             x-show="expanded"
                             :title="@js($apache_globals_loaded ? __('Reload from server') : __('Fetch current values from the server'))"
-                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadApacheGlobalsConfig" class="inline-flex">
                                 <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -262,7 +262,7 @@
                             <div wire:loading.block wire:target="loadApacheGlobalsConfig" aria-busy="true" aria-live="polite">
                                 <span class="sr-only">{{ __('Reading apache2.conf…') }}</span>
                                 @php $bar = 'animate-pulse rounded bg-brand-ink/10'; @endphp
-                                <p class="flex items-center gap-2 text-[11px] text-brand-moss">
+                                <p class="flex items-center gap-2 text-xs text-brand-moss">
                                     <x-spinner class="h-3.5 w-3.5 shrink-0" /> {{ __('Reading apache2.conf…') }}
                                 </p>
                                 <div class="mt-3 grid gap-4 sm:grid-cols-2" aria-hidden="true">
@@ -302,7 +302,7 @@
                         @else
                             <form wire:submit.prevent="saveApacheGlobalsConfig" class="mt-6 space-y-6">
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Top-level') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Top-level') }}</p>
                                     <div class="mt-3 grid gap-5 sm:grid-cols-2">
                                         @foreach ($apacheTopParams as $paramKey => $meta)
                                             <label class="block">
@@ -332,8 +332,8 @@
                                 </div>
 
                                 <div>
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('<IfModule :mpm> { … }', ['mpm' => $apache_globals_mpm]) }}</p>
-                                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('MPM directives may live in /etc/apache2/mods-available/mpm_event.conf instead of apache2.conf — if so, dply will report "no changes" and you should edit the mods file via the Config sub-tab.') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('<IfModule :mpm> { … }', ['mpm' => $apache_globals_mpm]) }}</p>
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('MPM directives may live in /etc/apache2/mods-available/mpm_event.conf instead of apache2.conf — if so, dply will report "no changes" and you should edit the mods file via the Config sub-tab.') }}</p>
                                     <div class="mt-3 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                                         @foreach ($apacheMpmParams as $paramKey => $meta)
                                             <label class="block">
@@ -381,7 +381,7 @@
                     >
                         <x-slot:actions>
                             <button type="button" wire:click="loadApacheCacheConfig" wire:loading.attr="disabled" wire:target="loadApacheCacheConfig"
-                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60">
+                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60">
                                 <span wire:loading.remove wire:target="loadApacheCacheConfig" class="inline-flex"><x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /></span>
                                 <span wire:loading wire:target="loadApacheCacheConfig" class="inline-flex"><x-spinner class="h-3.5 w-3.5" /></span>
                                 {{ __('Reload') }}
@@ -390,7 +390,7 @@
                                 wire:click="openConfirmActionModal('purgeApacheEngineCacheConfirmed', [], @js(__('Purge disk cache')), @js(__('Remove mod_cache disk storage under /var/cache/apache2? Browser caches on visitor devices are not affected.')), @js(__('Purge cache')), true)"
                                 wire:loading.attr="disabled"
                                 @disabled($isDeployer || $actionInFlight || ! $opsReady)
-                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
                                 <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Purge disk cache') }}
                             </button>
@@ -403,7 +403,7 @@
                     @endif
                     @if ($apache_cache_error)
                         <div class="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
-                            <pre class="whitespace-pre-wrap break-words font-mono text-[11px]">{{ $apache_cache_error }}</pre>
+                            <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $apache_cache_error }}</pre>
                         </div>
                     @endif
 
@@ -421,7 +421,7 @@
                             <li class="flex items-center justify-between gap-3">
                                 <span class="text-brand-moss">{{ __('mod_expires') }}</span>
                                 <span @class([
-                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                    'inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => ($apache_cache_status['mod_expires_enabled'] ?? false),
                                     'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! ($apache_cache_status['mod_expires_enabled'] ?? false),
                                 ])>{{ ($apache_cache_status['mod_expires_enabled'] ?? false) ? __('Enabled') : __('Disabled') }}</span>
@@ -429,7 +429,7 @@
                             <li class="flex items-center justify-between gap-3">
                                 <span class="text-brand-moss">{{ __('mod_deflate') }}</span>
                                 <span @class([
-                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                    'inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => ($apache_cache_status['mod_deflate_enabled'] ?? false),
                                     'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! ($apache_cache_status['mod_deflate_enabled'] ?? false),
                                 ])>{{ ($apache_cache_status['mod_deflate_enabled'] ?? false) ? __('Enabled') : __('Disabled') }}</span>
@@ -443,11 +443,11 @@
                                 <input type="checkbox" value="1" wire:model.live="apache_mod_cache_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
                                 <span class="text-xs text-brand-ink">
                                     <span class="font-semibold">{{ __('Track mod_cache disk caching') }}</span>
-                                    <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Preference flag for future mod_cache automation. Purge uses the disk path above.') }}</span>
+                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Preference flag for future mod_cache automation. Purge uses the disk path above.') }}</span>
                                 </span>
                             </label>
                             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-3">
-                                <button type="button" wire:click="setEngineSubtab('modules')" class="text-[11px] font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2">
+                                <button type="button" wire:click="setEngineSubtab('modules')" class="text-xs font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2">
                                     {{ __('Open Modules tab →') }}
                                 </button>
                                 <button type="submit" wire:loading.attr="disabled" wire:target="saveApacheCacheConfig" @disabled($isDeployer || $actionInFlight)

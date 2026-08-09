@@ -27,12 +27,12 @@
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS automation') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Pick which connected DNS credential Dply should use for this site, and the apex zone that exists in that provider account. Leave the zone empty to fall back to the app-default testing-domain pool.') }}
                 </p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                     <span class="inline-flex items-center gap-1">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $resolvedCredential ? 'bg-brand-forest' : 'bg-amber-500' }}"></span>
                         @if ($resolvedCredential)
@@ -80,7 +80,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Missing') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Missing') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('No DNS-capable credentials yet') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Connect DigitalOcean and/or Cloudflare under Server providers to use a custom DNS zone.') }}</p>
                     </div>
@@ -103,7 +103,7 @@
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Settings') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Settings') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & zone') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('The credential here can differ from where the server is hosted — for example DigitalOcean compute with Cloudflare DNS.') }}
@@ -167,7 +167,7 @@
                 <x-heroicon-o-command-line class="h-4 w-4" />
                 {{ __('Resolved DNS configuration') }}
             </p>
-            <span class="text-[10px] font-medium uppercase tracking-wide text-brand-cream/50">{{ __('read-only') }}</span>
+            <span class="text-2xs font-medium uppercase tracking-wide text-brand-cream/50">{{ __('read-only') }}</span>
         </div>
     </div>
     <div class="bg-brand-ink px-6 py-5 font-mono text-[12px] leading-relaxed text-brand-cream/90 sm:px-8">
@@ -175,17 +175,17 @@
             <span class="text-brand-cream/50">credential</span>
             <span class="ml-2">{{ $resolvedCredential ? $resolvedCredential->name.' ('.$resolvedCredential->dnsProviderLabel().')' : '— none resolved —' }}</span>
             @if ($resolvedCredential && ! $resolvedCredentialIsExplicit)
-                <span class="ml-2 inline-flex items-center rounded bg-brand-cream/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brand-cream/70">{{ __('org default') }}</span>
+                <span class="ml-2 inline-flex items-center rounded bg-brand-cream/10 px-1.5 py-0.5 text-2xs uppercase tracking-wide text-brand-cream/70">{{ __('org default') }}</span>
             @endif
         </p>
         <p class="mt-1">
             <span class="text-brand-cream/50">zone</span>
             <span class="ml-2">{{ $savedZone !== '' ? $savedZone : '— '.__('falls back to app testing-domain pool').' —' }}</span>
             @if ($savedZone === '' && ($guessed = $site->guessDnsZoneFromPrimaryHostname()))
-                <span class="ml-2 inline-flex items-center rounded bg-brand-cream/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brand-cream/70">{{ __('would suggest :z', ['z' => $guessed]) }}</span>
+                <span class="ml-2 inline-flex items-center rounded bg-brand-cream/10 px-1.5 py-0.5 text-2xs uppercase tracking-wide text-brand-cream/70">{{ __('would suggest :z', ['z' => $guessed]) }}</span>
             @endif
         </p>
-        <p class="mt-3 text-[11px] text-brand-cream/60">
+        <p class="mt-3 text-xs text-brand-cream/60">
             {{ __('Dply uses this configuration for preview-hostname DNS, DNS-01 challenge defaults, and any DNS records created during provisioning.') }}
         </p>
     </div>

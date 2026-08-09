@@ -26,7 +26,7 @@
                             <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ $onboardingPct }}%"></div>
                         </div>
                     </div>
-                    <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 ring-1 ring-sky-200">{{ $onboardingDone }}/{{ $onboardingTotal }}</span>
+                    <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-sky-700 ring-1 ring-sky-200">{{ $onboardingDone }}/{{ $onboardingTotal }}</span>
                     <x-heroicon-m-chevron-down class="h-5 w-5 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" />
                 </div>
             </button>

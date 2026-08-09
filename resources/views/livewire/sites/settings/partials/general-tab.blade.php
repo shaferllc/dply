@@ -2,8 +2,8 @@
     // Dense hairline rhythm — matches Workers / Platform / Settings densification.
     $panelBody = 'px-3 py-2.5 sm:px-4';
     $factCell = 'bg-white px-3 py-2 transition-colors hover:bg-brand-sand/[0.15] sm:px-3.5';
-    $factLabel = 'text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist';
-    $headLink = 'inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40';
+    $factLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
+    $headLink = 'inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40';
 @endphp
 
 {{-- Services-first: a live site with no app yet. Configure services here, then
@@ -35,7 +35,7 @@
                     </span>
                     <div class="min-w-0">
                         <h2 class="text-sm font-semibold tracking-tight text-brand-ink">{{ __('Set up your app') }}</h2>
-                        <p class="mt-0.5 max-w-2xl text-[11px] leading-snug text-brand-moss">{{ __('Site is live on its splash page. Configure services below, then choose how to ship — bindings wire into the first deploy.') }}</p>
+                        <p class="mt-0.5 max-w-2xl text-xs leading-snug text-brand-moss">{{ __('Site is live on its splash page. Configure services below, then choose how to ship — bindings wire into the first deploy.') }}</p>
                     </div>
                 </div>
                 <a href="{{ $chooseAppUrl }}" wire:navigate
@@ -54,7 +54,7 @@
                         </span>
                         <span class="min-w-0">
                             <span class="block text-xs font-semibold text-brand-ink">{{ $option['title'] }}</span>
-                            <span class="mt-0.5 block text-[11px] leading-snug text-brand-moss">{{ $option['body'] }}</span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-moss">{{ $option['body'] }}</span>
                         </span>
                     </a>
                 @endforeach
@@ -75,7 +75,7 @@
         <livewire:sites.logo-menu :site="$site" avatar-class="h-8 w-8 text-xs" :key="'overview-logo-menu-'.$site->id" />
         <h2 class="shrink-0 text-sm font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}">
+        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}">
             {{ __('Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}
         </p>
     </div>
@@ -157,7 +157,7 @@
                     <dt class="{{ $factLabel }}">{{ $card['label'] }}</dt>
                     <dd class="mt-0.5 flex min-w-0 items-center">
                         @if ($cardIsPositive || $cardIsNegative)
-                            <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none ring-1 ring-inset {{ $cardIsNegative ? 'bg-rose-50 text-rose-800 ring-rose-600/15' : 'bg-emerald-50 text-emerald-800 ring-emerald-600/15' }}">
+                            <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold leading-none ring-1 ring-inset {{ $cardIsNegative ? 'bg-rose-50 text-rose-800 ring-rose-600/15' : 'bg-emerald-50 text-emerald-800 ring-emerald-600/15' }}">
                                 <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }}" aria-hidden="true"></span>
                                 <span class="truncate">{{ ucfirst($cardValue) }}</span>
                             </span>
@@ -222,7 +222,7 @@
                     <dd class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                         <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}"
                             wire:navigate
-                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize {{ $latestTone }} hover:opacity-90">
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold capitalize {{ $latestTone }} hover:opacity-90">
                             {{ $latestStatus }}
                         </a>
                         @if ($this->latestDeployment->started_at)
@@ -245,7 +245,7 @@
                         <span class="text-brand-mist">—</span>
                     @endif
                 </dd>
-                <dd class="text-[11px] text-brand-mist">{{ $site->type->label() }}</dd>
+                <dd class="text-xs text-brand-mist">{{ $site->type->label() }}</dd>
             </div>
 
             <div @class([
@@ -355,7 +355,7 @@
                     <button type="button"
                         x-data="{ copied: false }"
                         x-on:click="navigator.clipboard.writeText(@js((string) $site->id)); copied = true; setTimeout(() => copied = false, 1500)"
-                        class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-brand-sage hover:bg-brand-sand/50"
+                        class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-brand-sage hover:bg-brand-sand/50"
                         :title="copied ? @js(__('Copied')) : @js(__('Copy site ID'))">
                         <span x-show="!copied" class="inline-flex items-center gap-1">
                             <x-heroicon-o-clipboard-document class="h-3.5 w-3.5" aria-hidden="true" />
@@ -397,7 +397,7 @@
                             wire:click="measureDiskUsage"
                             wire:target="measureDiskUsage"
                             wire:loading.attr="disabled"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="measureDiskUsage" aria-hidden="true" />
                             <span wire:loading.remove wire:target="measureDiskUsage">{{ is_numeric($diskBytes) ? __('Refresh') : __('Measure') }}</span>
                             <span wire:loading wire:target="measureDiskUsage">{{ __('Measuring…') }}</span>
@@ -410,7 +410,7 @@
                         <div class="h-1.5 w-full overflow-hidden rounded-full bg-brand-sand/60">
                             <div class="h-full rounded-full {{ $diskVolumePct >= 90 ? 'bg-rose-500' : ($diskVolumePct >= 75 ? 'bg-amber-500' : 'bg-brand-sage') }}" style="width: {{ $diskVolumePct }}%"></div>
                         </div>
-                        <p class="mt-1 text-[11px] text-brand-mist">
+                        <p class="mt-1 text-xs text-brand-mist">
                             {{ __(':pct% of volume used', ['pct' => rtrim(rtrim(number_format($diskVolumePct, 1), '0'), '.')]) }}
                             @if (is_numeric($diskVolumeTotal))
                                 · {{ __(':used of :total', ['used' => \Illuminate\Support\Number::fileSize((int) $diskVolumeUsed), 'total' => \Illuminate\Support\Number::fileSize((int) $diskVolumeTotal)]) }}
@@ -432,7 +432,7 @@
             :title="__('Site notes')"
         >
             <x-slot:actions>
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="text-[11px] font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('Edit in Settings') }} →</a>
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('Edit in Settings') }} →</a>
             </x-slot:actions>
         </x-workspace-panel-head>
 

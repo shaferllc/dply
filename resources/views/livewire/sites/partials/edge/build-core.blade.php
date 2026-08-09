@@ -22,7 +22,7 @@
 <section class="border-b border-brand-ink/10">
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
         <div class="min-w-0">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Source') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Source') }}</p>
             <p class="mt-0.5 truncate font-mono text-xs text-brand-ink">
                 @if ($edgeGithubRepoUrl)
                     <a href="{{ $edgeGithubRepoUrl }}" target="_blank" rel="noopener noreferrer" class="hover:underline">{{ $sourceLine }}</a>
@@ -31,7 +31,7 @@
                 @endif
             </p>
         </div>
-        <p class="text-[11px] text-brand-moss">{{ __('Repo & branch are fixed in v1.') }}</p>
+        <p class="text-xs text-brand-moss">{{ __('Repo & branch are fixed in v1.') }}</p>
     </div>
 
     @can('update', $site)
@@ -165,7 +165,7 @@
         @endcan
 
         <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Retention') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Retention') }}</p>
             <p class="mt-1 text-xs text-brand-moss">{{ __('Older deploy artifacts beyond this count are deleted from storage.') }}</p>
             @can('update', $site)
                 <form wire:submit.prevent="saveEdgeReleasesToKeep" class="mt-3 flex flex-wrap items-end gap-3">
@@ -199,7 +199,7 @@
             <div id="edge-build-repo-config" class="scroll-mt-24 border-t border-brand-ink/10 px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Repo config') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Repo config') }}</p>
                         <p class="mt-1 text-sm text-brand-ink">
                             {{ __('Managed by :file', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml']) }}
                         </p>
@@ -207,7 +207,7 @@
                             {{ __('Overrides dashboard build settings on each deploy. Routing rules live under Routing.') }}
                         </p>
                     </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                         {{ empty($latestRepoConfig['build']) ? __('No build keys') : count($latestRepoConfig['build']).' '.__('build keys') }}
                     </span>
                 </div>

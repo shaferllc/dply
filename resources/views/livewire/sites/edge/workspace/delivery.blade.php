@@ -20,7 +20,7 @@
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backend') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Backend') }}</p>
                 <p class="mt-1 text-sm text-brand-ink">{{ $edgeDeliveryBackendLabel ?? $site->edgeBackendLabel() }}</p>
                 @if ($site->usesOrgCloudflareEdge() && $site->edgeProviderCredential)
                     <p class="mt-0.5 text-xs text-brand-moss">{{ __('Account: :name', ['name' => $site->edgeProviderCredential->name]) }}</p>
@@ -38,13 +38,13 @@
 
     @if ($isHybrid)
         <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hybrid origin') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hybrid origin') }}</p>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Static assets stay on Edge; matching paths proxy to this origin.') }}</p>
 
             @can('update', $site)
                 <form wire:submit.prevent="saveEdgeHybridOrigin" class="mt-4 space-y-4">
                     <label class="block">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin URL') }}</span>
+                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin URL') }}</span>
                         <input type="url" wire:model="buildForm.edge_origin_url" autocomplete="off" spellcheck="false" placeholder="https://origin.example.com" class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
                         @error('buildForm.edge_origin_url') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                         @if (! empty($edgeOrigin['managed']))
@@ -52,24 +52,24 @@
                         @endif
                     </label>
                     <label class="block">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Proxy routes') }}</span>
+                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Proxy routes') }}</span>
                         <textarea wire:model="buildForm.edge_origin_routes" rows="3" spellcheck="false" placeholder="/api/*&#10;/_next/data/*" class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"></textarea>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('One pattern per line. Path rules that rewrite without an origin stay under Routing → Rewrites.') }}</p>
                         @error('buildForm.edge_origin_routes') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                     </label>
                     <label class="block">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Healthcheck path') }}</span>
+                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Healthcheck path') }}</span>
                         <input type="text" wire:model="buildForm.edge_origin_healthcheck_path" autocomplete="off" spellcheck="false" placeholder="/" class="mt-1.5 w-full max-w-xs rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
                         @error('buildForm.edge_origin_healthcheck_path') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                     </label>
                     <label class="block">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Failover HTML') }}</span>
+                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Failover HTML') }}</span>
                         <textarea wire:model="buildForm.edge_origin_failover_html" rows="3" spellcheck="false" placeholder="{{ __('Optional — blank uses the built-in 503 page.') }}" class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"></textarea>
                         @error('buildForm.edge_origin_failover_html') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                     </label>
 
                     <div class="flex flex-wrap items-center justify-end gap-3">
-                        <span wire:loading.inline-flex wire:target="saveEdgeHybridOrigin" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+                        <span wire:loading.inline-flex wire:target="saveEdgeHybridOrigin" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
                             <x-spinner size="sm" variant="muted" />
                             {{ __('Saving…') }}
                         </span>
@@ -99,7 +99,7 @@
                 @can('update', $site)
                     @if (! empty($edgeOrigin['auth_secret']))
                         <div x-data="{ copied: false }">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin auth secret') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin auth secret') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Sent as X-Dply-Origin-Auth on proxied requests.') }}</p>
                             <div class="mt-2 flex flex-wrap items-center gap-2">
                                 <input type="password" readonly value="{{ $edgeOrigin['auth_secret'] }}" class="block min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900" onclick="this.select()" />
@@ -120,7 +120,7 @@
                     @endif
 
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Purge cache by tag') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Purge cache by tag') }}</p>
                         <form wire:submit.prevent="purgeEdgeCacheByTag" class="mt-2 flex flex-wrap items-center gap-2">
                             <input type="text" wire:model="buildForm.edge_cache_purge_tag" autocomplete="off" spellcheck="false" placeholder="article-42" class="min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
                             <button type="submit" wire:loading.attr="disabled" wire:target="purgeEdgeCacheByTag" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60">
@@ -144,15 +144,15 @@
                             @if (isset($originProbe['status']))
                                 <p><span class="font-semibold">{{ __('HTTP :status', ['status' => $originProbe['status']]) }}</span> · {{ __(':latency ms', ['latency' => $originProbe['latency_ms'] ?? 0]) }}</p>
                             @endif
-                            @if (! empty($originProbe['target'])) <p class="mt-0.5 break-all font-mono text-[10px] opacity-80">{{ $originProbe['target'] }}</p> @endif
-                            @if (! empty($originProbe['error'])) <p class="mt-1 text-[11px]">{{ $originProbe['error'] }}</p> @endif
+                            @if (! empty($originProbe['target'])) <p class="mt-0.5 break-all font-mono text-2xs opacity-80">{{ $originProbe['target'] }}</p> @endif
+                            @if (! empty($originProbe['error'])) <p class="mt-1 text-xs">{{ $originProbe['error'] }}</p> @endif
                         </div>
                     @endif
                 @endcan
 
                 <div>
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                         <a href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}" class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline">
                             <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
                             {{ __('Generate :file', ['file' => $sourcePath]) }}
@@ -183,11 +183,11 @@ origin:
         </details>
     @elseif (auth()->user()?->can('update', $site))
         <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hybrid origin') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hybrid origin') }}</p>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Point dynamic routes at an existing origin. Static assets stay on Edge.') }}</p>
             <form wire:submit.prevent="requestConvertToHybrid" class="mt-4 space-y-3">
                 <label class="block">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin URL') }}</span>
+                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Origin URL') }}</span>
                     <input type="url" wire:model="buildForm.edge_convert_origin_url" autocomplete="off" spellcheck="false" placeholder="https://origin.example.com" class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Defaults to /api/* and /_next/data/* — edit after converting.') }}</p>
                     @error('buildForm.edge_convert_origin_url') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
@@ -207,7 +207,7 @@ origin:
 
     @can('update', $site)
         <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Image optimization') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Image optimization') }}</p>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Resize and reformat images at the edge via /_dply/image.') }}</p>
 
             <form wire:submit.prevent="saveEdgeImageOptimization" class="mt-4 space-y-4">
@@ -216,18 +216,18 @@ origin:
                     <span>
                         <span class="font-medium">{{ __('Enable') }}</span>
                         @if ($effectiveImages['enabled'])
-                            <span class="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ __('On') }}</span>
+                            <span class="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ __('On') }}</span>
                         @endif
                     </span>
                 </label>
                 <label class="block">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Allowed source hostnames') }}</span>
+                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Allowed source hostnames') }}</span>
                     <textarea wire:model="buildForm.edge_image_allowed_hosts" rows="3" spellcheck="false" placeholder="images.example.com" class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"></textarea>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('One per line. Merges with :file.', ['file' => $sourcePath]) }}</p>
                     @error('buildForm.edge_image_allowed_hosts') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                 </label>
                 <div class="flex flex-wrap items-center justify-end gap-3">
-                    <span wire:loading.inline-flex wire:target="saveEdgeImageOptimization" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+                    <span wire:loading.inline-flex wire:target="saveEdgeImageOptimization" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
                         <x-spinner size="sm" variant="muted" />
                         {{ __('Saving…') }}
                     </span>
@@ -243,7 +243,7 @@ origin:
                 <span class="inline-flex items-center gap-2">
                     {{ __('Images advanced') }}
                     @if ($hasRepoImages)
-                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
+                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
                     @endif
                 </span>
                 <x-heroicon-m-chevron-down class="h-4 w-4 text-brand-mist transition group-open:rotate-180" />
@@ -251,7 +251,7 @@ origin:
             <div class="space-y-5 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
                 @if ($imageSecret !== '')
                     <div x-data="{ copiedSig: false }">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Signing secret') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Signing secret') }}</p>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('HMAC-signs /_dply/image URLs.') }}</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <input type="password" readonly value="{{ $imageSecret }}" class="block min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900" onclick="this.select()" />
@@ -282,14 +282,14 @@ origin:
                     @php $tone = ($imageProbe['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'; @endphp
                     <div class="rounded-lg border px-3 py-2 text-xs {{ $tone }}">
                         @if (isset($imageProbe['status'])) <p><span class="font-semibold">{{ __('HTTP :status', ['status' => $imageProbe['status']]) }}</span> · {{ __(':latency ms', ['latency' => $imageProbe['latency_ms'] ?? 0]) }}</p> @endif
-                        @if (! empty($imageProbe['target'])) <p class="mt-0.5 break-all font-mono text-[10px] opacity-80">{{ $imageProbe['target'] }}</p> @endif
-                        @if (! empty($imageProbe['error'])) <p class="mt-1 text-[11px]">{{ $imageProbe['error'] }}</p> @endif
-                        @if (! empty($imageProbe['hint'])) <p class="mt-1 text-[11px] opacity-80">{{ $imageProbe['hint'] }}</p> @endif
+                        @if (! empty($imageProbe['target'])) <p class="mt-0.5 break-all font-mono text-2xs opacity-80">{{ $imageProbe['target'] }}</p> @endif
+                        @if (! empty($imageProbe['error'])) <p class="mt-1 text-xs">{{ $imageProbe['error'] }}</p> @endif
+                        @if (! empty($imageProbe['hint'])) <p class="mt-1 text-xs opacity-80">{{ $imageProbe['hint'] }}</p> @endif
                     </div>
                 @endif
 
                 <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                     @if ($hasRepoImages)
                         <p class="mt-2 font-mono text-xs text-brand-ink break-all">{{ implode(', ', $repoAllowed) }}</p>
                     @else

@@ -48,7 +48,7 @@
         @can('update', $site)
             <form wire:submit.prevent="addBinding" class="grid grid-cols-1 gap-3 border-b border-brand-ink/10 px-5 py-4 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:items-end sm:px-6">
                 <div>
-                    <label for="new-binding-name" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
+                    <label for="new-binding-name" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</label>
                     <input
                         id="new-binding-name"
                         type="text"
@@ -60,7 +60,7 @@
                     @error('new_name') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label for="new-binding-kind" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</label>
+                    <label for="new-binding-kind" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</label>
                     <select
                         id="new-binding-kind"
                         wire:model.live="new_kind"
@@ -73,7 +73,7 @@
                     @error('new_kind') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label for="new-binding-value" class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                    <label for="new-binding-value" class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                         {{ $create_resource ? __('New resource name') : ($valueLabels[$new_kind] ?? __('Identifier')) }}
                     </label>
                     <input
@@ -114,7 +114,7 @@
                     <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6" wire:key="binding-{{ $index }}-{{ $entry['name'] }}">
                         <div class="min-w-0">
                             <p class="font-mono text-sm text-brand-ink">env.{{ $entry['name'] }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-moss">
+                            <p class="mt-0.5 text-xs text-brand-moss">
                                 {{ $kindLabels[$entry['kind']] ?? $entry['kind'] }}
                                 <span class="text-brand-mist">·</span>
                                 <span class="font-mono">{{ $entry['value'] }}</span>
@@ -140,7 +140,7 @@
             <span class="inline-flex items-center gap-2">
                 {{ __('From repo') }}
                 @if ($repoBindings !== [])
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                         {{ count($repoBindings) }}
                     </span>
                 @endif

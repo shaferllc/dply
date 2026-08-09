@@ -27,7 +27,7 @@
         <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4" aria-hidden="true">
             <div class="mb-2 flex items-center gap-1.5">
                 <x-heroicon-o-rectangle-stack class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library on this server') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library on this server') }}</p>
             </div>
             <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
                 @foreach (range(1, 3) as $row)
@@ -48,7 +48,7 @@
         <div class="px-3 py-3 sm:px-4" aria-hidden="true">
             <div class="mb-2 flex items-center gap-2">
                 <x-heroicon-o-bolt class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('One-off command') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('One-off command') }}</p>
                 <div class="h-2.5 w-2/5 max-w-xs animate-pulse rounded bg-brand-ink/10"></div>
             </div>
             <div class="h-[4.5rem] w-full animate-pulse rounded-xl bg-brand-ink/10"></div>

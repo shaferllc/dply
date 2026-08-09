@@ -28,7 +28,7 @@
                         wire:loading.attr="disabled"
                         wire:target="runSmokeTest"
                         @disabled($isDeployer || ! $opsReady || $actionInFlight)
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="runSmokeTest" class="inline-flex">
                             <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -70,7 +70,7 @@
                         $smokeCounts[$u] = ($smokeCounts[$u] ?? 0) + 1;
                     }
                 @endphp
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-[11px] sm:px-5">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-xs sm:px-5">
                     <span class="text-brand-moss">{{ __(':probed of :total probed', ['probed' => $smoke_probed, 'total' => $smoke_total_sites]) }}@if ($smoke_truncated) <span class="text-amber-700">{{ __('(truncated)') }}</span>@endif</span>
                     @if ($smokeCounts['down'] > 0)
                         <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">
@@ -95,7 +95,7 @@
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
-                        <thead class="bg-brand-sand/20 text-[11px] uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/20 text-xs uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-4 py-1.5 font-medium sm:px-5">{{ __('Site') }}</th>
                                 <th class="px-3 py-1.5 font-medium">{{ __('Hostname') }}</th>
@@ -128,29 +128,29 @@
                                     <td class="px-3 py-1.5 text-xs">
                                         <span class="font-mono {{ $httpClass }}">{{ $httpStatus ?? '—' }}</span>
                                         @if (isset($r['http_time_ms']))
-                                            <span class="ml-1 text-[10px] text-brand-mist tabular-nums">{{ $r['http_time_ms'] }}ms</span>
+                                            <span class="ml-1 text-2xs text-brand-mist tabular-nums">{{ $r['http_time_ms'] }}ms</span>
                                         @endif
                                         @if (! empty($r['http_error']))
-                                            <p class="mt-0.5 text-[10px] text-rose-700">{{ $r['http_error'] }}</p>
+                                            <p class="mt-0.5 text-2xs text-rose-700">{{ $r['http_error'] }}</p>
                                         @endif
                                     </td>
                                     <td class="px-3 py-1.5 text-xs">
                                         <span class="font-mono {{ $httpsClass }}">{{ $httpsStatus ?? '—' }}</span>
                                         @if (isset($r['https_time_ms']))
-                                            <span class="ml-1 text-[10px] text-brand-mist tabular-nums">{{ $r['https_time_ms'] }}ms</span>
+                                            <span class="ml-1 text-2xs text-brand-mist tabular-nums">{{ $r['https_time_ms'] }}ms</span>
                                         @endif
                                         @if (! empty($r['https_status']) && empty($r['https_tls_ok']))
-                                            <span class="ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="TLS verification failed (-k accepted the cert anyway)">
+                                            <span class="ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-800" title="TLS verification failed (-k accepted the cert anyway)">
                                                 <x-heroicon-o-shield-exclamation class="h-3 w-3" /> tls
                                             </span>
                                         @endif
                                         @if (! empty($r['https_error']))
-                                            <p class="mt-0.5 text-[10px] text-rose-700">{{ $r['https_error'] }}</p>
+                                            <p class="mt-0.5 text-2xs text-rose-700">{{ $r['https_error'] }}</p>
                                         @endif
                                     </td>
                                     <td class="px-3 py-1.5 text-right">
                                         <span @class([
-                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
+                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold ring-1',
                                             'bg-rose-100 text-rose-900 ring-rose-200' => $urgency === 'down',
                                             'bg-rose-50 text-rose-700 ring-rose-200' => $urgency === 'error',
                                             'bg-amber-50 text-amber-800 ring-amber-200' => $urgency === 'warn',
@@ -188,7 +188,7 @@
                         wire:click="refreshDriftDetector"
                         wire:loading.attr="disabled"
                         wire:target="refreshDriftDetector,loadDriftDetector"
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="refreshDriftDetector,loadDriftDetector" class="inline-flex">
                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -227,7 +227,7 @@
                     <p class="mt-2">{{ __('No sites on this server yet — no configs to compare.') }}</p>
                 </div>
             @else
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-[11px] sm:px-5">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-xs sm:px-5">
                     <span class="text-brand-moss">{{ __(':total sites compared (:engine)', ['total' => count($drift_results), 'engine' => $drift_engine]) }}@if ($drift_truncated) <span class="text-amber-700">{{ __('(truncated to first 60)') }}</span>@endif</span>
                     @if ($drift_count > 0)
                         <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
@@ -258,28 +258,28 @@
                                             class="font-medium text-brand-ink hover:underline"
                                         >{{ $row['site_name'] }}</a>
                                         @if ($hasError)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700">
                                                 <x-heroicon-o-x-circle class="h-3 w-3" /> {{ $row['error'] }}
                                             </span>
                                         @elseif ($drifted)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800">
                                                 <x-heroicon-o-exclamation-triangle class="h-3 w-3" /> {{ __('drifted') }}
                                             </span>
-                                            <span class="text-[11px] tabular-nums text-emerald-700">+{{ $row['added'] }}</span>
-                                            <span class="text-[11px] tabular-nums text-rose-700">-{{ $row['removed'] }}</span>
+                                            <span class="text-xs tabular-nums text-emerald-700">+{{ $row['added'] }}</span>
+                                            <span class="text-xs tabular-nums text-rose-700">-{{ $row['removed'] }}</span>
                                         @else
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700">
                                                 <x-heroicon-o-check-circle class="h-3 w-3" /> {{ __('in sync') }}
                                             </span>
                                         @endif
                                     </div>
-                                    <p class="mt-0.5 break-all font-mono text-[11px] text-brand-mist">{{ $row['path'] }}</p>
+                                    <p class="mt-0.5 break-all font-mono text-xs text-brand-mist">{{ $row['path'] }}</p>
                                 </div>
                                 @if ($drifted && ! $hasError)
                                     <button
                                         type="button"
                                         x-on:click="open = !open"
-                                        class="inline-flex shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                        class="inline-flex shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                     >
                                         <span x-text="open ? @js(__('Hide diff')) : @js(__('Show diff'))"></span>
                                         <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
@@ -290,7 +290,7 @@
                             @if ($drifted && ! $hasError)
                                 <pre
                                     x-show="open" x-cloak
-                                    class="mt-3 max-h-96 overflow-auto rounded-lg bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"
+                                    class="mt-3 max-h-96 overflow-auto rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
                                 >{{ $row['diff'] }}</pre>
                             @endif
                         </div>

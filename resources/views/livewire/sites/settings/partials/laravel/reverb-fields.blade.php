@@ -19,7 +19,7 @@
                     min="1"
                     max="65535"
                 />
-                <p class="mt-1 text-[11px] text-brand-moss font-mono">{{ $site->reverbSupervisorCommandLine(($laravel_reverb_port ?? '') !== '' ? (int) $laravel_reverb_port : null) }}</p>
+                <p class="mt-1 text-xs text-brand-moss font-mono">{{ $site->reverbSupervisorCommandLine(($laravel_reverb_port ?? '') !== '' ? (int) $laravel_reverb_port : null) }}</p>
                 <x-input-error :messages="$errors->get('laravel_reverb_port')" class="mt-1" />
             </div>
             <div>
@@ -30,7 +30,7 @@
                     class="mt-1 block w-full font-mono text-sm"
                     placeholder="/app"
                 />
-                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Default `/app`; must match Echo / broadcasting config.') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Default `/app`; must match Echo / broadcasting config.') }}</p>
                 <x-input-error :messages="$errors->get('laravel_reverb_ws_path')" class="mt-1" />
             </div>
         </div>

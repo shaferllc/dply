@@ -104,7 +104,7 @@
                                 @if ($row['finished_at'])
                                     <span class="text-brand-moss">at {{ $row['finished_at'] }}</span>
                                 @endif
-                                <span class="ml-2 select-all rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-mist">{{ $row['deployment_id'] }}</span>
+                                <span class="ml-2 select-all rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs text-brand-mist">{{ $row['deployment_id'] }}</span>
                             </li>
                         @endforeach
                     </ul>
@@ -152,7 +152,7 @@
                             <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Dply cloud') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Dply cloud') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 {{ trans_choice('{1} 1 cloud container site|[2,*] :count cloud container sites', $cloudFleet['total'], ['count' => $cloudFleet['total']]) }}
                             </h2>
@@ -227,7 +227,7 @@
                                     <li>
                                         <span class="font-medium">{{ $row['name'] }}</span>
                                         @if ($row['container_image'])
-                                            <span class="ml-1 font-mono text-[11px] text-rose-700">{{ $row['container_image'] }}</span>
+                                            <span class="ml-1 font-mono text-xs text-rose-700">{{ $row['container_image'] }}</span>
                                         @endif
                                     </li>
                                 @endforeach

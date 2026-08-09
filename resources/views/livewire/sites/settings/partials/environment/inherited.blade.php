@@ -7,17 +7,17 @@
                 <div class="flex items-center gap-2">
                     <x-heroicon-o-link class="h-4 w-4 text-brand-moss" />
                     <span class="text-sm font-semibold text-brand-ink">{{ __('Inherited from project workspace') }}</span>
-                    <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-semibold text-brand-moss">
+                    <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-xs font-semibold text-brand-moss">
                         {{ trans_choice('{1} :count variable|[2,*] :count variables', $workspaceVariables->count(), ['count' => $workspaceVariables->count()]) }}
                     </span>
                 </div>
-                <span class="text-[11px] text-brand-mist">{{ __('Click to expand') }}</span>
+                <span class="text-xs text-brand-mist">{{ __('Click to expand') }}</span>
             </summary>
             <ul class="divide-y divide-brand-ink/8">
                 @foreach ($workspaceVariables->sortBy('env_key') as $wsVar)
                     <li class="flex items-center justify-between gap-3 px-6 py-2.5 sm:px-8" wire:key="ws-var-{{ $wsVar->id }}">
                         <span class="font-mono text-sm text-brand-ink">{{ $wsVar->env_key }}</span>
-                        <span class="text-[11px] text-brand-mist">
+                        <span class="text-xs text-brand-mist">
                             @if ((bool) ($wsVar->is_secret ?? false))
                                 {{ __('Secret — managed in project settings') }}
                             @else

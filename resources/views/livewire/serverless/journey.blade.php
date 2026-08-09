@@ -30,7 +30,7 @@
                         </span>
                         <div class="min-w-0">
                             @unless ($embedded)
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy journey') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy journey') }}</p>
                             @endunless
                             <h2 @class([
                                 'font-semibold tracking-tight text-brand-ink',
@@ -38,13 +38,13 @@
                                 'text-sm' => $embedded,
                                 'mt-0.5' => ! $embedded,
                             ])>{{ $title }}</h2>
-                            <p class="mt-0.5 truncate text-[11px] text-brand-moss">
+                            <p class="mt-0.5 truncate text-xs text-brand-moss">
                                 <span class="font-mono">{{ $site->git_repository_url }}</span>@if ($site->git_branch)<span class="text-brand-moss/60"> · {{ $site->git_branch }}</span>@endif
                             </p>
                         </div>
                     </div>
                     <span @class([
-                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                         'bg-brand-forest/15 text-brand-forest ring-brand-forest/20' => $live,
                         'bg-rose-100 text-rose-800 ring-rose-200' => $failed,
                         'bg-sky-100 text-sky-800 ring-sky-200' => ! $live && ! $failed,
@@ -62,7 +62,7 @@
                 </div>
 
                 <div class="mt-2">
-                    <div class="flex items-center justify-between text-[11px] font-medium text-brand-moss">
+                    <div class="flex items-center justify-between text-xs font-medium text-brand-moss">
                         <span>{{ $percent }}% {{ __('complete') }}</span>
                         <span class="tabular-nums">{{ $elapsedLabel }} {{ $elapsedHuman }}</span>
                     </div>
@@ -111,7 +111,7 @@
                         </span>
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-brand-ink">{{ $banner['title'] }}</p>
-                            <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ $banner['detail'] }}</p>
+                            <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $banner['detail'] }}</p>
                         </div>
                     </div>
                 </div>
@@ -131,7 +131,7 @@
                         @endunless
 
                         <span @class([
-                            'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white',
+                            'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-2xs font-bold ring-4 ring-white',
                             'bg-brand-forest text-white' => $stage['state'] === 'done',
                             'bg-brand-gold text-brand-ink' => $stage['state'] === 'active',
                             'bg-rose-500 text-white' => $stage['state'] === 'failed',
@@ -156,14 +156,14 @@
                                 'text-brand-ink' => $stage['state'] !== 'pending',
                                 'text-brand-moss/50' => $stage['state'] === 'pending',
                             ])>{{ $stage['label'] }}</p>
-                            <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ $stage['detail'] }}</p>
+                            <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $stage['detail'] }}</p>
 
                             @if ($stage['key'] === 'deploy' && count($deploySteps) > 0)
                                 <ul class="mt-1.5 space-y-1 rounded-lg bg-brand-ink/[0.03] px-2 py-1.5">
                                     @foreach ($deploySteps as $sub)
-                                        <li class="flex items-center gap-2 text-[11px]">
+                                        <li class="flex items-center gap-2 text-xs">
                                             <span @class([
-                                                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                                                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-3xs font-bold',
                                                 'bg-brand-forest text-white' => $sub['state'] === 'done',
                                                 'bg-brand-gold text-brand-ink' => $sub['state'] === 'active',
                                                 'bg-rose-500 text-white' => $sub['state'] === 'failed',
@@ -256,14 +256,14 @@
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('App details') }}</h3>
                     </div>
                     @if ($deployDuration !== '')
-                        <span class="ml-auto shrink-0 text-[11px] text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
+                        <span class="ml-auto shrink-0 text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
                     @endif
                 </div>
                 <div class="{{ $pad }}">
                     <dl class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
                         @foreach ($facts as $fact)
                             <div class="min-w-0">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ $fact['label'] }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ $fact['label'] }}</dt>
                                 <dd @class([
                                     'mt-0.5 break-all text-xs',
                                     'font-mono' => $fact['mono'] ?? false,
@@ -276,7 +276,7 @@
 
                     @if ($actionUrl)
                         <div class="mt-2 border-t border-brand-ink/10 pt-2">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Invocation URL') }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Invocation URL') }}</dt>
                             <dd class="mt-0.5">
                                 <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
                                    class="break-all font-mono text-xs text-brand-forest hover:underline">{{ $actionUrl }}</a>
@@ -290,13 +290,13 @@
             @if (trim($log) !== '')
                 <div class="border-t border-brand-ink/10">
                     <div class="flex items-center justify-between gap-3 bg-brand-sand/15 {{ $padTight }}">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy log') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Deploy log') }}</p>
                         @if ($deployStartedAt)
-                            <p class="text-[11px] text-brand-moss/60">{{ __('Started') }} {{ $deployStartedAt->diffForHumans() }}</p>
+                            <p class="text-xs text-brand-moss/60">{{ __('Started') }} {{ $deployStartedAt->diffForHumans() }}</p>
                         @endif
                     </div>
                     <div class="bg-brand-ink px-3 py-2.5 sm:px-4">
-                        <pre class="max-h-80 overflow-auto font-mono text-[11px] leading-relaxed text-brand-cream whitespace-pre-wrap break-all">{{ $log }}</pre>
+                        <pre class="max-h-80 overflow-auto font-mono text-xs leading-relaxed text-brand-cream whitespace-pre-wrap break-all">{{ $log }}</pre>
                     </div>
                 </div>
             @endif

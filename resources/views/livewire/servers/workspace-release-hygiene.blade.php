@@ -71,7 +71,7 @@
                 >
                     {{ __('Overview') }}
                     @if ($report['alert_count'] > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -82,7 +82,7 @@
                 >
                     {{ __('Releases') }}
                     @if (($report['releases']['sites_over_keep'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format((int) $report['releases']['sites_over_keep']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format((int) $report['releases']['sites_over_keep']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -136,7 +136,7 @@
                                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @switch($report['overall'])
                                         @case('critical') {{ __('Disk or release pressure') }} @break
@@ -181,7 +181,7 @@
                             <p class="mt-2 font-medium text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
                             <p class="mt-1">{{ __('The disk scan was queued but no result came back. The scan worker may be busy or offline.') }}</p>
                             @if (! empty($hygieneScanProgress))
-                                <div class="mx-auto mt-4 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                                <div class="mx-auto mt-4 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-xs leading-relaxed text-brand-ink/70">
                                     @foreach ($hygieneScanProgress as $entry)
                                         <div class="break-all">{{ $entry['line'] ?? '' }}</div>
                                     @endforeach
@@ -205,7 +205,7 @@
                                 <x-spinner class="h-4 w-4" aria-hidden="true" /> {{ __('Scanning disk over SSH…') }}
                             </span>
                             @if (! empty($hygieneScanProgress))
-                                <div class="mt-4 max-h-40 overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                                <div class="mt-4 max-h-40 overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 font-mono text-xs leading-relaxed text-brand-ink/70">
                                     @foreach ($hygieneScanProgress as $entry)
                                         <div class="break-all">{{ $entry['line'] ?? '' }}</div>
                                     @endforeach
@@ -288,7 +288,7 @@
                             <x-heroicon-o-square-3-stack-3d class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Releases') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Releases') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Atomic releases') }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply vs on-disk release folders from the last scan.') }}</p>
                         </div>
@@ -355,7 +355,7 @@
                                 <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cleanup') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cleanup') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Prune saved command') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $report['prune_command']['description'] }}</p>
                             </div>
@@ -374,7 +374,7 @@
                     </div>
                     <div class="space-y-4 px-5 py-5 sm:px-6">
                         {{-- Status + impact at a glance --}}
-                        <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                        <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
                             @if ($report['prune_command']['installed'])
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-1 text-brand-forest ring-1 ring-brand-sage/25">
                                     <x-heroicon-o-check-circle class="h-3.5 w-3.5" aria-hidden="true" />
@@ -436,7 +436,7 @@
                                 <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Logs') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Logs') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
                             </div>

@@ -36,7 +36,7 @@
                 type="button"
                 wire:click="refresh"
                 wire:loading.attr="disabled"
-                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
             >
                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refresh" aria-hidden="true" />
                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="refresh" aria-hidden="true" />
@@ -86,9 +86,9 @@
                 <div class="{{ $stripHead }} flex flex-wrap items-center justify-between gap-2">
                     <h3 class="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-brand-ink">
                         <span>{{ __('Action') }}</span>
-                        <code class="truncate font-mono text-[11px] text-brand-moss">{{ $actionName }}</code>
+                        <code class="truncate font-mono text-xs text-brand-moss">{{ $actionName }}</code>
                     </h3>
-                    <span class="shrink-0 font-mono text-[11px] text-brand-moss">v{{ $actionDoc['version'] ?? '—' }}</span>
+                    <span class="shrink-0 font-mono text-xs text-brand-moss">v{{ $actionDoc['version'] ?? '—' }}</span>
                 </div>
                 <dl class="{{ $panelPad }} grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
                     @foreach ([
@@ -104,7 +104,7 @@
                         ['Published', ($actionDoc['publish'] ?? false) ? 'true' : 'false'],
                     ] as [$label, $value])
                         <div class="min-w-0">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ __($label) }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __($label) }}</dt>
                             <dd class="mt-0.5 truncate font-mono text-xs text-brand-ink">{{ $value }}</dd>
                         </div>
                     @endforeach
@@ -123,7 +123,7 @@
             <dl class="{{ $panelPad }} grid grid-cols-2 gap-2 sm:grid-cols-4">
                 @foreach ($counts as [$label, $n])
                     <div class="flex items-baseline justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1.5">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss/70">{{ __($label) }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __($label) }}</dt>
                         <dd class="text-sm font-semibold tabular-nums text-brand-ink">{{ $n }}</dd>
                     </div>
                 @endforeach
@@ -137,7 +137,7 @@
                     type="button"
                     wire:click="deleteAction"
                     wire:confirm="{{ __('Delete the action :name from OpenWhisk?', ['name' => $actionName]) }}"
-                    class="inline-flex shrink-0 items-center rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700"
+                    class="inline-flex shrink-0 items-center rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
                 >
                     {{ __('Delete action') }}
                 </button>
@@ -160,7 +160,7 @@
         <div class="border-b border-brand-ink/10">
             <div class="{{ $stripHead }}">
                 <h3 class="text-xs font-semibold text-brand-ink">{{ __('Schedules') }}</h3>
-                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('DigitalOcean cron (UTC). One click adds a trigger.') }}</p>
+                <p class="mt-0.5 text-xs text-brand-moss">{{ __('DigitalOcean cron (UTC). One click adds a trigger.') }}</p>
             </div>
 
             @if (! $scheduled['ok'])
@@ -171,15 +171,15 @@
                         @php $added = $scheduledByName->has('dply-'.$key); @endphp
                         <li class="flex flex-wrap items-center gap-2 {{ $panelPad }} text-xs">
                             <span class="font-semibold text-brand-ink">{{ $preset['label'] }}</span>
-                            <span class="font-mono text-[11px] text-brand-moss/60">{{ $preset['cron'] }}</span>
+                            <span class="font-mono text-xs text-brand-moss/60">{{ $preset['cron'] }}</span>
                             <span class="ml-auto flex items-center gap-1.5">
                                 @if ($added)
-                                    <span class="text-[11px] font-semibold text-brand-forest">{{ __('Added') }}</span>
+                                    <span class="text-xs font-semibold text-brand-forest">{{ __('Added') }}</span>
                                     <button type="button" wire:click="removeSchedule('dply-{{ $key }}')"
-                                            class="rounded px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
+                                            class="rounded px-1.5 py-0.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
                                 @else
                                     <button type="button" wire:click="addSchedulePreset('{{ $key }}')"
-                                            class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Add') }}</button>
+                                            class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Add') }}</button>
                                 @endif
                             </span>
                         </li>
@@ -188,7 +188,7 @@
 
                 <div class="{{ $panelPad }} border-t border-brand-ink/10">
                     <button type="button" wire:click="$toggle('scheduleFormOpen')"
-                            class="text-[11px] font-semibold text-brand-sage hover:underline">
+                            class="text-xs font-semibold text-brand-sage hover:underline">
                         {{ $scheduleFormOpen ? __('Cancel') : __('Custom cron…') }}
                     </button>
                     @if ($scheduleFormOpen)
@@ -198,7 +198,7 @@
                                        class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                                 <x-input-error :messages="$errors->get('newScheduleCron')" class="mt-1" />
                             </div>
-                            <button type="submit" class="rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-forest/90">{{ __('Add') }}</button>
+                            <button type="submit" class="rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-forest/90">{{ __('Add') }}</button>
                         </form>
                     @endif
                 </div>
@@ -209,15 +209,15 @@
                             @php $tname = (string) ($trigger['name'] ?? ''); @endphp
                             <li class="flex flex-wrap items-center gap-2 {{ $panelPad }} text-xs">
                                 <span class="font-mono text-brand-ink">{{ $tname }}</span>
-                                <span class="font-mono text-[11px] text-brand-moss/60">{{ data_get($trigger, 'scheduled_details.cron', '—') }}</span>
+                                <span class="font-mono text-xs text-brand-moss/60">{{ data_get($trigger, 'scheduled_details.cron', '—') }}</span>
                                 @if (! ($trigger['is_enabled'] ?? true))
-                                    <span class="rounded bg-brand-sand px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('disabled') }}</span>
+                                    <span class="rounded bg-brand-sand px-1.5 py-0.5 text-2xs font-semibold text-brand-moss">{{ __('disabled') }}</span>
                                 @endif
                                 @if ($next = data_get($trigger, 'scheduled_runs.next_run_at'))
-                                    <span class="text-[11px] text-brand-moss/50">{{ __('next') }} {{ \Illuminate\Support\Carbon::parse($next)->diffForHumans() }}</span>
+                                    <span class="text-xs text-brand-moss/50">{{ __('next') }} {{ \Illuminate\Support\Carbon::parse($next)->diffForHumans() }}</span>
                                 @endif
                                 <button type="button" wire:click="removeSchedule('{{ $tname }}')"
-                                        class="ml-auto rounded px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
+                                        class="ml-auto rounded px-1.5 py-0.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
                             </li>
                         @endforeach
                     </ul>
@@ -229,7 +229,7 @@
             <div class="{{ $stripHead }} flex items-center justify-between gap-2">
                 <h3 class="text-xs font-semibold text-brand-ink">{{ __('Triggers') }}</h3>
                 <button type="button" wire:click="$toggle('triggerFormOpen')"
-                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">
+                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                     {{ $triggerFormOpen ? __('Cancel') : __('New') }}
                 </button>
             </div>
@@ -242,7 +242,7 @@
                     <textarea wire:model="newTriggerParams" rows="2" placeholder='{{ __('Default params JSON, e.g. {"region":"nyc"}') }}'
                               class="w-full rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs"></textarea>
                     <x-input-error :messages="$errors->get('newTriggerParams')" />
-                    <button type="submit" class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-forest/90">{{ __('Create') }}</button>
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-forest/90">{{ __('Create') }}</button>
                 </form>
             @endif
 
@@ -256,12 +256,12 @@
                         @php $tname = (string) ($trigger['name'] ?? ''); @endphp
                         <li class="flex flex-wrap items-center gap-2 {{ $panelPad }} text-xs">
                             <span class="font-mono text-brand-ink">{{ $tname }}</span>
-                            <span class="text-[11px] text-brand-moss/60">{{ trans_choice('{0}no params|{1}1 param|[2,*]:count params', count((array) ($trigger['parameters'] ?? [])), ['count' => count((array) ($trigger['parameters'] ?? []))]) }}</span>
+                            <span class="text-xs text-brand-moss/60">{{ trans_choice('{0}no params|{1}1 param|[2,*]:count params', count((array) ($trigger['parameters'] ?? [])), ['count' => count((array) ($trigger['parameters'] ?? []))]) }}</span>
                             <span class="ml-auto flex gap-1">
                                 <button type="button" wire:click="fireTrigger('{{ $tname }}')"
-                                        class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Fire') }}</button>
+                                        class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Fire') }}</button>
                                 <button type="button" wire:click="deleteTrigger('{{ $tname }}')" wire:confirm="{{ __('Delete trigger :n?', ['n' => $tname]) }}"
-                                        class="rounded px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
+                                        class="rounded px-1.5 py-0.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
                             </span>
                         </li>
                     @endforeach
@@ -273,7 +273,7 @@
             <div class="{{ $stripHead }} flex items-center justify-between gap-2">
                 <h3 class="text-xs font-semibold text-brand-ink">{{ __('Rules') }}</h3>
                 <button type="button" wire:click="$toggle('ruleFormOpen')"
-                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">
+                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                     {{ $ruleFormOpen ? __('Cancel') : __('New') }}
                 </button>
             </div>
@@ -299,7 +299,7 @@
                     </div>
                     <x-input-error :messages="$errors->get('newRuleTrigger')" />
                     <x-input-error :messages="$errors->get('newRuleAction')" />
-                    <button type="submit" class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-forest/90">{{ __('Create') }}</button>
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-forest/90">{{ __('Create') }}</button>
                 </form>
             @endif
 
@@ -318,17 +318,17 @@
                         @endphp
                         <li class="flex flex-wrap items-center gap-2 {{ $panelPad }} text-xs">
                             <span @class([
-                                'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                                'inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold',
                                 'bg-brand-forest/15 text-brand-forest' => $rstatus === 'active',
                                 'bg-brand-sand text-brand-moss' => $rstatus !== 'active',
                             ])>{{ $rstatus }}</span>
                             <span class="font-mono text-brand-ink">{{ $rname }}</span>
-                            <span class="font-mono text-[11px] text-brand-moss/60">{{ $rtrigger }} → {{ $raction }}</span>
+                            <span class="font-mono text-xs text-brand-moss/60">{{ $rtrigger }} → {{ $raction }}</span>
                             <span class="ml-auto flex gap-1">
                                 <button type="button" wire:click="toggleRule('{{ $rname }}', '{{ $rstatus }}')"
-                                        class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ $rstatus === 'active' ? __('Disable') : __('Enable') }}</button>
+                                        class="rounded border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ $rstatus === 'active' ? __('Disable') : __('Enable') }}</button>
                                 <button type="button" wire:click="deleteRule('{{ $rname }}')" wire:confirm="{{ __('Delete rule :n?', ['n' => $rname]) }}"
-                                        class="rounded px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
+                                        class="rounded px-1.5 py-0.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
                             </span>
                         </li>
                     @endforeach
@@ -345,7 +345,7 @@
             <div class="{{ $panelPad }} space-y-2.5">
                 <div class="flex flex-wrap items-end gap-2">
                     <label class="text-xs text-brand-moss">
-                        <span class="block text-[11px] font-semibold">{{ __('Method') }}</span>
+                        <span class="block text-xs font-semibold">{{ __('Method') }}</span>
                         <select wire:model="consoleMethod" class="mt-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs">
                             @foreach (['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as $m)
                                 <option value="{{ $m }}">{{ $m }}</option>
@@ -353,28 +353,28 @@
                         </select>
                     </label>
                     <label class="min-w-0 flex-1 text-xs text-brand-moss">
-                        <span class="block text-[11px] font-semibold">{{ __('Path') }}</span>
+                        <span class="block text-xs font-semibold">{{ __('Path') }}</span>
                         <input type="text" wire:model="consolePath" placeholder="/"
                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                     </label>
                 </div>
                 <label class="block text-xs text-brand-moss">
-                    <span class="text-[11px] font-semibold">{{ __('Body') }}</span>
+                    <span class="text-xs font-semibold">{{ __('Body') }}</span>
                     <textarea wire:model="consoleBody" rows="2" placeholder='{{ __('JSON or raw') }}'
                               class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs"></textarea>
                 </label>
                 <label class="block text-xs text-brand-moss">
-                    <span class="text-[11px] font-semibold">{{ __('Headers') }}</span>
+                    <span class="text-xs font-semibold">{{ __('Headers') }}</span>
                     <textarea wire:model="consoleHeaders" rows="2" placeholder="{{ __('One per line — Header: value') }}"
                               class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs"></textarea>
                 </label>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" wire:click="sendConsole" wire:loading.attr="disabled" wire:target="sendConsole"
-                            class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
+                            class="inline-flex items-center rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
                         <span wire:loading.remove wire:target="sendConsole">{{ __('Send') }}</span>
                         <span wire:loading wire:target="sendConsole">{{ __('Invoking…') }}</span>
                     </button>
-                    <p class="text-[11px] text-brand-moss/60">{{ __('Recorded as a test invocation.') }}</p>
+                    <p class="text-xs text-brand-moss/60">{{ __('Recorded as a test invocation.') }}</p>
                 </div>
             </div>
         </div>
@@ -386,20 +386,20 @@
                 @else
                     <div class="flex flex-wrap items-center gap-2">
                         <span @class([
-                            'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                            'inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold',
                             'bg-brand-forest/15 text-brand-forest' => $consoleResult['success'],
                             'bg-rose-100 text-rose-700' => ! $consoleResult['success'],
                         ])>{{ $consoleResult['success'] ? __('OK') : __('Error') }}</span>
                         @if ($consoleResult['status'])
-                            <span class="font-mono text-[11px] text-brand-moss">HTTP {{ $consoleResult['status'] }}</span>
+                            <span class="font-mono text-xs text-brand-moss">HTTP {{ $consoleResult['status'] }}</span>
                         @endif
-                        <span class="text-[11px] text-brand-moss">{{ $consoleResult['duration'] }}ms</span>
+                        <span class="text-xs text-brand-moss">{{ $consoleResult['duration'] }}ms</span>
                     </div>
                     @if (trim((string) $consoleResult['excerpt']) !== '')
-                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-2.5 text-[11px] leading-relaxed text-brand-ink">{{ $consoleResult['excerpt'] }}</pre>
+                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-2.5 text-xs leading-relaxed text-brand-ink">{{ $consoleResult['excerpt'] }}</pre>
                     @endif
                     @if (count($consoleResult['logs']) > 0)
-                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 text-[11px] leading-relaxed text-brand-cream">{{ implode("\n", $consoleResult['logs']) }}</pre>
+                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 text-xs leading-relaxed text-brand-cream">{{ implode("\n", $consoleResult['logs']) }}</pre>
                     @endif
                 @endif
             </div>

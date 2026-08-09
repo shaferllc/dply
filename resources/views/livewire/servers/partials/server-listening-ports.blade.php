@@ -133,7 +133,7 @@
              two line up instead of each picking their own gutter. --}}
         <div class="mx-6 mb-6 mt-3 overflow-x-auto rounded-xl border border-brand-ink/10 sm:mx-8">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-4 py-2 font-semibold">{{ __('Port') }}</th>
                         <th class="px-4 py-2 font-semibold">{{ __('Process') }}</th>
@@ -149,7 +149,7 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="font-mono">{{ $row['bind'] }}</span>
                                     <span
-                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $row['scope']['classes'] }}"
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $row['scope']['classes'] }}"
                                         title="{{ $row['scope']['tip'] }}"
                                     >{{ $row['scope']['label'] }}</span>
                                 </div>

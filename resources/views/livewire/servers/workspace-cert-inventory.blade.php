@@ -131,7 +131,7 @@
                                     <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can review certificate expiry but cannot queue renewals.') }}</p>
                                 </div>
@@ -207,7 +207,7 @@
                                     'border-emerald-200/70 bg-emerald-50/40' => $stat['tone'] === 'emerald',
                                     'border-brand-ink/10 bg-brand-sand/20' => $stat['tone'] === 'ink',
                                 ])>
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $stat['label'] }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $stat['label'] }}</p>
                                     <p @class([
                                         'mt-1 text-xl font-semibold tabular-nums',
                                         'text-rose-700' => $stat['tone'] === 'rose',
@@ -228,13 +228,13 @@
                                     <span>{{ __('Expired') }} <span class="font-semibold tabular-nums text-rose-700">{{ $report['summary']['expired'] }}</span></span>
                                 @endif
                                 @foreach ($report['breakdown']['providers'] ?? [] as $provider => $count)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[11px] font-medium text-brand-ink ring-1 ring-brand-ink/10">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
                                         {{ $provider }}
                                         <span class="tabular-nums text-brand-moss">{{ $count }}</span>
                                     </span>
                                 @endforeach
                                 @foreach ($report['breakdown']['challenges'] ?? [] as $challenge => $count)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[11px] font-medium uppercase text-brand-ink ring-1 ring-brand-ink/10">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-xs font-medium uppercase text-brand-ink ring-1 ring-brand-ink/10">
                                         {{ $challenge }}
                                         <span class="normal-case tabular-nums text-brand-moss">{{ $count }}</span>
                                     </span>
@@ -273,7 +273,7 @@
                                     type="button"
                                     wire:click="setCertFilter(@js($key))"
                                     @class([
-                                        'rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 transition',
+                                        'rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition',
                                         $certFilter === $key
                                             ? 'bg-brand-forest text-white ring-brand-forest'
                                             : 'bg-white text-brand-moss ring-brand-ink/15 hover:bg-brand-sand/40',
@@ -325,24 +325,24 @@
                                                     <span class="font-medium text-brand-ink">{{ $item['site_name'] }}</span>
                                                 @endif
                                                 @if (($item['scope_type'] ?? '') === SiteCertificate::SCOPE_PREVIEW)
-                                                    <p class="mt-0.5 text-[10px] text-brand-mist">{{ __('Preview') }}</p>
+                                                    <p class="mt-0.5 text-2xs text-brand-mist">{{ __('Preview') }}</p>
                                                 @endif
                                             </td>
                                             <td class="max-w-[14rem] px-3 py-2">
                                                 <p class="font-mono text-brand-ink">{{ $item['domain'] }}</p>
                                                 @if (count($item['all_domains'] ?? []) > 1)
-                                                    <p class="mt-0.5 text-[10px] text-brand-mist" title="{{ implode(', ', $item['all_domains']) }}">
+                                                    <p class="mt-0.5 text-2xs text-brand-mist" title="{{ implode(', ', $item['all_domains']) }}">
                                                         +{{ count($item['all_domains']) - 1 }} {{ __('SAN') }}
                                                     </p>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2">
-                                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusTone($item['status'], $item['severity']) }}">
+                                                <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $statusTone($item['status'], $item['severity']) }}">
                                                     {{ $item['status'] }}
                                                 </span>
                                             </td>
                                             <td class="px-3 py-2">
-                                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $tonePalette['mist'] }}">
+                                                <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold ring-1 {{ $tonePalette['mist'] }}">
                                                     {{ $item['provider'] }}
                                                 </span>
                                             </td>

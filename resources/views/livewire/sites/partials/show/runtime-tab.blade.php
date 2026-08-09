@@ -4,11 +4,11 @@
                                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runtime target') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The latest managed deploy details for this runtime target.') }}</p>
                             </div>
-                            <span class="ml-auto inline-flex shrink-0 items-center self-center rounded-full bg-brand-sand/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
+                            <span class="ml-auto inline-flex shrink-0 items-center self-center rounded-full bg-brand-sand/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">
                                 {{ $site->runtimeTargetLabel() }}
                             </span>
                         </div>
@@ -16,15 +16,15 @@
                         <div class="space-y-4 px-6 py-6 sm:px-7">
                         <dl class="grid gap-4 sm:grid-cols-3">
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Platform') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Platform') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">{{ ucfirst((string) ($runtimeTarget['platform'] ?? 'unknown')) }}</dd>
                             </div>
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Mode') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Mode') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">{{ ucfirst((string) ($runtimeTarget['mode'] ?? 'unknown')) }}</dd>
                             </div>
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Status') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Status') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">{{ ucfirst(str_replace('_', ' ', (string) ($runtimeTarget['status'] ?? 'unknown'))) }}</dd>
                             </div>
                         </dl>
@@ -34,15 +34,15 @@
                                 <h4 class="text-sm font-semibold text-brand-ink">{{ __('Deployment foundation') }}</h4>
                                 <dl class="mt-3 grid gap-4 sm:grid-cols-3">
                                     <div>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Current revision') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Current revision') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-xs text-brand-ink">{{ $foundationStatus['current_runtime_revision'] ?? '—' }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Last applied revision') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Last applied revision') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-xs text-brand-ink">{{ $foundationStatus['last_applied_runtime_revision'] ?? __('Not applied yet') }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Drift') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Drift') }}</dt>
                                         <dd class="mt-2 text-sm {{ $runtimeDrifted ? 'text-amber-700' : 'text-emerald-700' }}">{{ $runtimeDrifted ? __('Detected') : __('In sync') }}</dd>
                                     </div>
                                 </dl>
@@ -60,15 +60,15 @@
                         @if ($runtimePublication !== [])
                             <dl class="grid gap-4 sm:grid-cols-3">
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Publication status') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Publication status') }}</dt>
                                     <dd class="mt-2 text-sm text-brand-ink">{{ ucfirst((string) ($runtimePublication['status'] ?? 'pending')) }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Hostname') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Hostname') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['hostname'] ?? '—' }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Published URL') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Published URL') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['url'] ?? '—' }}</dd>
                                 </div>
                             </dl>
@@ -77,36 +77,36 @@
                         @if ($site->usesFunctionsRuntime())
                             <dl class="grid gap-4 sm:grid-cols-2">
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Runtime') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Runtime') }}</dt>
                                     <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $serverlessRuntime['runtime'] ?? '—' }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Entrypoint') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Entrypoint') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['entrypoint'] ?? '—' }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Revision') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Revision') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['last_revision_id'] ?? __('Not deployed yet') }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest artifact') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest artifact') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['artifact_path'] ?? __('Not built yet') }}</dd>
                                 </div>
                                 @if (! empty($serverlessRuntime['function_arn']))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function ARN') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function ARN') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['function_arn'] }}</dd>
                                     </div>
                                 @endif
                                 @if (! empty($serverlessRuntime['function_url']))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function URL') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function URL') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['function_url'] }}</dd>
                                     </div>
                                 @endif
                                 @if (! empty($serverlessRuntime['action_url']))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Published action URL') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Published action URL') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['action_url'] }}</dd>
                                     </div>
                                 @endif
@@ -114,16 +114,16 @@
                         @elseif ($site->usesDockerRuntime())
                             <dl class="grid gap-4 sm:grid-cols-2">
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Compose file') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Compose file') }}</dt>
                                     <dd class="mt-2 text-sm text-brand-ink">{{ isset($dockerRuntime['compose_yaml']) ? __('Available') : __('Not generated yet') }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Dockerfile') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Dockerfile') }}</dt>
                                     <dd class="mt-2 text-sm text-brand-ink">{{ isset($dockerRuntime['dockerfile']) ? __('Available') : __('Not generated yet') }}</dd>
                                 </div>
                                 @if (! empty($dockerRuntime['workspace_path']))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Local workspace') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Local workspace') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $dockerRuntime['workspace_path'] }}</dd>
                                     </div>
                                 @endif
@@ -133,29 +133,29 @@
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 space-y-4">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
                                         <div>
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Docker discovery') }}</p>
+                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Docker discovery') }}</p>
                                             <p class="mt-1 text-sm text-brand-moss">{{ __('Saved from the live runtime so hostname, IP, and identity stay referenceable.') }}</p>
                                         </div>
                                         @if (! empty($dockerRuntimeDetails['collected_at']))
-                                            <p class="font-mono text-[11px] text-brand-mist">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                                            <p class="font-mono text-xs text-brand-mist">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
                                         @endif
                                     </div>
 
                                     <dl class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Hostname') }}</dt>
+                                            <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Hostname') }}</dt>
                                             <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['hostname'] ?? '—' }}</dd>
                                         </div>
                                         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Container IP') }}</dt>
+                                            <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Container IP') }}</dt>
                                             <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['container_ip'] ?? '—' }}</dd>
                                         </div>
                                         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Container name') }}</dt>
+                                            <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Container name') }}</dt>
                                             <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['container_name'] ?? '—' }}</dd>
                                         </div>
                                         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Service') }}</dt>
+                                            <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Service') }}</dt>
                                             <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $runtimePublication['docker_service'] ?? '—' }}</dd>
                                         </div>
                                     </dl>
@@ -163,17 +163,17 @@
                                     @if ($dockerContainers->isNotEmpty())
                                         <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
                                             <div class="border-b border-brand-ink/10 px-4 py-3">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Containers') }}</p>
+                                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Containers') }}</p>
                                             </div>
                                             <div class="overflow-x-auto">
                                                 <table class="min-w-full divide-y divide-brand-ink/10 text-left">
                                                     <thead class="bg-brand-sand/30">
                                                         <tr>
-                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Name') }}</th>
-                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Service') }}</th>
-                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hostname') }}</th>
-                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('IP') }}</th>
-                                                            <th class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('State') }}</th>
+                                                            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Name') }}</th>
+                                                            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Service') }}</th>
+                                                            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hostname') }}</th>
+                                                            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('IP') }}</th>
+                                                            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('State') }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody class="divide-y divide-brand-ink/8 bg-white">
@@ -196,16 +196,16 @@
                         @else
                             <dl class="grid gap-4 sm:grid-cols-2">
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Namespace') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Namespace') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $kubernetesRuntime['namespace'] ?? __('default') }}</dd>
                                 </div>
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Manifest') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Manifest') }}</dt>
                                     <dd class="mt-2 text-sm text-brand-ink">{{ isset($kubernetesRuntime['manifest_yaml']) ? __('Generated') : __('Not generated yet') }}</dd>
                                 </div>
                                 @if (! empty($kubernetesRuntime['workspace_path']))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Local workspace') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Local workspace') }}</dt>
                                         <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $kubernetesRuntime['workspace_path'] }}</dd>
                                     </div>
                                 @endif
@@ -241,7 +241,7 @@
 
                                 @if ($runtimeOperationConsoles->isNotEmpty())
                                     <div class="space-y-3">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Recent runtime operations') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Recent runtime operations') }}</p>
                                         @foreach ($runtimeOperationConsoles as $runtimeConsole)
                                             @include('livewire.partials.deployment-activity-console', [
                                                 'title' => $runtimeConsole['title'],

@@ -108,7 +108,7 @@
                     @endif
                 </div>
                 @if ($activeUnit !== null)
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $activePill['classes'] }}">
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {{ $activePill['classes'] }}">
                         <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $activePill['dot'] }}"></span>
                         {{ $activePill['label'] }}
                     </span>
@@ -174,7 +174,7 @@
                             <p class="min-w-0 font-semibold text-brand-ink">{{ $info['label'] }}</p>
                         </div>
                         @if ($isComingSoon)
-                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
                                 {{ __('Soon') }}
                             </span>
@@ -215,7 +215,7 @@
                                     <x-heroicon-o-arrow-right class="h-3 w-3 text-brand-mist" />
                                     {{ $payload['to'] ?? '—' }}
                                 </span>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusClasses }}">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $statusClasses }}">
                                     @if ($isRollback)
                                         {{ __('rolled back') }}
                                     @elseif ($isSuccess)
@@ -225,12 +225,12 @@
                                     @endif
                                 </span>
                                 @if ($sitesCount > 0)
-                                    <span class="inline-flex items-center rounded-full bg-brand-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <span class="inline-flex items-center rounded-full bg-brand-ink/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         {{ trans_choice(':n site|:n sites', $sitesCount, ['n' => $sitesCount]) }}
                                     </span>
                                 @endif
                                 @if (! empty($payload['tls_opt_in']))
-                                    <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('TLS handover') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('TLS handover') }}</span>
                                 @endif
                             </div>
                             <div class="text-right text-xs text-brand-moss">
@@ -239,10 +239,10 @@
                             </div>
                         </div>
                         @if (! $isSuccess && ! empty($payload['reason']))
-                            <p class="mt-2 break-words font-mono text-[11px] text-rose-800">{{ $payload['reason'] }}</p>
+                            <p class="mt-2 break-words font-mono text-xs text-rose-800">{{ $payload['reason'] }}</p>
                         @endif
                         @if ($durationMs > 0)
-                            <p class="mt-1 text-[10px] text-brand-mist">
+                            <p class="mt-1 text-2xs text-brand-mist">
                                 {{ __('Duration:') }} <span class="font-mono">{{ $durationMs < 1000 ? $durationMs.' ms' : round($durationMs / 1000, 1).' s' }}</span>
                             </p>
                         @endif
@@ -264,7 +264,7 @@
 
             <div class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                    <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                    <thead class="bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                         <tr>
                             <th class="px-4 py-2 font-semibold">{{ __('Version') }}</th>
                             <th class="px-4 py-2 font-semibold">{{ __('Status') }}</th>
@@ -281,7 +281,7 @@
                             <tr>
                                 <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['version'] }}</td>
                                 <td class="px-4 py-2">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $pill['classes'] }}">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {{ $pill['classes'] }}">
                                         <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
                                         {{ $pill['label'] }}
                                     </span>
@@ -302,7 +302,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="openConfirmActionModal('runAllowlistedAction', ['restart_php_fpm'], @js($a['label']), @js($a['confirm']), @js($a['label']), false)"
-                                                    class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                    class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                 >{{ __('Restart') }}</button>
                                             @endif
                                             @if (! empty($serviceActions['reload_php_fpm']))
@@ -310,7 +310,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="openConfirmActionModal('runAllowlistedAction', ['reload_php_fpm'], @js($a['label']), @js($a['confirm']), @js($a['label']), false)"
-                                                    class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                    class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                 >{{ __('Reload') }}</button>
                                             @endif
                                         </div>
@@ -352,7 +352,7 @@
             @if (! empty($certs))
                 <div class="mt-5 overflow-hidden rounded-xl border border-brand-ink/10">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                        <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
+                        <thead class="bg-brand-sand/30 text-left text-xs uppercase tracking-wide text-brand-mist">
                             <tr>
                                 <th class="px-4 py-2 font-semibold">{{ __('Domains') }}</th>
                                 <th class="px-4 py-2 font-semibold">{{ __('Expires') }}</th>
@@ -371,7 +371,7 @@
                                     <td class="px-4 py-2 text-xs">
                                         <div class="font-medium text-brand-ink">{{ $cert['name'] }}</div>
                                         @if ($cert['domains'])
-                                            <div class="font-mono text-[11px] text-brand-moss">{{ $cert['domains'] }}</div>
+                                            <div class="font-mono text-xs text-brand-moss">{{ $cert['domains'] }}</div>
                                         @endif
                                     </td>
                                     <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $cert['expiry'] ?: '—' }}</td>

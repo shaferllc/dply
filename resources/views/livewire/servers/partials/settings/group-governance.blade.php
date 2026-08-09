@@ -74,7 +74,7 @@
                     </p>
                     <dl class="mt-3 grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-3">
                         <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Catalog rate') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Catalog rate') }}</dt>
                             <dd class="mt-0.5 text-base font-semibold text-brand-ink">
                                 {{ $lastPulledCostEstimate['currency'] === 'USD' ? '$' : '' }}{{ number_format((float) $lastPulledCostEstimate['monthly'], 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span>
                             </dd>
@@ -83,7 +83,7 @@
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Estimated MTD') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Estimated MTD') }}</dt>
                             <dd class="mt-0.5 text-base font-semibold text-brand-ink">
                                 {{ $lastPulledCostEstimate['currency'] === 'USD' ? '$' : '' }}{{ number_format((float) $lastPulledCostEstimate['mtd'], 2) }}
                             </dd>
@@ -92,7 +92,7 @@
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Estimated YTD') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Estimated YTD') }}</dt>
                             <dd class="mt-0.5 text-base font-semibold text-brand-ink">
                                 {{ $lastPulledCostEstimate['currency'] === 'USD' ? '$' : '' }}{{ number_format((float) $lastPulledCostEstimate['ytd'], 2) }}
                             </dd>

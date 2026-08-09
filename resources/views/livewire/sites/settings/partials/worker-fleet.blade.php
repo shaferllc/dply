@@ -22,7 +22,7 @@
             <x-heroicon-o-square-3-stack-3d class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background capacity') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background capacity') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Worker servers') }}</h2>
             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Worker servers in this workspace run your queues/background jobs. Scale them up when the backlog grows, down when it’s quiet.') }}</p>
         </div>
@@ -58,7 +58,7 @@
                                     @php $crossServer = $pool->source_server_id !== null && $pool->source_server_id !== $site->server_id; @endphp
                                     @if ($crossServer)
                                         <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800 ring-1 ring-inset ring-amber-200/70"
+                                            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-amber-800 ring-1 ring-inset ring-amber-200/70"
                                             title="{{ __('This pool runs a different server’s code and queues. It only drains this site’s jobs if they share the same queue connection/Redis.') }}"
                                         >
                                             <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
@@ -78,7 +78,7 @@
                                             wire:click="detachWorkerPool(@js((string) $pool->id))"
                                             wire:confirm="{{ __('Detach this worker pool from the site? The pool keeps running; it just stops being listed here.') }}"
                                             wire:loading.attr="disabled"
-                                            class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50">{{ __('Detach') }}</button>
+                                            class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50">{{ __('Detach') }}</button>
                                     @endif
                                 @endcan
                             </div>
@@ -109,13 +109,13 @@
                             <span>{{ trans_choice(':n worker process|:n worker processes', $poolProcs, ['n' => $poolProcs]) }}</span>
                             @can('update', $site)
                                 <button type="button" wire:click="refreshWorkerStats(@js((string) $pool->id))" wire:loading.attr="disabled" wire:target="refreshWorkerStats"
-                                    class="ml-auto inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                    class="ml-auto inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshWorkerStats" /> {{ __('Refresh') }}
                                 </button>
                             @endcan
                         </div>
                         @if ($collectedAt)
-                            <p class="mt-1 text-[10px] text-brand-mist">{{ __('Stats as of :t', ['t' => \Illuminate\Support\Carbon::parse($collectedAt)->diffForHumans()]) }}</p>
+                            <p class="mt-1 text-2xs text-brand-mist">{{ __('Stats as of :t', ['t' => \Illuminate\Support\Carbon::parse($collectedAt)->diffForHumans()]) }}</p>
                         @endif
 
                         <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
@@ -125,25 +125,25 @@
                                         <div class="flex items-center gap-2">
                                             <a href="{{ route('servers.overview', ['server' => $member]) }}" wire:navigate class="truncate font-medium text-brand-ink hover:text-brand-sage hover:underline">{{ $member->name }}</a>
                                             @if ($member->isPoolPrimary())
-                                                <span class="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ __('primary') }}</span>
+                                                <span class="rounded bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ __('primary') }}</span>
                                             @else
-                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('replica') }}</span>
+                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('replica') }}</span>
                                             @endif
                                             @if ($member->poolMemberState())
-                                                <span class="text-[10px] text-brand-mist">{{ $member->poolMemberState() }}</span>
+                                                <span class="text-2xs text-brand-mist">{{ $member->poolMemberState() }}</span>
                                             @endif
                                         </div>
-                                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist">{{ $member->ip_address ?? '—' }} · {{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</p>
+                                        <p class="mt-0.5 truncate font-mono text-xs text-brand-mist">{{ $member->ip_address ?? '—' }} · {{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</p>
                                         @php
                                             $mProcs = $workerProcs($member);
                                             $share = $poolProcs > 0 ? (int) round($mProcs / $poolProcs * 100) : 0;
                                         @endphp
                                         <div class="mt-1.5 flex items-center gap-2" title="{{ __('Worker processes on this box — its share of the pool\'s drain capacity (pull queue, so no fixed per-worker assignment).') }}">
-                                            <span class="text-[10px] text-brand-moss">{{ trans_choice(':n process|:n processes', $mProcs, ['n' => $mProcs]) }}</span>
+                                            <span class="text-2xs text-brand-moss">{{ trans_choice(':n process|:n processes', $mProcs, ['n' => $mProcs]) }}</span>
                                             <div class="h-1.5 w-24 overflow-hidden rounded-full bg-brand-sand/60">
                                                 <div class="h-full rounded-full bg-violet-500" style="width: {{ $share }}%"></div>
                                             </div>
-                                            <span class="text-[10px] font-medium text-brand-mist">{{ $share }}%</span>
+                                            <span class="text-2xs font-medium text-brand-mist">{{ $share }}%</span>
                                         </div>
                                     </div>
                                     @can('update', $site)
@@ -152,7 +152,7 @@
                                                 wire:click="removePoolWorker(@js((string) $pool->id), @js((string) $member->id))"
                                                 wire:confirm="{{ __('Drain and destroy this worker server? In-flight jobs finish first.') }}"
                                                 wire:loading.attr="disabled"
-                                                class="shrink-0 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{{ __('Remove') }}</button>
+                                                class="shrink-0 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{{ __('Remove') }}</button>
                                         @endunless
                                     @endcan
                                 </li>
@@ -169,7 +169,7 @@
         @can('update', $site)
             @if ($availablePools->isNotEmpty())
                 <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach worker servers') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach worker servers') }}</p>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Worker pools in this organization you can attach to this site.') }}</p>
                     <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
                         @foreach ($availablePools as $candidate)
@@ -183,13 +183,13 @@
                             <li class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm" wire:key="attach-pool-{{ $candidate->id }}">
                                 <div class="min-w-0">
                                     <p class="truncate font-medium text-brand-ink">{{ $candidate->name ?: __('Worker pool') }}</p>
-                                    <p class="mt-0.5 truncate text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 truncate text-xs text-brand-mist">
                                         {{ trans_choice(':n worker|:n workers', $candidate->servers->count(), ['n' => $candidate->servers->count()]) }}
                                         @if ($candidate->sourceServer)· {{ __('source') }}: {{ $candidate->sourceServer->name }}@endif
                                         · {{ __('status') }} {{ $candidate->status }}
                                     </p>
                                     @unless ($sameServer)
-                                        <p class="mt-1 flex items-start gap-1 text-[11px] font-medium text-amber-700">
+                                        <p class="mt-1 flex items-start gap-1 text-xs font-medium text-amber-700">
                                             <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                             <span>{{ __('Different source server — this pool only runs this site\'s jobs if they share the same queue/Redis.') }}</span>
                                         </p>

@@ -174,9 +174,9 @@
                                     <div class="flex items-center gap-2">
                                         <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $rule->enabled ? 'bg-emerald-500' : 'bg-brand-ink/20' }}" title="{{ $rule->enabled ? __('Active') : __('Paused') }}"></span>
                                         <p class="truncate text-xs font-semibold text-brand-ink">{{ $rule->name }}</p>
-                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $rule->type }}</span>
+                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $rule->type }}</span>
                                     </div>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                                    <p class="mt-0.5 text-xs text-brand-moss">
                                         @if ($rule->type === 'pattern')
                                             {{ __('A matching line appears within :mins min', ['mins' => $rule->window_minutes]) }}
                                         @else
@@ -185,7 +185,7 @@
                                         @if ($facetBits) · {{ implode(' · ', $facetBits) }} @endif
                                         · {{ __('cooldown :mins min', ['mins' => $rule->cooldown_minutes]) }}
                                     </p>
-                                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 text-xs text-brand-mist">
                                         @if ($rule->last_evaluated_at)
                                             {{ __('Last checked :ago', ['ago' => $rule->last_evaluated_at->diffForHumans()]) }}
                                             @if ($rule->last_count !== null) · {{ __(':n matched', ['n' => $rule->last_count]) }} @endif

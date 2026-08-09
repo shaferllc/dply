@@ -9,7 +9,7 @@
                 {{-- The stop-halts-everything warning stays out of the head's note:
                      a dense note truncates, and this one must not be the part that
                      gets cut off. --}}
-                <p class="flex items-center gap-1.5 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] font-medium text-amber-900 sm:px-5">
+                <p class="flex items-center gap-1.5 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs font-medium text-amber-900 sm:px-5">
                     <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Stopping the service halts all Supervisor-managed workers until you start it again.') }}
                 </p>
@@ -17,7 +17,7 @@
 
                     {{-- Diagnostics --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
                         <div class="flex flex-wrap gap-2">
                             <button
                                 type="button"
@@ -57,7 +57,7 @@
 
                     {{-- Lifecycle --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Lifecycle') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Lifecycle') }}</p>
                         <div class="flex flex-wrap gap-2">
                             {{-- Show Start when inactive or unknown; show Stop when active only --}}
                             @if ($supervisor_service_state !== 'active')
@@ -108,7 +108,7 @@
                                 {{ __('Reload') }}
                             </button>
                         </div>
-                        <p class="mt-2 inline-flex items-center gap-1 text-[11px] {{ $supervisor_service_state === 'active' ? 'text-emerald-700' : 'text-brand-mist' }}">
+                        <p class="mt-2 inline-flex items-center gap-1 text-xs {{ $supervisor_service_state === 'active' ? 'text-emerald-700' : 'text-brand-mist' }}">
                             <span class="inline-block h-1.5 w-1.5 rounded-full {{ $supervisor_service_state === 'active' ? 'bg-emerald-500' : 'bg-brand-mist' }}"></span>
                             @if ($supervisor_service_state === 'active')
                                 {{ __('Active') }}
@@ -122,7 +122,7 @@
 
                     {{-- Boot --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Boot') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Boot') }}</p>
                         <div class="flex flex-wrap gap-2">
                             {{-- Show Enable when disabled or unknown; show Disable when enabled only --}}
                             @if ($supervisor_boot_state !== 'enabled')
@@ -152,7 +152,7 @@
                             @endif
                         </div>
                         @if ($supervisor_boot_state !== null)
-                            <p class="mt-2 text-[11px] text-brand-mist">
+                            <p class="mt-2 text-xs text-brand-mist">
                                 {{ $supervisor_boot_state === 'enabled' ? __('Starts automatically on boot') : __('Does not start on boot') }}
                             </p>
                         @endif

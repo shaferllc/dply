@@ -34,7 +34,7 @@
                     };
                 @endphp
                 <x-slot:actions>
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold ring-1 ring-brand-ink/10 {{ $statusPill['classes'] }}">
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold ring-1 ring-brand-ink/10 {{ $statusPill['classes'] }}">
                         @if ($engineInFlight)
                             <x-spinner variant="forest" size="sm" />
                         @else
@@ -73,7 +73,7 @@
                     <button
                         type="button"
                         wire:click="setEngineSubtab('info')"
-                        class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-information-circle class="h-4 w-4" aria-hidden="true" />
                         {{ __('Learn more') }}
@@ -87,7 +87,7 @@
                     <button
                         type="button"
                         wire:click="openConfirmActionModal('stopAndRevertDatabaseEngineInstall', ['{{ $engine }}'], @js(__('Stop and revert :engine install?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Marks the install as failed and runs apt purge on the server to clean up any partial state. Use this when the install has stalled.')), @js(__('Stop & revert')), true)"
-                        class="inline-flex h-7 items-center gap-1 rounded-md border border-rose-300 bg-white px-2 text-[11px] font-semibold text-rose-800 shadow-sm transition hover:bg-rose-50"
+                        class="inline-flex h-7 items-center gap-1 rounded-md border border-rose-300 bg-white px-2 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-50"
                     >
                         <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" />
                         {{ __('Stop & revert') }}
@@ -119,7 +119,7 @@
                 ], true))
                     <div class="flex flex-wrap gap-2">
                         @if ($engineRow->is_default)
-                            <span class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-forest/20 bg-brand-forest/10 px-2 text-[11px] font-semibold text-brand-forest">
+                            <span class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-forest/20 bg-brand-forest/10 px-2 text-xs font-semibold text-brand-forest">
                                 <x-heroicon-o-check-badge class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Primary engine') }}
                             </span>
@@ -130,7 +130,7 @@
                                 wire:loading.attr="disabled"
                                 wire:target="setPrimaryEngine"
                                 title="{{ __('Make :engine the default engine for new sites on this server.', ['engine' => $dbEngineInfoForTab['label']]) }}"
-                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                             >
                                 <x-heroicon-o-star class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Make primary') }}
@@ -140,7 +140,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('setDatabaseEngineActivation', ['{{ $engine }}', false], @js(__('Deactivate :engine?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Stops the engine and disables it from starting at boot. Sites connected to it will lose their database until you activate it again. Data and binaries on the server are left untouched.')), @js(__('Deactivate')), true)"
-                                class="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
                             >
                                 <x-heroicon-o-pause-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Deactivate') }}
@@ -151,7 +151,7 @@
                                 wire:click="setDatabaseEngineActivation('{{ $engine }}', true)"
                                 wire:loading.attr="disabled"
                                 wire:target="setDatabaseEngineActivation('{{ $engine }}', true)"
-                                class="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
                             >
                                 <x-heroicon-o-play-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Activate') }}
@@ -160,7 +160,7 @@
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('uninstallDatabaseEngine', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $dbEngineInfoForTab['label']])), @js(__('apt purge will remove the engine and its data dirs from the server. Existing tracked databases stay in Dply but won\'t have a live engine to talk to.')), @js(__('Uninstall')), true)"
-                            class="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 text-[11px] font-semibold text-red-700 transition hover:bg-red-100"
+                            class="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
                         >
                             {{ __('Uninstall') }}
                         </button>
@@ -168,7 +168,7 @@
                             <button
                                 type="button"
                                 wire:click="setEngineSubtab('databases')"
-                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
                                 <x-heroicon-o-circle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Manage databases') }}
@@ -191,11 +191,11 @@
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
-                <span class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">{{ __('Active') }}</span>
+                <span class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold text-emerald-700 ring-1 ring-emerald-200">{{ __('Active') }}</span>
                 <button
                     type="button"
                     wire:click="setEngineSubtab('databases')"
-                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                 >
                     <x-heroicon-m-circle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Manage databases') }}

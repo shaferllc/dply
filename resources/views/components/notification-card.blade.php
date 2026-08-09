@@ -49,7 +49,7 @@
             </span>
             <div class="min-w-0">
                 @if ($category)
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $category }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $category }}</p>
                 @endif
                 <h4 class="text-base font-semibold leading-snug text-brand-ink">{{ $cleanTitle }}</h4>
                 @if (is_string($cleanBody) && $cleanBody !== '')

@@ -100,7 +100,7 @@
                             :note="__('Reading the code to detect the environment variables and resources it needs.')"
                         >
                             <x-slot:actions>
-                                <div class="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                <div class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-brand-moss">
                                     <span class="rounded-full bg-white px-2 py-0.5 tabular-nums ring-1 ring-brand-ink/10">
                                         {{ __('Step :n of :total', ['n' => $currentIdx + 1, 'total' => $stepCount]) }}
                                     </span>
@@ -189,17 +189,17 @@
                              reflow when the first line arrives. --}}
                         <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                             <div class="mb-1.5 flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">
                                     <x-heroicon-o-command-line class="h-3.5 w-3.5" />
                                     {{ __('Job console') }}
                                 </div>
-                                <span class="flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                <span class="flex items-center gap-1.5 text-xs font-medium text-brand-moss">
                                     <span class="h-1.5 w-1.5 rounded-full bg-brand-forest motion-safe:animate-pulse" aria-hidden="true"></span>
                                     {{ __('Live') }}
                                 </span>
                             </div>
                             <div
-                                class="max-h-52 min-h-[3.5rem] overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                class="max-h-52 min-h-[3.5rem] overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-xs leading-relaxed text-brand-ink"
                                 x-data
                                 x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
                             >
@@ -279,11 +279,11 @@
                         @php $scanConsole = (array) data_get($site->meta, 'setup_console', []); @endphp
                         @if ($scanConsole !== [])
                             <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
-                                <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                <div class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">
                                     <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
                                     {{ __('Job console') }}
                                 </div>
-                                <div class="max-h-52 overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                <div class="max-h-52 overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-xs leading-relaxed text-brand-ink"
                                     x-data x-init="$el.scrollTop = $el.scrollHeight">
                                     @foreach ($scanConsole as $entry)
                                         @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
@@ -307,7 +307,7 @@
                                     'text-brand-moss hover:text-brand-ink' => $step !== $s['id'],
                                 ])>
                                     <span @class([
-                                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-2xs font-bold',
                                         'bg-brand-forest text-brand-cream' => $step === $s['id'],
                                         'bg-brand-sage/25 text-brand-forest' => $step !== $s['id'] && $s['done'],
                                         'bg-brand-ink/[0.08] text-brand-mist' => $step !== $s['id'] && ! $s['done'],
@@ -350,12 +350,12 @@
                             <div class="px-5 py-4 sm:px-6">
                                 <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <div class="rounded-lg border border-brand-ink/10 px-3 py-2.5">
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Repository') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Repository') }}</dt>
                                         <dd class="mt-0.5 truncate font-mono text-sm text-brand-ink">{{ $site->git_repository_url }}</dd>
                                         <dd class="text-xs text-brand-moss">{{ __('Branch') }}: {{ $site->git_branch }}</dd>
                                     </div>
                                     <div class="rounded-lg border border-brand-ink/10 px-3 py-2.5">
-                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Document root') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Document root') }}</dt>
                                         <dd class="mt-0.5 font-mono text-sm text-brand-ink">{{ $site->document_root ?: '/' }}</dd>
                                         <dd class="text-xs text-brand-moss">{{ __('Runtime') }}: {{ $site->runtime }}{{ $site->runtime_version ? ' '.$site->runtime_version : '' }}</dd>
                                     </div>
@@ -375,18 +375,18 @@
                                          can deploy anyway and let it fail — their call. --}}
                                     <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3">
                                         <p class="text-xs font-semibold text-brand-ink">{{ __(':count required variable(s) still unset', ['count' => count($missing)]) }}</p>
-                                        <p class="mt-1 font-mono text-[11px] text-brand-moss">{{ implode(', ', $missing) }}</p>
-                                        <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('You can deploy without them — the deploy will surface the failure if the app needs them.') }}</p>
-                                        <button type="button" wire:click="goToStep('environment')" class="mt-1.5 text-[11px] font-semibold text-brand-forest hover:underline">{{ __('← Set them first') }}</button>
+                                        <p class="mt-1 font-mono text-xs text-brand-moss">{{ implode(', ', $missing) }}</p>
+                                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('You can deploy without them — the deploy will surface the failure if the app needs them.') }}</p>
+                                        <button type="button" wire:click="goToStep('environment')" class="mt-1.5 text-xs font-semibold text-brand-forest hover:underline">{{ __('← Set them first') }}</button>
                                     </div>
                                 @endif
 
                                 @if (! empty($unsatisfiedResources))
                                     <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-3">
                                         <p class="text-xs font-semibold text-brand-ink">{{ __(':count detected resource(s) not connected', ['count' => count($unsatisfiedResources)]) }}</p>
-                                        <p class="mt-1 text-[11px] text-brand-moss">{{ implode(', ', array_map(fn ($r) => $r['label'], $unsatisfiedResources)) }}</p>
-                                        <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('You can deploy without them — set their variables by hand, or connect the resource now.') }}</p>
-                                        <button type="button" wire:click="goToStep('resources')" class="mt-1.5 text-[11px] font-semibold text-brand-forest hover:underline">{{ __('← Connect resources') }}</button>
+                                        <p class="mt-1 text-xs text-brand-moss">{{ implode(', ', array_map(fn ($r) => $r['label'], $unsatisfiedResources)) }}</p>
+                                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('You can deploy without them — set their variables by hand, or connect the resource now.') }}</p>
+                                        <button type="button" wire:click="goToStep('resources')" class="mt-1.5 text-xs font-semibold text-brand-forest hover:underline">{{ __('← Connect resources') }}</button>
                                     </div>
                                 @endif
                             </div>

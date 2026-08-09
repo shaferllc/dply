@@ -162,7 +162,7 @@
                                 wire:navigate
                             >
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
@@ -178,7 +178,7 @@
                         @elseif ($isLast)
                             <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
@@ -191,7 +191,7 @@
                         @else
                             <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"

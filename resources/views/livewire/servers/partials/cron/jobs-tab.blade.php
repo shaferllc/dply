@@ -30,7 +30,7 @@
             <button
                 type="button"
                 x-on:click="$wire.cancelEdit(); $dispatch('open-modal', 'add-cron-job-modal')"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
             >
                 <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Add cron job') }}
@@ -40,7 +40,7 @@
                 wire:click="syncCronJobs"
                 wire:loading.attr="disabled"
                 wire:target="syncCronJobs"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <x-heroicon-m-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span wire:loading wire:target="syncCronJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center">
@@ -80,7 +80,7 @@
             @endif
         </div>
         @if ($contextSiteModel && $cron_list_scope === 'site')
-            <p class="text-[11px] text-brand-moss">{{ __('Showing jobs attached to :name.', ['name' => $contextSiteModel->name]) }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Showing jobs attached to :name.', ['name' => $contextSiteModel->name]) }}</p>
         @endif
     </div>
     @if (! empty($invalidExpressionJobs))
@@ -101,7 +101,7 @@
                     <ul class="mt-2 space-y-1">
                         @foreach ($invalidExpressionJobs as $bad)
                             <li class="flex flex-wrap items-center gap-2">
-                                <span class="rounded-md bg-white px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-rose-200">{{ $bad['cron_expression'] === '' ? __('(empty)') : $bad['cron_expression'] }}</span>
+                                <span class="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs font-semibold text-rose-800 ring-1 ring-rose-200">{{ $bad['cron_expression'] === '' ? __('(empty)') : $bad['cron_expression'] }}</span>
                                 <span class="truncate text-xs text-rose-900/90">
                                     {{ $bad['description'] !== '' ? $bad['description'] : \Illuminate\Support\Str::limit($bad['command'], 60) }}
                                 </span>
@@ -109,7 +109,7 @@
                                     type="button"
                                     wire:click="startEdit('{{ $bad['id'] }}')"
                                     x-on:click="$dispatch('open-modal', 'add-cron-job-modal')"
-                                    class="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-100"
+                                    class="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-0.5 text-xs font-semibold text-rose-800 hover:bg-rose-100"
                                 >
                                     <x-heroicon-o-pencil-square class="h-3 w-3" />
                                     {{ __('Edit') }}
@@ -164,51 +164,51 @@
                             {{-- schedule chip — flips to a rose pill when crontab would reject the expression --}}
                             @if ($hasInvalidExpression)
                                 <x-tooltip :label="__('crontab will reject this expression — click Edit to fix it')">
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-rose-200">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-rose-800 ring-1 ring-rose-200">
                                         <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                                         {{ $cj->cron_expression === '' ? __('(empty)') : $cj->cron_expression }}
                                     </span>
                                 </x-tooltip>
                             @else
-                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                     <x-heroicon-m-clock class="h-3 w-3 text-brand-moss" />
                                     {{ $cj->cron_expression }}
                                 </span>
                             @endif
                             @if ($cronDesc = $cj->cronDescription())
-                                <span class="text-[11px] text-brand-ink/50">{{ $cronDesc }}</span>
+                                <span class="text-xs text-brand-ink/50">{{ $cronDesc }}</span>
                             @endif
                             {{-- user chip --}}
-                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                 <x-heroicon-m-user class="h-3 w-3 text-brand-moss" />
                                 {{ $cj->user }}
                             </span>
                             @if (! $cj->enabled)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
                                     <x-heroicon-m-pause class="h-3 w-3" />
                                     {{ __('Paused') }}
                                 </span>
                             @endif
                             @if (! $cj->is_synced && ! $cj->system_managed)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[11px] font-medium text-sky-800 ring-1 ring-sky-200" title="{{ __('Pending changes — sync the crontab.') }}">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-200" title="{{ __('Pending changes — sync the crontab.') }}">
                                     <x-heroicon-m-arrow-path class="h-3 w-3" />
                                     {{ __('Unsynced') }}
                                 </span>
                             @endif
                             @if ($cj->system_managed)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-[11px] font-medium text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-xs font-medium text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
                                     <x-heroicon-m-shield-check class="h-3 w-3" />
                                     {{ __('Managed') }}
                                 </span>
                             @endif
                         </div>
 
-                        <p class="mt-1 truncate font-mono text-[11px] leading-relaxed text-brand-moss" title="{{ $cj->command }}">
+                        <p class="mt-1 truncate font-mono text-xs leading-relaxed text-brand-moss" title="{{ $cj->command }}">
                             {{ $cj->command }}
                         </p>
 
                         @if ($siteLabel || ($cj->depends_on_job_id && $cj->dependsOn) || ($cj->last_sync_error && ! $cj->is_synced))
-                            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                 @if ($siteLabel)
                                     <span class="inline-flex items-center gap-1">
                                         <x-heroicon-m-globe-alt class="h-3 w-3" />

@@ -9,7 +9,7 @@
     use different token scopes, so the OAuth advice doesn't transfer.
 --}}
 @if ($provider === 'github')
-    <p {{ $attributes->merge(['class' => 'text-[11px] leading-relaxed text-brand-mist']) }}>
+    <p {{ $attributes->merge(['class' => 'text-xs leading-relaxed text-brand-mist']) }}>
         {{ __('Using a fine-grained token? OAuth grants webhook access automatically.') }}
         <a
             href="{{ route('oauth.redirect', ['provider' => 'github']) }}"

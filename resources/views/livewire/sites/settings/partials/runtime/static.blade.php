@@ -1,6 +1,6 @@
 @php
     $panelBody = 'px-5 py-3 sm:px-6';
-    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
+    $fieldHelp = 'mt-1 text-xs text-brand-moss';
 @endphp
 
 <form wire:submit="saveRuntimePreferences" class="border-b border-brand-ink/10">

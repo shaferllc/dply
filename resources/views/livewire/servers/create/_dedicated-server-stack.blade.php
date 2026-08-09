@@ -33,7 +33,7 @@
         <div class="rounded-2xl border-2 border-brand-sage/40 bg-gradient-to-br from-brand-sage/10 via-white to-white p-5 ring-1 ring-brand-sage/20">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Server purpose') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Server purpose') }}</p>
                     <p class="mt-1 text-lg font-semibold text-brand-ink">{{ $selectedServerRole['label'] ?? $roleId }}</p>
                     @if (! empty($selectedServerRole['summary']))
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $selectedServerRole['summary'] }}</p>
@@ -51,7 +51,7 @@
 
             @if ($packageLabels->isNotEmpty())
                 <div class="mt-5">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Packages') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Packages') }}</p>
                     <ul class="mt-2 flex flex-wrap gap-2">
                         @foreach ($packageLabels as $package)
                             <li class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
@@ -78,7 +78,7 @@
 
         @if ($showDatabasePicker)
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database engine') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database engine') }}</p>
                 <p class="mt-1 text-xs text-brand-mist">{{ __('Pick the engine for this dedicated database host.') }}</p>
                 <div class="mt-3">
                     @include('livewire.servers.create._rich-select', [
@@ -103,7 +103,7 @@
 
         @if ($showPhpPicker)
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP runtime') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP runtime') }}</p>
                 <p class="mt-1 text-xs text-brand-mist">{{ __('Queue workers need PHP on the host. Pick the version your jobs target.') }}</p>
                 <div class="mt-3">
                     @include('livewire.servers.create._rich-select', [

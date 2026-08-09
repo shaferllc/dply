@@ -8,14 +8,14 @@
             <x-heroicon-m-chevron-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-90" aria-hidden="true" />
             <span class="min-w-0">
                 <span class="block text-xs font-semibold text-brand-ink">{{ __('Deploy script variables') }}</span>
-                <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Placeholders for custom steps, post-deploy commands, and hook scripts.') }}</span>
+                <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Placeholders for custom steps, post-deploy commands, and hook scripts.') }}</span>
             </span>
         </summary>
         <dl class="grid gap-px border-t border-brand-ink/10 bg-brand-ink/10 md:grid-cols-2">
             @foreach ($deployVariableReference as $token => $description)
                 <div class="bg-white px-4 py-2 sm:px-5">
                     <dt class="font-mono text-xs text-brand-ink">{{ $token }}</dt>
-                    <dd class="mt-0.5 text-[11px] text-brand-moss">{{ $description }}</dd>
+                    <dd class="mt-0.5 text-xs text-brand-moss">{{ $description }}</dd>
                 </div>
             @endforeach
         </dl>

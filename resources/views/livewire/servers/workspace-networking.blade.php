@@ -35,7 +35,7 @@
                 <x-server-workspace-tab id="net-tab-attached" icon="heroicon-o-arrows-right-left" :active="$networking_tab === 'attached'" wire:click="setNetworkingTab('attached')">
                     {{ __('Attached') }}
                     @if (count($attachedRemoteResources) > 0)
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ count($attachedRemoteResources) }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-brand-moss">{{ count($attachedRemoteResources) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 @if ($showRoutesTab)
@@ -140,24 +140,24 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $s->name }}</p>
                                         @if ($isCurrent)
-                                            <span class="rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('this server') }}</span>
+                                            <span class="rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('this server') }}</span>
                                         @endif
                                     </div>
                                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                                         @if ($s->private_ip_address)
-                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-mono text-[11px] text-emerald-700 ring-1 ring-emerald-200" title="{{ __('Private IP') }}">
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-mono text-xs text-emerald-700 ring-1 ring-emerald-200" title="{{ __('Private IP') }}">
                                                 <x-heroicon-m-lock-closed class="h-2.5 w-2.5" aria-hidden="true" />
                                                 {{ $s->private_ip_address }}
                                             </span>
                                         @endif
                                         @if ($s->ip_address)
-                                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-moss ring-1 ring-brand-ink/5" title="{{ __('Public IP') }}">
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-xs text-brand-moss ring-1 ring-brand-ink/5" title="{{ __('Public IP') }}">
                                                 <x-heroicon-m-globe-alt class="h-2.5 w-2.5 text-brand-mist" aria-hidden="true" />
                                                 {{ $s->ip_address }}
                                             </span>
                                         @endif
                                         @if ($s->region)
-                                            <span class="inline-flex items-center rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-mist ring-1 ring-brand-ink/5">{{ $s->region }}</span>
+                                            <span class="inline-flex items-center rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-mist ring-1 ring-brand-ink/5">{{ $s->region }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -173,7 +173,7 @@
                                             $totalCount = $engDbs->count();
                                         @endphp
                                         <span @class([
-                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
+                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold ring-1',
                                             'bg-amber-50 text-amber-800 ring-amber-200' => $exposedCount > 0,
                                             'bg-brand-sand/60 text-brand-moss ring-brand-ink/10' => $exposedCount === 0,
                                         ])>
@@ -188,14 +188,14 @@
                                         </span>
                                     @endforeach
                                     @foreach ($sCaches as $cache)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
                                             <x-heroicon-m-bolt class="h-2.5 w-2.5" aria-hidden="true" />
                                             {{ ucfirst($cache->engine) }} · {{ $cache->port }}
                                         </span>
                                     @endforeach
                                 </div>
                             @else
-                                <span class="text-[11px] italic text-brand-mist">{{ __('No tracked services') }}</span>
+                                <span class="text-xs italic text-brand-mist">{{ __('No tracked services') }}</span>
                             @endif
                         </div>
 
@@ -210,7 +210,7 @@
                                     @endphp
                                     <div x-data="{ copied: false }" class="group flex items-center gap-2 rounded-lg border border-brand-ink/8 bg-brand-sand/15 px-3 py-2">
                                         <x-heroicon-o-link class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                        <code class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-ink">{{ $connStr }}</code>
+                                        <code class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink">{{ $connStr }}</code>
                                         <button
                                             type="button"
                                             class="shrink-0 rounded p-1 text-brand-mist opacity-0 transition hover:bg-white hover:text-brand-ink group-hover:opacity-100"
@@ -219,8 +219,8 @@
                                         >
                                             <x-heroicon-o-clipboard class="h-3.5 w-3.5" aria-hidden="true" />
                                         </button>
-                                        <span x-show="copied" x-cloak class="shrink-0 text-[10px] font-medium text-emerald-700">{{ __('Copied') }}</span>
-                                        <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                        <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
+                                        <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-800 ring-1 ring-amber-200">
                                             {{ $db->allowed_from ?: __('no source set') }}
                                         </span>
                                     </div>
@@ -249,7 +249,7 @@
                         @if ($s->private_ip_address || $networkActionable)
                             <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/8 pt-3 pl-12">
                                 @if ($s->private_ip_address)
-                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                                         <x-heroicon-m-shield-check class="h-3.5 w-3.5" aria-hidden="true" />
                                         {{ __('On private network') }}
                                     </span>
@@ -257,14 +257,14 @@
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('detachFromNetwork', ['{{ $s->id }}'], @js(__('Detach :name from network?', ['name' => $s->name])), @js(__('The private IP will be removed. Services using it will lose connectivity.')), @js(__('Detach')), true)"
-                                            class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-mist transition hover:text-rose-600"
+                                            class="inline-flex items-center gap-1 text-xs font-medium text-brand-mist transition hover:text-rose-600"
                                         >
                                             <x-heroicon-m-link-slash class="h-3.5 w-3.5" aria-hidden="true" />
                                             {{ __('Detach from network') }}
                                         </button>
                                     @endif
                                 @elseif ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
-                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-sage" wire:poll.5s>
+                                    <span class="inline-flex items-center gap-1.5 text-xs text-brand-sage" wire:poll.5s>
                                         <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -272,7 +272,7 @@
                                         {{ __('Assigning private IP on network :id…', ['id' => $s->hetzner_network_id]) }}
                                     </span>
                                 @elseif ($s->provider->value === 'hetzner')
-                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-mist">
+                                    <span class="inline-flex items-center gap-1.5 text-xs text-brand-mist">
                                         <x-heroicon-m-globe-alt class="h-3.5 w-3.5" aria-hidden="true" />
                                         {{ __('No private network') }}
                                     </span>
@@ -280,17 +280,17 @@
                                         <button
                                             type="button"
                                             x-on:click="$dispatch('open-modal', 'create-network-modal')"
-                                            class="text-[11px] font-medium text-brand-sage hover:underline"
+                                            class="text-xs font-medium text-brand-sage hover:underline"
                                         >{{ __('Create network') }}</button>
                                         <button
                                             type="button"
                                             x-data
                                             x-on:click="$dispatch('open-modal', 'attach-network-modal-{{ $s->id }}'); $wire.loadHetznerNetworks()"
-                                            class="text-[11px] font-medium text-brand-sage hover:underline"
+                                            class="text-xs font-medium text-brand-sage hover:underline"
                                         >{{ __('Attach to existing') }}</button>
                                     </span>
                                 @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode'], true))
-                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-mist">
+                                    <span class="inline-flex items-center gap-1.5 text-xs text-brand-mist">
                                         <x-heroicon-m-globe-alt class="h-3.5 w-3.5" aria-hidden="true" />
                                         {{ __('No private IP — enable private networking') }}
                                     </span>
@@ -299,7 +299,7 @@
                                         wire:click="syncPrivateIp('{{ $s->id }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="syncPrivateIp('{{ $s->id }}')"
-                                        class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                        class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
                                     >
                                         <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from :provider', ['provider' => $s->provider->label()]) }}</span>
                                         <span wire:loading wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Syncing…') }}</span>
@@ -338,7 +338,7 @@
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                         <thead class="bg-brand-cream/40">
-                            <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <th class="px-6 py-2.5 sm:px-7">{{ __('Resource') }}</th>
                                 <th class="px-6 py-2.5">{{ __('Hosted on') }}</th>
                                 <th class="px-6 py-2.5">{{ __('Used by') }}</th>
@@ -356,12 +356,12 @@
                                                 <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
                                             @endif
                                             <span class="font-medium text-brand-ink">{{ $res['resource_name'] }}</span>
-                                            <span class="text-[11px] uppercase tracking-wide text-brand-mist">{{ $res['engine'] }}</span>
+                                            <span class="text-xs uppercase tracking-wide text-brand-mist">{{ $res['engine'] }}</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-3">
                                         <span class="text-brand-moss">{{ $res['host_server_name'] }}</span>
-                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
                                     </td>
                                     <td class="px-6 py-3 text-brand-moss">{{ $res['site_name'] }}</td>
                                     <td class="px-6 py-3">
@@ -388,7 +388,7 @@
                                             <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-xs font-semibold text-brand-mist">{{ __('Not checked') }}</span>
                                         @endif
                                         @if (! empty($res['checked_at']))
-                                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Checked :ago', ['ago' => \Illuminate\Support\Carbon::parse($res['checked_at'])->diffForHumans()]) }}</p>
+                                            <p class="mt-1 text-xs text-brand-mist">{{ __('Checked :ago', ['ago' => \Illuminate\Support\Carbon::parse($res['checked_at'])->diffForHumans()]) }}</p>
                                         @endif
                                     </td>
                                 </tr>
@@ -439,9 +439,9 @@
                     @endphp
                     @if ($dbs->isNotEmpty())
                         <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/5 px-6 py-3 sm:px-7">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $engineLabel }} · {{ __('port :port', ['port' => $enginePort]) }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $engineLabel }} · {{ __('port :port', ['port' => $enginePort]) }}</p>
                             @unless ($engineRunning)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200" title="{{ __('No running :engine engine on this server — the database record may be mis-tagged.', ['engine' => $engineLabel]) }}">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-amber-200" title="{{ __('No running :engine engine on this server — the database record may be mis-tagged.', ['engine' => $engineLabel]) }}">
                                     <x-heroicon-m-exclamation-triangle class="h-3 w-3" aria-hidden="true" />
                                     {{ __('engine not running') }}
                                 </span>
@@ -461,16 +461,16 @@
                                         <div class="min-w-0">
                                             <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</p>
                                             @if ($db->username)
-                                                <p class="truncate font-mono text-[11px] text-brand-mist">{{ $db->username }}</p>
+                                                <p class="truncate font-mono text-xs text-brand-mist">{{ $db->username }}</p>
                                             @endif
                                         </div>
                                         @if ($dbRemote)
-                                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-medium text-amber-800 ring-1 ring-amber-200">
                                                 <span aria-hidden="true" class="inline-block h-1 w-1 rounded-full bg-amber-500"></span>
                                                 {{ $db->allowed_from ?: __('no source set') }}
                                             </span>
                                         @else
-                                            <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                            <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                                 {{ __('localhost') }}
                                             </span>
                                         @endif
@@ -531,14 +531,14 @@
                                         }
                                     @endphp
                                     <div class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-3.5 py-3">
-                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Access via jump host') }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Access via jump host') }}</p>
                                         @if ($jumpHosts->isNotEmpty())
-                                            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                                                 {{ __(':db only accepts connections from :src, so connect through an allowlisted server: run the tunnel, then point your client at localhost on the chosen port.', ['db' => $db->name, 'src' => $db->allowed_from]) }}
                                             </p>
                                             <div class="mt-2 flex flex-wrap items-end gap-3">
                                                 <label class="flex flex-col gap-1">
-                                                    <span class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Jump host') }}</span>
+                                                    <span class="text-2xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Jump host') }}</span>
                                                     @if ($jumpHosts->count() > 1)
                                                         <select
                                                             wire:model.live="db_jump_host.{{ $db->id }}"
@@ -553,7 +553,7 @@
                                                     @endif
                                                 </label>
                                                 <label class="flex flex-col gap-1">
-                                                    <span class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Local port') }}</span>
+                                                    <span class="text-2xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Local port') }}</span>
                                                     <input
                                                         type="number"
                                                         min="1024"
@@ -566,7 +566,7 @@
                                             </div>
                                             <x-cli-snippet :commands="$accessRows" tone="details" open :summary="__('Tunnel commands')" size="10" class="mt-2" />
                                         @else
-                                            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                                                 {{ __('No server in this organization has a private IP inside :src. Add an allowlisted server\'s private IP to the source above, or connect from a host that is already allowed.', ['src' => $db->allowed_from ?: __('the allowlist')]) }}
                                             </p>
                                         @endif
@@ -614,12 +614,12 @@
                                     <p class="text-sm font-semibold text-brand-ink">{{ $cacheLabel }} <span class="font-mono text-xs font-normal text-brand-mist">· port {{ $cache->port }}</span></p>
                                 </div>
                                 @if ($isExposed)
-                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-medium text-amber-800 ring-1 ring-amber-200">
                                         <span aria-hidden="true" class="inline-block h-1 w-1 rounded-full bg-amber-500"></span>
                                         {{ $exposedCidr ?? 'exposed' }}
                                     </span>
                                 @else
-                                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                         {{ __('localhost') }}
                                     </span>
                                 @endif
@@ -664,7 +664,7 @@
                     @endforeach
                 </div>
                 <div class="border-t border-brand-ink/5 px-6 py-3 sm:px-7">
-                    <a href="{{ route('servers.caches', $server) }}" wire:navigate class="text-[11px] font-medium text-brand-sage hover:underline">
+                    <a href="{{ route('servers.caches', $server) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">
                         {{ __('Full cache configuration →') }}
                     </a>
                 </div>
@@ -697,16 +697,16 @@
                             <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
                                 <div class="flex min-w-0 items-center gap-4">
                                     <div>
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destination') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destination') }}</p>
                                         <code class="font-mono text-sm font-semibold text-brand-ink">{{ $route['destination'] }}</code>
                                     </div>
                                     <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
                                     <div>
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Gateway') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Gateway') }}</p>
                                         <p class="font-mono text-sm font-semibold text-brand-ink">
                                             {{ $gw }}
                                             @if ($gwServer)
-                                                <span class="ml-1 font-sans text-[11px] font-normal text-brand-mist">({{ $gwServer->name }})</span>
+                                                <span class="ml-1 font-sans text-xs font-normal text-brand-mist">({{ $gwServer->name }})</span>
                                             @endif
                                         </p>
                                     </div>
@@ -729,7 +729,7 @@
 
                 {{-- Add route form --}}
                 <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-5 sm:px-7">
-                    <p class="mb-4 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add route') }}</p>
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add route') }}</p>
                     <div class="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                         <div>
                             <x-input-label for="route_destination" :value="__('Destination (CIDR)')" />
@@ -743,7 +743,7 @@
                             @error('route_destination')
                                 <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                             @enderror
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('The CIDR you want routed through this network.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('The CIDR you want routed through this network.') }}</p>
                         </div>
                         <div>
                             <x-input-label for="route_gateway" :value="__('Gateway (private IP)')" />
@@ -766,7 +766,7 @@
                             @error('route_gateway')
                                 <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                             @enderror
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('The private IP of the server that will forward this traffic.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('The private IP of the server that will forward this traffic.') }}</p>
                         </div>
                         <div>
                             <button
@@ -809,7 +809,7 @@
                     <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hetzner') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hetzner') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create private network') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Dply creates the network in your Hetzner account and attaches every selected server. Private IPs appear here once assigned (~30 s).') }}
@@ -849,13 +849,13 @@
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $s->name }}
                                         @if ($s->id === $server->id)
-                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest">{{ __('this server') }}</span>
+                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-medium text-brand-forest">{{ __('this server') }}</span>
                                         @endif
                                     </p>
-                                    <p class="font-mono text-[11px] text-brand-mist">{{ $s->ip_address }} · {{ $s->region }}</p>
+                                    <p class="font-mono text-xs text-brand-mist">{{ $s->ip_address }} · {{ $s->region }}</p>
                                 </div>
                                 @if ($s->private_ip_address)
-                                    <span class="ml-auto text-[11px] text-emerald-600">{{ __('already has private IP') }}</span>
+                                    <span class="ml-auto text-xs text-emerald-600">{{ __('already has private IP') }}</span>
                                 @endif
                             </label>
                         @endforeach
@@ -901,7 +901,7 @@
                                 wire:click="loadHetznerNetworks"
                                 wire:loading.attr="disabled"
                                 wire:target="loadHetznerNetworks"
-                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
                             >
                                 <span wire:loading.remove wire:target="loadHetznerNetworks">{{ __('Refresh') }}</span>
                                 <span wire:loading wire:target="loadHetznerNetworks">{{ __('Loading…') }}</span>

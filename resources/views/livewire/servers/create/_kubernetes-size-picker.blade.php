@@ -65,7 +65,7 @@
                         <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                             <span>{{ __('Selected plan') }}</span>
                             @if ($selectedSizeCard && $recommendedSizeCard && $selectedSizeCard['value'] === $recommendedSizeCard['value'])
-                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
                             @endif
                         </div>
                         @if ($selectedSizeCard)
@@ -109,9 +109,9 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $sizeCard['name'] }}</div>
                                         @if ($recommendedSizeCard && $sizeCard['value'] === $recommendedSizeCard['value'])
-                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Recommended') }}</span>
                                         @elseif ($sizeCard['too_small'])
-                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 ring-1 ring-amber-200">{{ __('Too small') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-amber-700 ring-1 ring-amber-200">{{ __('Too small') }}</span>
                                         @endif
                                     </div>
                                     <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">

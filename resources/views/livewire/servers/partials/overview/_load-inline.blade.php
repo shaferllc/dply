@@ -29,7 +29,7 @@
         $val = $pct === null ? '—' : number_format($pct, 0).'%';
 
         return '<span class="inline-flex items-baseline gap-1">'
-            .'<span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">'.e($label).'</span>'
+            .'<span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">'.e($label).'</span>'
             .'<span class="font-mono font-semibold '.$metricTone($pct).'">'.e($val).'</span>'
             .'</span>';
     };
@@ -42,7 +42,7 @@
         @if ($metricLoad1m !== null)
             <span class="text-brand-mist">·</span>
             <span class="inline-flex items-baseline gap-1">
-                <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Load') }}</span>
+                <span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">{{ __('Load') }}</span>
                 <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
             </span>
         @endif

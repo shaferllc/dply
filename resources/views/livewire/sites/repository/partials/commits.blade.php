@@ -57,9 +57,9 @@
                             <li class="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-3" wire:key="commit-{{ $commit['sha'] }}">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <code class="rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink">{{ $commit['short_sha'] }}</code>
+                                        <code class="rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-ink">{{ $commit['short_sha'] }}</code>
                                         @if ($isDeployed)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/20">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/20">
                                                 <span class="inline-flex h-1.5 w-1.5 rounded-full bg-brand-sage"></span>
                                                 {{ __('Deployed') }}
                                             </span>
@@ -115,7 +115,7 @@
                 @if (! empty($commitsResult['account']['label']))
                     {{-- Which linked identity answered this read — so a wrong-token
                          404 is self-evident instead of looking like a missing repo. --}}
-                    <p class="mt-1 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 px-4 pt-3 pb-1 text-[11px] text-brand-moss">
+                    <p class="mt-1 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 px-4 pt-3 pb-1 text-xs text-brand-moss">
                         <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                         <span>{{ __('Read using :label', ['label' => $commitsResult['account']['label']]) }}</span>
                         @if (! empty($commitsResult['account']['kind']))

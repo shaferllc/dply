@@ -49,7 +49,7 @@
                 </button>
             </div>
             <pre
-                class="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-emerald-100"
+                class="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-2 font-mono text-xs leading-relaxed text-emerald-100"
                 x-data
                 x-init="$el.scrollTop = $el.scrollHeight"
                 x-effect="$el.scrollTop = $el.scrollHeight"
@@ -74,12 +74,12 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-slate-100">{{ __('Pick a server') }}</p>
-                            <p class="mt-0.5 text-[11px] text-slate-400">{{ __('Ready servers with SSH keys in this organization.') }}</p>
+                            <p class="mt-0.5 text-xs text-slate-400">{{ __('Ready servers with SSH keys in this organization.') }}</p>
                         </div>
                         <button
                             type="button"
                             wire:click="refreshAvailableServers"
-                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] font-medium text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
                             title="{{ __('Refresh server list') }}"
                         >
                             <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
@@ -117,7 +117,7 @@
                                     >
                                         <span class="min-w-0">
                                             <span class="block truncate text-sm font-semibold text-slate-100">{{ $s->name }}</span>
-                                            <span class="mt-0.5 block font-mono text-[11px] text-slate-500">{{ $s->ip_address }}</span>
+                                            <span class="mt-0.5 block font-mono text-xs text-slate-500">{{ $s->ip_address }}</span>
                                         </span>
                                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />
                                     </button>
@@ -139,9 +139,9 @@
                 <x-slot:toolbar>
                     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
                         <div class="flex min-w-0 items-center gap-2">
-                            <span class="truncate font-mono text-[11px] font-medium text-slate-300">{{ $prompt }}</span>
+                            <span class="truncate font-mono text-xs font-medium text-slate-300">{{ $prompt }}</span>
                             @if (! $serverReady)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
                                     {{ __('Unavailable') }}
                                 </span>
                             @else
@@ -155,7 +155,7 @@
                             @endif
                         </div>
 
-                        <div class="ms-auto flex flex-wrap items-center gap-2 text-[11px]">
+                        <div class="ms-auto flex flex-wrap items-center gap-2 text-xs">
                             @if (! empty($history))
                                 <button type="button" wire:click="clearHistory" class="font-medium text-slate-400 transition hover:text-slate-200">
                                     {{ __('Clear') }}
@@ -177,7 +177,7 @@
                     <div x-ref="scroll" class="min-h-[10rem] space-y-4">
                         @if (! $serverReady && ! $error)
                             <div class="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2">
-                                <p class="text-[11px] leading-relaxed text-amber-100/90">
+                                <p class="text-xs leading-relaxed text-amber-100/90">
                                     {{ __('Server is not ready. Commands may fail while provisioning finishes or SSH reconnects.') }}
                                 </p>
                             </div>
@@ -208,7 +208,7 @@
                                         <pre class="whitespace-pre-wrap break-words text-slate-300">{{ $entry['out'] }}</pre>
                                     @endif
                                     @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                                        <p class="text-[11px] text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                                        <p class="text-xs text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
                                     @endif
                                 @endif
                             </div>
@@ -220,7 +220,7 @@
                             <span class="animate-pulse">{{ __('running…') }}</span>
                         </div>
 
-                        <div wire:loading wire:target="selectServer" class="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                        <div wire:loading wire:target="selectServer" class="inline-flex items-center gap-1.5 text-xs text-slate-400">
                             <x-spinner variant="slate" size="sm" />
                             {{ __('Connecting to server…') }}
                         </div>

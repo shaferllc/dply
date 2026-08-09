@@ -41,14 +41,14 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('sites.edge.audit.export', ['server' => $site->server_id, 'site' => $site->id, 'format' => 'csv']) }}"
-                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
+                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
             >
                 <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
                 {{ __('CSV') }}
             </a>
             <a
                 href="{{ route('sites.edge.audit.export', ['server' => $site->server_id, 'site' => $site->id, 'format' => 'json']) }}"
-                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
+                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
             >
                 <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
                 {{ __('JSON') }}
@@ -79,7 +79,7 @@
                 <li class="px-5 py-3 sm:px-6" wire:key="audit-{{ $entry->id }}">
                     <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         <p class="min-w-0 font-mono text-xs font-semibold text-brand-ink">{{ $actionLabel }}</p>
-                        <time class="shrink-0 text-[11px] text-brand-mist" title="{{ $entry->created_at?->toIso8601String() }}">
+                        <time class="shrink-0 text-xs text-brand-mist" title="{{ $entry->created_at?->toIso8601String() }}">
                             {{ $entry->created_at?->diffForHumans() ?? '—' }}
                         </time>
                     </div>
@@ -90,7 +90,7 @@
                         @endif
                     </p>
                     @if ($detailLine !== '')
-                        <p class="mt-1 truncate font-mono text-[11px] text-brand-mist" title="{{ $detailLine }}">{{ $detailLine }}</p>
+                        <p class="mt-1 truncate font-mono text-xs text-brand-mist" title="{{ $detailLine }}">{{ $detailLine }}</p>
                     @endif
                 </li>
             @endforeach

@@ -3,7 +3,7 @@
     $rolloutNested = (bool) ($isEmbedded ?? false);
     $card = 'border-b border-brand-ink/10';
     $panelBody = 'px-5 py-3 sm:px-6';
-    $fieldHelp = 'mt-1 text-[11px] text-brand-moss';
+    $fieldHelp = 'mt-1 text-xs text-brand-moss';
     $isNginx = $site->webserver() === 'nginx';
 
     $showScheduler = $site->supportsLaravelScheduler();
@@ -153,19 +153,19 @@
 
                 @if ($showPostActivate)
                     <div class="space-y-2.5 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Post-activate') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Post-activate') }}</p>
                         @if ($showScheduler)
                             <label class="flex items-start gap-2.5">
                                 <input type="checkbox" wire:model="laravel_scheduler" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                                 <span class="min-w-0">
                                     <span class="block text-xs font-semibold text-brand-ink">{{ $site->runtimeSchedulerRolloutFormLabel() }}</span>
                                     @if ($site->runtimeSchedulerCheckboxHelp())
-                                        <span class="mt-0.5 block text-[11px] leading-relaxed text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</span>
+                                        <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</span>
                                     @endif
                                 </span>
                             </label>
                         @elseif ($schedulerCronLink)
-                            <p class="text-[11px] leading-relaxed text-brand-moss">
+                            <p class="text-xs leading-relaxed text-brand-moss">
                                 {{ __('Need a recurring task for this stack?') }}
                                 <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Set one up in Cron →') }}</a>
                             </p>
@@ -177,7 +177,7 @@
                                 <span class="text-xs font-semibold text-brand-ink">{{ __('Restart Supervisor programs after successful deploy') }}</span>
                             </label>
                         @elseif ($supervisorDaemonsLink)
-                            <p class="text-[11px] leading-relaxed text-brand-moss">
+                            <p class="text-xs leading-relaxed text-brand-moss">
                                 {{ __('Run background workers for this site?') }}
                                 <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Manage them in Daemons →') }}</a>
                             </p>

@@ -122,7 +122,7 @@
                                             {{ trans_choice('{0} no units selected|{1} :count selected unit|[2,*] :count selected units', $bulkCount, ['count' => $bulkCount]) }}
                                         </p>
                                     @elseif ($unit !== '')
-                                        <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-2 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">{{ $unit }}</p>
+                                        <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-2 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">{{ $unit }}</p>
                                     @endif
                                 </div>
                             </div>
@@ -159,27 +159,27 @@
                                     $stateLabel = $rowFailed ? __('Failed') : ($rowActive !== '' ? ucfirst($rowActive) : __('Unknown'));
                                 @endphp
                                 <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-7">
-                                    <p class="mb-3 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current state') }}</p>
+                                    <p class="mb-3 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current state') }}</p>
                                     <div class="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                                         <div>
-                                            <p class="text-[10px] uppercase tracking-wide text-brand-mist">{{ __('Active') }}</p>
+                                            <p class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Active') }}</p>
                                             <p class="mt-1">
-                                                <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $stateBadge }}">
+                                                <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 {{ $stateBadge }}">
                                                     {{ $stateLabel }}@if ($rowSub !== '' && $rowSub !== $rowActive) <span class="font-normal">/ {{ $rowSub }}</span>@endif
                                                 </span>
                                             </p>
                                         </div>
                                         <div>
-                                            <p class="text-[10px] uppercase tracking-wide text-brand-mist">{{ __('PID') }}</p>
-                                            <p class="mt-1 font-mono text-[11px] text-brand-ink">{{ $rowPid !== '' && $rowPid !== '0' ? $rowPid : '—' }}</p>
+                                            <p class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('PID') }}</p>
+                                            <p class="mt-1 font-mono text-xs text-brand-ink">{{ $rowPid !== '' && $rowPid !== '0' ? $rowPid : '—' }}</p>
                                         </div>
                                         <div>
-                                            <p class="text-[10px] uppercase tracking-wide text-brand-mist">{{ __('Boot') }}</p>
-                                            <p class="mt-1 font-mono text-[11px] text-brand-ink">{{ $rowBoot !== '' ? $rowBoot : '—' }}</p>
+                                            <p class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Boot') }}</p>
+                                            <p class="mt-1 font-mono text-xs text-brand-ink">{{ $rowBoot !== '' ? $rowBoot : '—' }}</p>
                                         </div>
                                         <div>
-                                            <p class="text-[10px] uppercase tracking-wide text-brand-mist">{{ __('Last change') }}</p>
-                                            <p class="mt-1 text-[11px] text-brand-ink" title="{{ $rowTs }}">
+                                            <p class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Last change') }}</p>
+                                            <p class="mt-1 text-xs text-brand-ink" title="{{ $rowTs }}">
                                                 @if ($rowTsCompact)
                                                     {{ $rowTsCompact }}
                                                     @if ($rowTsRel)
@@ -192,7 +192,7 @@
                                         </div>
                                     </div>
                                     @if ($rowVersion !== '')
-                                        <p class="mt-3 text-[11px] text-brand-mist">{{ __('Version') }}: <span class="font-mono text-brand-moss">{{ $rowVersion }}</span></p>
+                                        <p class="mt-3 text-xs text-brand-mist">{{ __('Version') }}: <span class="font-mono text-brand-moss">{{ $rowVersion }}</span></p>
                                     @endif
                                     @if (! empty($confirmRow['standby_reason']) && in_array($kind, ['start', 'enable'], true))
                                         <p class="mt-3 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
@@ -204,7 +204,7 @@
 
                             <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-7">
                                 <p class="text-sm leading-relaxed text-brand-moss">{{ $config['description'] }}</p>
-                                <ul class="mt-3 space-y-1 text-[11px] text-brand-mist">
+                                <ul class="mt-3 space-y-1 text-xs text-brand-mist">
                                     <li class="inline-flex items-center gap-1.5">
                                         <x-heroicon-m-command-line class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
                                         {{ __('Runs as root over SSH on :host', ['host' => $server->getSshConnectionString()]) }}
@@ -222,13 +222,13 @@
                             @if ($previewCommand !== null)
                                 <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-7">
                                     <div class="mb-2 flex items-center justify-between gap-2">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Console — what will run') }}</p>
-                                        <span class="inline-flex items-center gap-1 text-[10px] text-brand-mist">
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Console — what will run') }}</p>
+                                        <span class="inline-flex items-center gap-1 text-2xs text-brand-mist">
                                             <x-heroicon-m-arrow-down-on-square class="h-3 w-3" aria-hidden="true" />
                                             ssh
                                         </span>
                                     </div>
-                                    <pre class="overflow-x-auto rounded-lg border border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"><code>{{ $previewCommand }}</code></pre>
+                                    <pre class="overflow-x-auto rounded-lg border border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"><code>{{ $previewCommand }}</code></pre>
                                 </div>
                             @endif
 
@@ -353,13 +353,13 @@
                                     wire:loading.attr="disabled"
                                     wire:target="fetchSystemdModalStatus"
                                     @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
-                                    class="!inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
+                                    class="!inline-flex !items-center !gap-1.5 !py-2 !text-xs"
                                 >
                                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
                                     <span wire:loading.remove wire:target="fetchSystemdModalStatus">{{ __('Refresh') }}</span>
                                     <span wire:loading wire:target="fetchSystemdModalStatus">{{ __('Working…') }}</span>
                                 </x-secondary-button>
-                                <x-secondary-button size="sm" type="button" wire:click="closeSystemdStatusModal" class="!py-2 !text-[11px]">
+                                <x-secondary-button size="sm" type="button" wire:click="closeSystemdStatusModal" class="!py-2 !text-xs">
                                     {{ __('Close') }}
                                 </x-secondary-button>
                             </div>
@@ -368,7 +368,7 @@
                     <div class="px-4 py-4 sm:px-6 sm:py-5">
                         @if ($systemdStatusModalLoading)
                             <p class="text-xs font-medium text-brand-ink">{{ $systemdStatusModalView === 'logs' ? __('Fetching journalctl logs…') : __('Fetching systemctl status…') }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('This can take a few seconds over SSH.') }}</p>
                         @endif
                         @if ($systemdStatusModalError)
                             <div class="mb-3 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $systemdStatusModalError }}</div>
@@ -474,11 +474,11 @@
                                 class="rounded-xl border border-brand-ink/15 bg-zinc-50 p-3 shadow-inner"
                             >
                                 <div class="mb-2 flex items-center justify-between gap-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-ink">{{ $systemdStatusModalView === 'logs' ? __('journalctl -u') : __('systemctl status') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-ink">{{ $systemdStatusModalView === 'logs' ? __('journalctl -u') : __('systemctl status') }}</p>
                                     <button
                                         type="button"
                                         @click="copy()"
-                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
                                         <template x-if="copied">
                                             <span class="inline-flex items-center gap-1 text-emerald-700">
@@ -499,7 +499,7 @@
                                      while the visible <pre> renders the
                                      highlighted version. --}}
                                 <pre x-ref="statusRaw" class="hidden">{{ $systemdStatusModalOutput }}</pre>
-                                <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{!! $statusOut !!}</pre>
+                                <pre class="font-mono text-xs leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere]">{!! $statusOut !!}</pre>
                             </div>
                         @elseif (! $systemdStatusModalLoading && $systemdStatusModalError === null)
                             <p class="text-xs text-brand-moss">{{ __('No output yet. Choose Refresh status.') }}</p>
@@ -526,7 +526,7 @@
                                 <h2 id="systemd-notify-modal-heading" class="text-base font-semibold text-brand-ink">{{ __('Notify on service changes') }}</h2>
                                 <p class="mt-0.5 font-mono text-xs text-brand-moss break-all">{{ $systemdNotifyUnit }}</p>
                             </div>
-                            <x-secondary-button size="sm" type="button" wire:click="closeSystemdNotifyModal" class="!py-2 !text-[11px]">
+                            <x-secondary-button size="sm" type="button" wire:click="closeSystemdNotifyModal" class="!py-2 !text-xs">
                                 {{ __('Close') }}
                             </x-secondary-button>
                         </div>
@@ -535,7 +535,7 @@
                         <p class="text-xs text-brand-moss leading-snug">
                             {{ __('When background inventory detects a change, notify the channels you choose. Tick the events you care about per channel, then save.') }}
                         </p>
-                        <p class="mt-2 text-[11px] text-brand-moss leading-snug">
+                        <p class="mt-2 text-xs text-brand-moss leading-snug">
                             {{ __('Tip: “Restarted” can be noisy during deploys; “Stopped” and “State change” are usually enough.') }}
                         </p>
                         @if ($systemdNotifyChannelRows === [])
@@ -545,19 +545,19 @@
                                     <a
                                         href="{{ route('organizations.notification-channels', $server->organization_id) }}"
                                         wire:navigate
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 !py-2 !text-[11px]"
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 !py-2 !text-xs"
                                     >
                                         {{ __('Add organization channels') }}
                                     </a>
                                 @endif
-                                <x-secondary-button size="sm" href="{{ route('profile.notification-channels') }}" wire:navigate class="!py-2 !text-[11px]">
+                                <x-secondary-button size="sm" href="{{ route('profile.notification-channels') }}" wire:navigate class="!py-2 !text-xs">
                                     {{ __('My notification channels') }}
                                 </x-secondary-button>
                             </div>
                         @else
                             <div class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10">
                                 <table class="min-w-full text-left text-xs">
-                                    <thead class="bg-brand-sand/40 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <thead class="bg-brand-sand/40 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         <tr>
                                             <th class="px-2 py-2">{{ __('Channel') }}</th>
                                             @foreach ($systemdKindLabels as $kind => $_label)
@@ -592,7 +592,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="saveSystemdNotifyPreferences"
                                     @disabled($isDeployer)
-                                    class="!py-2 !text-[11px]"
+                                    class="!py-2 !text-xs"
                                 >
                                     <span wire:loading wire:target="saveSystemdNotifyPreferences" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" aria-hidden="true"></span>
                                     <span wire:loading.remove wire:target="saveSystemdNotifyPreferences">{{ __('Save alert routing') }}</span>

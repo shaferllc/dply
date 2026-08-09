@@ -4,7 +4,7 @@
             <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hostname') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hostname') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Default hostname') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your site is always available on its dply Edge URL.') }}</p>
         </div>
@@ -24,7 +24,7 @@
             <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. Managed delivery issues TLS via Custom Hostnames on the dply Edge zone; BYO Cloudflare uses your zone’s orange-cloud proxy.') }}</p>
         </div>
@@ -66,19 +66,19 @@
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="font-mono text-sm text-brand-ink">{{ $hostname }}</p>
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                    <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
                                     @if ($sslLabel && $sslBadge)
-                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $sslBadge }}">{{ $sslLabel }}</span>
+                                        <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $sslBadge }}">{{ $sslLabel }}</span>
                                     @endif
                                 </div>
                                 @if ($cnameTarget !== '')
                                     <div class="mt-2" x-data="{ copied: false }">
-                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('CNAME target') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('CNAME target') }}</p>
                                         <div class="mt-1 flex flex-wrap items-center gap-2">
                                             <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink">{{ $cnameTarget }}</code>
                                             <button
                                                 type="button"
-                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                                 @click="navigator.clipboard.writeText(@js($cnameTarget)); copied = true; setTimeout(() => copied = false, 2000)"
                                             >
                                                 <x-heroicon-o-clipboard class="h-4 w-4" />
@@ -90,13 +90,13 @@
                                 @endif
                                 @if (is_array($ownership) && ($ownership['name'] ?? '') !== '' && ($ownership['value'] ?? '') !== '' && $sslStatus !== 'active')
                                     <div class="mt-2" x-data="{ copied: false }">
-                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership :type record', ['type' => strtoupper((string) ($ownership['type'] ?? 'TXT'))]) }}</p>
-                                        <p class="mt-1 font-mono text-[11px] text-brand-moss break-all">{{ $ownership['name'] }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership :type record', ['type' => strtoupper((string) ($ownership['type'] ?? 'TXT'))]) }}</p>
+                                        <p class="mt-1 font-mono text-xs text-brand-moss break-all">{{ $ownership['name'] }}</p>
                                         <div class="mt-1 flex flex-wrap items-center gap-2">
                                             <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink break-all">{{ $ownership['value'] }}</code>
                                             <button
                                                 type="button"
-                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40"
                                                 @click="navigator.clipboard.writeText(@js($ownership['value'])); copied = true; setTimeout(() => copied = false, 2000)"
                                             >
                                                 <x-heroicon-o-clipboard class="h-4 w-4" />

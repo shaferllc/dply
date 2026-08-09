@@ -17,7 +17,7 @@
         placeholder="{{ $hint }}"
     ></textarea>
     <x-input-error :messages="$errors->get($model)" class="mt-1" />
-    <p class="mt-2 text-[11px] text-brand-mist">
+    <p class="mt-2 text-xs text-brand-mist">
         {{ __('Uses deploy script variables plus') }}
         <span class="font-mono text-brand-moss">{RELEASE_DIR}</span>,
         <span class="font-mono text-brand-moss">{REPO_URL}</span>,

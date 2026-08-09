@@ -8,22 +8,22 @@
         :note="$headlineCopy.' · '.__('The server pushes fresh metrics back to Dply every minute.')"
     >
         <x-slot:actions>
-            <span class="inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold ring-1 {{ $statusChipClasses }}">
+            <span class="inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold ring-1 {{ $statusChipClasses }}">
                 <x-dynamic-component :component="$statusChipIcon" class="h-3 w-3" aria-hidden="true" />
                 {{ $statusChipLabel }}
             </span>
             @if ($lastGuestSampleAt)
-                <span class="hidden text-[10px] text-brand-mist sm:inline">{{ __('last sample :time', ['time' => $lastGuestSampleAt->diffForHumans()]) }}</span>
+                <span class="hidden text-2xs text-brand-mist sm:inline">{{ __('last sample :time', ['time' => $lastGuestSampleAt->diffForHumans()]) }}</span>
             @endif
-            <span class="hidden text-[10px] text-brand-mist sm:inline">{{ __('Installed and running') }}</span>
+            <span class="hidden text-2xs text-brand-mist sm:inline">{{ __('Installed and running') }}</span>
             @if (! $isDeployer)
-                <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" wire:target="queueMonitoringProbe" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" wire:target="queueMonitoringProbe" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="queueMonitoringProbe" aria-hidden="true" />
                     <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck') }}</span>
                     <span wire:loading wire:target="queueMonitoringProbe">{{ __('…') }}</span>
                 </button>
                 @if (! $monitorHealthy)
-                    <button type="button" wire:click="setMonitorWorkspaceTab('diagnostics')" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <button type="button" wire:click="setMonitorWorkspaceTab('diagnostics')" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                         <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Diagnostics') }}
                     </button>
@@ -35,7 +35,7 @@
     <dl class="grid grid-cols-1 gap-px border-b border-brand-ink/10 bg-brand-ink/5 sm:grid-cols-2 lg:grid-cols-4">
         @foreach ($checks as $c)
             <div class="bg-white px-3 py-2">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $c['label'] }}</dt>
+                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $c['label'] }}</dt>
                 <dd class="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-brand-ink">
                     @if ($c['ok'])
                         <x-heroicon-s-check-circle class="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
@@ -50,7 +50,7 @@
 
     @if ($routingSummary['server_routes'] === 0 && $opsReady)
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 bg-amber-50/50 px-3 py-1.5 sm:px-4">
-            <p class="min-w-0 text-[11px] text-amber-900">
+            <p class="min-w-0 text-xs text-amber-900">
                 <span class="font-semibold">{{ __('No notification routes') }}</span>
                 <span class="text-amber-800/90">— {{ __('add a channel for stale metrics and threshold alerts.') }}</span>
             </p>
@@ -58,7 +58,7 @@
                 <button
                     type="button"
                     wire:click="setMonitorWorkspaceTab('notifications')"
-                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
+                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Add route') }}
@@ -66,7 +66,7 @@
                 <a
                     href="{{ route('servers.notifications', $server) }}"
                     wire:navigate
-                    class="inline-flex h-6 items-center rounded-md border border-amber-300/80 bg-white px-2 text-[11px] font-semibold text-amber-900 shadow-sm hover:bg-amber-100"
+                    class="inline-flex h-6 items-center rounded-md border border-amber-300/80 bg-white px-2 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100"
                 >
                     {{ __('Manage') }}
                 </a>
@@ -95,7 +95,7 @@
                 :note="$latest ? __('Last sample :time', ['time' => \App\Support\Servers\ServerDateFormatter::format($latest->captured_at, $server)]) : null"
             >
                 <x-slot:actions>
-                    <a href="{{ route('servers.insights', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 text-[11px] font-medium text-brand-moss hover:text-brand-ink">
+                    <a href="{{ route('servers.insights', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 text-xs font-medium text-brand-moss hover:text-brand-ink">
                         {{ __('View deploy correlations on Insights') }}
                         <x-heroicon-o-arrow-right class="h-3 w-3" aria-hidden="true" />
                     </a>
@@ -106,7 +106,7 @@
             <dl class="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <dt class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <dt class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                             <x-heroicon-o-cpu-chip class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
                             {{ __('CPU') }}
                         </dt>
@@ -115,14 +115,14 @@
                     <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-brand-ink/8" aria-hidden="true">
                         <div class="h-1 rounded-full {{ $cpuTone['bar'] }}" style="width: {{ $cpuPct ?? 0 }}%"></div>
                     </div>
-                    <dd class="mt-1 text-[10px] text-brand-mist">
+                    <dd class="mt-1 text-2xs text-brand-mist">
                         {{ trans_choice(':count core|:count cores', (int) ($latestPayloadSummary['cpu_count'] ?? 0), ['count' => (int) ($latestPayloadSummary['cpu_count'] ?? 0)]) }}
                     </dd>
                 </div>
 
                 <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <dt class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <dt class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                             <x-heroicon-o-circle-stack class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
                             {{ __('Memory') }}
                         </dt>
@@ -131,14 +131,14 @@
                     <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-brand-ink/8" aria-hidden="true">
                         <div class="h-1 rounded-full {{ $memTone['bar'] }}" style="width: {{ $memPct ?? 0 }}%"></div>
                     </div>
-                    <dd class="mt-1 text-[10px] text-brand-mist">
+                    <dd class="mt-1 text-2xs text-brand-mist">
                         {{ $fmtBytes($latestPayloadSummary['memory_available_bytes'] ?? null) }} {{ __('free of') }} {{ $fmtBytes(isset($p['mem_total_kb']) ? (int) $p['mem_total_kb'] * 1024 : null) }}
                     </dd>
                 </div>
 
                 <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <dt class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <dt class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                             <x-heroicon-o-server-stack class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
                             {{ __('Disk') }} ({{ __('root') }})
                         </dt>
@@ -147,14 +147,14 @@
                     <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-brand-ink/8" aria-hidden="true">
                         <div class="h-1 rounded-full {{ $diskTone['bar'] }}" style="width: {{ $diskPct ?? 0 }}%"></div>
                     </div>
-                    <dd class="mt-1 text-[10px] text-brand-mist">
+                    <dd class="mt-1 text-2xs text-brand-mist">
                         {{ $fmtBytes($latestPayloadSummary['disk_free_bytes'] ?? null) }} {{ __('free of') }} {{ $fmtBytes($p['disk_total_bytes'] ?? null) }}
                     </dd>
                 </div>
 
                 <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <dt class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                        <dt class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                             <x-heroicon-o-chart-bar class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
                             {{ __('Load avg') }}
                         </dt>
@@ -163,7 +163,7 @@
                     <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-brand-ink/8" aria-hidden="true">
                         <div class="h-1 rounded-full {{ $loadTone['bar'] }}" style="width: {{ $loadFillPct ?? 0 }}%"></div>
                     </div>
-                    <dd class="mt-1 text-[10px] text-brand-mist">
+                    <dd class="mt-1 text-2xs text-brand-mist">
                         @if (isset($p['load_5m'], $p['load_15m']))
                             {{ number_format((float) $p['load_5m'], 2) }} / {{ number_format((float) $p['load_15m'], 2) }} (5m / 15m)
                         @else
@@ -179,7 +179,7 @@
                         <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Uptime') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Uptime') }}</p>
                         <p class="text-sm font-semibold tabular-nums text-brand-ink">{{ $fmtDuration($latestPayloadSummary['uptime_seconds'] ?? null) }}</p>
                     </div>
                 </div>
@@ -188,7 +188,7 @@
                         <x-heroicon-o-arrow-down class="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{{ __('Inbound') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-sky-700">{{ __('Inbound') }}</p>
                         <p class="text-sm font-semibold tabular-nums text-brand-ink">{{ $fmtRate($latestPayloadSummary['rx_bytes_per_sec'] ?? null) }}</p>
                     </div>
                 </div>
@@ -197,7 +197,7 @@
                         <x-heroicon-o-arrow-up class="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-violet-700">{{ __('Outbound') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-violet-700">{{ __('Outbound') }}</p>
                         <p class="text-sm font-semibold tabular-nums text-brand-ink">{{ $fmtRate($latestPayloadSummary['tx_bytes_per_sec'] ?? null) }}</p>
                     </div>
                 </div>
@@ -216,22 +216,22 @@
                 >
                     <x-slot:actions>
                         @if ($editingThresholds)
-                            <button type="button" wire:click="cancelEditingThresholds" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="cancelEditingThresholds" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 {{ __('Cancel') }}
                             </button>
-                            <button type="button" wire:click="saveThresholdSettings" wire:loading.attr="disabled" class="inline-flex h-6 items-center rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                            <button type="button" wire:click="saveThresholdSettings" wire:loading.attr="disabled" class="inline-flex h-6 items-center rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
                                 <span wire:loading.remove wire:target="saveThresholdSettings">{{ __('Save') }}</span>
                                 <span wire:loading wire:target="saveThresholdSettings">{{ __('Saving…') }}</span>
                             </button>
                         @else
-                            <button type="button" wire:click="startEditingThresholds" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="startEditingThresholds" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-pencil class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Edit') }}
                             </button>
                             @if ($thresholds['cpu'] !== (float) config('insights.thresholds.cpu_warn_pct', 85) ||
                                   $thresholds['mem'] !== (float) config('insights.thresholds.mem_warn_pct', 85) ||
                                   $thresholds['load'] !== (float) config('insights.thresholds.load_warn', 4.0))
-                                <button type="button" wire:click="resetThresholdsToDefaults" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <button type="button" wire:click="resetThresholdsToDefaults" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     {{ __('Reset') }}
                                 </button>
                             @endif
@@ -296,21 +296,21 @@
                     @else
                         <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('CPU warning') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('CPU warning') }}</dt>
                                 <dd class="mt-1 flex items-baseline gap-1">
                                     <span class="text-lg font-semibold tabular-nums text-brand-ink">{{ $thresholds['cpu'] }}</span>
                                     <span class="text-sm text-brand-moss">%</span>
                                 </dd>
                             </div>
                             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Memory warning') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Memory warning') }}</dt>
                                 <dd class="mt-1 flex items-baseline gap-1">
                                     <span class="text-lg font-semibold tabular-nums text-brand-ink">{{ $thresholds['mem'] }}</span>
                                     <span class="text-sm text-brand-moss">%</span>
                                 </dd>
                             </div>
                             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Load warning') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Load warning') }}</dt>
                                 <dd class="mt-1 flex items-baseline gap-1">
                                     <span class="text-lg font-semibold tabular-nums text-brand-ink">{{ $thresholds['load'] }}</span>
                                 </dd>

@@ -11,13 +11,13 @@
             {{ __('Add a redirect') }}
         </h3>
         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('The edge proxy applies redirects before forwarding upstream. First match wins.') }}">
+        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('The edge proxy applies redirects before forwarding upstream. First match wins.') }}">
             {{ __('Applied before upstream · first match wins') }}
         </p>
     </div>
     <form wire:submit.prevent="addRedirect" class="{{ $panelPad }} grid gap-2 sm:grid-cols-12 sm:items-end">
         <label class="sm:col-span-4 text-sm">
-            <span class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('From path') }}</span>
+            <span class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('From path') }}</span>
             <input
                 type="text"
                 wire:model="newRedirectFrom"
@@ -26,7 +26,7 @@
             />
         </label>
         <label class="sm:col-span-5 text-sm">
-            <span class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Target URL or path') }}</span>
+            <span class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Target URL or path') }}</span>
             <input
                 type="text"
                 wire:model="newRedirectTo"
@@ -35,7 +35,7 @@
             />
         </label>
         <label class="sm:col-span-2 text-sm">
-            <span class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</span>
+            <span class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</span>
             <select
                 wire:model="newRedirectStatus"
                 class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
@@ -66,7 +66,7 @@
             <x-heroicon-o-list-bullet class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
             {{ __('Active redirects') }}
         </h3>
-        <span class="ml-auto shrink-0 text-[11px] tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count redirect|[2,*] :count redirects', count($redirects), ['count' => count($redirects)]) }}</span>
+        <span class="ml-auto shrink-0 text-xs tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count redirect|[2,*] :count redirects', count($redirects), ['count' => count($redirects)]) }}</span>
     </div>
 
     @if (empty($redirects))
@@ -76,7 +76,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                <thead class="text-left text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                     <tr>
                         <th class="px-3 py-1.5 pr-3 sm:px-4">{{ __('From') }}</th>
                         <th class="py-1.5 pr-3">{{ __('To') }}</th>
@@ -94,7 +94,7 @@
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('removeRedirect', @js([$index]), @js(__('Remove redirect')), @js(__('Remove :from → :to?', ['from' => $redirect['from'], 'to' => $redirect['to']])), @js(__('Remove')), true)"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
                                 >
                                     <x-heroicon-o-trash class="h-3.5 w-3.5" />
                                     {{ __('Remove') }}

@@ -40,38 +40,38 @@
                 <span class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 font-mono text-xs text-emerald-900">{{ $detectedPlan['version'] }}</span>
             @endif
             @if ($detectionIsServerless && ! empty($detectedPlan['deploy_kind']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['deploy_kind'] }} {{ __('action') }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['deploy_kind'] }} {{ __('action') }}</span>
             @endif
             @if (! empty($detectedPlan['confidence']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
             @endif
             @if (! empty($detectedPlan['has_manifest']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ __('dply.yaml present') }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ __('dply.yaml present') }}</span>
             @endif
         </div>
 
         <dl class="grid gap-3 sm:grid-cols-2">
             @if (! empty($detectedPlan['build_command']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['build_command'] }}</dd>
                 </div>
             @endif
             @if (! empty($detectedPlan['output_dir']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['output_dir'] }}</dd>
                 </div>
             @endif
             @if (! empty($detectedPlan['start_command']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['start_command'] }}</dd>
                 </div>
             @endif
             @if ($detectionIsServerless && ! empty($detectedPlan['entrypoint']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Entrypoint') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Entrypoint') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['entrypoint'] }}</dd>
                 </div>
             @endif
@@ -79,11 +79,11 @@
 
         @if (! empty($detectedPlan['processes']))
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Suggested processes') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Suggested processes') }}</p>
                 <ul class="mt-1 space-y-1 text-xs">
                     @foreach ($detectedPlan['processes'] as $process)
                         <li class="flex items-start gap-2">
-                            <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-white/70 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-[10px] text-emerald-900">{{ $process['type'] }}</span>
+                            <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-white/70 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-2xs text-emerald-900">{{ $process['type'] }}</span>
                             <span><span class="font-semibold">{{ $process['name'] }}</span> — <span class="font-mono">{{ $process['command'] }}</span></span>
                         </li>
                     @endforeach

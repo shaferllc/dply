@@ -28,7 +28,7 @@
         <div class="border-b border-brand-ink/10 px-4 py-2 sm:px-5" aria-hidden="true">
             <div class="flex items-center gap-2">
                 <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
                     {{ $isContainerHost ? __('Container apps') : __('Site directory') }}
                 </p>
             </div>

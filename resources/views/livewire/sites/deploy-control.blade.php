@@ -106,7 +106,7 @@
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
                         </span>
                     @else
-                        <span class="rounded bg-brand-sand/60 px-1.5 text-[10px] font-bold tabular-nums text-brand-moss">{{ $syncPeers->count() }}</span>
+                        <span class="rounded bg-brand-sand/60 px-1.5 text-2xs font-bold tabular-nums text-brand-moss">{{ $syncPeers->count() }}</span>
                     @endif
                 </button>
             @endif
@@ -125,7 +125,7 @@
                 >
                     <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy console') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy console') }}</p>
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $site->name ?? $site->domain }}</p>
                         </div>
                         <div class="flex items-center gap-2">
@@ -133,7 +133,7 @@
                                 type="button"
                                 wire:click="deploy"
                                 @disabled($inProgress)
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
                             >
                                 @if ($inProgress)
                                     <x-spinner variant="white" size="sm" /> {{ __('Deploying…') }}
@@ -161,13 +161,13 @@
                         @else
                             <div class="mb-3 flex items-center justify-between gap-2">
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $latest->status === 'success',
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $latest->status === 'failed',
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $latest->status === 'running',
                                     'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($latest->status, ['success', 'failed', 'running'], true),
                                 ])>{{ $latest->status }}</span>
-                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $latest]) }}" wire:navigate class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $latest]) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
                                     {{ __('Full log') }}
                                     <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />
                                 </a>
@@ -193,7 +193,7 @@
                                                 @endswitch
                                                 {{ $phase['label'] }}
                                             </span>
-                                            @if ($durTxt)<span class="font-mono text-[11px] text-brand-mist">{{ $durTxt }}</span>@endif
+                                            @if ($durTxt)<span class="font-mono text-xs text-brand-mist">{{ $durTxt }}</span>@endif
                                         </div>
                                         @if ($phase['steps'] !== [])
                                             <ul class="mt-2 space-y-1 pl-6">
@@ -201,25 +201,25 @@
                                                     @php $stepFailed = ! ($step['ok'] ?? false) && ! ($step['skipped'] ?? false) && ! ($step['pending'] ?? false); @endphp
                                                     <li>
                                                         <div class="flex items-center gap-2 text-xs">
-                                                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
+                                                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-3xs font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
                                                             <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : (($step['pending'] ?? false) ? 'text-brand-mist' : 'text-brand-ink') }}">{{ $step['label'] }}</span>
                                                             @if ($step['pending'] ?? false)
-                                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-moss">{{ __('queued') }}</span>
+                                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.1em] text-brand-moss">{{ __('queued') }}</span>
                                                             @elseif ($step['skipped'])
-                                                                <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
+                                                                <span class="rounded bg-amber-100 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
                                                             @elseif (($step['duration_ms'] ?? 0) > 0)
                                                                 <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
                                                             @endif
                                                         </div>
                                                         @if (($step['output'] ?? '') !== '')
                                                             <details @if ($stepFailed) open @endif class="mt-1 group">
-                                                                <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline [&::-webkit-details-marker]:hidden">
+                                                                <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-2xs font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline [&::-webkit-details-marker]:hidden">
                                                                     <span class="font-mono group-open:hidden">▸</span>
                                                                     <span class="font-mono hidden group-open:inline">▾</span>
                                                                     <span class="group-open:hidden">{{ __('Show output') }}</span>
                                                                     <span class="hidden group-open:inline">{{ __('Hide output') }}</span>
                                                                 </summary>
-                                                                <pre class="mt-1 max-h-96 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                                                                <pre class="mt-1 max-h-96 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-xs leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
                                                             </details>
                                                         @endif
                                                     </li>
@@ -248,13 +248,13 @@
                                     <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
                                         <p class="text-xs font-semibold text-rose-800">{{ __('Deploy failed before the first phase started — usually the initial clone or the connection to the server.') }}</p>
                                         @if ($failTail !== '')
-                                            <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+                                            <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-xs leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
                                         @endif
                                     </div>
                                 @endunless
                                 @if ($drawerRem && empty($drawerRem['guided']))
                                     <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                                        <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                                        <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
                                             <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
                                             {{ __('dply recognized this failure') }}
                                         </p>
@@ -306,12 +306,12 @@
                 >
                     <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync deploy') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync deploy') }}</p>
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ ! $syncConsoleMode ? __('Deploy together') : ($syncBusy ? __('Deploying :n sites', ['n' => count($syncRows)]) : __('Synced :n sites', ['n' => count($syncRows)])) }}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             @if ($syncConsoleMode)
-                                <button type="button" wire:click="newSync" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <button type="button" wire:click="newSync" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                     <x-heroicon-o-arrow-left class="h-4 w-4" /> {{ __('New sync') }}
                                 </button>
                             @endif
@@ -329,12 +329,12 @@
                             @endforeach
                         </div>
 
-                        <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3 text-center text-[11px] text-brand-moss">
+                        <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3 text-center text-xs text-brand-moss">
                             @if ($syncBusy)
                                 <span class="inline-flex items-center gap-1.5"><x-spinner size="sm" /> {{ __('Deploying — this updates live.') }}</span>
                             @else
                                 <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
-                                    <button type="button" wire:click="deployAgain" wire:loading.attr="disabled" wire:target="deployAgain" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
+                                    <button type="button" wire:click="deployAgain" wire:loading.attr="disabled" wire:target="deployAgain" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="deployAgain" />
                                         <x-spinner size="sm" wire:loading wire:target="deployAgain" />
                                         {{ __('Deploy again') }}
@@ -355,10 +355,10 @@
                                                 <div class="flex items-center gap-2">
                                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $peer->name }}</span>
                                                     @if ($peer->id === $site->id)
-                                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('this site') }}</span>
+                                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('this site') }}</span>
                                                     @endif
                                                     @if ($peer->isWorkerSite())
-                                                        <span class="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ __('worker') }}</span>
+                                                        <span class="rounded bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ __('worker') }}</span>
                                                     @endif
                                                 </div>
                                                 <p class="mt-0.5 truncate text-xs text-brand-mist">{{ $peer->server?->name ?? '—' }}@if ($peer->git_branch) · {{ $peer->git_branch }}@endif</p>

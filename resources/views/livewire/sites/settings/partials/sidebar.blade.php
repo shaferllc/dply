@@ -72,7 +72,7 @@
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
                     @php $sidebarTestingHostname = trim((string) $site->testingHostname()); @endphp
                     @if ($sidebarTestingHostname !== '' && $sidebarTestingHostname !== $sidebarPrimaryHostname)
-                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist" title="{{ $sidebarTestingHostname }}">{{ $sidebarTestingHostname }}</p>
+                        <p class="mt-0.5 truncate font-mono text-xs text-brand-mist" title="{{ $sidebarTestingHostname }}">{{ $sidebarTestingHostname }}</p>
                     @endif
                     @php
                         // Resolve through the request-scoped registry rather than
@@ -97,7 +97,7 @@
             </div>
 
             <div class="mt-3 flex items-center gap-1.5">
-                <span class="shrink-0 rounded-md bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">URL</span>
+                <span class="shrink-0 rounded-md bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">URL</span>
                 @if ($sidebarVisitUrl || $sidebarPrimaryHostname)
                     @php
                         $sidebarDisplayUrl = $sidebarVisitUrl
@@ -125,7 +125,7 @@
                             <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                         </a>
                     @endif
-                    <span x-show="copiedUrl" x-cloak class="text-[10px] font-medium text-brand-forest">{{ __('Copied') }}</span>
+                    <span x-show="copiedUrl" x-cloak class="text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
                 @else
                     <span class="text-xs text-brand-mist">—</span>
                 @endif
@@ -196,7 +196,7 @@
                         type="button"
                         x-on:click="toggle('{{ $groupKey }}')"
                         :aria-expanded="(! collapsed['{{ $groupKey }}']).toString()"
-                        class="ws-hide-collapsed {{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
+                        class="ws-hide-collapsed {{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
                     >
                         <span x-bind:class="collapsed['{{ $groupKey }}'] ? '' : 'rotate-90'" class="inline-flex transition-transform">
                             <x-heroicon-o-chevron-right class="h-3 w-3" />
@@ -205,7 +205,7 @@
                         @if ($groupAlertCount > 0)
                             <span
                                 x-show="collapsed['{{ $groupKey }}']"
-                                class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700"
+                                class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-3xs font-bold text-rose-700"
                             >{{ $groupAlertCount > 99 ? '99+' : $groupAlertCount }}</span>
                         @endif
                         @if ($groupNeedsSetup)
@@ -287,11 +287,11 @@
                         @if ($item['id'] === 'errors' && empty($item['preview_only']))
                             @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForSite((string) $site->id); @endphp
                             @if ($openErrorCount > 0)
-                                <span class="ws-hide-collapsed shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                                <span class="ws-hide-collapsed shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-2xs font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
                             @endif
                         @endif
                         @if (! empty($item['preview_only']))
-                            <span class="ws-hide-collapsed shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <span class="ws-hide-collapsed shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-moss">
                                 {{ __('Soon') }}
                             </span>
                         @endif

@@ -5,7 +5,7 @@
 <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Monthly quota') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Monthly quota') }}</p>
             <p class="mt-1 text-xs text-brand-moss">{{ __('Soft cap — warn at :pct%, flag at 100%.', ['pct' => $guardrail['warn_at_percent'] ?? config('edge.guardrail.warn_at_percent', 80)]) }}</p>
         </div>
         @if ($guardrail !== null)
@@ -22,7 +22,7 @@
                     default => __('OK'),
                 };
             @endphp
-            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $stateBadge }}">{{ $stateLabel }}</span>
+            <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $stateBadge }}">{{ $stateLabel }}</span>
         @endif
     </div>
 
@@ -60,8 +60,8 @@
         <div class="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
                 <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Requests') }}</span>
-                    <span class="font-mono text-[11px] text-brand-moss">{{ $reqPct }}%</span>
+                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Requests') }}</span>
+                    <span class="font-mono text-xs text-brand-moss">{{ $reqPct }}%</span>
                 </div>
                 <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-brand-sand/80">
                     <div class="h-full rounded-full {{ $barColor($reqPct) }}" style="width: {{ max(0, min(100, $reqPct)) }}%"></div>
@@ -73,8 +73,8 @@
             </div>
             <div>
                 <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bandwidth') }}</span>
-                    <span class="font-mono text-[11px] text-brand-moss">{{ $bytesPct }}%</span>
+                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bandwidth') }}</span>
+                    <span class="font-mono text-xs text-brand-moss">{{ $bytesPct }}%</span>
                 </div>
                 <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-brand-sand/80">
                     <div class="h-full rounded-full {{ $barColor($bytesPct) }}" style="width: {{ max(0, min(100, $bytesPct)) }}%"></div>
@@ -86,7 +86,7 @@
             </div>
         </div>
         @if ($evaluatedAt)
-            <p class="mt-2 text-right text-[11px] text-brand-mist">{{ __('Checked :ts', ['ts' => \Illuminate\Support\Carbon::parse($evaluatedAt)->diffForHumans()]) }}</p>
+            <p class="mt-2 text-right text-xs text-brand-mist">{{ __('Checked :ts', ['ts' => \Illuminate\Support\Carbon::parse($evaluatedAt)->diffForHumans()]) }}</p>
         @endif
     @endif
 </section>

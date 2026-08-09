@@ -50,7 +50,7 @@
                             <div class="flex items-start gap-3 border-b border-brand-ink/5 px-3 py-2 font-mono text-xs last:border-b-0">
                                 <span class="shrink-0 tabular-nums text-brand-mist">{{ $line['timestamp'] ?? '' }}</span>
                                 @if (! empty($line['source']))
-                                    <span class="shrink-0 rounded bg-brand-sand/50 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ $line['source'] }}</span>
+                                    <span class="shrink-0 rounded bg-brand-sand/50 px-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ $line['source'] }}</span>
                                 @endif
                                 @if (! empty($line['level']))
                                     <span class="shrink-0 text-brand-mist">{{ $line['level'] }}</span>

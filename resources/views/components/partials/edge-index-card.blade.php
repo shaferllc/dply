@@ -23,7 +23,7 @@
                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $site->name }}</span>
                 @endif
                 @if ($site->previewBranch)
-                    <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
+                    <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
                         @if ($site->previewPrNumber)
                             PR #{{ $site->previewPrNumber }}
                         @else
@@ -31,12 +31,12 @@
                         @endif
                     </span>
                 @endif
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $site->statusBadgeClass }}">
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $site->statusBadgeClass }}">
                     {{ $site->statusLabel }}
                 </span>
             </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                 <span class="inline-flex items-center gap-1 font-mono">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     {{ $site->sourceLabel ?? '—' }}
@@ -46,7 +46,7 @@
                     <x-heroicon-m-cpu-chip class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     {{ $site->runtimeLabel }}
                     @if ($site->frameworkLabel)
-                        <span class="inline-flex rounded-full border border-brand-ink/15 bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ $site->frameworkLabel }}</span>
+                        <span class="inline-flex rounded-full border border-brand-ink/15 bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ $site->frameworkLabel }}</span>
                     @endif
                 </span>
                 <span aria-hidden="true" class="text-brand-mist/60">·</span>

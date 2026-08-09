@@ -45,7 +45,7 @@
                         <p class="text-sm font-semibold text-brand-ink">{{ $selectedInstallProfile['label'] }}</p>
                         <p class="mt-1 text-sm leading-6 text-brand-moss">{{ $selectedInstallProfile['summary'] ?? '' }}</p>
                     </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
                         {{ __('Preset') }}
                     </span>
                 </div>
@@ -99,14 +99,14 @@
                         <p class="text-sm font-semibold text-brand-ink">{{ $selectedServerRole['label'] }}</p>
                         <p class="mt-1 text-sm leading-6 text-brand-moss">{{ $selectedServerRole['summary'] ?? ($selectedServerRole['detail'] ?? '') }}</p>
                     </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
                         {{ __('Role') }}
                     </span>
                 </div>
 
                 @if ($serverRoleInstalls->isNotEmpty())
                     <div class="mt-4 border-t border-brand-ink/10 pt-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Default installs') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Default installs') }}</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($serverRoleInstalls as $install)
                                 <span class="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">{{ $install }}</span>

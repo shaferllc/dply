@@ -137,21 +137,21 @@
                             <span class="inline-block h-2 w-2 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
                             <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
                         </p>
-                        <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
+                        <p class="mt-1 truncate text-xs text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Estimated')">
                         <p class="mt-2 flex items-baseline gap-1">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($displayCents / 100, 0) }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ $interval === 'year' ? '/'.__('yr') : '/'.__('mo') }}</span>
+                            <span class="text-xs text-brand-moss">{{ $interval === 'year' ? '/'.__('yr') : '/'.__('mo') }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Daily run rate $:n', ['n' => number_format(($summary['daily_run_rate_cents'] ?? 0) / 100, 2)]) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Daily run rate $:n', ['n' => number_format(($summary['daily_run_rate_cents'] ?? 0) / 100, 2)]) }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Resources')">
                         <p class="mt-2 flex items-baseline gap-1">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $billableResources }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('billable') }}</span>
                         </p>
-                        <p class="mt-1 truncate text-[11px] text-brand-mist">
+                        <p class="mt-1 truncate text-xs text-brand-mist">
                             @foreach (array_values(array_filter($resourceParts, fn ($p) => $p['visible'])) as $i => $part)
                                 @if ($i > 0) <span aria-hidden="true">·</span> @endif
                                 {{ $part['count'] }} {{ $part['label'] }}
@@ -181,19 +181,19 @@
                             <x-heroicon-o-banknotes class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Observatory') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Observatory') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Transparent cost observatory') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Dply platform fees, estimated provider infrastructure, and metered delivery — in one pane. We bill our work; you pay your cloud provider directly.') }}</p>
                         </div>
                     </div>
                     <div class="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply platform') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply platform') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($obsDplyCents / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span></p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Plan + managed products + Edge usage') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Plan + managed products + Edge usage') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider infrastructure') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider infrastructure') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">
                                 @if ($obsProviderCents > 0)
                                     ${{ number_format($obsProviderCents / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span>
@@ -201,7 +201,7 @@
                                     <span class="text-lg">{{ __('Unknown') }}</span>
                                 @endif
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-moss">
+                            <p class="mt-1 text-xs text-brand-moss">
                                 @if ($obsPartial)
                                     {{ trans_choice(':known with estimates · :unknown need cost notes|:known with estimates · :unknown need cost notes', $obsUnknown, ['known' => count($obsServers) - $obsUnknown, 'unknown' => $obsUnknown]) }}
                                 @else
@@ -210,14 +210,14 @@
                             </p>
                         </div>
                         <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Full stack estimate') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Full stack estimate') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($obsStackCents / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span></p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Dply + provider (where known)') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Dply + provider (where known)') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('vs Forge Hobby') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('vs Forge Hobby') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($obsForgeBaseline / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span></p>
-                            <p class="mt-1 text-[11px] text-brand-moss">
+                            <p class="mt-1 text-xs text-brand-moss">
                                 @if ($obsDelta !== 0)
                                     {{ __('Dply stack :delta vs Forge + same infra', ['delta' => ($obsDelta >= 0 ? '+' : '-').'$'.number_format(abs($obsDelta) / 100, 2)]) }}
                                 @else
@@ -229,10 +229,10 @@
 
                     @if ($obsServers !== [])
                         <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('BYO VM provider estimates') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('BYO VM provider estimates') }}</p>
                             <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
                                 <table class="w-full text-sm">
-                                    <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         <tr>
                                             <th class="px-4 py-2 text-left">{{ __('Server') }}</th>
                                             <th class="px-4 py-2 text-left">{{ __('Provider / plan') }}</th>
@@ -303,37 +303,37 @@
                             <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Forecast') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Forecast') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring revenue') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Normalized MRR / ARR, projected month-end, and the change versus 30 days ago.') }}</p>
                         </div>
                     </div>
                     <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('MRR') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MRR') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($forecastMrrCents / 100, 2) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Normalized recurring monthly revenue') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Normalized recurring monthly revenue') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('ARR') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('ARR') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($forecastArrCents / 100, 2) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Annualized recurring run-rate') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Annualized recurring run-rate') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Month-end projection') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Month-end projection') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($forecastProjectedMonthEndCents / 100, 2) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Fixed + extrapolated Edge usage MTD') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Fixed + extrapolated Edge usage MTD') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Δ vs 30 days') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Δ vs 30 days') }}</p>
                             @if (is_int($forecastDeltaVsThirtyDays))
                                 <p class="mt-1 font-mono text-2xl font-semibold tabular-nums {{ $forecastDeltaVsThirtyDays >= 0 ? 'text-brand-rust' : 'text-brand-forest' }}">
                                     {{ $forecastDeltaVsThirtyDays >= 0 ? '+' : '-' }}${{ number_format(abs($forecastDeltaVsThirtyDays) / 100, 2) }}
                                 </p>
-                                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Change in current monthly estimate') }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Change in current monthly estimate') }}</p>
                             @else
                                 <p class="mt-1 text-sm font-semibold text-brand-ink">{{ __('Not enough history') }}</p>
-                                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Appears once snapshots accumulate') }}</p>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Appears once snapshots accumulate') }}</p>
                             @endif
                         </div>
                     </div>
@@ -346,7 +346,7 @@
                             <x-heroicon-o-presentation-chart-line class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trend') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trend') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Historical spend') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Daily billing snapshots for the last 90 days, with a focused 30-day table below.') }}</p>
                         </div>
@@ -361,7 +361,7 @@
                             </div>
                         @else
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4">
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last 90 days') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last 90 days') }}</p>
                                 <div class="mt-3 flex h-24 items-end gap-1" aria-hidden="true">
                                     @foreach ($spendTrendNinety as $day)
                                         <div class="flex-1 min-w-0">
@@ -377,10 +377,10 @@
 
                             @if ($spendTrendThirty !== [])
                                 <div class="mt-5">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last 30 days') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last 30 days') }}</p>
                                     <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10">
                                         <table class="w-full text-sm">
-                                            <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 <tr>
                                                     <th class="px-4 py-2 text-left">{{ __('Date') }}</th>
                                                     <th class="px-4 py-2 text-right">{{ __('Total') }}</th>
@@ -411,7 +411,7 @@
                             <x-heroicon-o-chart-pie class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Breakdown') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Breakdown') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Spend by category') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Current-cycle estimate — updates when your fleet changes.') }}</p>
                         </div>
@@ -442,7 +442,7 @@
 
                         <div class="overflow-hidden rounded-xl border border-brand-ink/10">
                             <table class="w-full text-sm">
-                                <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
                                         <th class="px-4 py-2 text-left">{{ __('Line item') }}</th>
                                         <th class="px-4 py-2 text-right">{{ __('Qty') }}</th>
@@ -484,7 +484,7 @@
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge sites') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Per-site platform fee, delivery usage (MTD), and daily request trends.') }}</p>
                         </div>
@@ -500,7 +500,7 @@
                         @else
                             @if ($edgeUsageDaily !== [])
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Org total — daily requests') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Org total — daily requests') }}</p>
                                     <div class="mt-3 flex h-20 items-end gap-1" aria-hidden="true">
                                         @foreach ($edgeUsageDaily as $day)
                                             <div class="flex-1 min-w-0 group relative">
@@ -533,7 +533,7 @@
                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Catalog') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Catalog') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed products') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Live Cloud, Edge, and Serverless sites billed per unit — separate from BYO VM tiers.') }}</p>
                         </div>
@@ -552,7 +552,7 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0">
                                         <h4 class="text-sm font-semibold text-brand-ink">{{ $meta['title'] }}</h4>
-                                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ trans_choice(':count live|:count live', count($rows), ['count' => count($rows)]) }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ trans_choice(':count live|:count live', count($rows), ['count' => count($rows)]) }}</p>
                                     </div>
                                     <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                                         <x-dynamic-component :component="$meta['icon']" class="h-4 w-4" aria-hidden="true" />
@@ -583,7 +583,7 @@
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compute') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compute') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('BYO server fleet') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Spec-tiered VMs you SSH into — counted separately from managed products.') }}</p>
                         </div>
@@ -597,7 +597,7 @@
                         </div>
                     @else
                         <table class="w-full text-sm">
-                            <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
                                     <th class="px-5 py-2 text-left sm:px-6">{{ __('Server') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Tier / status') }}</th>
@@ -631,7 +631,7 @@
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Audit') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Audit') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stripe sync events') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent billing reconciliation runs, including no-op and failed runs.') }}</p>
                         </div>
@@ -645,7 +645,7 @@
                         </div>
                     @else
                         <table class="w-full text-sm">
-                            <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
                                     <th class="px-5 py-2 text-left sm:px-6">{{ __('Time') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Trigger') }}</th>
@@ -670,7 +670,7 @@
                                         </td>
                                         <td class="px-4 py-3 text-brand-moss">{{ str_replace('_', ' ', $event['trigger'] ?? 'manual') }}</td>
                                         <td class="px-4 py-3">
-                                            <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusClasses }}">
+                                            <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusClasses }}">
                                                 {{ $eventStatus }}
                                             </span>
                                             @if (! empty($event['error_message']))
@@ -693,7 +693,7 @@
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoice history') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent Stripe invoices — up to 24 months of paid charges.') }}</p>
                         </div>
@@ -721,7 +721,7 @@
                             </div>
                         </div>
                         <table class="w-full border-t border-brand-ink/10 text-sm">
-                            <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
                                     <th class="px-5 py-2 text-left sm:px-6">{{ __('Date') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Number') }}</th>

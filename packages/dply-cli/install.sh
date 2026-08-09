@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
-# dply CLI installer — downloads the CLI package from your dply instance.
+# dply CLI installer — downloads the CLI package from the same origin as this script.
 #
 #   curl -fsSL https://your-dply.example/cli/install.sh | bash -s -- --login
 #
-# The CLI is hosted by dply at /cli/dply-cli.tgz (not npm, unless you opt in).
+# The served script injects that origin as DEFAULT_BASE_URL, then downloads
+# /cli/dply-cli.tgz from it (built on demand by the app — no pre-published npm).
 #
 # Environment:
-#   DPLY_BASE_URL              dply web/API origin
+#   DPLY_BASE_URL              dply web/API origin (overrides injected default)
 #   DPLY_CLI_INSTALL_METHOD    tarball | npm | auto (injected default: __DPLY_CLI_INSTALL_METHOD__)
 #   DPLY_CLI_NPM_PUBLISHED     1 when @dply/cli is on npm (injected: __DPLY_CLI_NPM_PUBLISHED__)
 #
@@ -43,14 +44,14 @@ usage() {
   cat <<'EOF'
 dply CLI installer
 
-The CLI package is downloaded from your dply instance (/cli/dply-cli.tgz).
-Requires Node.js 18+ and npm (used only to install the downloaded package globally).
+Downloads /cli/dply-cli.tgz from the same host that served this script
+(built on demand). Requires Node.js 18+ and npm (global install only).
 
 Usage:
   curl -fsSL https://<your-dply>/cli/install.sh | bash -s -- --login
 
 Options:
-  --base-url URL   dply instance URL (auto-filled when served from dply)
+  --base-url URL   Override download/login origin (default: host of this script)
   --login          Run `dply login` when install finishes
   --no-login       Skip login after install
   --method METHOD  tarball | npm | auto

@@ -34,7 +34,7 @@
                 </div>
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <span class="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $tone['badge'] }}">
+                <span class="rounded-full px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide {{ $tone['badge'] }}">
                     {{ $isOver ? __('Over') : __('Warn') }}
                 </span>
                 <a

@@ -30,9 +30,9 @@
             @foreach ($systemdWorkers as $w)
                 <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 text-sm sm:px-7">
                     <span class="font-semibold text-brand-ink">{{ $w['name'] }}</span>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[11px] uppercase tracking-wide text-brand-moss">{{ $w['type'] }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs uppercase tracking-wide text-brand-moss">{{ $w['type'] }}</span>
                     <span class="text-xs text-brand-moss">{{ $w['site_name'] }}</span>
-                    <code class="ml-auto truncate font-mono text-[11px] text-brand-moss" title="{{ $w['command'] }}">{{ $w['command'] }}</code>
+                    <code class="ml-auto truncate font-mono text-xs text-brand-moss" title="{{ $w['command'] }}">{{ $w['command'] }}</code>
                 </div>
             @endforeach
         </div>
@@ -60,7 +60,7 @@
                 wire:loading.attr="disabled"
                 wire:target="loadProgramStatuses"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Refresh') }}
@@ -71,7 +71,7 @@
                 wire:loading.attr="disabled"
                 wire:target="runPreflightPathCheck"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <x-heroicon-m-folder class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Path check') }}
@@ -89,7 +89,7 @@
                 wire:loading.attr="disabled"
                 wire:target="restartAllPrograms"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span wire:loading.remove wire:target="restartAllPrograms" class="inline-flex items-center gap-1">
                     <x-heroicon-m-arrow-path-rounded-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -113,7 +113,7 @@
                 wire:loading.attr="disabled"
                 wire:target="syncSupervisor"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span wire:loading.remove wire:target="syncSupervisor" class="inline-flex items-center gap-1">
                     <x-heroicon-m-cloud-arrow-up class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -128,7 +128,7 @@
                 type="button"
                 wire:click="openCreateDaemonModal"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
             >
                 <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Add program') }}
@@ -138,7 +138,7 @@
 
     @if ($contextSiteModel)
         <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
-            <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Show') }}</span>
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Show') }}</span>
             <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm" role="group" aria-label="{{ __('Program list scope') }}">
                 <button type="button" wire:click="$set('programs_list_scope', 'site')" @class([
                     'rounded-lg px-3 py-1 text-xs font-semibold transition',
@@ -170,7 +170,7 @@
                 type="button"
                 wire:click="openCreateDaemonModal"
                 @disabled($supervisor_installed !== true)
-                class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
             >
                 <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Add program') }}
@@ -217,11 +217,11 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $sp->slug }}</p>
                             @if (! $statusesLoaded)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading.remove wire:target="loadProgramStatuses">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading.remove wire:target="loadProgramStatuses">
                                     <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist/50"></span>
                                     {{ __('—') }}
                                 </span>
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading wire:target="loadProgramStatuses">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading wire:target="loadProgramStatuses">
                                     <x-spinner size="sm" variant="muted" />
                                     {{ __('Loading') }}
                                 </span>
@@ -237,7 +237,7 @@
                                     };
                                 @endphp
                                 <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $badgeClass }}"
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $badgeClass }}"
                                     @if ($pstTooltip) title="{{ $pstTooltip }}" @endif
                                 >{{ $pst }}</span>
                             @endif
@@ -253,7 +253,7 @@
                         <p class="mt-2 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $sp->command }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ $sp->effectiveDirectory() }}</p>
                         @if (in_array($pst, ['backoff', 'fatal'], true))
-                            <p class="mt-2 text-[11px] leading-relaxed text-red-700">
+                            <p class="mt-2 text-xs leading-relaxed text-red-700">
                                 <span class="font-semibold">{{ $pst === 'backoff' ? __('Crash loop:') : __('Fatal:') }}</span>
                                 {{ $pst === 'backoff'
                                     ? __('Process starts then exits immediately. Check .env, Redis/DB connectivity, and that the working directory exists.')
@@ -397,7 +397,7 @@
 
     @if ($preflight_messages !== [])
         <div class="border-t border-brand-ink/10 bg-white px-6 py-4 sm:px-7">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path check') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Path check') }}</p>
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-brand-ink">
                 @foreach ($preflight_messages as $msg)
                     <li>{{ $msg }}</li>

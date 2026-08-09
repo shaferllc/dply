@@ -11,105 +11,100 @@
         $sessionCount = $cliTokens->count();
         $orgCount = $organizations->count();
         $lastUsed = $cliTokens->pluck('last_used_at')->filter()->sort()->last();
+        $installUrl = route('cli.install');
     @endphp
 
     <x-profile-shell
+        dense
         :title="__('CLI')"
-        :description="__('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.')"
+        :description="__('Install once, device-flow login, then manage sessions for your orgs.')"
         icon="heroicon-o-command-line"
     >
+        <x-slot:actions>
+            <x-docs-link
+                slug="account-cli"
+                class="!h-6 !gap-1 !rounded-md !px-2 !py-0 !text-xs !font-semibold"
+            >
+                <x-heroicon-o-book-open class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Docs') }}
+            </x-docs-link>
+        </x-slot:actions>
+
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sessions') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $sessionCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('session|sessions', $sessionCount) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Active devices') }}</p>
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('CLI at a glance') }}">
+                <div class="bg-white px-3 py-2">
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sessions') }}</dt>
+                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $sessionCount }}</dd>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organizations') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $orgCount) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('You administer') }}</p>
+                <div class="bg-white px-3 py-2">
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organizations') }}</dt>
+                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</dd>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last used') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="text-sm font-semibold text-brand-ink">{{ $lastUsed ? $lastUsed->diffForHumans() : '—' }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Most recent sign-in') }}</p>
+                <div class="bg-white px-3 py-2">
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last used') }}</dt>
+                    <dd class="mt-0.5 truncate text-sm font-semibold text-brand-ink">{{ $lastUsed ? $lastUsed->diffForHumans() : '—' }}</dd>
                 </div>
             </dl>
         </x-slot:stats>
 
         @if ($organizations->isEmpty())
-            <div class="px-5 py-6 sm:px-6">
+            <div class="px-3 py-6 sm:px-4">
                 <p class="text-sm text-brand-moss">{{ __('Org admin access is required to manage CLI authentications.') }}</p>
             </div>
         @else
-            <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Get the dply CLI') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Requires Node 18+. Run `dply login` — your browser opens here, you approve once, and the terminal drops into `dply shell`. Press Enter for numbered menus, or type commands directly.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="space-y-4 px-5 py-5 sm:px-6">
+            {{-- Get started --}}
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-arrow-down-tray"
+                :title="__('Get the dply CLI')"
+                :note="__('Node 18+. Package served from this instance at `/cli/dply-cli.tgz` — not npm.')"
+            />
+
+            <div class="grid gap-px border-b border-brand-ink/10 bg-brand-ink/5 lg:grid-cols-2">
+                <div class="space-y-3 bg-white px-3 py-3 sm:px-4">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install') }}</p>
-                        @php $installUrl = route('cli.install'); @endphp
-                        <x-cli-snippet class="mt-2" :commands="[
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install') }}</p>
+                        <x-cli-snippet class="mt-1.5" size="10" :commands="[
                             ['label' => '', 'command' => 'curl -fsSL '.$installUrl.' | bash -s -- --login'],
                         ]" />
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('The CLI is hosted by this dply instance — not npm. The script downloads /cli/dply-cli.tgz and installs it globally. Node 18+ required.') }}
-                        </p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2. Sign in') }}</p>
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('If you used `--login` above, you are already authenticated. Otherwise run:') }}
-                        </p>
-                        <x-cli-snippet class="mt-2" :commands="[
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2. Sign in') }}</p>
+                        <x-cli-snippet class="mt-1.5" size="10" :commands="[
                             ['label' => '', 'command' => 'dply login --base-url '.$appUrl],
                         ]" />
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Need more scopes later? Run `dply auth refresh` (or `dply refresh`) — same browser approval, new token on that machine.') }}
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Skip if you used `--login` above. More scopes later: `dply auth refresh` (or `r`).') }}
                         </p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3. Verify') }}</p>
-                        <x-cli-snippet class="mt-2" :commands="[
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3. Verify') }}</p>
+                        <x-cli-snippet class="mt-1.5" size="10" open :commands="[
                             ['label' => __('Account'), 'command' => 'dply account show'],
                             ['label' => __('Menu'),    'command' => 'dply menu'],
                             ['label' => __('Servers'), 'command' => 'dply server list'],
                             ['label' => __('Sites'),   'command' => 'dply site list'],
                         ]" />
                     </div>
+                </div>
+
+                <div class="space-y-3 bg-white px-3 py-3 sm:px-4">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('4. Deploy a BYO site from your repo') }}</p>
-                        <x-cli-snippet class="mt-2" :commands="[
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('4. Deploy from a repo') }}</p>
+                        <x-cli-snippet class="mt-1.5" size="10" :commands="[
                             ['label' => __('Link'),   'command' => 'dply link'],
                             ['label' => __('Deploy'), 'command' => 'dply deploy --follow'],
                             ['label' => __('Status'), 'command' => 'dply site status'],
                             ['label' => __('Logs'),   'command' => 'dply site logs --follow'],
                         ]" />
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('`dply link` opens a picker (BYO + Edge). Edge: `dply edge status --wait` or `dply deploy --wait`. Server SSH: `dply server run --server <id> <command>` needs `commands.run`. Firewall: `dply server firewall show` needs `network.read` — run `dply auth refresh` if scopes are missing.') }}
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Edge: `dply edge status --wait`. SSH run needs `commands.run`; firewall needs `network.read`.') }}
                         </p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('5. GitHub Actions (BYO deploy)') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>name: Deploy
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('5. GitHub Actions') }}</p>
+                        <pre class="mt-1.5 max-h-40 overflow-auto rounded-md border border-brand-ink/10 bg-[#0b1020] px-2.5 py-2 font-mono text-2xs leading-relaxed text-slate-200"><code>name: Deploy
 on:
   push:
     branches: [main]
@@ -124,29 +119,45 @@ jobs:
       - run: curl -fsSL {{ $installUrl }} | bash -s -- --no-shell
       - run: dply login --token "$@{{ secrets.DPLY_TOKEN }}" --no-shell
       - run: dply deploy --sync --wait --idempotency-key "$@{{ github.sha }}"</code></pre>
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Create an org API token with sites.deploy. Link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.') }}
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Org API token with `sites.deploy`. Commit `.dply/site.json` or pass `--site` in CI.') }}
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Repo config: dply.yaml or dply.json') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Drop a `dply.yaml`, `dply.yml`, or `dply.json` at your repo root. dply reads it on every deploy — build overrides, redirects, rewrites, header rules, and env declarations. YAML and JSON are interchangeable; pick whichever your team prefers.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="space-y-4 px-5 py-5 sm:px-6">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('YAML — dply.yaml') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>@verbatim build:
+            {{-- Command index --}}
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-queue-list"
+                :title="__('Command index')"
+                :note="__(':n commands · search or filter · press / to focus', ['n' => $cliTotal])"
+                :count="(string) $cliTotal"
+            />
+
+            <x-cli-command-index
+                :groups="$cliGroups"
+                :entries="$cliEntries"
+                :total="$cliTotal"
+            />
+
+            {{-- Repo config (collapsed) --}}
+            <details class="group border-b border-brand-ink/10">
+                <summary class="flex cursor-pointer list-none items-center gap-2 bg-brand-sand/15 px-3 py-2 sm:px-4 [&::-webkit-details-marker]:hidden">
+                    <x-heroicon-o-code-bracket-square class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <span class="text-sm font-semibold text-brand-ink">{{ __('Repo config: dply.yaml / dply.json') }}</span>
+                    <span class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('Optional — build, redirects, headers, env…') }}</span>
+                    <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div class="space-y-3 border-t border-brand-ink/10 px-3 py-3 sm:px-4">
+                    <p class="text-xs leading-relaxed text-brand-moss">
+                        {{ __('Drop `dply.yaml`, `dply.yml`, or `dply.json` at the repo root. YAML and JSON are interchangeable. Validate with `dply edge lint` / `dply lint`.') }}
+                    </p>
+                    <div class="grid gap-3 lg:grid-cols-2">
+                        <div>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('YAML') }}</p>
+                            <pre class="mt-1 max-h-48 overflow-auto rounded-md border border-brand-ink/10 bg-[#0b1020] px-2.5 py-2 font-mono text-2xs leading-relaxed text-slate-200"><code>@verbatim build:
   command: npm run build
   output: dist
   node: "20"
@@ -166,10 +177,10 @@ env:
     NODE_VERSION: "20"
   secret:
     - DATABASE_URL@endverbatim</code></pre>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('JSON — dply.json (equivalent)') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>@verbatim{
+                        </div>
+                        <div>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('JSON') }}</p>
+                            <pre class="mt-1 max-h-48 overflow-auto rounded-md border border-brand-ink/10 bg-[#0b1020] px-2.5 py-2 font-mono text-2xs leading-relaxed text-slate-200"><code>@verbatim{
   "build": { "command": "npm run build", "output": "dist", "node": "20" },
   "redirects": [
     { "from": "/old/*", "to": "/new/:splat", "status": 301 }
@@ -182,119 +193,105 @@ env:
     "secret": ["DATABASE_URL"]
   }
 }@endverbatim</code></pre>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Validate before you push') }}</p>
-                        <x-cli-snippet class="mt-2" :commands="[
-                            ['label' => __('Lint cwd'),  'command' => 'dply lint'],
-                            ['label' => __('Lint file'), 'command' => 'dply lint --path dply.json'],
-                        ]" />
-                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('`dply lint` runs the same rules the build uses on deploy — fatal parse errors fail the build, and malformed rules are dropped with a warning. Secrets stay out of the file: list secret names under `env.secret` and set their values in the dashboard.') }}
-                        </p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('All supported keys') }}</p>
-                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Every section is optional. Keys not listed here are ignored. The examples above use YAML, but each key works identically in JSON.') }}
-                        </p>
-                        <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-brand-sand/30 text-brand-mist">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">{{ __('Key') }}</th>
-                                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">{{ __('What it does') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-brand-ink/10">
-                                    @foreach ([
-                                        ['build', __('Build overrides: `command`, `output`, `root` (monorepo subdir), `node` version, and `env_files` (repo-relative .env paths merged into the build).')],
-                                        ['redirects', __('List of `{from, to, status}`. Status must be 301, 302, 303, 307, or 308 (defaults to 301).')],
-                                        ['rewrites', __('List of `{from, to}` — proxy a path pattern to another path or URL without changing the address bar.')],
-                                        ['headers', __('List of `{for, values}` — attach response header name/value pairs to paths matching the `for` glob.')],
-                                        ['env', __('`public:` map of safe-to-commit NAME: value pairs, plus `secret:` — a list of names only (values are set in the dashboard).')],
-                                        ['bindings', __('Cloudflare bindings: `kv`, `r2`, `d1`, `queues` maps of ALL_CAPS name → resource id or title. Co-equal with wrangler.toml.')],
-                                        ['origin', __('Origin proxy: `url`, `routes` (path patterns to proxy), and `failover_html` shown when the origin is unreachable.')],
-                                        ['domains', __('List of hostnames to attach on deploy. Attach-only — removing a name never detaches (detach via dashboard/API).')],
-                                        ['crons', __('List of `{schedule}` (5-field cron). Up to 5 per site; exports `scheduled` from your middleware module.')],
-                                        ['firewall', __('`country_mode` (off / allow / block) plus a `countries` list of ISO 3166 alpha-2 codes.')],
-                                        ['images', __('`allowed_hosts` — hostnames the image-resizing proxy may fetch from. (Signing secret is set in the dashboard.)')],
-                                        ['error_pages', __('Custom 404/500 HTML via `html_404`/`html_500` (inline) or `html_404_path`/`html_500_path` (repo-relative files).')],
-                                        ['maintenance', __('`enabled` (bool) plus `html` or `html_path` — serves 503 + your page on every request when on.')],
-                                        ['previews', __('Preview gating: `enabled`, `pr_only`, `branches`, `exclude_branches`, and `protection` (mode + allowed_emails).')],
-                                        ['comment_widget', __('`enabled` (bool) — toggle the preview-deploy comment widget. Token/api_base are generated server-side.')],
-                                    ] as [$key, $desc])
-                                        <tr>
-                                            <td class="whitespace-nowrap px-3 py-2 align-top font-mono text-brand-ink">{{ $key }}</td>
-                                            <td class="px-3 py-2 leading-relaxed text-brand-moss">{{ $desc }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
                         </div>
+                    </div>
+                    <x-cli-snippet size="10" :commands="[
+                        ['label' => __('Lint cwd'),  'command' => 'dply lint'],
+                        ['label' => __('Lint file'), 'command' => 'dply lint --path dply.json'],
+                    ]" />
+                    <div class="overflow-hidden rounded-md border border-brand-ink/10">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-brand-sand/30 text-brand-mist">
+                                <tr>
+                                    <th class="px-2.5 py-1.5 font-semibold uppercase tracking-wide">{{ __('Key') }}</th>
+                                    <th class="px-2.5 py-1.5 font-semibold uppercase tracking-wide">{{ __('What it does') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/10">
+                                @foreach ([
+                                    ['build', __('Build overrides: `command`, `output`, `root`, `node`, `env_files`.')],
+                                    ['redirects', __('`{from, to, status}` — 301–308 (default 301).')],
+                                    ['rewrites', __('`{from, to}` path proxies without changing the URL bar.')],
+                                    ['headers', __('`{for, values}` response headers for path globs.')],
+                                    ['env', __('`public:` map + `secret:` name list (values in dashboard).')],
+                                    ['bindings', __('Cloudflare: `kv`, `r2`, `d1`, `queues` maps.')],
+                                    ['origin', __('Origin proxy: `url`, `routes`, `failover_html`.')],
+                                    ['domains', __('Hostnames to attach on deploy (attach-only).')],
+                                    ['crons', __('`{schedule}` 5-field cron · up to 5 per site.')],
+                                    ['firewall', __('`country_mode` + `countries` ISO codes.')],
+                                    ['images', __('`allowed_hosts` for image resizing.')],
+                                    ['error_pages', __('Custom 404/500 via html or path keys.')],
+                                    ['maintenance', __('`enabled` + html/path → 503 page.')],
+                                    ['previews', __('Preview gating + protection rules.')],
+                                    ['comment_widget', __('`enabled` — preview comment widget.')],
+                                ] as [$key, $desc])
+                                    <tr>
+                                        <td class="whitespace-nowrap px-2.5 py-1.5 align-top font-mono text-brand-ink">{{ $key }}</td>
+                                        <td class="px-2.5 py-1.5 leading-relaxed text-brand-moss">{{ $desc }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="last:border-b-0">
-                <div class="flex flex-col gap-4 bg-brand-sand/15 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('CLI authentications') }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Tokens from device-flow login (“:name”). Revoke to sign a machine out immediately.', ['name' => $cliTokenName]) }}
-                            </p>
-                        </div>
-                    </div>
-                    @if ($organizations->count() > 1)
+            {{-- Sessions --}}
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-shield-check"
+                :title="__('CLI authentications')"
+                :note="__('Device-flow tokens (“:name”). Revoke to sign a machine out immediately.', ['name' => $cliTokenName])"
+                :count="(string) $sessionCount"
+            >
+                @if ($organizations->count() > 1)
+                    <x-slot:actions>
                         <select
                             wire:model.live="organization_id"
-                            class="block min-w-[12rem] rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                            class="h-6 min-w-[10rem] rounded-md border-brand-ink/15 bg-white py-0 pl-2 pr-7 text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                         >
                             @foreach ($organizations as $org)
                                 <option value="{{ $org->id }}">{{ $org->name }}</option>
                             @endforeach
                         </select>
-                    @endif
-                </div>
-
-                @if ($cliTokens->isEmpty())
-                    <div class="px-5 py-10 text-center sm:px-6">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No CLI sessions yet') }}</p>
-                        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                            {{ __('Run `dply login` from a terminal and approve the device to create the first session.') }}
-                        </p>
-                    </div>
-                @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($cliTokens as $token)
-                            <li wire:key="cli-token-{{ $token->id }}" class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                                <div class="min-w-0">
-                                    <p class="font-mono text-sm text-brand-ink">{{ $token->token_prefix }}…</p>
-                                    <p class="mt-1 text-xs text-brand-moss">
-                                        {{ $token->user?->email ?? __('Unknown') }}
-                                        · {{ $token->created_at?->diffForHumans() }}
-                                        @if ($token->last_used_at)
-                                            · {{ __('Last used :time', ['time' => $token->last_used_at->diffForHumans()]) }}
-                                        @endif
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    wire:click="openConfirmActionModal('revokeCliToken', [@js((string) $token->id)], @js(__('Revoke this CLI session?')), @js(__('That machine loses API access immediately. Re-run `dply login` to reconnect.')), @js(__('Revoke session')), true)"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100"
-                                >
-                                    <x-heroicon-o-x-circle class="h-4 w-4" />
-                                    {{ __('Revoke') }}
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
+                    </x-slot:actions>
                 @endif
-            </div>
+            </x-workspace-panel-head>
+
+            @if ($cliTokens->isEmpty())
+                <div class="px-3 py-8 text-center sm:px-4">
+                    <p class="text-sm font-medium text-brand-ink">{{ __('No CLI sessions yet') }}</p>
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                        {{ __('Run `dply login` from a terminal and approve the device to create the first session.') }}
+                    </p>
+                </div>
+            @else
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($cliTokens as $token)
+                        <li wire:key="cli-token-{{ $token->id }}" class="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+                            <div class="min-w-0">
+                                <p class="font-mono text-sm text-brand-ink">{{ $token->token_prefix }}…</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">
+                                    {{ $token->user?->email ?? __('Unknown') }}
+                                    · {{ $token->created_at?->diffForHumans() }}
+                                    @if ($token->last_used_at)
+                                        · {{ __('Last used :time', ['time' => $token->last_used_at->diffForHumans()]) }}
+                                    @endif
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('revokeCliToken', [@js((string) $token->id)], @js(__('Revoke this CLI session?')), @js(__('That machine loses API access immediately. Re-run `dply login` to reconnect.')), @js(__('Revoke session')), true)"
+                                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                            >
+                                <x-heroicon-o-x-circle class="h-3.5 w-3.5" />
+                                {{ __('Revoke') }}
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         @endif
     </x-profile-shell>
 

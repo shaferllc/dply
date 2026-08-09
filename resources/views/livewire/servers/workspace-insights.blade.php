@@ -154,7 +154,7 @@
                 <x-server-workspace-tab id="insights-tab-dismissed" icon="heroicon-o-eye-slash" wire:click="setTab('dismissed')" :active="$tab === 'dismissed'">
                     {{ __('Dismissed') }}
                     @if ($dismissedCount > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $dismissedCount }}</span>
+                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $dismissedCount }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="insights-tab-notifications" icon="heroicon-o-bell-alert" wire:click="setTab('notifications')" :active="$tab === 'notifications'">
@@ -218,7 +218,7 @@
                     <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Findings') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Findings') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-scoped open findings appear here. Site-specific items are on each site’s Insights page.') }}</p>
                 </div>
@@ -311,7 +311,7 @@
                                          View details affordance pinned to the right so it's
                                          always visible regardless of body length. --}}
                                     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide leading-none">
+                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold uppercase tracking-wide leading-none">
                                             <span class="{{ $iconText }}">{{ $sevLabel }}</span>
                                             <span class="text-brand-mist">·</span>
                                             <span class="text-brand-mist whitespace-nowrap normal-case font-normal" title="{{ $fmt($f->detected_at) }}">
@@ -322,7 +322,7 @@
                                                 <span class="text-brand-mist whitespace-nowrap" title="{{ $fmt($f->acknowledged_at) }}">{{ __('Dismissed') }}</span>
                                             @endif
                                         </p>
-                                        <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
+                                        <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
                                             {{ __('View details') }}
                                             <x-heroicon-o-arrow-right class="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                                         </span>
@@ -366,7 +366,7 @@
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Suggestions') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Suggestions') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Tuning suggestions based on observed signals. Nothing is broken — these are opportunities to improve.') }}</p>
                     </div>
@@ -393,7 +393,7 @@
                                         <x-heroicon-s-light-bulb class="h-4 w-4 text-brand-forest" aria-hidden="true" />
                                     </span>
                                     <div class="min-w-0">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggestion') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggestion') }}</p>
                                         <h4 class="text-base font-semibold leading-snug text-brand-ink break-words [overflow-wrap:anywhere] underline decoration-brand-ink/15 decoration-2 underline-offset-4 transition-colors group-hover:text-brand-forest group-hover:decoration-brand-forest/60">{{ $f->title }}</h4>
                                         @if ($f->body)
                                             <p class="mt-1.5 text-sm leading-6 text-brand-moss whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $f->body }}</p>
@@ -417,7 +417,7 @@
                                     <span class="text-xs text-brand-mist whitespace-nowrap" title="{{ $fmt($f->detected_at) }}">
                                         {{ $f->detected_at?->diffForHumans() ?? '—' }}
                                     </span>
-                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition-all group-hover:bg-brand-forest group-hover:text-brand-cream group-hover:ring-brand-forest">
                                         {{ __('View details') }}
                                         <x-heroicon-o-arrow-right class="h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                                     </span>
@@ -436,7 +436,7 @@
                         <x-heroicon-o-arrow-uturn-left class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Fixes Dply applied where an on-disk backup is still recorded. Revert reads the backup, validates the prior config, and reloads the affected service.') }}</p>
                     </div>
@@ -492,7 +492,7 @@
                         <x-heroicon-o-eye-slash class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dismissed') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dismissed') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Findings you acknowledged. Silenced from the banner and Overview. Restore one to bring it back to the open list.') }}</p>
                     </div>
@@ -522,14 +522,14 @@
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide leading-none">
+                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold uppercase tracking-wide leading-none">
                                             <span class="{{ $iconText }} opacity-80">{{ $sevLabel }}</span>
                                             <span class="text-brand-mist">·</span>
                                             <span class="text-brand-mist normal-case font-normal whitespace-nowrap" title="{{ $fmt($f->acknowledged_at) }}">
                                                 {{ __('Dismissed :time', ['time' => $f->acknowledged_at?->diffForHumans() ?? '—']) }}
                                             </span>
                                         </p>
-                                        <button type="button" wire:click="unacknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unacknowledgeFinding({{ $f->id }})" class="pointer-events-auto relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition hover:bg-brand-forest hover:text-brand-cream hover:ring-brand-forest disabled:cursor-not-allowed disabled:opacity-50">
+                                        <button type="button" wire:click="unacknowledgeFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unacknowledgeFinding({{ $f->id }})" class="pointer-events-auto relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/25 transition hover:bg-brand-forest hover:text-brand-cream hover:ring-brand-forest disabled:cursor-not-allowed disabled:opacity-50">
                                             <x-heroicon-o-arrow-uturn-left class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             {{ __('Restore') }}
                                         </button>
@@ -553,7 +553,7 @@
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ignored') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ignored') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
                     </div>

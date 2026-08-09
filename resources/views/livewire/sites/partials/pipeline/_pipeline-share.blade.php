@@ -4,7 +4,7 @@
 @endphp
 
 <details class="rounded-2xl border border-brand-ink/10 bg-white">
-    <summary class="cursor-pointer list-none px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist marker:content-none sm:px-5">
+    <summary class="cursor-pointer list-none px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist marker:content-none sm:px-5">
         <span class="inline-flex items-center gap-1.5">
             <x-heroicon-m-chevron-right class="h-3.5 w-3.5 transition [[open]_&]:rotate-90" />
             {{ __('Share pipeline') }}

@@ -99,7 +99,7 @@
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
-                <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold ring-1', $overallTone])>
+                <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-semibold ring-1', $overallTone])>
                     @switch($report['overall'])
                         @case('critical')
                             <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -113,7 +113,7 @@
                     {{ $overallLabel }}
                 </span>
 
-                <span class="hidden whitespace-nowrap text-[11px] text-brand-mist sm:inline">{{ $scanLabel }}</span>
+                <span class="hidden whitespace-nowrap text-xs text-brand-mist sm:inline">{{ $scanLabel }}</span>
 
                 @if ($opsReady && ! $isDeployer)
                     <button
@@ -121,7 +121,7 @@
                         wire:click="refreshSecurityDigestScan"
                         wire:loading.attr="disabled"
                         wire:target="refreshSecurityDigestScan"
-                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="refreshSecurityDigestScan" class="inline-flex">
                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -146,7 +146,7 @@
                 >
                     {{ __('Overview') }}
                     @if (($report['alert_count'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -196,7 +196,7 @@
             @if ($digest_tab === 'overview')
                 <div>
                     @if ($isDeployer)
-                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
                             <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Read-only — deployers can review the digest but cannot run SSH scans.') }}
                         </p>
@@ -220,13 +220,13 @@
                                 @endphp
                                 <li class="flex flex-wrap items-start gap-x-2 gap-y-1 px-4 py-2 sm:px-5">
                                     <x-heroicon-m-exclamation-triangle class="mt-px h-3.5 w-3.5 shrink-0 {{ $alertIconTone }}" aria-hidden="true" />
-                                    <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-brand-moss">
+                                    <p class="min-w-0 flex-1 text-xs leading-relaxed text-brand-moss">
                                         <span class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</span>
                                         <span class="text-brand-mist" aria-hidden="true">·</span>
                                         {{ $alert['message'] }}
                                     </p>
                                     @if ($alert['href'] && $alert['link_label'])
-                                        <a href="{{ $alert['href'] }}" wire:navigate class="ml-auto inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[11px] font-semibold text-brand-forest hover:underline">
+                                        <a href="{{ $alert['href'] }}" wire:navigate class="ml-auto inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-semibold text-brand-forest hover:underline">
                                             {{ $alert['link_label'] }}
                                             <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
                                         </a>
@@ -297,7 +297,7 @@
                             <a
                                 href="{{ route('servers.logs', $server) }}"
                                 wire:navigate
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
                                 {{ __('System logs') }}
                                 <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -339,7 +339,7 @@
                             <a
                                 href="{{ route('servers.firewall', $server) }}"
                                 wire:navigate
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
                                 {{ __('Firewall') }}
                             </a>
@@ -357,7 +357,7 @@
                                     {{ __('No jail detail captured yet') }}
                                 @endif
                             </p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Refresh digest when SSH is ready — sshd jail stats appear here automatically.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Refresh digest when SSH is ready — sshd jail stats appear here automatically.') }}</p>
                         </div>
                     @else
                         <div class="overflow-x-auto">
@@ -380,7 +380,7 @@
                                             <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_banned'] ?? '—' }}</td>
                                             <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['currently_failed'] ?? '—' }}</td>
                                             <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_failed'] ?? '—' }}</td>
-                                            <td class="max-w-[14rem] px-3 py-1.5 font-mono text-[10px] text-brand-moss sm:pr-5">
+                                            <td class="max-w-[14rem] px-3 py-1.5 font-mono text-2xs text-brand-moss sm:pr-5">
                                                 @if (count($jail['banned_ips'] ?? []) > 0)
                                                     {{ implode(', ', array_slice($jail['banned_ips'], 0, 4)) }}
                                                     @if (count($jail['banned_ips']) > 4)
@@ -412,7 +412,7 @@
                             <a
                                 href="{{ route('servers.ssh-keys', $server) }}"
                                 wire:navigate
-                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
                                 {{ __('SSH keys') }}
                                 <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -421,7 +421,7 @@
                                 <a
                                     href="{{ route('servers.ssh-access', $server) }}"
                                     wire:navigate
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
                                     {{ __('Access graph') }}
                                     <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -473,7 +473,7 @@
                                 <a
                                     href="{{ route('servers.ssh-access', $server) }}"
                                     wire:navigate
-                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
                                     {{ __('Open access graph') }}
                                 </a>

@@ -4,7 +4,7 @@
             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Billing') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Billing') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How billing works') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A quick reference for what you\'re paying for.') }}</p>
         </div>

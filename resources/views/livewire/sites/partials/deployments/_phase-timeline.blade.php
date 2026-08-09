@@ -44,7 +44,7 @@
             'bg-amber-400' => $isRunningOverall && ! $phaseFailed,
         ]) style="width: {{ $phaseFailed ? max($pct, 8) : $pct }}%"></div>
     </div>
-    <p class="shrink-0 text-[11px] font-medium text-brand-moss">
+    <p class="shrink-0 text-xs font-medium text-brand-moss">
         @if ($phaseFailed)
             <span class="font-semibold text-rose-700">{{ __('Failed') }}</span>
         @elseif ($currentPhaseLabel)
@@ -104,9 +104,9 @@
                     @endif
                 </p>
                 @if ($calloutBody !== '')
-                    <pre class="mt-1.5 max-h-36 overflow-auto rounded-md bg-brand-ink p-2 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $calloutBody }}</pre>
+                    <pre class="mt-1.5 max-h-36 overflow-auto rounded-md bg-brand-ink p-2 font-mono text-xs leading-relaxed text-rose-100/95">{{ $calloutBody }}</pre>
                 @else
-                    <p class="mt-1 text-[11px] text-rose-700/90">{{ __('No output was captured. Trigger the deploy again, or open the full deploy log.') }}</p>
+                    <p class="mt-1 text-xs text-rose-700/90">{{ __('No output was captured. Trigger the deploy again, or open the full deploy log.') }}</p>
                 @endif
             </div>
         </div>
@@ -147,7 +147,7 @@
             <div class="flex min-h-7 flex-col justify-center pb-3.5">
                 {{-- Phase node --}}
                 <span @class([
-                    'absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold shadow-sm',
+                    'absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold shadow-sm',
                     'bg-emerald-500 text-white' => $st === 'success',
                     'bg-rose-500 text-white' => $st === 'failed',
                     'bg-amber-400 text-white ring-2 ring-amber-200/70' => $st === 'running',
@@ -182,7 +182,7 @@
                         'text-brand-ink' => $st !== 'pending' && $st !== 'skipped',
                         'text-brand-mist' => $st === 'pending' || $st === 'skipped',
                     ])>{{ $phase['label'] }}</span>
-                    <span class="text-[11px] text-brand-moss">
+                    <span class="text-xs text-brand-moss">
                         @switch ($st)
                             @case('success')
                                 {{ trans_choice('{1} :count step|[2,*] :count steps', $stepCount, ['count' => $stepCount]) }}@if ($durTxt) · <span class="font-mono tabular-nums">{{ $durTxt }}</span>@endif
@@ -200,7 +200,7 @@
                                 {{ __('Not started') }}
                         @endswitch
                     </span>
-                    @if ($hasSteps)<span class="ml-auto self-center font-mono text-[10px] text-brand-mist" x-text="open ? '▾' : '▸'"></span>@endif
+                    @if ($hasSteps)<span class="ml-auto self-center font-mono text-2xs text-brand-mist" x-text="open ? '▾' : '▸'"></span>@endif
                 </div>
 
                 {{-- Steps (collapsible) --}}
@@ -235,19 +235,19 @@
 
 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
     <div class="mt-3 space-y-1.5 rounded-lg border border-rose-200 bg-rose-50/50 p-2.5">
-        <p class="font-mono text-[11px] font-semibold text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
+        <p class="font-mono text-xs font-semibold text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
         {{-- A deploy can fail BETWEEN recorded phases (e.g. a thrown exception that
              never becomes a pipeline step), leaving the timeline with nothing to
              expand. Surface the captured failure reason from the log. --}}
         @php($failLog = trim((string) $deployment->log_output))
         @if ($failLog !== '')
             @php($failTail = mb_strlen($failLog) > 4000 ? '…'.mb_substr($failLog, -4000) : $failLog)
-            <pre class="max-h-52 overflow-auto rounded-md bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+            <pre class="max-h-52 overflow-auto rounded-md bg-brand-ink p-2.5 font-mono text-xs leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
         @else
             {{-- No output was captured (e.g. the worker was restarted mid-deploy,
                  so the job's catch/failed handlers never ran). Don't leave the
                  failure reasonless — always say *something*. --}}
-            <p class="text-[11px] text-rose-700/90">{{ __('Deploy failed before any output was captured — the worker may have been restarted mid-deploy. Trigger the deploy again.') }}</p>
+            <p class="text-xs text-rose-700/90">{{ __('Deploy failed before any output was captured — the worker may have been restarted mid-deploy. Trigger the deploy again.') }}</p>
         @endif
     </div>
 @endif

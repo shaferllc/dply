@@ -42,7 +42,7 @@
                                 ])
                             >
                                 @if ($option['featured'] ?? false)
-                                    <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-gold/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">
+                                    <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-gold/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-forest">
                                         {{ __('Tier B') }}
                                     </span>
                                 @endif
@@ -60,7 +60,7 @@
                                 role="group"
                                 aria-labelledby="launch-soon-{{ $option['id'] }}"
                             >
-                                <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                                <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                     {{ __('Coming soon') }}
                                 </span>
                                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">

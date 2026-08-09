@@ -42,7 +42,7 @@
         >
             @if ($showBanner)
                 <x-slot:actions>
-                    <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold ring-1', $overallTone])>
+                    <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-semibold ring-1', $overallTone])>
                         @switch($overall)
                             @case('blocked')
                                 <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -69,7 +69,7 @@
                 <x-server-workspace-tab id="dpl-tab-windows" icon="heroicon-o-calendar-days" :active="$tab === 'deploy-windows'" wire:click="setTab('deploy-windows')">
                     {{ __('Deploy windows') }}
                     @if ($ruleCount > 0)
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ $ruleCount }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-brand-moss">{{ $ruleCount }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="dpl-tab-coverage" icon="heroicon-o-globe-alt" :active="$tab === 'coverage'" wire:click="setTab('coverage')">
@@ -82,7 +82,7 @@
         </div>
 
         @if ($showBanner)
-            <div @class(['flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2 text-[11px] sm:px-5', $overallTone])>
+            <div @class(['flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2 text-xs sm:px-5', $overallTone])>
                 <div class="flex items-center gap-1.5 font-semibold">
                     @switch($overall)
                         @case('blocked')

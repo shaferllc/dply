@@ -44,19 +44,19 @@
                     wire:loading.attr="disabled"
                     wire:target="installCli"
                     @disabled($cliInstalling)
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40 disabled:opacity-60"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40 disabled:opacity-60"
                 >
                     <span wire:loading.remove wire:target="installCli">{{ __('Install') }}</span>
                     <span wire:loading wire:target="installCli">{{ __('Installing…') }}</span>
                 </button>
                 @if ($cliInstallError)
-                    <p class="basis-full text-[11px] text-rose-700">{{ $cliInstallError }}</p>
+                    <p class="basis-full text-xs text-rose-700">{{ $cliInstallError }}</p>
                 @endif
             </div>
         @elseif ($probesLoaded && $cliState === 'partial')
             <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-amber-300/70 bg-amber-50/70 px-3 py-2">
                 <p class="min-w-0 text-xs font-semibold leading-snug text-amber-900">{{ __('dply CLI install is incomplete') }}</p>
-                <ul class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-amber-900/90">
+                <ul class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-amber-900/90">
                     <li class="flex items-center gap-1.5">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliBinaryOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
                         <span>{{ $cliBinaryOk ? __('binary') : __('binary missing') }}</span>
@@ -76,14 +76,14 @@
                     wire:loading.attr="disabled"
                     wire:target="installCli"
                     @disabled($cliInstalling)
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700/90 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-60"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700/90 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-60"
                     title="{{ __('Repair re-runs the installer (idempotent).') }}"
                 >
                     <span wire:loading.remove wire:target="installCli">{{ __('Repair') }}</span>
                     <span wire:loading wire:target="installCli">{{ __('Repairing…') }}</span>
                 </button>
                 @if ($cliInstallError)
-                    <p class="basis-full text-[11px] text-rose-700">{{ $cliInstallError }}</p>
+                    <p class="basis-full text-xs text-rose-700">{{ $cliInstallError }}</p>
                 @endif
             </div>
         @endif
@@ -137,7 +137,7 @@
                                 type="button"
                                 wire:click="runQuickAction({{ $i }})"
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/40 disabled:opacity-50"
+                                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/40 disabled:opacity-50"
                                 title="{{ $action['cmd'] }}"
                             >
                                 {{ $action['label'] }}
@@ -147,12 +147,12 @@
 
                     <div class="flex shrink-0 items-center gap-2">
                         @if ($cliState === 'ok')
-                            <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
+                            <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-2xs font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
                                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
                                 dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
                             </span>
                         @elseif ($cliState === 'partial')
-                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
+                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-2xs font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
                                 <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
                                 dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
                             </span>
@@ -160,14 +160,14 @@
                         <a
                             href="{{ route('servers.run', $server) }}"
                             wire:navigate
-                            class="text-[11px] font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
+                            class="text-xs font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
                             title="{{ __('Save and re-run commands on the Run tab.') }}"
                         >{{ __('Saved runs') }}</a>
                         @if (! empty($history))
                             <button
                                 type="button"
                                 wire:click="clearHistory"
-                                class="text-[11px] font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
+                                class="text-xs font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
                             >
                                 {{ __('Clear') }}
                             </button>
@@ -176,7 +176,7 @@
                             type="button"
                             x-on:click="toggle()"
                             x-bind:aria-pressed="open ? 'true' : 'false'"
-                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 text-[11px] font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
                             title="{{ __('Toggle help sidebar') }}"
                         >
@@ -205,7 +205,7 @@
                                 <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
                                 <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
                             </div>
-                            <span class="truncate font-mono text-[11px] font-medium text-slate-300">{{ $promptUser.'@'.$promptHost }}</span>
+                            <span class="truncate font-mono text-xs font-medium text-slate-300">{{ $promptUser.'@'.$promptHost }}</span>
                             <span class="inline-flex items-center gap-1.5 text-emerald-300/90">
                                 <span class="relative flex h-1.5 w-1.5">
                                     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/50 opacity-75"></span>
@@ -241,7 +241,7 @@
                                             <pre class="whitespace-pre-wrap break-words text-slate-300">{{ $entry['out'] }}</pre>
                                         @endif
                                         @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                                            <p class="text-[11px] text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                                            <p class="text-xs text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
                                         @endif
                                     @endif
                                 </div>
@@ -277,11 +277,11 @@
                         >
                             @if ($error)
                                 <div class="mb-2.5 rounded-lg border border-rose-200/20 bg-rose-500/10 px-3 py-2">
-                                    <p class="text-[11px] leading-relaxed text-rose-200">{{ $error }}</p>
+                                    <p class="text-xs leading-relaxed text-rose-200">{{ $error }}</p>
                                 </div>
                             @endif
                             @if ($probeError)
-                                <p class="mb-2 text-[11px] text-amber-300">{{ __('Autocomplete probes failed: :err', ['err' => $probeError]) }}</p>
+                                <p class="mb-2 text-xs text-amber-300">{{ __('Autocomplete probes failed: :err', ['err' => $probeError]) }}</p>
                             @endif
 
                             {{-- Dropdown — positioned above the input. --}}
@@ -293,7 +293,7 @@
                             >
                                 <template x-for="(group, gi) in groups" :key="gi">
                                     <div class="border-b border-white/5 last:border-b-0">
-                                        <div class="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">
+                                        <div class="flex items-center justify-between px-3 py-1 text-2xs uppercase tracking-wide text-slate-500">
                                             <span x-text="group.label"></span>
                                             <span x-show="group.label === 'Installed' && !probesLoaded" class="italic text-slate-500">{{ __('indexing…') }}</span>
                                         </div>
@@ -313,7 +313,7 @@
                                         </template>
                                     </div>
                                 </template>
-                                <div class="bg-white/5 px-3 py-1 text-[10px] text-slate-500">
+                                <div class="bg-white/5 px-3 py-1 text-2xs text-slate-500">
                                     <kbd class="rounded bg-white/10 px-1">Tab</kbd> next
                                     · <kbd class="rounded bg-white/10 px-1">↑↓</kbd> select
                                     · <kbd class="rounded bg-white/10 px-1">Enter</kbd> insert
@@ -344,7 +344,7 @@
                                     type="submit"
                                     wire:loading.attr="disabled"
                                     wire:target="run,runQuickAction"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     <span wire:loading.remove wire:target="run,runQuickAction">{{ __('Run') }}</span>
                                     <span wire:loading wire:target="run,runQuickAction" class="inline-flex items-center gap-1.5">
@@ -354,7 +354,7 @@
                                 </button>
                             </div>
                             @error('command')
-                                <p class="mt-1.5 text-[11px] text-rose-300">{{ $message }}</p>
+                                <p class="mt-1.5 text-xs text-rose-300">{{ $message }}</p>
                             @enderror
                         </form>
                     </x-slot:footer>
@@ -387,7 +387,7 @@
                         placeholder="{{ __('Search…') }}"
                         class="mt-2 w-full rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-sm text-brand-ink placeholder-brand-moss/70 focus:border-brand-sage focus:outline-none focus:ring-1 focus:ring-brand-sage/40"
                     />
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Click to insert. Press Enter in the prompt to run.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Click to insert. Press Enter in the prompt to run.') }}</p>
                 </div>
 
                 <div class="overflow-y-auto flex-1 px-3 py-3 space-y-4">
@@ -396,7 +396,7 @@
                             <header class="mb-1">
                                 <h4 class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $section['label'] }}</h4>
                                 @if (! empty($section['description']))
-                                    <p class="text-[11px] text-brand-moss/80">{{ $section['description'] }}</p>
+                                    <p class="text-xs text-brand-moss/80">{{ $section['description'] }}</p>
                                 @endif
                             </header>
                             <ul class="space-y-1">
@@ -409,7 +409,7 @@
                                         >
                                             <code class="block font-mono text-[12px] text-brand-ink break-all">{{ $entry['command'] }}</code>
                                             @if (! empty($entry['description']))
-                                                <span class="mt-0.5 block text-[11px] text-brand-moss leading-snug">{{ $entry['description'] }}</span>
+                                                <span class="mt-0.5 block text-xs text-brand-moss leading-snug">{{ $entry['description'] }}</span>
                                             @endif
                                         </button>
                                     </li>
@@ -429,7 +429,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use the console.') }}</p>
                     </div>

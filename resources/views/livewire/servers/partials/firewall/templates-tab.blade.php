@@ -42,23 +42,23 @@
                                     <div class="flex w-full items-center justify-between gap-2">
                                         <span class="text-sm font-semibold text-brand-ink">{{ __($b['label'] ?? $bKey) }}</span>
                                         @if ($isAll)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                                 <x-heroicon-m-check class="h-3 w-3" />
                                                 {{ __('Applied') }}
                                             </span>
                                         @elseif ($isPartial)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                                                 {{ __(':p of :t', ['p' => $meta['present_count'], 't' => $meta['total']]) }}
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 {{ trans_choice('{1} :n rule|[2,*] :n rules', $meta['total'], ['n' => $meta['total']]) }}
                                             </span>
                                         @endif
                                     </div>
 
                                     @if (! empty($b['description']))
-                                        <p class="text-[11px] leading-relaxed text-brand-moss">{{ __($b['description']) }}</p>
+                                        <p class="text-xs leading-relaxed text-brand-moss">{{ __($b['description']) }}</p>
                                     @endif
 
                                     {{-- Concrete rules this preset manages --}}
@@ -66,7 +66,7 @@
                                         <div class="mt-1 flex flex-wrap gap-1">
                                             @foreach ($chips as $chip)
                                                 <span @class([
-                                                    'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[10px] ring-1',
+                                                    'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-2xs ring-1',
                                                     'bg-emerald-50 text-emerald-700 ring-emerald-200' => $chip['present'],
                                                     'bg-white text-brand-moss ring-brand-ink/10' => ! $chip['present'],
                                                 ])
@@ -84,17 +84,17 @@
                                     {{-- State-aware action hint --}}
                                     @if ($isAll)
                                         @if ($meta['removable_count'] > 0)
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-rose-700">
                                                 {{ trans_choice('{1} Click to remove :n rule|[2,*] Click to remove :n rules', $meta['removable_count'], ['n' => $meta['removable_count']]) }}
                                                 @if ($meta['has_ssh']) · {{ __('SSH kept') }} @endif
                                             </p>
                                         @else
-                                            <p class="text-[10px] uppercase tracking-wide text-emerald-700">{{ __('All rules present · only SSH (kept) — nothing to remove') }}</p>
+                                            <p class="text-2xs uppercase tracking-wide text-emerald-700">{{ __('All rules present · only SSH (kept) — nothing to remove') }}</p>
                                         @endif
                                     @elseif ($isPartial)
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">{{ __('Partially applied · click to add the missing rule(s)') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-amber-700">{{ __('Partially applied · click to add the missing rule(s)') }}</p>
                                     @else
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Click to add') }}@if ($portsSummary !== '') · {{ $portsSummary }} @endif</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Click to add') }}@if ($portsSummary !== '') · {{ $portsSummary }} @endif</p>
                                     @endif
                                 </button>
                             @endforeach

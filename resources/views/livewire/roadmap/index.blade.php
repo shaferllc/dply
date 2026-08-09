@@ -72,7 +72,7 @@
                 <div class="sticky top-16 z-10 space-y-2.5 border-b border-brand-ink/10 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5">
                     @if ($publishedReleaseTrains->isNotEmpty())
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <p class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Release') }}</p>
+                            <p class="w-16 shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Release') }}</p>
                             <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="{{ __('Filter by release train') }}">
                                 <button
                                     type="button"
@@ -110,7 +110,7 @@
                     @endif
 
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <p class="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Area') }}</p>
+                        <p class="w-16 shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Area') }}</p>
                         <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="{{ __('Filter by product area') }}">
                             <button
                                 type="button"
@@ -157,7 +157,7 @@
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($recentlyShipped as $shippedItem)
                                 <li wire:key="recently-shipped-{{ $shippedItem->id }}" class="border-l-2 {{ $statusMeta['shipped']['rail'] }} px-5 py-4 sm:px-6">
-                                    <div class="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                                    <div class="flex flex-wrap items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em]">
                                         @if ($shippedItem->areaLabel())
                                             <span class="{{ $areaAccent[$shippedItem->area] ?? 'text-brand-sage' }}">{{ $shippedItem->areaLabel() }}</span>
                                         @endif
@@ -222,18 +222,18 @@
                                     @forelse ($columnItems as $item)
                                         <li wire:key="roadmap-item-{{ $item->id }}" class="border-l-2 {{ $meta['rail'] }} px-4 py-4 sm:px-5">
                                             @if ($item->areaLabel())
-                                                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] {{ $areaAccent[$item->area] ?? 'text-brand-sage' }}">{{ $item->areaLabel() }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-[0.14em] {{ $areaAccent[$item->area] ?? 'text-brand-sage' }}">{{ $item->areaLabel() }}</p>
                                             @endif
                                             <div class="mt-1 flex flex-wrap items-center gap-1.5">
                                                 <h4 class="text-sm font-semibold leading-snug text-brand-ink">{{ $item->title }}</h4>
                                                 @if ($item->targetQuarterLabel())
-                                                    <span class="rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $item->targetQuarterLabel() }}</span>
+                                                    <span class="rounded-full bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $item->targetQuarterLabel() }}</span>
                                                 @endif
                                                 @if ($item->targetRelease && $item->status !== \App\Modules\Roadmap\Models\RoadmapItem::STATUS_SHIPPED)
-                                                    <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ $item->targetRelease->trainLabel() }}</span>
+                                                    <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ $item->targetRelease->trainLabel() }}</span>
                                                 @endif
                                                 @if ($item->shippedRelease)
-                                                    <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ $item->shippedRelease->trainLabel() }}</span>
+                                                    <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ $item->shippedRelease->trainLabel() }}</span>
                                                 @endif
                                             </div>
                                             @if ($item->summary)

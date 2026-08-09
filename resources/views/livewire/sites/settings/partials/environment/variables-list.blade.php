@@ -16,15 +16,15 @@
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
                         {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                     </span>
                     @if ($workspaceVariables->isNotEmpty())
-                        <span class="inline-flex items-center gap-1 text-[11px] text-brand-mist"><x-heroicon-m-link class="h-3 w-3" />{{ trans_choice('{1} :count inherited|[2,*] :count inherited', $workspaceVariables->count(), ['count' => $workspaceVariables->count()]) }}</span>
+                        <span class="inline-flex items-center gap-1 text-xs text-brand-mist"><x-heroicon-m-link class="h-3 w-3" />{{ trans_choice('{1} :count inherited|[2,*] :count inherited', $workspaceVariables->count(), ['count' => $workspaceVariables->count()]) }}</span>
                     @endif
                     @if ($freshnessLabel)
-                        <span class="text-[11px] text-brand-mist">· {{ $freshnessLabel }}</span>
+                        <span class="text-xs text-brand-mist">· {{ $freshnessLabel }}</span>
                     @endif
                 </div>
             {{-- Action toolbar: create actions on the left, the primary CTA
@@ -92,7 +92,7 @@
                                 <x-heroicon-o-magnifying-glass class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" />
                                 <span>
                                     <span class="block text-xs font-semibold text-brand-ink">{{ __('Scan for required variables') }}</span>
-                                    <span class="block text-[10px] text-brand-mist">{{ $envScannedAt ? __('Last scanned :when', ['when' => \Illuminate\Support\Carbon::parse($envScannedAt)->diffForHumans()]) : __('Not scanned yet') }}</span>
+                                    <span class="block text-2xs text-brand-mist">{{ $envScannedAt ? __('Last scanned :when', ['when' => \Illuminate\Support\Carbon::parse($envScannedAt)->diffForHumans()]) : __('Not scanned yet') }}</span>
                                 </span>
                             </button>
                         @endif
@@ -105,7 +105,7 @@
                                 <x-heroicon-o-sparkles class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" />
                                 <span>
                                     <span class="block text-xs font-semibold text-brand-ink">{{ __('Clear all caches') }}</span>
-                                    <span class="block text-[10px] text-brand-mist">{{ __('Includes config (env), route, and view caches') }}</span>
+                                    <span class="block text-2xs text-brand-mist">{{ __('Includes config (env), route, and view caches') }}</span>
                                 </span>
                             </button>
                         @endif
@@ -132,7 +132,7 @@
                 </button>
             </div>
             </div>
-            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                 @if ($supportsEnvPush)
                     {{ __('Key/value pairs written into the site\'s .env file. Edits push to the server automatically.') }}
                 @else
@@ -159,7 +159,7 @@
                          filter the list to that group; combines with search. --}}
                     <div class="flex min-w-0 flex-wrap gap-1">
                         <button type="button" wire:click="$set('env_group', '')" @class([
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
                             'bg-brand-forest text-brand-cream' => $selectedEnvGroup === '',
                             'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== '',
                         ])>
@@ -167,7 +167,7 @@
                         </button>
                         @foreach ($envGroups as $g => $cnt)
                             <button type="button" wire:click="$set('env_group', @js($g))" @class([
-                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold transition-colors',
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-semibold transition-colors',
                                 'bg-brand-forest text-brand-cream' => $selectedEnvGroup === $g,
                                 'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== $g,
                             ])>
@@ -216,8 +216,8 @@
             <div class="border-b border-brand-ink/10 bg-sky-50/20">
                 <div class="flex items-center gap-2 px-5 py-1.5 sm:px-6">
                     <x-heroicon-o-link class="h-3.5 w-3.5 text-sky-700" aria-hidden="true" />
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800">{{ __('Managed by connected resources') }}</p>
-                    <span class="text-[11px] text-brand-moss">{{ __('injected at deploy · editable as an override') }}</span>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-800">{{ __('Managed by connected resources') }}</p>
+                    <span class="text-xs text-brand-moss">{{ __('injected at deploy · editable as an override') }}</span>
                 </div>
 
                 @foreach ($bindingManagedGroups as $gBindingId => $group)
@@ -238,14 +238,14 @@
                                 @if ($group['name'])
                                     <span class="truncate font-mono text-xs text-brand-moss">· {{ $group['name'] }}</span>
                                 @endif
-                                <span class="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ trans_choice('{1} :count var|[2,*] :count vars', count($group['vars']), ['count' => count($group['vars'])]) }}</span>
+                                <span class="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ trans_choice('{1} :count var|[2,*] :count vars', count($group['vars']), ['count' => count($group['vars'])]) }}</span>
                                 @if ($gGroupOverrides)
-                                    <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ trans_choice('{1} :count override|[2,*] :count overrides', count($gGroupOverrides['keys']), ['count' => count($gGroupOverrides['keys'])]) }}</span>
+                                    <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ trans_choice('{1} :count override|[2,*] :count overrides', count($gGroupOverrides['keys']), ['count' => count($gGroupOverrides['keys'])]) }}</span>
                                 @endif
                                 @if ($gConn !== null && ($gConn['ok'] ?? null) === true)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
                                 @elseif ($gConn !== null && ($gConn['ok'] ?? null) === false)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $gConn['detail'] ?? '' }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $gConn['detail'] ?? '' }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
                                 @endif
                             </button>
                             <div class="flex shrink-0 items-center gap-1.5">
@@ -277,7 +277,7 @@
                                                 <x-heroicon-o-paper-airplane class="h-4 w-4" />
                                                 {{ __('Send test email') }}
                                             </button>
-                                            <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                            <p class="mt-1.5 text-xs text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
                                         </div>
                                     </div>
                                 @endif
@@ -338,7 +338,7 @@
                                                     <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                                 </div>
                                             </div>
-                                            <p class="text-[11px] text-brand-moss">{{ __('Saving creates a .env override for :key — it takes precedence over the :type binding until you delete the override.', ['key' => $mKey, 'type' => $gTypeLabel]) }}</p>
+                                            <p class="text-xs text-brand-moss">{{ __('Saving creates a .env override for :key — it takes precedence over the :type binding until you delete the override.', ['key' => $mKey, 'type' => $gTypeLabel]) }}</p>
                                             <div class="flex items-center justify-end gap-2">
                                                 <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                                 <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
@@ -352,7 +352,7 @@
                                             <div class="flex min-w-0 items-center gap-3 pl-9">
                                                 <div class="min-w-0">
                                                     <p class="font-mono text-sm font-semibold text-brand-ink">{{ $mKey }}</p>
-                                                    <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
+                                                    <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
                                                         @if ($mValue === '')
                                                             <span class="text-brand-mist">(empty)</span>
                                                         @elseif ($mSensitive)
@@ -373,7 +373,7 @@
                                  within the same group so "Database · tracely" is one unit. --}}
                             @if ($gGroupOverrides)
                                 <li class="border-t border-amber-200/40 bg-amber-50/30 px-5 py-1.5 sm:px-6" wire:key="override-divider-{{ md5((string) $gBindingId) }}">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800">{{ __('Your overrides · take precedence at deploy') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-amber-800">{{ __('Your overrides · take precedence at deploy') }}</p>
                                 </li>
                                 @foreach ($gGroupOverrides['keys'] as $oKey => $oValue)
                                     @php
@@ -394,7 +394,7 @@
                                                     @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
+                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                             @if ($oEditHint['type'] === 'text')
                                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -424,7 +424,7 @@
                                                 <div class="flex min-w-0 items-center gap-3 pl-9">
                                                     <div class="min-w-0">
                                                         <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
-                                                        <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
+                                                        <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
                                                             @if ($oIsRevealed)
                                                                 {{ $oValue === '' ? '(empty)' : $oValue }}
                                                             @elseif ($oValueLength === 0)
@@ -434,7 +434,7 @@
                                                             @endif
                                                         </p>
                                                         @if ($oRowComment !== null && $oRowComment !== '')
-                                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $oRowComment }}</p>
+                                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
                                                         @endif
                                                     </div>
                                                 </div>
@@ -479,7 +479,7 @@
                                 @if ($ogGroup['name'])
                                     <span class="truncate font-mono text-xs text-brand-moss">· {{ $ogGroup['name'] }}</span>
                                 @endif
-                                <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ trans_choice('{1} :count override|[2,*] :count overrides', count($ogGroup['keys']), ['count' => count($ogGroup['keys'])]) }}</span>
+                                <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ trans_choice('{1} :count override|[2,*] :count overrides', count($ogGroup['keys']), ['count' => count($ogGroup['keys'])]) }}</span>
                             </button>
                         </div>
                         <ul class="divide-y divide-brand-ink/8" x-show="expanded" x-cloak>
@@ -502,7 +502,7 @@
                                                 @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                 <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                     <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
+                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                         @if ($oEditHint['type'] === 'text')
                                                             <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                 <span x-show="!showValue">{{ __('Show') }}</span>
@@ -527,7 +527,7 @@
                                             <div class="flex min-w-0 items-center gap-3">
                                                 <div class="min-w-0">
                                                     <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
-                                                    <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
+                                                    <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
                                                         @if ($oIsRevealed)
                                                             {{ $oValue === '' ? '(empty)' : $oValue }}
                                                         @elseif ($oValueLength === 0)
@@ -537,7 +537,7 @@
                                                         @endif
                                                     </p>
                                                     @if ($oRowComment !== null && $oRowComment !== '')
-                                                        <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $oRowComment }}</p>
+                                                        <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
                                                     @endif
                                                 </div>
                                             </div>
@@ -643,7 +643,7 @@
                                     @php $editHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="editing_env_value_{{ md5($key) }}">
-                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
+                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                             @if ($editHint['type'] === 'text')
                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -734,7 +734,7 @@
                                         @endif
                                     </div>
 
-                                    <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-moss">
+                                    <p class="min-w-0 flex-1 truncate font-mono text-xs text-brand-moss">
                                         @if ($residency)
                                             @if ($escrowRevealed)
                                                 {{ $revealed_escrow_values[$key] === '' ? '(empty)' : $revealed_escrow_values[$key] }}
@@ -834,7 +834,7 @@
                                 {{-- Comment sits under the row (plain, not mono, so it
                                      separates from the KEY/value pair) and only costs a
                                      line on the few rows that carry one. --}}
-                                <p class="mt-0.5 whitespace-pre-line pl-6 text-[11px] italic text-brand-mist">
+                                <p class="mt-0.5 whitespace-pre-line pl-6 text-xs italic text-brand-mist">
                                     # {{ $rowComment }}
                                 </p>
                             @endif
@@ -849,13 +849,13 @@
                     $envTo = min($envCurrentPage * $envPerPage, $envFilteredCount);
                 @endphp
                 <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-2 sm:px-6">
-                    <span class="text-[11px] text-brand-mist">{{ __(':from–:to of :total', ['from' => $envFrom, 'to' => $envTo, 'total' => $envFilteredCount]) }}</span>
+                    <span class="text-xs text-brand-mist">{{ __(':from–:to of :total', ['from' => $envFrom, 'to' => $envTo, 'total' => $envFilteredCount]) }}</span>
                     <div class="flex items-center gap-1.5">
                         <button type="button" wire:click="$set('env_page', {{ max(1, $envCurrentPage - 1) }})" @disabled($envCurrentPage <= 1) class="dply-btn dply-btn-xs dply-btn-outline">
                             <x-heroicon-o-chevron-left class="h-3 w-3" />
                             {{ __('Prev') }}
                         </button>
-                        <span class="px-1 text-[11px] font-semibold text-brand-moss">{{ __('Page :p / :n', ['p' => $envCurrentPage, 'n' => $envTotalPages]) }}</span>
+                        <span class="px-1 text-xs font-semibold text-brand-moss">{{ __('Page :p / :n', ['p' => $envCurrentPage, 'n' => $envTotalPages]) }}</span>
                         <button type="button" wire:click="$set('env_page', {{ min($envTotalPages, $envCurrentPage + 1) }})" @disabled($envCurrentPage >= $envTotalPages) class="dply-btn dply-btn-xs dply-btn-outline">
                             {{ __('Next') }}
                             <x-heroicon-o-chevron-right class="h-3 w-3" />

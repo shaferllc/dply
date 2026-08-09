@@ -73,7 +73,7 @@
                     <x-heroicon-o-no-symbol class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Unavailable') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Unavailable') }}</p>
                     <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Supervisor workers are not available for this site’s runtime') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Managed SSH Supervisor applies to VM-hosted sites. For container or serverless runtimes, run workers on that platform instead.') }}

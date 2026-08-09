@@ -105,7 +105,7 @@
                                         @php $g = $def['group'] ?? 'other'; @endphp
                                         @if ($g !== $lastGroup)
                                             @php $lastGroup = $g; @endphp
-                                            <p class="mb-1 mt-3 px-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-brand-mist first:mt-0">{{ str_replace('_', ' ', $g) }}</p>
+                                            <p class="mb-1 mt-3 px-2 pt-1 text-2xs font-bold uppercase tracking-wider text-brand-mist first:mt-0">{{ str_replace('_', ' ', $g) }}</p>
                                         @endif
                                         <button
                                             type="button"
@@ -119,13 +119,13 @@
                                         >
                                             <span class="font-medium leading-snug">{{ __($def['label'] ?? $sourceKey) }}</span>
                                             @if (! empty($def['path']))
-                                                <span class="break-all font-mono text-[10px] leading-relaxed text-brand-mist">{{ $def['path'] }}</span>
+                                                <span class="break-all font-mono text-2xs leading-relaxed text-brand-mist">{{ $def['path'] }}</span>
                                             @elseif (($def['type'] ?? '') === 'dply')
-                                                <span class="text-[10px] text-brand-moss">{{ __('Control plane audit trail') }}</span>
+                                                <span class="text-2xs text-brand-moss">{{ __('Control plane audit trail') }}</span>
                                             @elseif (($def['type'] ?? '') === 'dply_site')
-                                                <span class="text-[10px] text-brand-moss">{{ __('Deploy, webhook, and audit activity for this site') }}</span>
+                                                <span class="text-2xs text-brand-moss">{{ __('Deploy, webhook, and audit activity for this site') }}</span>
                                             @elseif (($def['type'] ?? '') === 'journal')
-                                                <span class="break-all font-mono text-[10px] leading-relaxed text-brand-mist">journalctl -u {{ $def['unit'] ?? $def['unit_template'] ?? '' }}</span>
+                                                <span class="break-all font-mono text-2xs leading-relaxed text-brand-mist">journalctl -u {{ $def['unit'] ?? $def['unit_template'] ?? '' }}</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -191,7 +191,7 @@
                                     @click.stop
                                 >
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-3">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <div>
                                             <label for="log-tail-lines" class="mb-2 block text-xs font-medium text-brand-moss">{{ __('Lines to tail') }}</label>
@@ -237,7 +237,7 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <p class="mt-2 text-[11px] leading-5 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
+                                        <p class="mt-2 text-xs leading-5 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
                                     </div>
                                     <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <button
@@ -323,7 +323,7 @@
                     @endif
                     @if ($currentLogIsAccessLog && $logTotalLines > 0)
                         <div class="mt-2 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2">
-                            <span class="me-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Traffic') }}</span>
+                            <span class="me-1 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Traffic') }}</span>
                             @php
                                 $trafficFilters = [
                                     'all' => ['label' => __('All'), 'count' => $logTotalLines],
@@ -340,7 +340,7 @@
                                     wire:click="setLogTrafficFilter('{{ $filterKey }}')"
                                     wire:key="log-traffic-{{ $filterKey }}"
                                     @class([
-                                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors',
+                                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
                                         'border-brand-sage/30 bg-brand-sage text-white shadow-sm' => $activeTrafficFilter === $filterKey,
                                         'border-brand-ink/10 bg-white text-brand-moss hover:border-brand-ink/15 hover:bg-brand-sand/40 hover:text-brand-ink' => $activeTrafficFilter !== $filterKey,
                                     ])
@@ -391,7 +391,7 @@
                 >{{ $remoteLogOutput !== null && $remoteLogOutput !== '' ? $remoteLogOutput : ($remoteLogError ? '' : __('No output yet. Choose a log and press Refresh.')) }}</pre>
             </div>
             @if ($logFetchedHuman)
-                <p class="mt-1.5 text-[11px] text-brand-mist">
+                <p class="mt-1.5 text-xs text-brand-mist">
                     {{ __('Last fetch: :time — :lines lines, :kb KB', [
                         'time' => $logFetchedHuman,
                         'lines' => $logTotalLines,

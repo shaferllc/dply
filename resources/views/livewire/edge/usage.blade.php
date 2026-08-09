@@ -46,26 +46,26 @@
         @if ($totals)
             <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Edge sites') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Edge sites') }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-brand-ink">{{ number_format($totals['all_sites']) }}</p>
-                    <p class="mt-0.5 text-[10px] text-brand-mist">{{ __(':n billable', ['n' => number_format($totals['sites'])]) }}</p>
+                    <p class="mt-0.5 text-2xs text-brand-mist">{{ __(':n billable', ['n' => number_format($totals['sites'])]) }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Requests (MTD)') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Requests (MTD)') }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-brand-ink">{{ number_format($totals['requests']) }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Egress (MTD)') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Egress (MTD)') }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-brand-ink">{{ $humanBytes($totals['bytes_egress']) }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('R2 storage') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('R2 storage') }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-brand-ink">{{ $humanBytes($totals['r2_storage_bytes']) }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-5 py-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Est. total / mo') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Est. total / mo') }}</p>
                     <p class="mt-1 text-2xl font-bold tabular-nums text-brand-ink">${{ number_format($totals['total_cents'] / 100, 2) }}</p>
-                    <p class="mt-0.5 text-[10px] text-brand-mist">
+                    <p class="mt-0.5 text-2xs text-brand-mist">
                         {{ __(':platform platform + :usage usage', [
                             'platform' => '$'.number_format($totals['platform_cents'] / 100, 2),
                             'usage' => '$'.number_format($totals['usage_cents'] / 100, 2),
@@ -90,7 +90,7 @@
         @else
             <div class="dply-card overflow-hidden">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                    <thead class="bg-brand-sand/30 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
+                    <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">
                         <tr>
                             <th class="px-4 py-3">{{ __('Site') }}</th>
                             <th class="px-4 py-3 text-right">{{ __('Requests') }}</th>
@@ -123,13 +123,13 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="font-semibold text-brand-ink truncate">{{ $siteName }}</p>
                                         @if (! empty($row['is_preview']))
-                                            <span class="rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-olive">{{ __('Preview') }}</span>
+                                            <span class="rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-olive">{{ __('Preview') }}</span>
                                         @elseif (! $billable && $status !== '')
-                                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
+                                            <span class="rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
                                         @endif
                                     </div>
                                     @if ($hostname)
-                                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-moss">{{ $hostname }}</p>
+                                        <p class="mt-0.5 truncate font-mono text-xs text-brand-moss">{{ $hostname }}</p>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-right tabular-nums">{{ number_format($row['requests'] ?? 0) }}</td>

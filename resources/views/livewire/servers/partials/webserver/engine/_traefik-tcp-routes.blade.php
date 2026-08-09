@@ -36,7 +36,7 @@
                 @foreach ($traefik_tcp_routes_form as $tcpSlug => $tcpFields)
                     <form wire:submit.prevent="saveTraefikTcpRoute(@js($tcpSlug))" class="mt-4 rounded-xl border border-brand-ink/10 p-4" wire:key="traefik-tcp-{{ $tcpSlug }}">
                         <div class="flex justify-between"><p class="font-mono text-sm font-semibold">dply-tcp-{{ $tcpSlug }}</p>
-                            <button type="button" wire:click="openConfirmActionModal('removeTraefikTcpRoute', [@js($tcpSlug)], @js(__('Remove TCP route')), @js(__('Delete this TCP config?')), @js(__('Remove')), true)" class="text-[11px] text-rose-800">{{ __('Remove') }}</button></div>
+                            <button type="button" wire:click="openConfirmActionModal('removeTraefikTcpRoute', [@js($tcpSlug)], @js(__('Remove TCP route')), @js(__('Delete this TCP config?')), @js(__('Remove')), true)" class="text-xs text-rose-800">{{ __('Remove') }}</button></div>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <label class="sm:col-span-2"><span class="text-xs">{{ __('Rule') }}</span><input type="text" wire:model.lazy="traefik_tcp_routes_form.{{ $tcpSlug }}.rule" class="mt-1 w-full rounded-md font-mono text-sm" /></label>
                             <label><span class="text-xs">{{ __('Entry points') }}</span><input type="text" wire:model.lazy="traefik_tcp_routes_form.{{ $tcpSlug }}.entry_points" class="mt-1 w-full rounded-md text-sm" /></label>

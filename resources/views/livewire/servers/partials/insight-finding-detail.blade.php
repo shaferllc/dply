@@ -43,10 +43,10 @@
                 <x-dynamic-component :component="$severityIcon" class="h-4 w-4" aria-hidden="true" />
                 {{ $severityLabel }}
             </span>
-            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset {{ $kindChipClass }}">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset {{ $kindChipClass }}">
                 {{ $f->kind === 'suggestion' ? __('Suggestion') : __('Problem') }}
             </span>
-            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset {{ $statusChipClass }}">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset {{ $statusChipClass }}">
                 {{ ucfirst((string) $f->status) }}
             </span>
         </div>
@@ -115,7 +115,7 @@
     {{-- Body / what this means --}}
     @if ($f->body)
         <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('What this means') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('What this means') }}</p>
             <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-brand-ink [overflow-wrap:anywhere]">{{ $f->body }}</p>
         </div>
     @endif
@@ -123,13 +123,13 @@
     {{-- Signal data (raw numbers from the runner) --}}
     @if ($signalRows !== [])
         <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Signal data') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Signal data') }}</p>
             <p class="mt-0.5 text-xs text-brand-mist">{{ __('Exact values the runner saw when this finding was emitted.') }}</p>
             <dl class="mt-2 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10 bg-white text-xs">
                 @foreach ($signalRows as $key => $value)
                     <div class="grid grid-cols-1 gap-1 px-3 py-1.5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center sm:gap-3">
-                        <dt class="font-mono text-[11px] text-brand-moss">{{ $key }}</dt>
-                        <dd class="break-all font-mono text-[11px] text-brand-ink">
+                        <dt class="font-mono text-xs text-brand-moss">{{ $key }}</dt>
+                        <dd class="break-all font-mono text-xs text-brand-ink">
                             @if (is_bool($value))
                                 {{ $value ? 'true' : 'false' }}
                             @elseif (is_null($value))
@@ -162,8 +162,8 @@
     @if ($hasFixHistory)
         <div>
             <div class="flex items-center justify-between gap-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Fix run') }}</p>
-                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $runChip }}">
+                <p class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Fix run') }}</p>
+                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $runChip }}">
                     <x-dynamic-component :component="$runIcon" class="h-4 w-4 {{ $fixHistory['run_status'] === 'queued' ? 'animate-spin' : '' }}" aria-hidden="true" />
                     {{ $runLabel }}
                 </span>
@@ -191,7 +191,7 @@
                 @endif
                 @if ($fixHistory['failed_at'])
                     <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-red-700">
                             {{ __('Failed') }}
                             <time datetime="{{ $fixHistory['failed_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['failed_at']) }}">
                                 · {{ $fixHistory['failed_at']->diffForHumans() }}
@@ -204,7 +204,7 @@
                 @endif
                 @if ($fixHistory['refused_at'])
                     <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-amber-700">
                             {{ __('Refused at preflight') }}
                             <time datetime="{{ $fixHistory['refused_at']->toIso8601String() }}" title="{{ $fmt($fixHistory['refused_at']) }}">
                                 · {{ $fixHistory['refused_at']->diffForHumans() }}
@@ -218,7 +218,7 @@
                 @if ($fixHistory['output'])
                     <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15" {{ $fixHistory['run_status'] === 'failed' ? 'open' : '' }}>
                         <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-brand-moss">{{ __('Fix output') }}</summary>
-                        <pre class="overflow-x-auto whitespace-pre-wrap break-words border-t border-brand-ink/10 px-3 py-2 font-mono text-[11px] leading-5 text-brand-ink">{{ $fixHistory['output'] }}</pre>
+                        <pre class="overflow-x-auto whitespace-pre-wrap break-words border-t border-brand-ink/10 px-3 py-2 font-mono text-xs leading-5 text-brand-ink">{{ $fixHistory['output'] }}</pre>
                     </details>
                 @endif
                 @if ($fixHistory['backup_path'])
@@ -233,13 +233,13 @@
     {{-- Correlation --}}
     @if ($correlationFindings->isNotEmpty())
         <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Related findings') }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Related findings') }}</p>
             <ul class="mt-2 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10 bg-white">
                 @foreach ($correlationFindings as $related)
                     <li class="px-3 py-2">
                         <button type="button" wire:click="openFindingDetail({{ $related->id }})" class="flex w-full items-center justify-between gap-3 text-left hover:text-brand-forest">
                             <span class="min-w-0 flex-1 truncate text-sm text-brand-ink">{{ $related->title }}</span>
-                            <span class="shrink-0 text-[10px] uppercase tracking-wide text-brand-mist">{{ $related->severity }}</span>
+                            <span class="shrink-0 text-2xs uppercase tracking-wide text-brand-mist">{{ $related->severity }}</span>
                         </button>
                     </li>
                 @endforeach

@@ -34,7 +34,7 @@
                                     {{ __('Loading…') }}
                                 </span>
                                 <span class="inline-flex items-center gap-1 font-mono">
-                                    <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">SSH</span>
+                                    <span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">SSH</span>
                                     <span class="break-all text-brand-ink">{{ $ssh }}</span>
                                 </span>
                             </div>
@@ -52,14 +52,14 @@
                         <div class="grid grid-cols-3 divide-x divide-brand-ink/10">
                             @foreach ([__('Provider'), __('Region'), __('Size')] as $label)
                                 <div class="min-w-0 px-3 py-2 sm:px-4">
-                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                     <dd class="mt-1.5 h-4 w-16 animate-pulse rounded bg-brand-ink/10"></dd>
                                 </div>
                             @endforeach
                         </div>
                         @foreach ([__('Status'), __('IP')] as $label)
                             <div class="flex items-baseline justify-between gap-4 px-3 py-2 sm:px-4">
-                                <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                <dt class="shrink-0 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                 <dd class="h-4 w-24 animate-pulse rounded bg-brand-ink/10"></dd>
                             </div>
                         @endforeach
@@ -70,7 +70,7 @@
             <div class="border-t border-brand-ink/10 bg-brand-sand/25 p-6 sm:p-8">
                 <div class="mb-3 flex items-center gap-2">
                     <x-heroicon-o-squares-2x2 class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workspace summary') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workspace summary') }}</p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     @foreach (range(1, 5) as $tile)

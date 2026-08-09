@@ -40,14 +40,14 @@
         >
             <x-slot:actions>
                 @if ($opsReady && $pyOk)
-                    <span @class(['inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold ring-1', $statusChipClasses])>
+                    <span @class(['inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold ring-1', $statusChipClasses])>
                         <x-dynamic-component :component="$statusChipIcon" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ $statusChipLabel }}
                     </span>
                 @endif
                 @if ($server->workspace)
                     @feature('surface.projects')
-                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Project operations') }}">
+                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Project operations') }}">
                             <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Operations') }}
                         </a>
@@ -237,7 +237,7 @@
                     >
                         {{ __('Notifications') }}
                         @if($routingSummary['server_routes'] > 0)
-                            <span class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-ink px-1.5 text-[10px] font-semibold text-brand-cream">
+                            <span class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-ink px-1.5 text-2xs font-semibold text-brand-cream">
                                 {{ $routingSummary['server_routes'] }}
                             </span>
                         @endif

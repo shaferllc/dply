@@ -49,7 +49,7 @@
                     <div class="flex justify-between gap-2">
                         <p class="font-mono text-sm font-semibold">dply-custom-{{ $routeSlug }}.yml</p>
                         <button type="button" wire:click="openConfirmActionModal('removeTraefikCustomRoute', [@js($routeSlug)], @js(__('Remove custom route')), @js(__('Delete this dynamic route file?')), @js(__('Remove')), true)"
-                            class="text-[11px] font-medium text-rose-800">{{ __('Remove') }}</button>
+                            class="text-xs font-medium text-rose-800">{{ __('Remove') }}</button>
                     </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <label class="sm:col-span-2"><span class="text-xs">{{ __('Hostnames') }}</span>

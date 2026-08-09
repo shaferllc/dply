@@ -58,9 +58,9 @@
                                     <span class="flex items-center gap-2">
                                         <span class="block text-sm font-semibold text-brand-ink">{{ $tile['label'] }}</span>
                                         @if ($isComingSoon)
-                                            <span class="inline-flex items-center rounded-full bg-brand-ink/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-mist">{{ __('Coming soon') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-brand-ink/[0.06] px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-brand-mist">{{ __('Coming soon') }}</span>
                                         @elseif ($isInstaller)
-                                            <span class="inline-flex items-center rounded-full bg-brand-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-rust">{{ __('Auto-install') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-brand-gold/20 px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-brand-rust">{{ __('Auto-install') }}</span>
                                         @endif
                                     </span>
                                     <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $tile['description'] }}</span>
@@ -143,7 +143,7 @@
                                                 'border-amber-200 bg-amber-50 text-amber-900' => $git_ref_kind === 'tag',
                                                 'border-sky-200 bg-sky-50 text-sky-900' => $git_ref_kind === 'commit',
                                             ])>
-                                                <span class="text-[10px] font-semibold uppercase tracking-wide">{{ match ($git_ref_kind ?? 'branch') {
+                                                <span class="text-2xs font-semibold uppercase tracking-wide">{{ match ($git_ref_kind ?? 'branch') {
                                                     'tag' => __('Tag'),
                                                     'commit' => __('Commit'),
                                                     default => __('Branch'),

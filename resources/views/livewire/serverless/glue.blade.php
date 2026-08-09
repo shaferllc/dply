@@ -52,9 +52,9 @@
                                         <div class="flex flex-wrap items-center gap-2">
                                             <h3 class="text-sm font-semibold text-brand-ink">{{ $item['title'] }}</h3>
                                             @if ($item['available'])
-                                                <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Ready') }}</span>
+                                                <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Ready') }}</span>
                                             @else
-                                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Needs setup') }}</span>
+                                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Needs setup') }}</span>
                                             @endif
                                         </div>
                                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $item['summary'] }}</p>
@@ -88,7 +88,7 @@
 
                     @if (! $recipe['available'])
                         <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-4 sm:px-6 dark:bg-amber-950/20">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Inventory gap') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Inventory gap') }}</p>
                             <p class="mt-1 text-sm text-brand-ink">{{ $recipe['unavailable_reason'] }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Steps below are still useful as a template while you wire up prerequisites.') }}</p>
                         </div>
@@ -96,7 +96,7 @@
 
                     @if (count($recipe['gaps']) > 0)
                         <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Before wiring') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Before wiring') }}</p>
                             <ul class="mt-2 space-y-1.5 text-sm text-brand-moss">
                                 @foreach ($recipe['gaps'] as $gap)
                                     <li class="flex gap-2">
@@ -117,7 +117,7 @@
                                 @foreach ($recipe['resources'] as $resource)
                                     <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 sm:px-6">
                                         <div class="min-w-0">
-                                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $resource['kind'] }}</span>
+                                            <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $resource['kind'] }}</span>
                                             <p class="text-sm font-semibold text-brand-ink">{{ $resource['label'] }}</p>
                                             @if ($resource['meta'])
                                                 <p class="mt-0.5 font-mono text-xs text-brand-moss">{{ $resource['meta'] }}</p>
@@ -307,7 +307,7 @@
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($snapshot['edge_hooks'] as $hook)
                                 <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-5 py-3 text-sm sm:px-6">
-                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Edge') }}</span>
+                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Edge') }}</span>
                                     <span class="font-semibold text-brand-ink">{{ $hook['site_name'] }}</span>
                                     <span class="text-brand-moss">/ {{ $hook['hook_name'] }}</span>
                                     <span class="font-mono text-xs text-brand-mist">…{{ $hook['token_prefix'] }}</span>
@@ -315,7 +315,7 @@
                             @endforeach
                             @foreach ($snapshot['cloud_sites'] as $cloud)
                                 <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-5 py-3 text-sm sm:px-6">
-                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Cloud') }}</span>
+                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Cloud') }}</span>
                                     <span class="font-semibold text-brand-ink">{{ $cloud['name'] }}</span>
                                     @if ($cloud['redeploy_hook'])
                                         <span class="font-mono text-xs text-brand-mist">{{ $cloud['redeploy_hook'] }}</span>
@@ -324,7 +324,7 @@
                             @endforeach
                             @foreach ($snapshot['byo_crons'] as $cron)
                                 <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-5 py-3 text-sm sm:px-6">
-                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('BYO cron') }}</span>
+                                    <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('BYO cron') }}</span>
                                     <span class="font-semibold text-brand-ink">{{ $cron['server_name'] }}</span>
                                     <span class="font-mono text-xs text-brand-moss">{{ $cron['cron_expression'] }}</span>
                                     @if ($cronDesc = cron_describe($cron['cron_expression']))

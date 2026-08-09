@@ -95,7 +95,7 @@
                 >
                     {{ __('Overview') }}
                     @if (($report['alert_count'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
+                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format($report['alert_count']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -106,7 +106,7 @@
                 >
                     {{ __('Packages') }}
                     @if (($report['packages']['total'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format((int) $report['packages']['total']) }}</span>
+                        <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss">{{ number_format((int) $report['packages']['total']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
@@ -168,7 +168,7 @@
                                     <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view patch state but cannot run apt actions or change unattended-upgrades settings.') }}</p>
                                 </div>

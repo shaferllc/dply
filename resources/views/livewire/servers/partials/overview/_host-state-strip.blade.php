@@ -127,8 +127,8 @@
             @foreach ($hostStateStats as $stat)
                 <div @class(['flex items-baseline justify-between gap-3 rounded-2xl border px-4 py-3 shadow-sm', $statCardTones[$stat['tone']]])>
                     <div class="min-w-0">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
-                        <p class="mt-1 truncate text-[11px] {{ $stat['subTone'] }}" title="{{ $stat['sub'] }}">{{ $stat['sub'] }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
+                        <p class="mt-1 truncate text-xs {{ $stat['subTone'] }}" title="{{ $stat['sub'] }}">{{ $stat['sub'] }}</p>
                     </div>
                     <p class="shrink-0 whitespace-nowrap font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
                 </div>

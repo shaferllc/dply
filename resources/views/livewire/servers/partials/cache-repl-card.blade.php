@@ -31,7 +31,7 @@
             <button
                 type="button"
                 x-on:click="$dispatch('open-modal', @js($commandModalName))"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 <x-heroicon-m-book-open class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Command reference') }}
@@ -39,7 +39,7 @@
             <button
                 type="button"
                 wire:click="clearReplHistory"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                 @disabled(empty($replHistory))
             >
                 <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -60,7 +60,7 @@
             />
             <span class="text-xs font-semibold text-brand-ink">{{ __('Allow mutating commands') }}</span>
         </label>
-        <span class="text-[11px] text-brand-moss">
+        <span class="text-xs text-brand-moss">
             @if ($replUnlocked)
                 {{ __('Unlocked — every command is recorded in the audit log.') }}
             @else
@@ -70,7 +70,7 @@
     </div>
 
     <div
-        class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"
+        class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
         x-data="{ pendingCmd: '' }"
         x-on:repl-submitting.window="pendingCmd = $event.detail?.cmd || ''"
     >
@@ -231,7 +231,7 @@
                     <span class="font-mono font-semibold text-brand-ink" x-text="item.name"></span>
                     <span class="ml-2 font-mono text-brand-mist" x-text="item.syntax.slice(item.name.length).trim()"></span>
                     <template x-if="item.mutating">
-                        <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('mutating') }}</span>
+                        <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-700">{{ __('mutating') }}</span>
                     </template>
                 </button>
             </template>
@@ -304,11 +304,11 @@
                                         <span class="flex w-full items-center justify-between gap-2">
                                             <span class="font-mono text-sm font-semibold text-brand-ink" x-text="item.name"></span>
                                             <template x-if="item.mutating">
-                                                <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('mutating') }}</span>
+                                                <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-700">{{ __('mutating') }}</span>
                                             </template>
                                         </span>
-                                        <span class="font-mono text-[11px] text-brand-mist" x-text="item.syntax"></span>
-                                        <span class="text-[11px] leading-snug text-brand-moss" x-text="item.summary"></span>
+                                        <span class="font-mono text-xs text-brand-mist" x-text="item.syntax"></span>
+                                        <span class="text-xs leading-snug text-brand-moss" x-text="item.summary"></span>
                                     </button>
                                 </template>
                             </div>

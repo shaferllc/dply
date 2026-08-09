@@ -15,7 +15,7 @@
 
     <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-3 py-2 sm:px-4">
         <div class="min-w-[7.5rem]">
-            <label for="status_filter" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
+            <label for="status_filter" class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
             <select id="status_filter" wire:model.live="statusFilter" class="{{ $selectCls }} w-full">
                 <option value="">{{ __('Any') }}</option>
                 @foreach ($statuses as $s)
@@ -24,7 +24,7 @@
             </select>
         </div>
         <div class="min-w-[7.5rem]">
-            <label for="trigger_filter" class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Trigger') }}</label>
+            <label for="trigger_filter" class="block text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Trigger') }}</label>
             <select id="trigger_filter" wire:model.live="triggerFilter" class="{{ $selectCls }} w-full">
                 <option value="">{{ __('Any') }}</option>
                 @foreach ($triggers as $t)
@@ -41,7 +41,7 @@
     </div>
 
     @if ($deployments->isEmpty())
-        <div class="px-3 py-4 text-center text-[11px] text-brand-moss sm:px-4">
+        <div class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
             @if ($statusFilter !== '' || $triggerFilter !== '')
                 {{ __('No deployments match the current filters.') }}
             @else
@@ -88,7 +88,7 @@
                             {{-- Headline: status + when + duration --}}
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                 <span @class([
-                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-inset',
+                                    'inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] ring-1 ring-inset',
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $isFailed,
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $isRunning,
@@ -97,14 +97,14 @@
                                 ])>{{ $isBillingBlocked ? __('blocked — billing') : $deployment->status }}</span>
 
                                 @if ($deployment->started_at)
-                                    <span class="text-[11px] text-brand-moss" title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
+                                    <span class="text-xs text-brand-moss" title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
                                 @endif
                                 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
-                                    <span class="font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
+                                    <span class="font-mono text-2xs text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
                                 @endif
 
                                 @if ($duration !== null)
-                                    <span class="ml-auto inline-flex items-center gap-1 whitespace-nowrap font-mono text-[11px] text-brand-moss">
+                                    <span class="ml-auto inline-flex items-center gap-1 whitespace-nowrap font-mono text-xs text-brand-moss">
                                         <x-heroicon-m-clock class="h-3 w-3 text-brand-mist" aria-hidden="true" />
                                         {{ $duration }}
                                     </span>
@@ -113,10 +113,10 @@
 
                             {{-- Meta row: trigger + commit + phases --}}
                             <div class="mt-1 flex flex-wrap items-center gap-1">
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployment->trigger ?: '—' }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployment->trigger ?: '—' }}</span>
 
                                 @if ($deployment->git_sha)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-sage ring-1 ring-inset ring-brand-ink/10" title="{{ $deployment->git_sha }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 font-mono text-2xs font-semibold text-brand-sage ring-1 ring-inset ring-brand-ink/10" title="{{ $deployment->git_sha }}">
                                         <x-heroicon-m-code-bracket class="h-3 w-3" aria-hidden="true" />
                                         {{ \Illuminate\Support\Str::limit($deployment->git_sha, 7, '') }}
                                     </span>
@@ -125,7 +125,7 @@
                                 @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
                                     @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                         <span @class([
-                                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
+                                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
                                             'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->phaseOk($phase),
                                             'bg-rose-50 text-rose-800 ring-rose-200' => ! $deployment->phaseOk($phase),
                                         ])>{{ $phase }}</span>
@@ -147,18 +147,18 @@
                                     }
                                 @endphp
                                 @if ($failExcerpt !== '')
-                                    <p class="mt-1 truncate font-mono text-[10px] text-rose-700" title="{{ \Illuminate\Support\Str::limit($failExcerpt, 600) }}">{{ \Illuminate\Support\Str::limit($failExcerpt, 220) }}</p>
+                                    <p class="mt-1 truncate font-mono text-2xs text-rose-700" title="{{ \Illuminate\Support\Str::limit($failExcerpt, 600) }}">{{ \Illuminate\Support\Str::limit($failExcerpt, 220) }}</p>
                                 @endif
                             @endif
 
                             {{-- Footer: deploy id + failure helper --}}
                             <div class="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-                                <span class="font-mono text-[10px] text-brand-mist">{{ $deployment->id }}</span>
+                                <span class="font-mono text-2xs text-brand-mist">{{ $deployment->id }}</span>
                                 @if ($isFailed && ops_copilot_active())
                                     <a
                                         href="{{ route('fleet.copilot', ['site' => $site->id]) }}"
                                         wire:navigate
-                                        class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-brand-forest hover:text-brand-sage"
+                                        class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-forest hover:text-brand-sage"
                                     >
                                         {{ __('Explain failure') }}
                                         <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />

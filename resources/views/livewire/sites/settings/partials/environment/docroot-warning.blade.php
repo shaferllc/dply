@@ -6,7 +6,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Exposure') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Exposure') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Env file lives inside the docroot') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-amber-900">
                             {{ __(':path is reachable by the webserver. The default deny rule blocks /.env over HTTP, but moving the file outside the docroot is safer if the rule is ever changed or bypassed.', ['path' => $site->effectiveEnvFilePath()]) }}

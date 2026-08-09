@@ -45,23 +45,23 @@
                     <x-fleet-stat :label="__('Teams')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $teamCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $teamCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('total|total', $teamCount) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('In this organization') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('In this organization') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Memberships')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $totalMemberSlots }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('slot|slots', $totalMemberSlots) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('slot|slots', $totalMemberSlots) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all teams') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Across all teams') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Members')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $orgMemberCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $orgMemberCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('available|available', $orgMemberCount) }}</span>
                         </p>
-                        <a href="{{ route('organizations.members', $organization) }}" wire:navigate class="mt-1 inline-flex text-[11px] font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
+                        <a href="{{ route('organizations.members', $organization) }}" wire:navigate class="mt-1 inline-flex text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -78,7 +78,7 @@
                         <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your teams') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Rename teams, manage membership, or open per-team notification channels.') }}</p>
                     </div>

@@ -80,7 +80,7 @@
                 x-on:resize.window.passive="open && compute()"
                 x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
                 role="tooltip"
-                class="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-brand-ink/95 px-2 py-1 text-[11px] font-medium text-brand-cream shadow-lg ring-1 ring-brand-ink/40"
+                class="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-brand-ink/95 px-2 py-1 text-xs font-medium text-brand-cream shadow-lg ring-1 ring-brand-ink/40"
             >
                 {{ $label }}
             </span>

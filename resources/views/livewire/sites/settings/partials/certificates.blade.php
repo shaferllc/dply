@@ -111,23 +111,23 @@
         </x-workspace-panel-head>
 
         @if ($caddy_managed_certs_error)
-            <div class="border-b border-rose-200 bg-rose-50/70 px-5 py-2 text-[11px] text-rose-900 sm:px-6">{{ $caddy_managed_certs_error }}</div>
+            <div class="border-b border-rose-200 bg-rose-50/70 px-5 py-2 text-xs text-rose-900 sm:px-6">{{ $caddy_managed_certs_error }}</div>
         @endif
 
         @if (! $caddy_managed_certs_loaded)
-            <div class="px-5 py-4 text-center text-[11px] text-brand-moss sm:px-6" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
+            <div class="px-5 py-4 text-center text-xs text-brand-moss sm:px-6" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
                 <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
             </div>
         @else
             <x-replay-log :frames="$caddy_managed_certs_progress">
                 @if ($caddy_managed_certs_unreadable)
-                    <div class="px-5 py-4 text-center text-[11px] text-brand-moss sm:px-6">
+                    <div class="px-5 py-4 text-center text-xs text-brand-moss sm:px-6">
                         {{ __('Could not read the certificate over SSH. Caddy still serves TLS — check deploy-user sudo for find + openssl.') }}
                     </div>
                 @elseif (empty($caddy_managed_certs))
                     <div class="px-5 py-5 text-center sm:px-6">
                         <p class="text-xs font-medium text-brand-ink">{{ __('Caddy hasn’t issued a certificate yet.') }}</p>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Fetched on the first HTTPS request once DNS points here.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Fetched on the first HTTPS request once DNS points here.') }}</p>
                     </div>
                 @else
                     <ul class="divide-y divide-brand-ink/10">
@@ -144,7 +144,7 @@
                                             <p class="text-xs font-semibold text-brand-ink">{{ $cert['subject'] ?: __('Caddy certificate') }}</p>
                                             @if (! $cert['error'])
                                                 <span @class([
-                                                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                                                     'bg-rose-100 text-rose-900 ring-rose-200' => $urgency === 'expired',
                                                     'bg-rose-50 text-rose-700 ring-rose-200' => $urgency === 'danger',
                                                     'bg-amber-50 text-amber-800 ring-amber-200' => $urgency === 'warn',
@@ -163,12 +163,12 @@
                                             @endif
                                         </div>
                                         @if ($cert['issuer'])
-                                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Issued by') }} <span class="font-medium text-brand-ink">{{ $cert['issuer'] }}</span></p>
+                                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Issued by') }} <span class="font-medium text-brand-ink">{{ $cert['issuer'] }}</span></p>
                                         @endif
                                         @if (! empty($cert['not_after']))
-                                            <p class="text-[11px] tabular-nums text-brand-mist">{{ __('Valid until :date', ['date' => $cert['not_after']]) }}</p>
+                                            <p class="text-xs tabular-nums text-brand-mist">{{ __('Valid until :date', ['date' => $cert['not_after']]) }}</p>
                                         @endif
-                                        <p class="mt-0.5 break-all font-mono text-[10px] text-brand-mist">{{ $cert['path'] }}</p>
+                                        <p class="mt-0.5 break-all font-mono text-2xs text-brand-mist">{{ $cert['path'] }}</p>
                                     </div>
                                 </div>
                             </li>
@@ -226,7 +226,7 @@
                 <div>
                     <x-input-label for="new_certificate_preview_domain_id" :value="__('Preview domain')" class="!text-xs" />
                     @if ($availablePreviewDomains->isEmpty())
-                        <p class="mt-1 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3 py-1.5 text-[11px] text-brand-moss">
+                        <p class="mt-1 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3 py-1.5 text-xs text-brand-moss">
                             {{ $site->previewDomains->isEmpty()
                                 ? __('No preview domains are attached to this site yet.')
                                 : __('Every preview domain already has a certificate.') }}
@@ -267,7 +267,7 @@
                     </div>
                     <textarea id="new_certificate_domains" wire:model="new_certificate_domains" rows="2" class="dply-input mt-1 font-mono text-xs" placeholder="app.example.com&#10;www.example.com"></textarea>
                     <x-input-error :messages="$errors->get('new_certificate_domains')" class="mt-1" />
-                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Leave empty to use all customer domains, or load only those without a certificate.') }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Leave empty to use all customer domains, or load only those without a certificate.') }}</p>
                 </div>
             @endif
 
@@ -324,12 +324,12 @@
             <div class="grid gap-2 sm:grid-cols-2">
                 <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-ink">
                     <input type="checkbox" wire:model="new_certificate_force_skip_dns_checks" class="mt-0.5 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
-                    <span class="text-[11px] leading-relaxed text-brand-moss">{{ __('Skip DNS preflight checks when the challenge path allows it.') }}</span>
+                    <span class="text-xs leading-relaxed text-brand-moss">{{ __('Skip DNS preflight checks when the challenge path allows it.') }}</span>
                 </label>
                 @if ($supportsHttp3Certificates)
                     <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-ink">
                         <input type="checkbox" wire:model="new_certificate_enable_http3" class="mt-0.5 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
-                        <span class="text-[11px] leading-relaxed text-brand-moss">{{ __('Record HTTP/3 intent on hosts that support it.') }}</span>
+                        <span class="text-xs leading-relaxed text-brand-moss">{{ __('Record HTTP/3 intent on hosts that support it.') }}</span>
                     </label>
                 @endif
             </div>
@@ -348,7 +348,7 @@
     >
         @if ($activeCertificateCount > 0 || $pendingCertificateCount > 0)
             <x-slot:actions>
-                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-brand-mist">
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-2xs text-brand-mist">
                     @if ($activeCertificateCount > 0)
                         <span class="inline-flex items-center gap-1">
                             <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
@@ -369,7 +369,7 @@
     @if ($site->certificates->isEmpty())
         <div class="px-5 py-5 text-center sm:px-6">
             <p class="text-xs font-medium text-brand-ink">{{ __('No certificates have been requested yet.') }}</p>
-            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Use the form above to request Let’s Encrypt or install an existing cert.') }}</p>
+            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Use the form above to request Let’s Encrypt or install an existing cert.') }}</p>
         </div>
     @else
         <ul class="divide-y divide-brand-ink/10">
@@ -387,30 +387,30 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <p class="text-xs font-semibold text-brand-ink">{{ ucfirst($certificate->provider_type) }} · {{ ucfirst($certificate->scope_type) }}</p>
-                                <span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chipClasses }}">
+                                <span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $chipClasses }}">
                                     <x-dynamic-component :component="$chipIcon" class="h-2.5 w-2.5" />
                                     {{ $certificate->status }}
                                 </span>
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                     {{ $certificate->challenge_type }}
                                 </span>
                             </div>
 
                             @if (! empty($hostnames))
-                                <p class="mt-0.5 break-all font-mono text-[11px] text-brand-mist">
+                                <p class="mt-0.5 break-all font-mono text-xs text-brand-mist">
                                     {{ implode(', ', $hostnames) }}
                                 </p>
                             @endif
 
                             @if ($certificate->last_output)
                                 <details class="mt-1">
-                                    <summary class="cursor-pointer list-none text-[10px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
+                                    <summary class="cursor-pointer list-none text-2xs font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
                                         <span class="inline-flex items-center gap-1">
                                             <x-heroicon-o-chevron-down class="h-3 w-3" />
                                             {{ __('Last output') }}
                                         </span>
                                     </summary>
-                                    <pre class="mt-1.5 max-h-40 overflow-auto rounded-lg bg-brand-sand/15 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-brand-moss">{{ \Illuminate\Support\Str::limit($certificate->last_output, 800) }}</pre>
+                                    <pre class="mt-1.5 max-h-40 overflow-auto rounded-lg bg-brand-sand/15 px-2.5 py-1.5 font-mono text-xs leading-relaxed text-brand-moss">{{ \Illuminate\Support\Str::limit($certificate->last_output, 800) }}</pre>
                                 </details>
                             @endif
                         </div>

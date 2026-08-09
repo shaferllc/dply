@@ -7,7 +7,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Provisioning error') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Provisioning error') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                         {{ __('Provisioning failed at :provider', ['provider' => $provisionError['provider'] ?? 'the provider']) }}
                     </h3>
@@ -38,7 +38,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster unavailable') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster unavailable') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                         {{ __(':provider can\'t find this cluster anymore', ['provider' => $kubernetesError['provider_label']]) }}
                     </h3>
@@ -50,13 +50,13 @@
             <dl class="grid gap-3 text-xs sm:grid-cols-2">
                 @if ($kubernetesError['cluster_name'] !== '')
                     <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster name') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster name') }}</dt>
                         <dd class="mt-1 font-mono text-brand-ink">{{ $kubernetesError['cluster_name'] }}</dd>
                     </div>
                 @endif
                 @if ($kubernetesError['cluster_id'] !== '')
                     <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster id') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster id') }}</dt>
                         <dd class="mt-1 break-all font-mono text-brand-ink">{{ $kubernetesError['cluster_id'] }}</dd>
                     </div>
                 @endif

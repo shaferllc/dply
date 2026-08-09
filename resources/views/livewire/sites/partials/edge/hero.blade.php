@@ -6,7 +6,7 @@
         :note="$edgeSourceSpec ? $edgeSourceRef : null"
     >
         <x-slot:actions>
-            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $edgeStatusBadgeClass }}">
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $edgeStatusBadgeClass }}">
                 {{ $edgeStatusLabel }}
             </span>
             @if ($edgeLiveUrl && ! empty($edgeActiveDeploymentId))
@@ -44,7 +44,7 @@
                 </a>
                 <button
                     type="button"
-                    class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900 dark:text-brand-sage"
+                    class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900 dark:text-brand-sage"
                     @click="navigator.clipboard.writeText(@js($edgeLiveUrl)); copied = true; setTimeout(() => copied = false, 2000)"
                 >
                     <x-heroicon-o-clipboard class="h-4 w-4" />
@@ -61,7 +61,7 @@
 
     <dl class="grid gap-px border-t border-brand-ink/10 bg-brand-ink/[0.07] text-xs sm:grid-cols-2">
         <div class="bg-white px-5 py-3.5 sm:px-6 dark:bg-zinc-900/60">
-            <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Latest deploy') }}</dt>
+            <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Latest deploy') }}</dt>
             <dd class="mt-1 text-brand-ink">
                 @if ($edgeLatestDeployment)
                     <span class="font-medium capitalize">{{ str_replace('_', ' ', (string) $edgeLatestDeployment->status) }}</span>
@@ -72,7 +72,7 @@
             </dd>
         </div>
         <div class="bg-white px-5 py-3.5 sm:px-6 dark:bg-zinc-900/60">
-            <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auto deploy') }}</dt>
+            <dt class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auto deploy') }}</dt>
             <dd class="mt-1 font-medium text-brand-ink">{{ $edgeDeployOnPush ? __('On push to :branch', ['branch' => $edgeBranch]) : __('Manual only') }}</dd>
         </div>
     </dl>

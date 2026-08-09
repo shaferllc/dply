@@ -4,7 +4,7 @@
             <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduler & queue worker') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('DigitalOcean Functions has no long-running process, so dply invokes this function every minute to run the Laravel scheduler (schedule:run) and drain queued jobs (queue:work).') }}
@@ -34,7 +34,7 @@
                         <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy the function first') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Ticks are skipped until the function has an invocation URL.') }}</p>
                     </div>

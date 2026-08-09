@@ -56,9 +56,9 @@
                     <x-fleet-stat :label="__('Members')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $memberCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $memberCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('total|total', $memberCount) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('With access') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('With access') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat
                         :label="__('Invites')"
@@ -68,16 +68,16 @@
                     >
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $invitationCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('pending|pending', $invitationCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('pending|pending', $invitationCount) }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Not yet accepted') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('Not yet accepted') }}</p>
                     </x-fleet-stat>
                     <x-fleet-stat :label="__('Teams')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $teamCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('team|teams', $teamCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('team|teams', $teamCount) }}</span>
                         </p>
-                        <a href="{{ route('organizations.teams', $organization) }}" wire:navigate class="mt-1 inline-flex text-[11px] font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
+                        <a href="{{ route('organizations.teams', $organization) }}" wire:navigate class="mt-1 inline-flex text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
                     </x-fleet-stat>
                 </dl>
             </x-slot:stats>
@@ -98,11 +98,11 @@
                             <x-heroicon-o-envelope class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outstanding') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outstanding') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pending invitations') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('People you\'ve invited but who haven\'t accepted yet.') }}</p>
                         </div>
-                        <span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-900 ring-1 ring-amber-200">{{ $invitationCount }}</span>
+                        <span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-900 ring-1 ring-amber-200">{{ $invitationCount }}</span>
                     </div>
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($organization->invitations as $inv)
@@ -110,9 +110,9 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $inv->email }}</span>
-                                        <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $roleClasses($inv->role) }}">{{ $inv->role }}</span>
+                                        <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $roleClasses($inv->role) }}">{{ $inv->role }}</span>
                                     </div>
-                                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 text-xs text-brand-mist">
                                         @if ($inv->expires_at)
                                             {{ __('Expires :time', ['time' => $inv->expires_at->diffForHumans()]) }}
                                         @else
@@ -124,7 +124,7 @@
                                     <button
                                         type="button"
                                         wire:click="promptCancelInvitation('{{ $inv->id }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                     >
                                         <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Cancel') }}
@@ -143,7 +143,7 @@
                         <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Members') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Roles control what each person can change. Deployers have a reduced scope.') }}</p>
                     </div>
@@ -179,9 +179,9 @@
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $user->name }}</p>
-                                    <p class="mt-0.5 truncate text-[11px] text-brand-moss">{{ $user->email }}</p>
+                                    <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $user->email }}</p>
                                 </div>
-                                <span class="shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $roleClasses($user->pivot->role) }}">{{ $user->pivot->role }}</span>
+                                <span class="shrink-0 rounded-md border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $roleClasses($user->pivot->role) }}">{{ $user->pivot->role }}</span>
                             </li>
                         @endforeach
                     </ul>

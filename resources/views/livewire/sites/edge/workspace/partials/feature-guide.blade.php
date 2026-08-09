@@ -25,7 +25,7 @@
         <summary class="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 sm:px-5 [&::-webkit-details-marker]:hidden">
             <span class="min-w-0 flex-1">
                 <span class="flex items-center gap-2">
-                    <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('How this works') }}</span>
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('How this works') }}</span>
                     <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
                 </span>
                 @if ($what !== '')

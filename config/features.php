@@ -129,7 +129,7 @@ return [
     'workspace' => [
         'site_promote' => env('FEATURE_WORKSPACE_SITE_PROMOTE', true),
         'health' => env('FEATURE_WORKSPACE_HEALTH', true),
-        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', false),
+        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', true),
         'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
         'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),

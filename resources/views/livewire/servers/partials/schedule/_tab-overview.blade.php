@@ -56,13 +56,13 @@
                                 <p class="text-sm font-semibold text-brand-ink">{{ $site->name }}</p>
                             @endif
                             @if ($cardData['kind'])
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['kind'] }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['kind'] }}</span>
                             @endif
                             @if ($cardData['health'] !== null)
-                                <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $chip['classes'] }}">{{ $chip['label'] }}</span>
+                                <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold ring-1 {{ $chip['classes'] }}">{{ $chip['label'] }}</span>
                             @endif
                         </div>
-                        <p class="mt-0.5 text-[11px] text-brand-moss">
+                        <p class="mt-0.5 text-xs text-brand-moss">
                             @if ($cardData['state'] === 'no_scheduler')
                                 {{ __('No scheduler enabled for this site.') }}
                             @elseif ($cardData['state'] === 'detected_unmonitored')
@@ -74,7 +74,7 @@
                             @endif
                         </p>
                     </div>
-                    <button type="button" wire:click="setScheduleWorkspaceTab('schedulers')" class="shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">
+                    <button type="button" wire:click="setScheduleWorkspaceTab('schedulers')" class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">
                         {{ __('View scheduler') }}
                     </button>
                 </li>

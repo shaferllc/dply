@@ -99,7 +99,7 @@
                         </span>
                         <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <p class="border-t border-brand-ink/10 px-4 py-2.5 text-[11px] leading-relaxed text-brand-moss sm:px-5">{{ $current['help']['body'] }}</p>
+                    <p class="border-t border-brand-ink/10 px-4 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-5">{{ $current['help']['body'] }}</p>
                 </details>
             </x-slot:footer>
         @endif

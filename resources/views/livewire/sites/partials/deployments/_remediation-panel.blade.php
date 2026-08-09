@@ -31,7 +31,7 @@
             <div class="min-w-0 flex-1">
                 @if ($succeeded)
                     {{-- Success state: the fix applied — point the operator at re-deploy. --}}
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">{{ __('Fix applied') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-emerald-700">{{ __('Fix applied') }}</p>
                     <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $remediation['title'] }} — {{ __('resolved') }}</h3>
                     <p class="mt-1 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('The fix ran successfully on :server. Re-deploy to continue where the deployment left off.', ['server' => $server->name]) }}</p>
                     <div class="mt-2.5">
@@ -52,7 +52,7 @@
                         @endif
                     </div>
                 @else
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply recognized this failure') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply recognized this failure') }}</p>
                     <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $remediation['title'] }}</h3>
                     <p class="mt-1 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ $remediation['explanation'] }}</p>
 
@@ -72,7 +72,7 @@
                                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
                                     {{ $action['label'] }}
                                     @if (! empty($action['recommended']))
-                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>
                                     @endif
                                 </a>
                             @else
@@ -90,7 +90,7 @@
                                     <x-heroicon-o-wrench class="h-3.5 w-3.5" aria-hidden="true" />
                                     {{ $action['label'] }}
                                     @if (! empty($action['recommended']))
-                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>
                                     @endif
                                 </button>
                             @endif
@@ -98,9 +98,9 @@
                     </div>
                     @php $hasScriptAction = collect($remediation['actions'])->contains(fn ($a) => empty($a['route'])); @endphp
                     @if ($hasScriptAction)
-                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
+                        <p class="mt-2 text-xs text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
                     @else
-                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('After updating, re-deploy to continue.') }}</p>
+                        <p class="mt-2 text-xs text-brand-mist">{{ __('After updating, re-deploy to continue.') }}</p>
                     @endif
                 @endif
             </div>

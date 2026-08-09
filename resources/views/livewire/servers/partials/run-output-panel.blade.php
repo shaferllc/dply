@@ -34,12 +34,12 @@
             </div>
             <div class="flex items-center gap-2">
                 @if ($badge)
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $badge['class'] }}">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $badge['class'] }}">
                         {{ $badge['label'] }}
                     </span>
                 @endif
                 @if ($activeRunExitCode !== null)
-                    <span class="font-mono text-[11px] text-brand-moss">{{ __('exit') }} {{ $activeRunExitCode }}</span>
+                    <span class="font-mono text-xs text-brand-moss">{{ __('exit') }} {{ $activeRunExitCode }}</span>
                 @endif
             </div>
         </div>

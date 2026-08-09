@@ -71,28 +71,28 @@
             <x-slot:stats>
                 <dl class="grid grid-cols-3 gap-2">
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('channel|channels', $channelCount) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('channel|channels', $channelCount) }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('You own') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ __('You own') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ isset($organizationChannels) ? $organizationChannels->count() : 0 }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', isset($organizationChannels) ? $organizationChannels->count() : 0) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('available|available', isset($organizationChannels) ? $organizationChannels->count() : 0) }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}</p>
                     </div>
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count()) }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count())) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('available|available', ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count())) }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n team|:n teams', ($teamChannelGroups ?? collect())->count(), ['n' => ($teamChannelGroups ?? collect())->count()]) }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">{{ trans_choice(':n team|:n teams', ($teamChannelGroups ?? collect())->count(), ['n' => ($teamChannelGroups ?? collect())->count()]) }}</p>
                     </div>
                 </dl>
             </x-slot:stats>

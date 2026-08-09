@@ -41,7 +41,7 @@
 
     $panelBody = 'px-5 py-3 sm:px-6';
     $panelFoot = 'flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4';
-    $pillBase = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1';
+    $pillBase = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1';
     $btnBase = 'dply-btn dply-btn-xs dply-btn-outline';
     $linkBase = 'text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline';
     $workersSchedulersNote = (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
@@ -61,7 +61,7 @@
         :note="__('Per-language tuning lives on the PHP, Ruby, or Static tab when applicable.')"
     >
         <x-slot:actions>
-            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold {{ $runtimeDisplay === __('Not set') ? 'text-brand-moss' : 'text-brand-ink' }} ring-1 ring-brand-ink/10">{{ $runtimeDisplay }}</span>
+            <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 font-mono text-xs font-semibold {{ $runtimeDisplay === __('Not set') ? 'text-brand-moss' : 'text-brand-ink' }} ring-1 ring-brand-ink/10">{{ $runtimeDisplay }}</span>
         </x-slot:actions>
     </x-workspace-panel-head>
 
@@ -81,12 +81,12 @@
             @if ($showAppPortEditor)
                 <form wire:submit="saveRuntimePreferences" class="flex flex-wrap items-end gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
                     <div class="min-w-0">
-                        <x-input-label for="runtime_app_port_input" :value="__('App listens on (localhost)')" class="!text-[11px]" />
+                        <x-input-label for="runtime_app_port_input" :value="__('App listens on (localhost)')" class="!text-xs" />
                         <x-text-input id="runtime_app_port_input" type="number" wire:model="runtime_app_port" class="mt-1 block w-[8rem] font-mono text-sm" placeholder="3000" min="1" max="65535" />
                         <x-input-error :messages="$errors->get('runtime_app_port')" class="mt-1" />
                     </div>
                     <x-primary-button size="sm" type="submit">{{ __('Save') }}</x-primary-button>
-                    <p class="w-full text-[11px] text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('Reverse proxy target: Node, Rails/Puma, Python, or container app port.') }}</p>
+                    <p class="w-full text-xs text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('Reverse proxy target: Node, Rails/Puma, Python, or container app port.') }}</p>
                 </form>
             @endif
         </div>
@@ -141,7 +141,7 @@
         <div class="{{ $panelBody }} space-y-2">
             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Workers') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Workers') }}</p>
                     @if (! $runtimeHealthLoaded)
                         <span class="flex items-center gap-1.5 text-xs text-brand-moss">
                             <x-spinner variant="forest" class="h-3 w-3 shrink-0" />
@@ -162,10 +162,10 @@
                         <div class="h-full rounded-full {{ $fpmSaturated ? 'bg-amber-500' : 'bg-brand-forest' }}" style="width: {{ max(2, $fpmPct) }}%"></div>
                     </div>
                     @if ($fpmSaturated)
-                        <p class="mt-1.5 text-[11px] font-medium text-amber-700">{{ __('Near the worker ceiling (:pct%). Consider raising max children on the PHP tab.', ['pct' => $fpmPct]) }}</p>
+                        <p class="mt-1.5 text-xs font-medium text-amber-700">{{ __('Near the worker ceiling (:pct%). Consider raising max children on the PHP tab.', ['pct' => $fpmPct]) }}</p>
                     @endif
                     @if (! $runtimeHealth['conf_present'])
-                        <p class="mt-1.5 text-[11px] font-medium text-amber-700">{{ __('Pool config not found on disk yet — written on the next webserver apply.') }}</p>
+                        <p class="mt-1.5 text-xs font-medium text-amber-700">{{ __('Pool config not found on disk yet — written on the next webserver apply.') }}</p>
                     @endif
                 @endif
             </div>
@@ -247,7 +247,7 @@
             </dl>
 
             @if ($runtimeHealthLoaded && $runtimeHealth !== null && empty($runtimeHealth['listening']))
-                <p class="mt-2 text-[11px] leading-relaxed text-brand-moss">{{ __('Check the start command and that workers are running — see Workers (Supervisor) or Services (systemd). Confirm the app binds to 127.0.0.1 on this port.') }}</p>
+                <p class="mt-2 text-xs leading-relaxed text-brand-moss">{{ __('Check the start command and that workers are running — see Workers (Supervisor) or Services (systemd). Confirm the app binds to 127.0.0.1 on this port.') }}</p>
             @endif
         </div>
 
@@ -327,7 +327,7 @@
                     <div class="grid gap-2 sm:grid-cols-2">
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
                             <div class="flex items-baseline justify-between gap-2">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Memory') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Memory') }}</p>
                                 <span class="font-mono text-xs text-brand-ink">{{ $bytesToMb($ocUsed) }} / {{ $bytesToMb($ocTotal) }}</span>
                             </div>
                             <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-brand-ink/10">
@@ -336,7 +336,7 @@
                         </div>
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
                             <div class="flex items-baseline justify-between gap-2">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Cached keys') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Cached keys') }}</p>
                                 <span class="font-mono text-xs text-brand-ink">{{ number_format($ocKeys) }} / {{ number_format($ocMaxKeys) }}</span>
                             </div>
                             <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-brand-ink/10">
@@ -355,7 +355,7 @@
                     </dl>
 
                     @if ($ocPressure)
-                        <p class="text-[11px] font-medium text-amber-700">
+                        <p class="text-xs font-medium text-amber-700">
                             @if ($ocOom > 0)
                                 {{ __('OPcache has hit out-of-memory restarts (:n) — raise opcache.memory_consumption from the server PHP workspace.', ['n' => $ocOom]) }}
                             @else
@@ -423,7 +423,7 @@
                     <x-fact-row :label="$limit['label']" :tone="$isOverride ? 'default' : 'muted'">
                         {{ $isOverride ? $limit['value'] : $limit['default'] }}
                         @unless ($isOverride)
-                            <span class="ml-1 rounded bg-brand-sand/70 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('default') }}</span>
+                            <span class="ml-1 rounded bg-brand-sand/70 px-1 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('default') }}</span>
                         @endunless
                     </x-fact-row>
                 @endforeach
@@ -453,14 +453,14 @@
                     <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" aria-hidden="true"></span>
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ \Illuminate\Support\Str::headline((string) $event->category) }}</span>
+                            <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ \Illuminate\Support\Str::headline((string) $event->category) }}</span>
                             <p class="min-w-0 truncate text-xs font-medium text-brand-ink">{{ $event->title }}</p>
                         </div>
                         @if (filled($event->detail))
-                            <p class="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-brand-moss">{{ $event->detail }}</p>
+                            <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-brand-moss">{{ $event->detail }}</p>
                         @endif
                     </div>
-                    <time class="shrink-0 whitespace-nowrap text-[11px] text-brand-moss" datetime="{{ optional($event->occurred_at)->toIso8601String() }}">{{ optional($event->occurred_at)->diffForHumans() }}</time>
+                    <time class="shrink-0 whitespace-nowrap text-xs text-brand-moss" datetime="{{ optional($event->occurred_at)->toIso8601String() }}">{{ optional($event->occurred_at)->diffForHumans() }}</time>
                 </li>
             @endforeach
         </ul>
@@ -568,7 +568,7 @@
             >
                 @if (! empty($dockerRuntimeDetails['collected_at']))
                     <x-slot:actions>
-                        <p class="font-mono text-[11px] text-brand-moss">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
+                        <p class="font-mono text-xs text-brand-moss">{{ __('Collected :time', ['time' => $dockerRuntimeDetails['collected_at']]) }}</p>
                     </x-slot:actions>
                 @endif
             </x-workspace-panel-head>
@@ -587,11 +587,11 @@
                             <table class="min-w-full divide-y divide-brand-ink/10 text-left">
                                 <thead class="bg-brand-sand/40">
                                     <tr>
-                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Name') }}</th>
-                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Service') }}</th>
-                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Hostname') }}</th>
-                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('IP') }}</th>
-                                        <th class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('State') }}</th>
+                                        <th class="px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Name') }}</th>
+                                        <th class="px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Service') }}</th>
+                                        <th class="px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Hostname') }}</th>
+                                        <th class="px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('IP') }}</th>
+                                        <th class="px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('State') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/10 bg-white">
@@ -634,7 +634,7 @@
             </div>
 
             <div class="{{ $panelFoot }}">
-                <p class="text-[11px] text-brand-moss">{{ __('Removes managed local containers and artifacts for this app.') }}</p>
+                <p class="text-xs text-brand-moss">{{ __('Removes managed local containers and artifacts for this app.') }}</p>
                 <button type="button" wire:click="openConfirmActionModal('runRuntimeAction', ['destroy'], @js(__('Destroy runtime')), @js(__('Destroy the managed local runtime artifacts and containers for this app?')), @js(__('Destroy runtime')), true)" class="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-50">{{ __('Destroy') }}</button>
             </div>
         </section>
@@ -645,7 +645,7 @@
 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
     <div class="flex shrink-0 items-center gap-1.5">
         <x-heroicon-o-folder class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-        <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Working directory') }}</span>
+        <span class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Working directory') }}</span>
     </div>
     <code class="min-w-0 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</code>
 </div>

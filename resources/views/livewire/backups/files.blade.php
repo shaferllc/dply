@@ -25,7 +25,7 @@
                 <a
                     href="{{ route('profile.backup-configurations') }}"
                     wire:navigate
-                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                 >
                     <x-heroicon-o-archive-box class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Destinations') }}
@@ -38,25 +38,25 @@
 
             {{-- Compact guidance + destination chips --}}
             <section class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-                <p class="text-[11px] leading-relaxed text-brand-moss">
+                <p class="text-xs leading-relaxed text-brand-moss">
                     <span class="font-semibold text-brand-ink">{{ __('Hygiene:') }}</span>
                     {{ __('Back up hard-to-recreate paths, keep excludes explicit, and document restore destination + checks in a runbook.') }}
                 </p>
                 @if ($storageDestinations->isEmpty())
-                    <p class="mt-1.5 text-[11px] text-brand-moss">
+                    <p class="mt-1.5 text-xs text-brand-moss">
                         <a href="{{ route('profile.backup-configurations') }}" wire:navigate class="font-semibold text-brand-sage hover:text-brand-ink">{{ __('Add a storage destination') }}</a>
                         {{ __('before expecting repeatable recovery.') }}
                     </p>
                 @else
                     <div class="mt-1.5 flex flex-wrap gap-1.5">
                         @foreach ($storageDestinations->take(6) as $destination)
-                            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 text-[10px] text-brand-ink">
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 text-2xs text-brand-ink">
                                 <span class="font-semibold">{{ $destination->name }}</span>
                                 <span class="text-brand-mist">· {{ $providerLabels[$destination->provider] ?? $destination->provider }}</span>
                             </span>
                         @endforeach
                         @if ($storageDestinations->count() > 6)
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[10px] text-brand-moss">
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-2xs text-brand-moss">
                                 {{ __('+:count more', ['count' => $storageDestinations->count() - 6]) }}
                             </span>
                         @endif
@@ -92,7 +92,7 @@
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
                             <thead>
-                                <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <tr class="border-b border-brand-ink/10 bg-brand-sand/15 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                     <th class="px-3 py-2 sm:px-4">{{ __('Site') }}</th>
                                     <th class="px-3 py-2">{{ __('Server') }}</th>
                                     <th class="px-3 py-2">{{ __('Archive scope') }}</th>
@@ -115,7 +115,7 @@
                                         <td class="px-3 py-2 text-xs text-brand-moss">
                                             <p>{{ __('Document root: :path', ['path' => $site->document_root]) }}</p>
                                             @if ($effectiveRoot !== $site->document_root)
-                                                <p class="text-[11px] text-brand-mist">{{ __('Repository root: :path', ['path' => $effectiveRoot]) }}</p>
+                                                <p class="text-xs text-brand-mist">{{ __('Repository root: :path', ['path' => $effectiveRoot]) }}</p>
                                             @endif
                                         </td>
                                         <td class="px-3 py-2 text-xs text-brand-moss align-top">
@@ -124,7 +124,7 @@
                                                     <button
                                                         type="button"
                                                         wire:click="queueFullBackup('{{ $site->id }}')"
-                                                        class="inline-flex h-6 items-center rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
+                                                        class="inline-flex h-6 items-center rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
                                                     >
                                                         {{ __('Queue full backup') }}
                                                     </button>
@@ -173,7 +173,7 @@
                 @endif
             </section>
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss sm:px-4">
+            <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss sm:px-4">
                 {{ __('Database dumps and file archives are separate artifacts — restore SQL, then files, using your runbooks.') }}
             </div>
         </x-profile-shell>

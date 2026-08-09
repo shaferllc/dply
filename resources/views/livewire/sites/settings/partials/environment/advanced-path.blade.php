@@ -10,7 +10,7 @@
                     <x-heroicon-o-cog-6-tooth class="h-4 w-4 text-brand-moss" />
                     <span class="text-sm font-semibold text-brand-ink">{{ __('Advanced — .env file location') }}</span>
                 </div>
-                <span class="font-mono text-[11px] text-brand-mist">{{ $site->effectiveEnvFilePath() }}</span>
+                <span class="font-mono text-xs text-brand-mist">{{ $site->effectiveEnvFilePath() }}</span>
             </summary>
             <div class="px-6 py-5 sm:px-8 space-y-3">
                 <p class="text-sm text-brand-moss">
@@ -35,7 +35,7 @@
                         <span wire:loading wire:target="saveEnvFilePath" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                     </x-primary-button>
                 </form>
-                <p class="text-[11px] text-brand-moss">
+                <p class="text-xs text-brand-moss">
                     {{ __('Push will mkdir -p the parent directory and write the file there. Sync and Load fetch from this path. The webserver deny rule for /.env still applies for the default location.') }}
                 </p>
             </div>

@@ -8,7 +8,7 @@
                 ]) }}
             </span>
             @if ($overall === 'stale')
-                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
                     {{ __('Probe stale — refresh recommended') }}
                 </span>
             @elseif ($overall === 'blocked')
@@ -58,7 +58,7 @@
     </div>
 
     <nav class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6" aria-label="{{ __('Related workspaces') }}">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Also') }}</span>
+        <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Also') }}</span>
         <a
             href="{{ route('servers.caches', $server) }}"
             wire:navigate

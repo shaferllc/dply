@@ -103,10 +103,10 @@
                             class="flex w-full items-center gap-3 text-left"
                             x-on:click="openId = openId === @js($delivery->id) ? null : @js($delivery->id)"
                         >
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset {{ $badgeClasses }}">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset {{ $badgeClasses }}">
                                 {{ $badgeLabel }}
                                 @if ($delivery->http_status)
-                                    <span class="ml-1 font-mono text-[10px] opacity-80">{{ $delivery->http_status }}</span>
+                                    <span class="ml-1 font-mono text-2xs opacity-80">{{ $delivery->http_status }}</span>
                                 @endif
                             </span>
                             <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink">{{ $delivery->event_key }}</span>
@@ -158,13 +158,13 @@
 
                             <div>
                                 <p class="mb-1 font-medium text-brand-moss">{{ __('Payload') }}</p>
-                                <pre class="max-h-64 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">{{ $payloadJson }}</pre>
+                                <pre class="max-h-64 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-100">{{ $payloadJson }}</pre>
                             </div>
 
                             @if ($delivery->response_excerpt)
                                 <div>
                                     <p class="mb-1 font-medium text-brand-moss">{{ __('Response excerpt') }}</p>
-                                    <pre class="max-h-48 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">{{ $delivery->response_excerpt }}</pre>
+                                    <pre class="max-h-48 overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-100">{{ $delivery->response_excerpt }}</pre>
                                 </div>
                             @endif
 

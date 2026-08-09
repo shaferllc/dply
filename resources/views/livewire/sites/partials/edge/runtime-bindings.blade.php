@@ -85,7 +85,7 @@
             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge runtime') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('What your worker can read from `env`. dply provisions a default KV namespace per site automatically; declare more in wrangler.toml or dply.yaml.') }}</p>
         </div>
@@ -99,9 +99,9 @@
                 <p class="mt-0.5 text-xs text-brand-moss">
                     {{ __('KV namespace') }}
                     @if ($defaultKvId)
-                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ __('Live') }}</span>
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ __('Live') }}</span>
                     @else
-                        — <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Provisioned on next deploy') }}</span>
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Provisioned on next deploy') }}</span>
                     @endif
                 </p>
             </div>
@@ -120,21 +120,21 @@
         </div>
 
         <div x-show="tab === 'read'" x-cloak class="mt-2">
-            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand"><code>const value = await env.KV.get('user:42');
+            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand"><code>const value = await env.KV.get('user:42');
 return new Response(value ?? 'not found');</code></pre>
         </div>
         <div x-show="tab === 'write'" x-cloak class="mt-2">
-            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand"><code>await env.KV.put('user:42', JSON.stringify({ name: 'Ada' }), {
+            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand"><code>await env.KV.put('user:42', JSON.stringify({ name: 'Ada' }), {
   expirationTtl: 60 * 60, // 1 hour
 });</code></pre>
         </div>
         <div x-show="tab === 'list'" x-cloak class="mt-2">
-            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand"><code>const { keys } = await env.KV.list({ prefix: 'user:' });
+            <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand"><code>const { keys } = await env.KV.list({ prefix: 'user:' });
 for (const { name } of keys) console.log(name);</code></pre>
         </div>
 
         @if ($declaredKv !== [])
-            <p class="mt-3 text-[11px] text-brand-mist">
+            <p class="mt-3 text-xs text-brand-mist">
                 {{ __('Extra KV bindings declared:') }}
                 <span class="font-mono text-brand-moss">{{ implode(', ', array_map(fn ($n) => "env.{$n}", array_keys($declaredKv))) }}</span>
             </p>
@@ -149,7 +149,7 @@ for (const { name } of keys) console.log(name);</code></pre>
                 <p class="mt-0.5 text-xs text-brand-moss">
                     {{ __('R2 bucket') }}
                     @if ($declaredR2 !== [])
-                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredR2) }} {{ __('declared') }}</span>
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredR2) }} {{ __('declared') }}</span>
                     @else
                         — <span class="text-brand-mist">{{ __('Not wired — declare in wrangler.toml or dply.yaml') }}</span>
                     @endif
@@ -160,28 +160,28 @@ for (const { name } of keys) console.log(name);</code></pre>
         <div x-show="r2Open" x-cloak class="space-y-4 px-6 pb-4 sm:px-8">
             @if ($declaredR2 === [])
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Declare it') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Declare it') }}</p>
                     <div class="mt-1 flex gap-1 border-b border-brand-ink/10">
                         <button type="button" :class="r2Fmt === 'wrangler' ? 'border-brand-ink text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink'" class="border-b-2 px-3 py-1 text-xs font-semibold uppercase tracking-wide" @click="r2Fmt = 'wrangler'">{{ __('wrangler.toml') }}</button>
                         <button type="button" :class="r2Fmt === 'yaml' ? 'border-brand-ink text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink'" class="border-b-2 px-3 py-1 text-xs font-semibold uppercase tracking-wide" @click="r2Fmt = 'yaml'">{{ __('dply.yaml') }}</button>
                     </div>
                     <div x-show="r2Fmt === 'wrangler'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="r2Wrangler"><code>[[r2_buckets]]
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="r2Wrangler"><code>[[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "my-site-photos"</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.r2Wrangler.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.r2Wrangler.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
                     <div x-show="r2Fmt === 'yaml'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="r2Yaml"><code>bindings:
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="r2Yaml"><code>bindings:
   r2:
     BUCKET: "my-site-photos"</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.r2Yaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.r2Yaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
-                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('dply auto-creates the bucket on your next deploy.') }}</p>
+                    <p class="mt-1.5 text-xs text-brand-mist">{{ __('dply auto-creates the bucket on your next deploy.') }}</p>
                 </div>
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
-                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand opacity-70"><code>await env.BUCKET.put('photos/hero.jpg', request.body, {
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
+                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand opacity-70"><code>await env.BUCKET.put('photos/hero.jpg', request.body, {
   httpMetadata: { contentType: 'image/jpeg' },
 });
 const obj = await env.BUCKET.get('photos/hero.jpg');</code></pre>
@@ -191,12 +191,12 @@ const obj = await env.BUCKET.get('photos/hero.jpg');</code></pre>
                     @foreach ($declaredR2 as $name => $bucketName)
                         <div class="rounded-lg border border-brand-ink/10 p-3">
                             <p class="font-mono text-sm text-brand-ink">env.{{ $name }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Bucket:') }} <span class="font-mono">{{ $bucketName }}</span></p>
+                            <p class="mt-0.5 text-xs text-brand-mist">{{ __('Bucket:') }} <span class="font-mono">{{ $bucketName }}</span></p>
                         </div>
                     @endforeach
                 </div>
                 @php $firstName = (string) array_key_first($declaredR2); @endphp
-                <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand"><code>await env.{{ $firstName }}.put('photos/hero.jpg', request.body, {
+                <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand"><code>await env.{{ $firstName }}.put('photos/hero.jpg', request.body, {
   httpMetadata: { contentType: 'image/jpeg' },
 });
 const obj = await env.{{ $firstName }}.get('photos/hero.jpg');</code></pre>
@@ -212,7 +212,7 @@ const obj = await env.{{ $firstName }}.get('photos/hero.jpg');</code></pre>
                 <p class="mt-0.5 text-xs text-brand-moss">
                     {{ __('D1 database') }}
                     @if ($declaredD1 !== [])
-                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredD1) }} {{ __('declared') }}</span>
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredD1) }} {{ __('declared') }}</span>
                     @else
                         — <span class="text-brand-mist">{{ __('Not wired — declare in wrangler.toml or dply.yaml') }}</span>
                     @endif
@@ -223,28 +223,28 @@ const obj = await env.{{ $firstName }}.get('photos/hero.jpg');</code></pre>
         <div x-show="d1Open" x-cloak class="space-y-4 px-6 pb-4 sm:px-8">
             @if ($declaredD1 === [])
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Declare it') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Declare it') }}</p>
                     <div class="mt-1 flex gap-1 border-b border-brand-ink/10">
                         <button type="button" :class="d1Fmt === 'wrangler' ? 'border-brand-ink text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink'" class="border-b-2 px-3 py-1 text-xs font-semibold uppercase tracking-wide" @click="d1Fmt = 'wrangler'">{{ __('wrangler.toml') }}</button>
                         <button type="button" :class="d1Fmt === 'yaml' ? 'border-brand-ink text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink'" class="border-b-2 px-3 py-1 text-xs font-semibold uppercase tracking-wide" @click="d1Fmt = 'yaml'">{{ __('dply.yaml') }}</button>
                     </div>
                     <div x-show="d1Fmt === 'wrangler'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="d1Wrangler"><code>[[d1_databases]]
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="d1Wrangler"><code>[[d1_databases]]
 binding = "DB"
 database_name = "my-site-db"</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.d1Wrangler.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.d1Wrangler.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
                     <div x-show="d1Fmt === 'yaml'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="d1Yaml"><code>bindings:
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="d1Yaml"><code>bindings:
   d1:
     DB: "my-site-db"</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.d1Yaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.d1Yaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
-                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('dply auto-creates the database on your next deploy.') }}</p>
+                    <p class="mt-1.5 text-xs text-brand-mist">{{ __('dply auto-creates the database on your next deploy.') }}</p>
                 </div>
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
-                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand opacity-70"><code>const { results } = await env.DB
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
+                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand opacity-70"><code>const { results } = await env.DB
   .prepare('SELECT id, email FROM users WHERE org_id = ?')
   .bind(orgId)
   .all();</code></pre>
@@ -254,12 +254,12 @@ database_name = "my-site-db"</code></pre>
                     @foreach ($declaredD1 as $name => $databaseId)
                         <div class="rounded-lg border border-brand-ink/10 p-3">
                             <p class="font-mono text-sm text-brand-ink">env.{{ $name }}</p>
-                            <p class="mt-0.5 break-all font-mono text-[11px] text-brand-mist">{{ $databaseId }}</p>
+                            <p class="mt-0.5 break-all font-mono text-xs text-brand-mist">{{ $databaseId }}</p>
                         </div>
                     @endforeach
                 </div>
                 @php $firstName = (string) array_key_first($declaredD1); @endphp
-                <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand"><code>const { results } = await env.{{ $firstName }}
+                <pre class="overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand"><code>const { results } = await env.{{ $firstName }}
   .prepare('SELECT id, email FROM users WHERE org_id = ?')
   .bind(orgId)
   .all();</code></pre>
@@ -276,7 +276,7 @@ database_name = "my-site-db"</code></pre>
                 <p class="mt-0.5 text-xs text-brand-moss">
                     {{ __('Bind to your dply database, cache, or queue') }}
                     @if ($declaredDply !== [])
-                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredDply) }} {{ __('declared') }}</span>
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredDply) }} {{ __('declared') }}</span>
                     @else
                         — <span class="text-brand-mist">{{ __('Not wired — declare in dply.yaml') }}</span>
                     @endif
@@ -289,18 +289,18 @@ database_name = "my-site-db"</code></pre>
                 <div>
                     <p class="text-xs text-brand-moss">{{ __('Reference a resource from another site in this workspace by name. Publicly-reachable resources (managed clusters) inject a connection string as a worker secret; VM resources route through hybrid origin instead.') }}</p>
                     <div x-show="true" class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="dplyYaml"><code>bindings:
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="dplyYaml"><code>bindings:
   dply:
     DATABASE_URL: database.main
     REDIS_URL: redis.cache
     API_BASE: site.api</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.dplyYaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.dplyYaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
-                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Format: ENV_NAME: <kind>.<name> — kinds: database, redis, queue, storage, site.') }}</p>
+                    <p class="mt-1.5 text-xs text-brand-mist">{{ __('Format: ENV_NAME: <kind>.<name> — kinds: database, redis, queue, storage, site.') }}</p>
                 </div>
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
-                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand opacity-70"><code>const db = postgres(env.DATABASE_URL);
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
+                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand opacity-70"><code>const db = postgres(env.DATABASE_URL);
 const rows = await db`select id, email from users`;</code></pre>
                 </div>
             @else
@@ -316,16 +316,16 @@ const rows = await db`select id, email from users`;</code></pre>
                         <div class="rounded-lg border border-brand-ink/10 p-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p class="font-mono text-sm text-brand-ink">env.{{ $binding['env_name'] }}</p>
-                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $pillClass }}">{{ $pillLabel }}</span>
+                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $pillClass }}">{{ $pillLabel }}</span>
                             </div>
-                            <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $binding['ref'] }}</p>
+                            <p class="mt-0.5 font-mono text-xs text-brand-mist">{{ $binding['ref'] }}</p>
                             @if ($binding['warning'] !== null)
-                                <p class="mt-1 text-[11px] text-brand-moss">{{ $binding['warning'] }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ $binding['warning'] }}</p>
                             @endif
                         </div>
                     @endforeach
                 </div>
-                <p class="text-[11px] text-brand-mist">{{ __('Connection secrets are resolved fresh on each deploy and never stored in your repo or shown here.') }}</p>
+                <p class="text-xs text-brand-mist">{{ __('Connection secrets are resolved fresh on each deploy and never stored in your repo or shown here.') }}</p>
             @endif
         </div>
     </div>
@@ -356,12 +356,12 @@ const rows = await db`select id, email from users`;</code></pre>
                     </div>
 
                     <div x-show="tplFmt === 'wrangler'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="tplWrangler{{ $loop->index }}"><code>{{ $template['wrangler'] }}</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.tplWrangler{{ $loop->index }}.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="tplWrangler{{ $loop->index }}"><code>{{ $template['wrangler'] }}</code></pre>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.tplWrangler{{ $loop->index }}.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
                     <div x-show="tplFmt === 'yaml'" x-cloak class="mt-2 flex items-start gap-2">
-                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="tplYaml{{ $loop->index }}"><code>{{ $template['yaml'] }}</code></pre>
-                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.tplYaml{{ $loop->index }}.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-brand-sand" x-ref="tplYaml{{ $loop->index }}"><code>{{ $template['yaml'] }}</code></pre>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.tplYaml{{ $loop->index }}.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
                     </div>
                 </div>
             @endforeach

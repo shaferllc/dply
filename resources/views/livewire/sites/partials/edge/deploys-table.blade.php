@@ -77,7 +77,7 @@
                         @if ($edge_deploy_commit_branch !== null)
                             <p class="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-brand-moss">
                                 <span>{{ __('Will deploy on branch') }}</span>
-                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-ink">
                                     {{ $edge_deploy_commit_branch }}
                                     <button type="button" wire:click="$set('edge_deploy_commit_branch', null)" class="text-brand-mist hover:text-brand-ink" title="{{ __('Clear branch override (deploy will record the site default).') }}">
                                         <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
@@ -123,7 +123,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/8 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <tr>
                         <th class="px-6 py-3 sm:px-8">{{ __('Deployment') }}</th>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
@@ -158,7 +158,7 @@
                                     $deploymentAliases = $deployment->aliasHostnames();
                                 @endphp
                                 @if ($deploymentAliases !== [])
-                                    <div class="mt-1 flex flex-col gap-0.5 text-[10px] font-normal text-brand-moss">
+                                    <div class="mt-1 flex flex-col gap-0.5 text-2xs font-normal text-brand-moss">
                                         @foreach ($deploymentAliases as $alias)
                                             <a href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'aliases']) }}" wire:navigate class="inline-flex items-center gap-1 hover:text-brand-forest dark:hover:text-brand-sage" title="{{ __('Stable per-deploy URL — always points at this build.') }}">
                                                 <x-heroicon-o-link class="h-3 w-3 opacity-60" aria-hidden="true" />
@@ -169,11 +169,11 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
+                                <span class="inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $depBadge }}">
                                     {{ str_replace('_', ' ', (string) $deployment->status) }}
                                 </span>
                                 @if ($isActive)
-                                    <span class="ms-1 inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
+                                    <span class="ms-1 inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
                                         {{ __('Production') }}
                                     </span>
                                 @endif
@@ -189,7 +189,7 @@
                             <td class="px-4 py-3 text-xs text-brand-moss">
                                 {{ $deployment->published_at?->diffForHumans() ?? ($deployment->created_at?->diffForHumans() ?? '—') }}
                                 @if ($deployment->pruned_at)
-                                    <span class="ms-1 inline-flex rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist" title="{{ __('R2 artifacts deleted by retention policy.') }}">{{ __('Pruned') }}</span>
+                                    <span class="ms-1 inline-flex rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist" title="{{ __('R2 artifacts deleted by retention policy.') }}">{{ __('Pruned') }}</span>
                                 @endif
                             </td>
                             <td class="px-6 py-3 text-right text-xs sm:px-8">

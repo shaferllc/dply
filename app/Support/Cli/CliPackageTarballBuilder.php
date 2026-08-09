@@ -30,12 +30,19 @@ final class CliPackageTarballBuilder
         'README.md',
     ];
 
-    public function cachedContents(): string
+    public function cachedContents(?string $baseUrl = null): string
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, fn (): string => $this->buildContents());
+        $resolved = $this->resolveBaseUrl($baseUrl);
+        $cacheKey = self::CACHE_KEY.'.'.sha1($resolved);
+
+        return Cache::remember(
+            $cacheKey,
+            self::CACHE_SECONDS,
+            fn (): string => $this->buildContents($resolved),
+        );
     }
 
-    public function buildContents(): string
+    public function buildContents(?string $baseUrl = null): string
     {
         $packageDir = base_path('packages/dply-cli');
         if (! is_dir($packageDir)) {
@@ -64,7 +71,7 @@ final class CliPackageTarballBuilder
 
             $defaultsPath = $packageRoot.'/src/instance-defaults.json';
             File::put($defaultsPath, json_encode([
-                'baseUrl' => rtrim((string) config('cli.default_base_url', config('app.url')), '/'),
+                'baseUrl' => $this->resolveBaseUrl($baseUrl),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
 
             $process = new Process(['tar', '-czf', $archivePath, '-C', $workDir, 'package']);
@@ -81,5 +88,14 @@ final class CliPackageTarballBuilder
         } finally {
             File::deleteDirectory($workDir);
         }
+    }
+
+    private function resolveBaseUrl(?string $baseUrl): string
+    {
+        $candidate = filled($baseUrl)
+            ? $baseUrl
+            : (string) config('cli.default_base_url', config('app.url'));
+
+        return rtrim($candidate, '/');
     }
 }

@@ -28,7 +28,7 @@
                     {{ $label }}
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 </a>
-                <code class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[11px] text-brand-moss">/{{ $endpoint }}/</code>
+                <code class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs text-brand-moss">/{{ $endpoint }}/</code>
             </li>
         @endforeach
     </ul>

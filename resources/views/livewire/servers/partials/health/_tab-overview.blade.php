@@ -31,7 +31,7 @@
             <a
                 href="{{ route('servers.monitor', $server) }}"
                 wire:navigate
-                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 {{ __('Full metrics') }}
                 <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -44,20 +44,20 @@
             @foreach ($report['alerts'] as $alert)
                 <li class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-2 sm:px-5">
                     <span @class([
-                        'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        'shrink-0 rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                         'bg-rose-100 text-rose-800' => $alert['severity'] === 'critical',
                         'bg-amber-100 text-amber-900' => $alert['severity'] === 'warning',
                     ])>{{ $alert['severity'] }}</span>
                     <p class="shrink-0 text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p>
-                    <p class="min-w-0 flex-1 truncate text-[11px] text-brand-moss" title="{{ $alert['message'] }}">{{ $alert['message'] }}</p>
+                    <p class="min-w-0 flex-1 truncate text-xs text-brand-moss" title="{{ $alert['message'] }}">{{ $alert['message'] }}</p>
                     @if ($alert['href'] && $alert['link_label'])
-                        <a href="{{ $alert['href'] }}" wire:navigate class="ml-auto shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>
+                        <a href="{{ $alert['href'] }}" wire:navigate class="ml-auto shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>
                     @endif
                 </li>
             @endforeach
         </ul>
     @else
-        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
             <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
             {{ __('No active health alerts on this server.') }}
         </p>
@@ -77,7 +77,7 @@
                 <button
                     type="button"
                     wire:click="setHealthWorkspaceTab('capacity')"
-                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                 >
                     {{ __('Capacity details') }}
                     <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0" aria-hidden="true" />

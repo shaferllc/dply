@@ -151,7 +151,7 @@
                             id="{{ $idPrefix }}-ssh-keypair-private"
                             readonly
                             rows="8"
-                            class="block w-full resize-y rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink"
+                            class="block w-full resize-y rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-xs leading-relaxed text-brand-ink"
                             x-model="privateKey"
                         ></textarea>
                         <div class="mt-2 flex flex-wrap gap-2">
@@ -171,9 +171,9 @@
                         <p class="mt-1 text-xs leading-5 text-brand-moss">{{ __('Copies a one-liner that writes the private key to ~/.ssh/, chmods it 600, and (on macOS) adds it to your login keychain. Paste it in your terminal.') }}</p>
                         <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                             <label class="block">
-                                <span class="text-[11px] font-medium text-brand-moss">{{ __('Filename in ~/.ssh/') }}</span>
+                                <span class="text-xs font-medium text-brand-moss">{{ __('Filename in ~/.ssh/') }}</span>
                                 <div class="mt-1 flex items-stretch overflow-hidden rounded-lg border border-brand-ink/15 bg-white">
-                                    <span class="flex shrink-0 items-center bg-brand-sand/30 px-2 font-mono text-[11px] text-brand-moss">~/.ssh/</span>
+                                    <span class="flex shrink-0 items-center bg-brand-sand/30 px-2 font-mono text-xs text-brand-moss">~/.ssh/</span>
                                     <input
                                         type="text"
                                         x-model="installFilename"
@@ -205,7 +205,7 @@
                             id="{{ $idPrefix }}-ssh-keypair-public"
                             readonly
                             rows="3"
-                            class="block w-full resize-y rounded-xl border border-brand-ink/15 bg-white px-3 py-2 font-mono text-[11px] text-brand-ink"
+                            class="block w-full resize-y rounded-xl border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink"
                             x-model="publicKey"
                         ></textarea>
                         <button type="button" class="mt-2 inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40" @click="copyPublic()">

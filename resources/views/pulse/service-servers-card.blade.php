@@ -12,7 +12,7 @@
                     <div class="flex items-center gap-2">
                         <span class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ $server->name }}</span>
                         @if ($server->stale)
-                            <span class="text-[10px] uppercase tracking-wide text-red-500" title="No metrics in the last 10 minutes">stale</span>
+                            <span class="text-2xs uppercase tracking-wide text-red-500" title="No metrics in the last 10 minutes">stale</span>
                         @endif
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ $server->service ?? $server->ip }}</div>

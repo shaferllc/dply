@@ -76,7 +76,7 @@
             <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 @foreach ($summaryStats as $stat)
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                        <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                        <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                             <span class="truncate">{{ $stat['label'] }}</span>
                         </dt>
@@ -177,7 +177,7 @@
                     <x-slot name="content">
                         <div class="space-y-3">
                             <div>
-                                <label for="servers_status" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
+                                <label for="servers_status" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
                                 <x-select id="servers_status" wire:model.live="statusFilter" class="mt-1.5 w-full">
                                     @foreach ($statusOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
@@ -187,7 +187,7 @@
 
                             @if (count($tagOptions) > 0)
                                 <div>
-                                    <label for="servers_tag" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tag') }}</label>
+                                    <label for="servers_tag" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tag') }}</label>
                                     <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-1.5 w-full">
                                         <option value="">{{ __('All tags') }}</option>
                                         @foreach ($tagOptions as $tag)
@@ -198,7 +198,7 @@
                             @endif
 
                             <div>
-                                <label for="servers_sort" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Order by') }}</label>
+                                <label for="servers_sort" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Order by') }}</label>
                                 <x-select id="servers_sort" wire:model.live="sort" class="mt-1.5 w-full">
                                     @foreach ($sortOptions as $value => $label)
                                         <option value="{{ $value }}">{{ __($label) }}</option>
@@ -266,7 +266,7 @@
                                     <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                     {{ $groupLabel }}
                                 </h2>
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/30 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/30 px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
                             </div>
                             <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($groupServers as $server)
@@ -284,7 +284,7 @@
                                 <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ $groupLabel }}</span>
                             </h2>
-                            <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
+                            <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
                         </div>
                         <ul>
                             @foreach ($groupServers as $server)

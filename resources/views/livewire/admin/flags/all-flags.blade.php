@@ -10,7 +10,7 @@
     <section class="dply-card-compact mb-6">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="flex-1">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Search') }}</span>
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Search') }}</span>
                 <input
                     type="search"
                     wire:model.live.debounce.250ms="search"
@@ -20,7 +20,7 @@
             </label>
 
             <label class="sm:w-56">
-                <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Namespace') }}</span>
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Namespace') }}</span>
                 <select
                     wire:model.live="namespace"
                     class="w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
@@ -62,8 +62,8 @@
         @forelse ($groups as $group)
             <section class="dply-card-compact" wire:key="ns-{{ $group['namespace'] }}">
                 <div class="mb-3 flex items-baseline justify-between gap-3">
-                    <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['namespace'] }}</h2>
-                    <span class="text-[10px] text-brand-mist">{{ trans_choice('{1} :count flag|[2,*] :count flags', count($group['flags']), ['count' => count($group['flags'])]) }}</span>
+                    <h2 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['namespace'] }}</h2>
+                    <span class="text-2xs text-brand-mist">{{ trans_choice('{1} :count flag|[2,*] :count flags', count($group['flags']), ['count' => count($group['flags'])]) }}</span>
                 </div>
 
                 <ul class="grid gap-2 lg:grid-cols-2">
@@ -73,7 +73,7 @@
                                 <span class="flex shrink-0 items-center gap-2">
                                     @if ($flag['overridden'])
                                         <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-brand-rust/10 px-2 py-0.5 text-[10px] font-semibold text-brand-rust"
+                                            class="inline-flex items-center gap-1 rounded-full bg-brand-rust/10 px-2 py-0.5 text-2xs font-semibold text-brand-rust"
                                             title="{{ __('Platform override — differs from config default') }}"
                                         >
                                             {{ __('override') }}
@@ -91,7 +91,7 @@
                                             type="button"
                                             wire:click.prevent="requestClearOrgOverrides('{{ $flag['key'] }}')"
                                             wire:loading.attr="disabled"
-                                            class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-[10px] font-medium text-brand-moss hover:bg-brand-ink/10"
+                                            class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-medium text-brand-moss hover:bg-brand-ink/10"
                                             title="{{ __('Clear per-org overrides') }}"
                                         >{{ __(':count org', ['count' => $flag['orgOverrides']]) }}</button>
                                     @endif

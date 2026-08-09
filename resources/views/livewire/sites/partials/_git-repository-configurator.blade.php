@@ -61,7 +61,7 @@
     <div>
         <div class="flex items-center gap-2">
             <x-input-label for="{{ $idPrefix }}-account" :value="__('Account')" :required="$required" />
-            <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-moss">
+            <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1 text-xs font-medium text-brand-moss">
                 <x-spinner size="sm" />
                 {{ __('Loading repositories…') }}
             </span>
@@ -132,12 +132,12 @@
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span class="font-mono text-sm font-semibold text-brand-ink">{{ $scannedRepoName }}</span>
                             <span @class([
-                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide',
                                 'bg-brand-sage/15 text-brand-forest' => $scannedVisibility === 'public',
                                 'bg-amber-100 text-amber-800' => $scannedVisibility !== 'public',
                             ])>{{ $scannedVisibility === 'public' ? __('Public') : __('Private') }}</span>
                             @if ($scannedStars > 0)
-                                <span class="flex items-center gap-0.5 text-[10px] text-brand-moss">
+                                <span class="flex items-center gap-0.5 text-2xs text-brand-moss">
                                     <x-heroicon-s-star class="h-3 w-3 text-brand-gold" aria-hidden="true" />
                                     {{ number_format($scannedStars) }}
                                 </span>

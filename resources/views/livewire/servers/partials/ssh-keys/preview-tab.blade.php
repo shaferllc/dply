@@ -17,7 +17,7 @@
                             wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
                             @disabled($syncBusy || $driftBusy)
                             title="{{ $syncBusy ? __('A sync is already running.') : ($driftBusy ? __('A drift preview is running — wait for it to finish.') : __('Apply the pending changes by writing authorized_keys on the server.')) }}"
-                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/10 px-2 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/10 px-2 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-heroicon-o-arrow-up-tray class="h-4 w-4" />
                             <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
@@ -30,7 +30,7 @@
                             wire:target="previewDiff"
                             @disabled($syncBusy || $driftBusy)
                             title="{{ $syncBusy ? __('A sync is in flight — wait for it to finish before refreshing the drift preview.') : ($driftBusy ? __('A drift preview is already running. Wait for it to finish.') : '') }}"
-                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="previewDiff" />
                             <span wire:loading wire:target="previewDiff" class="inline-flex h-4 w-4 items-center justify-center">
@@ -122,10 +122,10 @@
                                         </span>
                                         <h3 class="font-mono text-sm font-semibold text-brand-ink">{{ $user }}</h3>
                                         @if ($user === $server->ssh_user)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('login') }}</span>
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('login') }}</span>
                                         @endif
                                     </div>
-                                    <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
                                         @if ($keptCount > 0)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 font-semibold text-brand-moss ring-1 ring-brand-ink/10" title="{{ __('Already on the server — Sync would not change these.') }}">
                                                 <x-heroicon-m-check class="h-3 w-3" />
@@ -157,7 +157,7 @@
                                 <div>
                                     @if ($hasDrift)
                                         <div class="border-b border-brand-ink/8 bg-emerald-50/30 px-4 py-2 sm:px-5">
-                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-900">
                                                 {{ __('Pending changes — Sync will apply these to the server') }}
                                             </p>
                                         </div>
@@ -169,13 +169,13 @@
                                                     </span>
                                                     <div class="min-w-0 flex-1">
                                                         <div class="flex flex-wrap items-center gap-2">
-                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
+                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
                                                             @if (($comment = $sshCommentOf($line)) !== '')
                                                                 <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
                                                             @endif
-                                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('panel · not yet on server') }}</span>
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('panel · not yet on server') }}</span>
                                                         </div>
-                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                        <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -186,15 +186,15 @@
                                                     </span>
                                                     <div class="min-w-0 flex-1">
                                                         <div class="flex flex-wrap items-center gap-2">
-                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
+                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
                                                             @if (($comment = $sshCommentOf($line)) !== '')
                                                                 <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
                                                             @else
                                                                 <span class="text-xs italic text-brand-mist">{{ __('untracked key on server') }}</span>
                                                             @endif
-                                                            <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('on server · not in panel') }}</span>
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('on server · not in panel') }}</span>
                                                         </div>
-                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                        <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -203,7 +203,7 @@
 
                                     @if ($keptCount > 0)
                                         <div class="border-b border-t border-brand-ink/8 bg-brand-sand/15 px-4 py-2 sm:px-5">
-                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 {{ __('Already on the server — no change') }}
                                             </p>
                                         </div>
@@ -216,9 +216,9 @@
                                                     </span>
                                                     <div class="min-w-0 flex-1">
                                                         <div class="flex flex-wrap items-center gap-2">
-                                                            <span class="inline-flex items-center rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ $sshTypeOf($line) }}</span>
+                                                            <span class="inline-flex items-center rounded-md bg-white px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ $sshTypeOf($line) }}</span>
                                                             @if ($managedKind === 'operational')
-                                                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                                                     <x-heroicon-m-cog-6-tooth class="h-3 w-3" />
                                                                     {{ __('Dply operational') }}
                                                                 </span>
@@ -227,7 +227,7 @@
                                                                 <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
                                                             @endif
                                                         </div>
-                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                        <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
                                                     </div>
                                                 </div>
                                             @endforeach

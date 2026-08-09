@@ -32,7 +32,7 @@
                         <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Script') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Use non-interactive flags so execution does not hang over SSH.') }}</p>
                     </div>
@@ -71,7 +71,7 @@
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Run') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Run') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run script') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Select servers to run this script on. Requires SSH access from Dply.') }}</p>
                     </div>

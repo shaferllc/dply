@@ -17,23 +17,23 @@
                         {{ $site->name }}
                     </a>
                     @if ($site->frameworkLabel)
-                        <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-[11px] font-semibold text-brand-forest">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-xs font-semibold text-brand-forest">
                             {{ $site->frameworkLabel }}
                         </span>
                     @endif
-                    <span class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 text-[11px] font-semibold text-brand-moss">
+                    <span class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 text-xs font-semibold text-brand-moss">
                         <x-heroicon-o-cpu-chip class="h-3 w-3 shrink-0 text-brand-sage" aria-hidden="true" />
                         {{ $site->typeLabel }}
                     </span>
-                    <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-moss">
+                    <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-xs font-medium text-brand-moss">
                         {{ $site->runtimeExecutionModeLabel }}
                     </span>
                     @if ($site->phpVersion)
-                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-moss">
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-xs font-medium text-brand-moss">
                             {{ __('PHP :v', ['v' => $site->phpVersion]) }}
                         </span>
                     @elseif ($site->runtimeVersion)
-                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-moss">
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-xs font-medium text-brand-moss">
                             {{ ucfirst((string) ($site->runtimeKey ?? '')) }} {{ $site->runtimeVersion }}
                         </span>
                     @endif
@@ -105,7 +105,7 @@
                             </span>
                         @endif
                         @if ($site->gitBranch)
-                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-ink ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-hashtag class="h-3 w-3 shrink-0 text-brand-sage" aria-hidden="true" />
                                 {{ $site->gitBranch }}
                             </span>

@@ -38,7 +38,7 @@
                     </div>
                 @elseif ($switch_plan['blocker'] !== null)
                     <div class="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3">
-                        <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-900">
+                        <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-rose-900">
                             <x-heroicon-m-no-symbol class="h-4 w-4" />
                             {{ __('Cannot switch') }}
                         </p>
@@ -46,7 +46,7 @@
                     </div>
                 @else
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
                         <ul class="mt-2 space-y-1.5">
                             @foreach ($switch_plan['auto'] as $row)
                                 <li class="flex items-start gap-2 text-sm text-brand-ink">
@@ -59,7 +59,7 @@
 
                     @if (! empty($switch_plan['optIn']))
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
                             <ul class="mt-2 space-y-2">
                                 @foreach ($switch_plan['optIn'] as $row)
                                     @php
@@ -80,7 +80,7 @@
                     @endif
 
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Estimated timing') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Estimated timing') }}</p>
                         <ul class="mt-2 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
                             @foreach ($switch_plan['downtime'] as $phase)
                                 @php
@@ -92,11 +92,11 @@
                                 <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                     <span class="text-brand-ink">{{ $phase['label'] }}</span>
                                     <span class="flex items-center gap-2">
-                                        <span class="font-mono text-[11px] text-brand-moss">~{{ $secLabel }}</span>
+                                        <span class="font-mono text-xs text-brand-moss">~{{ $secLabel }}</span>
                                         @if ($phase['blocking'])
-                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('downtime') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('downtime') }}</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('live') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('live') }}</span>
                                         @endif
                                     </span>
                                 </li>
@@ -106,7 +106,7 @@
 
                     @if (! empty($switch_plan['manual']))
                         <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-                            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+                            <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
                                 <x-heroicon-m-information-circle class="h-4 w-4" />
                                 {{ __('Cannot be fixed from here') }}
                             </p>

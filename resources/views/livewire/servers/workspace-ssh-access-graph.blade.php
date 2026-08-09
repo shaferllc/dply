@@ -41,7 +41,7 @@
             >
                 <x-slot:actions>
                     @if ($timeline['you_active_now'])
-                        <span class="inline-flex h-6 items-center rounded-full bg-amber-50 px-2 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                        <span class="inline-flex h-6 items-center rounded-full bg-amber-50 px-2 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
                             {{ __('You have access now') }}
                         </span>
                     @endif
@@ -50,7 +50,7 @@
                             type="button"
                             wire:click="$set('timeline_range', '{{ $value }}')"
                             @class([
-                                'inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-semibold ring-1 transition',
+                                'inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold ring-1 transition',
                                 'bg-brand-forest text-white ring-brand-forest' => $timeline_range === $value,
                                 'border border-brand-ink/15 bg-white text-brand-moss hover:bg-brand-sand/40 ring-transparent' => $timeline_range !== $value,
                             ])
@@ -62,7 +62,7 @@
             </x-workspace-panel-head>
 
             <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
-                <div class="flex flex-wrap items-center gap-3 text-[10px] text-brand-moss">
+                <div class="flex flex-wrap items-center gap-3 text-2xs text-brand-moss">
                     <span class="inline-flex items-center gap-1.5">
                         <span class="inline-block h-0.5 w-5 rounded bg-brand-forest"></span>
                         {{ __('Total active keys') }}
@@ -81,10 +81,10 @@
 
                 @if (count($timeline['lanes']) > 0)
                     <div class="space-y-1.5">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access lanes') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access lanes') }}</p>
                         <div class="space-y-1">
                             @foreach ($timeline['lanes'] as $lane)
-                                <div wire:key="access-lane-{{ $lane['key'] }}" class="grid grid-cols-[minmax(0,8rem)_1fr] items-center gap-2.5 text-[11px]">
+                                <div wire:key="access-lane-{{ $lane['key'] }}" class="grid grid-cols-[minmax(0,8rem)_1fr] items-center gap-2.5 text-xs">
                                     <div class="min-w-0 truncate">
                                         <span @class(['font-semibold', 'text-amber-800' => $lane['is_you'], 'text-sky-800' => ! $lane['is_you'] && ($lane['source'] ?? '') === 'platform', 'text-brand-ink' => ! $lane['is_you'] && ($lane['source'] ?? '') !== 'platform'])>
                                             @if ($lane['is_you'])
@@ -96,9 +96,9 @@
                                             @endif
                                         </span>
                                         @if ($lane['is_you'])
-                                            <span class="ml-1 text-[10px] text-brand-mist">({{ $lane['label'] }})</span>
+                                            <span class="ml-1 text-2xs text-brand-mist">({{ $lane['label'] }})</span>
                                         @elseif (($lane['source'] ?? '') === 'platform')
-                                            <span class="ml-1 text-[10px] text-brand-mist">({{ $lane['label'] }})</span>
+                                            <span class="ml-1 text-2xs text-brand-mist">({{ $lane['label'] }})</span>
                                         @endif
                                     </div>
                                     <div class="relative h-4 rounded bg-brand-sand/30 ring-1 ring-brand-ink/5">
@@ -121,7 +121,7 @@
 
                 @if (count($timeline['events']) > 0)
                     <div class="border-t border-brand-ink/8 pt-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent changes') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent changes') }}</p>
                         <ul class="mt-2 divide-y divide-brand-ink/5 overflow-hidden rounded-lg border border-brand-ink/8 bg-white">
                             @foreach ($timeline['events'] as $event)
                                 @php
@@ -144,9 +144,9 @@
                                         <span class="inline-flex h-2 w-2 shrink-0 rounded-full ring-[3px] {{ $dotClass }}" aria-hidden="true"></span>
                                         <span class="min-w-0 flex-1">
                                             <span class="block truncate text-xs font-semibold {{ $titleClass }}">{{ $event['label'] }}</span>
-                                            <span class="block truncate text-[11px] text-brand-moss">{{ $event['detail'] }}</span>
+                                            <span class="block truncate text-xs text-brand-moss">{{ $event['detail'] }}</span>
                                         </span>
-                                        <span class="shrink-0 whitespace-nowrap text-[10px] text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
+                                        <span class="shrink-0 whitespace-nowrap text-2xs text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
                                         <x-heroicon-o-chevron-right class="h-3.5 w-3.5 shrink-0 text-brand-mist/60 transition group-hover:translate-x-0.5 group-hover:text-brand-moss" aria-hidden="true" />
                                     </button>
                                 </li>
@@ -154,7 +154,7 @@
                         </ul>
 
                         @if (($eventsPagination['total_pages'] ?? 1) > 1)
-                            <div class="mt-2 flex items-center justify-between gap-3 text-[10px] text-brand-moss">
+                            <div class="mt-2 flex items-center justify-between gap-3 text-2xs text-brand-moss">
                                 <span>
                                     {{ __('Page :page of :total', ['page' => $eventsPagination['page'], 'total' => $eventsPagination['total_pages']]) }}
                                     · {{ trans_choice(':count change|:count changes', $eventsPagination['total'], ['count' => $eventsPagination['total']]) }}
@@ -209,17 +209,17 @@
             >
                 <x-slot:actions>
                     @if ($sessionsEnabled)
-                        <button type="button" wire:click="openGrantSessionModal" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/5 px-2 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
+                        <button type="button" wire:click="openGrantSessionModal" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/5 px-2 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
                     @endif
-                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
+                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
                 </x-slot:actions>
             </x-workspace-panel-head>
             @if ($report['alert_count'] > 0)
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['alerts'] as $alert)
                         <li class="flex flex-wrap items-start justify-between gap-3 px-4 py-2.5 sm:px-5">
-                            <div class="min-w-0"><p class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p><p class="text-[11px] leading-relaxed text-brand-moss">{{ $alert['message'] }}</p></div>
-                            @if ($alert['href'])<a href="{{ $alert['href'] }}" wire:navigate class="shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>@endif
+                            <div class="min-w-0"><p class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p><p class="text-xs leading-relaxed text-brand-moss">{{ $alert['message'] }}</p></div>
+                            @if ($alert['href'])<a href="{{ $alert['href'] }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>@endif
                         </li>
                     @endforeach
                 </ul>
@@ -262,9 +262,9 @@
                         <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold text-brand-ink">{{ $session['name'] }}</p>
-                                <p class="text-[11px] text-brand-moss">{{ __('Expires :time · :user', ['time' => $session['expires_at']->diffForHumans(), 'user' => $session['created_by'] ?: __('Unknown')]) }}</p>
+                                <p class="text-xs text-brand-moss">{{ __('Expires :time · :user', ['time' => $session['expires_at']->diffForHumans(), 'user' => $session['created_by'] ?: __('Unknown')]) }}</p>
                             </div>
-                            <button type="button" wire:click="openRevokeSessionModal('{{ $session['id'] }}')" class="shrink-0 text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Revoke') }}</button>
+                            <button type="button" wire:click="openRevokeSessionModal('{{ $session['id'] }}')" class="shrink-0 text-xs font-semibold text-rose-700 hover:underline">{{ __('Revoke') }}</button>
                         </li>
                     @endforeach
                 </ul>
@@ -280,7 +280,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Temporary access') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Temporary access') }}</p>
                         <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Grant temporary SSH session') }}</h2>
                         <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                             {{ __('Paste a contractor public key. Dply installs it on the server and removes it automatically when the session expires.') }}
@@ -341,7 +341,7 @@
                                 <x-input-error :messages="$errors->get('session_duration_hours')" class="mt-1" />
                             </div>
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Quick pick') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Quick pick') }}</p>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     @foreach ($durationPresets as $hours)
                                         @php $active = (int) $session_duration_hours === (int) $hours; @endphp
@@ -394,7 +394,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-800">{{ __('Revoke access') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-800">{{ __('Revoke access') }}</p>
                         <h2 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Revoke SSH session?') }}</h2>
                         <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                             {{ __('This removes the session key from authorized_keys on the server immediately. The contractor will lose SSH access.') }}
@@ -445,11 +445,11 @@
 
         <div class="relative border-b border-brand-ink/10 {{ $detailHeaderClass }} px-6 py-5 sm:px-7">
             <div class="pr-10">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $detail['eyebrow'] ?? __('Access event') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $detail['eyebrow'] ?? __('Access event') }}</p>
                 <div class="mt-1 flex flex-wrap items-center gap-2">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ $detail['title'] ?? __('Access event') }}</h2>
                     @if (! empty($detail['status']))
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $detailPillClass }}">{{ $detail['status'] }}</span>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $detailPillClass }}">{{ $detail['status'] }}</span>
                     @endif
                 </div>
             </div>
@@ -477,7 +477,7 @@
 
             @if (! empty($detail['command']))
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Last command') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Last command') }}</p>
                     <div class="mt-2 flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-ink/5 px-3 py-2.5">
                         <span class="select-none font-mono text-xs leading-relaxed text-brand-mist" aria-hidden="true">$</span>
                         <pre class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-brand-ink">{{ $detail['command'] }}</pre>

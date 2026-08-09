@@ -32,7 +32,7 @@
                     <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where alerts go') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Subscribe Slack, email, and other channels to Edge deploys, domains, usage, and RUM breaches — the same channel system as BYO sites.') }}
@@ -72,7 +72,7 @@
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
-            <span wire:loading.inline-flex wire:target="saveEdgeAlertNotificationSubscriptions" class="mr-3 inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+            <span wire:loading.inline-flex wire:target="saveEdgeAlertNotificationSubscriptions" class="mr-3 inline-flex items-center gap-1.5 text-xs text-brand-moss">
                 <x-spinner size="sm" variant="muted" />
                 {{ __('Saving…') }}
             </span>
@@ -91,7 +91,7 @@
     </section>
 
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Thresholds') }}</p>
+        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Thresholds') }}</p>
         <p class="mt-1 text-sm text-brand-moss">{{ __('Checked hourly against the last 60 minutes. Breaches notify via the channels above (6h cooldown per kind).') }}</p>
 
         <div class="mt-4 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
@@ -107,7 +107,7 @@
                     <label class="sr-only" for="lcp">{{ __('Threshold (ms)') }}</label>
                     <div class="relative">
                         <input id="lcp" type="number" min="100" max="60000" step="50" wire:model="lcp_threshold" wire:key="lcp-threshold-{{ $lcp_enabled ? 'on' : 'off' }}" @disabled(! $lcp_enabled) class="block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 pr-10 font-mono text-xs text-brand-ink focus:border-brand-forest focus:ring-brand-forest disabled:bg-brand-sand/20 dark:border-brand-mist/20 dark:bg-zinc-900" />
-                        <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-brand-mist">ms</span>
+                        <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-2xs text-brand-mist">ms</span>
                     </div>
                     @error('lcp_threshold') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
@@ -125,7 +125,7 @@
                     <label class="sr-only" for="errrate">{{ __('Threshold (%)') }}</label>
                     <div class="relative">
                         <input id="errrate" type="number" min="0.1" max="100" step="0.1" wire:model="err_rate_threshold" wire:key="err-rate-threshold-{{ $err_rate_enabled ? 'on' : 'off' }}" @disabled(! $err_rate_enabled) class="block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 pr-8 font-mono text-xs text-brand-ink focus:border-brand-forest focus:ring-brand-forest disabled:bg-brand-sand/20 dark:border-brand-mist/20 dark:bg-zinc-900" />
-                        <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-brand-mist">%</span>
+                        <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-2xs text-brand-mist">%</span>
                     </div>
                     @error('err_rate_threshold') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
@@ -149,7 +149,7 @@
     </section>
 
     <div class="flex items-center justify-end gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
-        <span wire:loading.inline-flex wire:target="save" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+        <span wire:loading.inline-flex wire:target="save" class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
             <x-spinner size="sm" variant="muted" />
             {{ __('Saving…') }}
         </span>
@@ -165,7 +165,7 @@
             <span class="inline-flex items-center gap-2">
                 {{ __('Advanced') }}
                 @if ($hasRepoAlerts)
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Repo') }}</span>
                 @endif
             </span>
             <x-heroicon-m-chevron-down class="h-4 w-4 text-brand-mist transition group-open:rotate-180" />
@@ -173,7 +173,7 @@
 
         <div class="space-y-4 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                 <a
                     href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
                     class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline"
@@ -195,7 +195,7 @@
                         @endif
                     @endforeach
                 </ul>
-                <p class="text-[11px] text-brand-mist">{{ __('Dashboard overrides merge with the repo on the next check.') }}</p>
+                <p class="text-xs text-brand-mist">{{ __('Dashboard overrides merge with the repo on the next check.') }}</p>
             @else
                 <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
             @endif

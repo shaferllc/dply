@@ -45,7 +45,7 @@
                 <button type="button" role="tab" id="activity-tab-feed" wire:click="setTab('feed')"
                     aria-selected="{{ $tab === 'feed' ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold leading-none transition-colors',
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold leading-none transition-colors',
                         'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'feed',
                         'text-brand-moss hover:text-brand-ink' => $tab !== 'feed',
                     ])>
@@ -55,7 +55,7 @@
                 <button type="button" role="tab" id="activity-tab-trends" wire:click="setTab('trends')"
                     aria-selected="{{ $tab === 'trends' ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold leading-none transition-colors',
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold leading-none transition-colors',
                         'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'trends',
                         'text-brand-moss hover:text-brand-ink' => $tab !== 'trends',
                     ])>
@@ -71,7 +71,7 @@
         <div class="flex flex-col gap-2.5 px-5 py-3 sm:px-6">
             <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
                 <div>
-                    <label for="activity_range" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Range') }}</label>
+                    <label for="activity_range" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Range') }}</label>
                     <select id="activity_range" wire:model.live="range" class="mt-1 rounded-md border-brand-ink/15 bg-white py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
                         @foreach ($rangeOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
@@ -80,7 +80,7 @@
                 </div>
 
                 <div>
-                    <label for="activity_actor" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actor') }}</label>
+                    <label for="activity_actor" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actor') }}</label>
                     <select id="activity_actor" wire:model.live="userId" class="mt-1 rounded-md border-brand-ink/15 bg-white py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
                         <option value="">{{ __('Anyone') }}</option>
                         @foreach ($actors as $actor)
@@ -99,16 +99,16 @@
             </div>
 
             <div class="flex flex-col gap-1.5">
-                <span class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Category') }}</span>
+                <span class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Category') }}</span>
                 <div class="flex flex-wrap items-center gap-1.5">
                     <button type="button" wire:click="setCategory('')" @class([
-                        'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                        'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
                         'border-brand-forest bg-brand-forest text-brand-cream' => $category === '',
                         'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $category !== '',
                     ])>{{ __('All') }}</button>
                     @foreach ($categories as $key => $label)
                         <button type="button" wire:click="setCategory('{{ $key }}')" @class([
-                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
                             'border-brand-forest bg-brand-forest text-brand-cream' => $category === $key,
                             'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $category !== $key,
                         ])>
@@ -150,7 +150,7 @@
                             <x-heroicon-o-clock class="h-4 w-4" />
                         </span>
                         <p class="text-xs font-semibold text-brand-ink">{{ __('Nothing recorded in this range.') }}</p>
-                        <p class="text-[11px] text-brand-moss">{{ __('Firewall edits, cron saves, SSH key changes, insight fixes, and deploys will all show up here.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Firewall edits, cron saves, SSH key changes, insight fixes, and deploys will all show up here.') }}</p>
                     </div>
                 @else
                     <div class="space-y-1.5" x-data="{ openId: null }">
@@ -173,14 +173,14 @@
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <span class="text-xs font-semibold text-brand-ink">{{ $event->action_summary }}</span>
-                                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss">
+                                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/30 px-1.5 py-0.5 font-mono text-2xs uppercase tracking-wide text-brand-moss">
                                                     {{ __($categories[$cat] ?? $cat) }}
                                                 </span>
-                                                <span class="ml-auto text-[11px] text-brand-mist" title="{{ $event->created_at?->toIso8601String() }}">
+                                                <span class="ml-auto text-xs text-brand-mist" title="{{ $event->created_at?->toIso8601String() }}">
                                                     {{ $event->created_at?->diffForHumans() }}
                                                 </span>
                                             </div>
-                                            <p class="mt-0.5 text-[11px] text-brand-moss">
+                                            <p class="mt-0.5 text-xs text-brand-moss">
                                                 {{ __('by :actor', ['actor' => $actorName]) }}
                                                 @if ($subject)
                                                     <span class="ml-1 text-brand-mist">· {{ $subject }}</span>
@@ -202,15 +202,15 @@
                                         <div x-show="openId === '{{ $event->id }}'" x-cloak class="border-t border-brand-ink/8 bg-brand-sand/15 px-3 py-3 sm:px-4">
                                             <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
                                                 <div class="overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/40">
-                                                    <div class="flex items-center gap-1.5 border-b border-rose-200/60 bg-rose-50/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-800">
+                                                    <div class="flex items-center gap-1.5 border-b border-rose-200/60 bg-rose-50/60 px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-rose-800">
                                                         <x-heroicon-m-minus-circle class="h-3 w-3" />
                                                         {{ __('Before') }}
                                                     </div>
                                                     <div class="p-3">
                                                         @if ($event->old_values)
-                                                            <pre class="overflow-x-auto font-mono text-[11px] leading-snug text-rose-950">{{ json_encode($event->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre class="overflow-x-auto font-mono text-xs leading-snug text-rose-950">{{ json_encode($event->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         @else
-                                                            <p class="italic text-[11px] text-rose-900/60">{{ __('No prior values — this was created.') }}</p>
+                                                            <p class="italic text-xs text-rose-900/60">{{ __('No prior values — this was created.') }}</p>
                                                         @endif
                                                     </div>
                                                 </div>
@@ -222,23 +222,23 @@
                                                 </div>
 
                                                 <div class="overflow-hidden rounded-lg border border-emerald-200/70 bg-emerald-50/40">
-                                                    <div class="flex items-center gap-1.5 border-b border-emerald-200/60 bg-emerald-50/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
+                                                    <div class="flex items-center gap-1.5 border-b border-emerald-200/60 bg-emerald-50/60 px-3 py-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
                                                         <x-heroicon-m-plus-circle class="h-3 w-3" />
                                                         {{ __('After') }}
                                                     </div>
                                                     <div class="p-3">
                                                         @if ($event->new_values)
-                                                            <pre class="overflow-x-auto font-mono text-[11px] leading-snug text-emerald-950">{{ json_encode($event->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre class="overflow-x-auto font-mono text-xs leading-snug text-emerald-950">{{ json_encode($event->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                                                         @else
-                                                            <p class="italic text-[11px] text-emerald-900/60">{{ __('No new values — this was removed.') }}</p>
+                                                            <p class="italic text-xs text-emerald-900/60">{{ __('No new values — this was removed.') }}</p>
                                                         @endif
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-brand-mist">
+                                            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-brand-mist">
                                                 <span>{{ __('Action key') }}</span>
-                                                <code class="inline-flex items-center rounded-md border border-brand-ink/10 bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $event->action }}</code>
+                                                <code class="inline-flex items-center rounded-md border border-brand-ink/10 bg-white px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $event->action }}</code>
                                             </div>
                                         </div>
                                     @endif
@@ -280,7 +280,7 @@
                             <x-heroicon-o-chart-bar class="h-4 w-4" />
                         </span>
                         <p class="text-xs font-semibold text-brand-ink">{{ __('No events in this range yet.') }}</p>
-                        <p class="text-[11px] text-brand-moss">{{ __('Widen the range or change the category filter to see more.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Widen the range or change the category filter to see more.') }}</p>
                     </div>
                 @else
                     <div class="px-1 pt-10">
@@ -308,13 +308,13 @@
                                     ])>
                                         <div class="rounded-md border border-brand-ink/15 bg-white px-3 py-2 shadow-md">
                                             <p class="text-xs font-semibold text-brand-ink">{{ $bucketDate->format('D, M j') }}</p>
-                                            <p class="text-[11px] text-brand-moss">{{ trans_choice('{0} No events|{1} :count event|[2,*] :count events', $bucket['total'], ['count' => $bucket['total']]) }}</p>
+                                            <p class="text-xs text-brand-moss">{{ trans_choice('{0} No events|{1} :count event|[2,*] :count events', $bucket['total'], ['count' => $bucket['total']]) }}</p>
                                             @if ($bucket['total'] > 0)
                                                 <div class="mt-1.5 space-y-0.5 min-w-[150px]">
                                                     @foreach ($categories as $key => $label)
                                                         @php $count = $bucket['by_category'][$key] ?? 0; @endphp
                                                         @if ($count > 0)
-                                                            <div class="flex items-center gap-1.5 text-[11px]">
+                                                            <div class="flex items-center gap-1.5 text-xs">
                                                                 <span @class(['h-2 w-2 rounded-full', $categoryColor[$key] ?? 'bg-zinc-400'])></span>
                                                                 <span class="text-brand-moss">{{ __($label) }}</span>
                                                                 <span class="ml-auto font-semibold text-brand-ink">{{ $count }}</span>
@@ -329,7 +329,7 @@
                             @endforeach
                         </div>
 
-                        <div class="mt-2 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-brand-mist">
+                        <div class="mt-2 flex items-center justify-between text-2xs uppercase tracking-[0.12em] text-brand-mist">
                             <span>{{ \Illuminate\Support\Carbon::parse($trends['buckets'][0]['date'])->format('M j') }}</span>
                             <span>{{ \Illuminate\Support\Carbon::parse($trends['buckets'][count($trends['buckets']) - 1]['date'])->format('M j') }}</span>
                         </div>

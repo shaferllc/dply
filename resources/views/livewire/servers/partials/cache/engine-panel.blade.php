@@ -65,7 +65,7 @@
                                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Coming soon') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Coming soon') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine support is on the way', ['engine' => $info['label']]) }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                         {{ $info['tagline'] }}
@@ -114,7 +114,7 @@
                                 {{-- Distro gate: the host's /etc/os-release codename isn't in the engine's
                                      supported list (e.g. KeyDB on Ubuntu 24.04 — upstream doesn't ship
                                      for noble). Disable the button instead of letting apt fail later. --}}
-                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                                     <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     <span>{{ $unsupportedReason }}</span>
                                 </p>
@@ -130,7 +130,7 @@
                                     </button>
                                 </div>
                             @elseif ($cacheBusy)
-                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-900">
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
                                     <x-spinner variant="forest" class="shrink-0" />
                                     <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
                                 </p>
@@ -249,7 +249,7 @@
                         />
                         <dl class="grid gap-3 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
                             <div>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                                 <dd class="mt-1">
                                     @switch($row->status)
                                         @case(\App\Models\ServerCacheService::STATUS_RUNNING)
@@ -267,7 +267,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
                                 <dd class="mt-1">
                                     {{-- Three-state badge. "Status: Running, Probe: Not reachable"
                                          used to surface because the SSH-probe couldn't get a PONG
@@ -291,7 +291,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
                                 <dd class="mt-1 flex flex-wrap items-center gap-2 font-mono text-sm text-brand-ink">
                                     <span>{{ $row->version ?: '—' }}</span>
                                     @if (! $row->version && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
@@ -300,7 +300,7 @@
                                             wire:click="probeCacheServiceVersion('{{ $engine }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="probeCacheServiceVersion"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 font-sans text-xs font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
                                         >
                                             <span wire:loading.remove wire:target="probeCacheServiceVersion">{{ __('Probe') }}</span>
                                             <span wire:loading wire:target="probeCacheServiceVersion" class="inline-flex items-center gap-1">
@@ -311,7 +311,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
+                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
                                 <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
                             </div>
                         </dl>
@@ -381,7 +381,7 @@
                             $btnDebug = 'inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50';
                             $btnMuted = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-mist hover:bg-brand-sand/40';
                             $groupShell = 'rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3';
-                            $groupLabel = 'mb-2 text-[10px] font-semibold uppercase tracking-wide text-brand-mist';
+                            $groupLabel = 'mb-2 text-2xs font-semibold uppercase tracking-wide text-brand-mist';
                             $groupButtons = 'flex flex-wrap gap-1.5';
                         @endphp
 
@@ -618,7 +618,7 @@
                                         this.$dispatch('toast', { message: @js(__('Password copied')) });
                                     },
                                 }">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current password') }}</p>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current password') }}</p>
                                     <div class="mt-1 flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-zinc-50 px-3 py-2">
                                         <code class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">
                                             <span x-show="! shown">{{ str_repeat('•', min(strlen((string) $row->auth_password), 24)) }}</span>
@@ -715,12 +715,12 @@
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
                                     @if ($isExposed)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                                             <x-heroicon-m-globe-alt class="h-3 w-3" />
                                             {{ __('Exposed') }}
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                             <x-heroicon-m-lock-closed class="h-3 w-3" />
                                             {{ __('Loopback only') }}
                                         </span>
@@ -826,7 +826,7 @@
                                     <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
                                         @if ($cacheMemoryLoaded)
                                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
@@ -908,7 +908,7 @@
                                         <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Memory settings not loaded') }}</p>
                                         <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                                             {{ __('Click here (or') }}
-                                            <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                            <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">
                                                 <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
                                                 {{ __('Load current settings') }}
                                             </span>
@@ -1054,13 +1054,13 @@
                             >
                                 <x-slot:actions>
                                     @if ($cacheClients === null && $cacheClientsError === null)
-                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
                                             <x-heroicon-m-users class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheClients">{{ __('Load clients') }}</span>
                                             <span wire:loading wire:target="loadCacheClients">{{ __('Loading…') }}</span>
                                         </button>
                                     @else
-                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
                                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Refresh') }}
                                         </button>
@@ -1234,7 +1234,7 @@
                                     <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No snapshot yet') }}</p>
                                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                                         {{ __('Click here (or') }}
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">
                                             <x-heroicon-o-users class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Load clients') }}
                                         </span>
@@ -1355,7 +1355,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadCacheConfig"
                                     x-on:click="$dispatch('open-modal', @js($configModalName))"
-                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
                                     <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
                                     <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
@@ -1407,7 +1407,7 @@
                                     <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Config not loaded') }}</p>
                                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                                         {{ __('Click here (or') }}
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">
                                             <x-heroicon-o-document-text class="h-3 w-3" aria-hidden="true" />
                                             {{ __('View config') }}
                                         </span>
@@ -1444,7 +1444,7 @@
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if (! $cacheConfigEditing)
-                                        <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                        <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
                                             <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Refresh') }}</span>
                                             <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>

@@ -114,13 +114,13 @@
                         <x-heroicon-o-lock-closed class="h-7 w-7" />
                     </div>
                     <div class="min-w-0 flex-1 text-left">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-moss">{{ __('Secure zone') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.22em] text-brand-moss">{{ __('Secure zone') }}</p>
                         <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $pathHint }}</p>
                     </div>
                 </div>
 
                 <div class="mt-4">
-                    <div class="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-brand-moss">
+                    <div class="mb-1 flex items-center justify-between text-2xs font-semibold uppercase tracking-widest text-brand-moss">
                         <span>{{ __('Persuasion level') }}</span>
                         <span x-text="`${scans}%`"></span>
                     </div>
@@ -130,17 +130,17 @@
                             :style="`width: ${scans}%`"
                         ></div>
                     </div>
-                    <p class="mt-2 text-left text-[11px] text-brand-moss/80">{{ __('Cap intentionally set at 99%.') }}</p>
+                    <p class="mt-2 text-left text-xs text-brand-moss/80">{{ __('Cap intentionally set at 99%.') }}</p>
                 </div>
             </div>
 
             <div class="absolute inset-x-10 bottom-16 rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/50 px-4 py-3 dark:bg-brand-cream/5">
-                <p class="text-[10px] font-semibold uppercase tracking-widest text-brand-moss">{{ __('Badge reader') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-widest text-brand-moss">{{ __('Badge reader') }}</p>
                 <div class="relative mt-3 h-12 rounded-lg bg-brand-ink/90">
                     <div class="forbidden-reader-beam absolute inset-y-1 left-2 w-8 rounded bg-brand-gold/35"></div>
                     <button
                         type="button"
-                        class="forbidden-badge absolute z-10 flex h-10 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border border-brand-cream/30 bg-linear-to-br from-brand-forest to-brand-ink text-[9px] font-bold uppercase tracking-wider text-brand-cream shadow-lg shadow-brand-ink/30 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream dark:focus-visible:ring-offset-brand-cream"
+                        class="forbidden-badge absolute z-10 flex h-10 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border border-brand-cream/30 bg-linear-to-br from-brand-forest to-brand-ink text-3xs font-bold uppercase tracking-wider text-brand-cream shadow-lg shadow-brand-ink/30 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream dark:focus-visible:ring-offset-brand-cream"
                         :style="`left: ${badgeX}%; top: ${badgeY}%;`"
                         x-on:click="scanBadge()"
                         :aria-label="@js(__('Scan access badge'))"
@@ -265,7 +265,7 @@
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-rust/90"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-gold/90"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-brand-sage/90"></span>
-                <span class="ml-1 text-[10px] font-semibold uppercase tracking-widest text-brand-mist">{{ __('Access log') }}</span>
+                <span class="ml-1 text-2xs font-semibold uppercase tracking-widest text-brand-mist">{{ __('Access log') }}</span>
             </div>
             <ul class="max-h-40 space-y-1 overflow-y-auto px-3 py-3 font-mono text-xs leading-relaxed text-brand-sand/90">
                 <template x-for="(entry, index) in logs" :key="`${index}-${entry.line}`">

@@ -45,12 +45,12 @@
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalTokens }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('total') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('total') }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">
+                    <p class="mt-1 text-xs text-brand-mist">
                         @if ($totalTokens !== $activeTokens)
                             {{ trans_choice(':n active|:n active', $activeTokens, ['n' => $activeTokens]) }}
                         @else
@@ -63,20 +63,20 @@
                     'border-amber-200 bg-amber-50/90' => $expiringSoon > 0,
                     'border-brand-ink/10 bg-white/80' => $expiringSoon === 0,
                 ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expiring') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expiring') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $expiringSoon }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('soon') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('soon') }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Within 14 days') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Within 14 days') }}</p>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('org|orgs', $orgCount) }}</span>
+                        <span class="text-xs text-brand-moss">{{ trans_choice('org|orgs', $orgCount) }}</span>
                     </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('You can issue against') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('You can issue against') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
@@ -117,7 +117,7 @@
                             <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700/80">{{ __('Created') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700/80">{{ __('Created') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-emerald-950">{{ __('Copy this token now — you won\'t see it again') }}</h3>
                             <p class="mt-1 text-sm text-emerald-900/80">{{ __('Token name:') }} <span class="font-semibold">{{ $new_token_name }}</span></p>
                         </div>
@@ -208,19 +208,19 @@
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $t->name }}</span>
                                     @if ($expired)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-700">
                                             <x-heroicon-m-no-symbol class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Expired') }}
                                         </span>
                                     @elseif ($expiringSoonRow)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">
                                             <x-heroicon-m-clock class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Expiring') }}
                                         </span>
                                     @endif
                                 </div>
-                                <p class="font-mono text-[11px] text-brand-mist">{{ $t->masked_display }}</p>
-                                <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                <p class="font-mono text-xs text-brand-mist">{{ $t->masked_display }}</p>
+                                <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
                                     @if ($t->last_used_at)
                                         <span class="inline-flex items-center gap-1">
                                             <x-heroicon-m-bolt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -247,10 +247,10 @@
                                 @if ($t->abilities)
                                     <p class="flex flex-wrap gap-1 pt-1">
                                         @foreach (array_slice($t->abilities, 0, 6) as $ability)
-                                            <code class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $ability }}</code>
+                                            <code class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $ability }}</code>
                                         @endforeach
                                         @if (count($t->abilities) > 6)
-                                            <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">+{{ count($t->abilities) - 6 }}</span>
+                                            <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">+{{ count($t->abilities) - 6 }}</span>
                                         @endif
                                     </p>
                                 @endif
@@ -258,7 +258,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                             >
                                 <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Revoke') }}
@@ -324,7 +324,7 @@
                         <div>
                             <x-input-label for="api_token_exp_modal" :value="__('Expires (optional)')" />
                             <x-text-input id="api_token_exp_modal" wire:model="token_expires_at" type="date" class="mt-1 block w-full max-w-xs" min="{{ date('Y-m-d', strtotime('+1 day')) }}" />
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Leave blank for no expiry. Short-lived tokens are safer for CI runners.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank for no expiry. Short-lived tokens are safer for CI runners.') }}</p>
                             <x-input-error :messages="$errors->get('token_expires_at')" class="mt-2" />
                         </div>
 
@@ -337,7 +337,7 @@
                                 class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                 placeholder="{{ __('Comma-separated or one per line. Leave empty to allow any IP.') }}"
                             ></textarea>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('IPv4, IPv6, or IPv4 CIDR ranges.') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('IPv4, IPv6, or IPv4 CIDR ranges.') }}</p>
                             <x-input-error :messages="$errors->get('token_allowed_ips_text')" class="mt-2" />
                         </div>
 
@@ -387,7 +387,7 @@
                                             aria-expanded="{{ $expanded ? 'true' : 'false' }}"
                                         >
                                             <span>{{ $cat['label'] }}</span>
-                                            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-moss">
                                                 <span @class([
                                                     'rounded-full px-1.5 py-0.5 tabular-nums',
                                                     'bg-brand-sage/20 text-brand-forest' => $selectedInCat > 0,

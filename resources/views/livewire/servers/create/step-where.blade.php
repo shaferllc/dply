@@ -45,7 +45,7 @@
                             'border-brand-sage/30 bg-brand-sage/8' => $isProvider ? filled($form->provider_host_kind) : filled($form->custom_host_kind),
                             'border-brand-ink/10 bg-white' => $isProvider ? blank($form->provider_host_kind) : blank($form->custom_host_kind),
                         ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host kind') }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host kind') }}</dt>
                             <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
                                 @if ($isProvider)
                                     {{ match ($form->provider_host_kind) { 'vm' => __('VM'), 'docker' => __('Docker host'), 'kubernetes' => __('Kubernetes'), default => __('Not set') } }}
@@ -53,14 +53,14 @@
                                     {{ match ($form->custom_host_kind) { 'vm' => __('VM / VPS'), 'docker' => __('Docker host'), default => __('Not set') } }}
                                 @endif
                             </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $isProvider ? __('Provider mode') : __('Custom mode') }}</p>
+                            <p class="mt-1 text-xs text-brand-mist">{{ $isProvider ? __('Provider mode') : __('Custom mode') }}</p>
                         </div>
                         <div @class([
                             'rounded-2xl border px-4 py-3 shadow-sm',
                             'border-brand-sage/30 bg-brand-sage/8' => $isProvider ? (filled($form->type) && filled($form->provider_credential_id)) : filled($form->ip_address),
                             'border-brand-ink/10 bg-white' => $isProvider ? (blank($form->type) || blank($form->provider_credential_id)) : blank($form->ip_address),
                         ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $isProvider ? __('Account') : __('Endpoint') }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $isProvider ? __('Account') : __('Endpoint') }}</dt>
                             <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
                                 @if ($isProvider)
                                     {{ filled($form->provider_credential_id) && filled($providerLabel) ? $providerLabel : ($providerLabel ?: __('Not set')) }}
@@ -68,7 +68,7 @@
                                     <span class="font-mono">{{ filled($form->ip_address) ? $form->ip_address : '—' }}</span>
                                 @endif
                             </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">
+                            <p class="mt-1 text-xs text-brand-mist">
                                 {{ $isProvider ? __('Provider & credential') : __('IP / hostname') }}
                             </p>
                         </div>
@@ -87,7 +87,7 @@
                         class="border-b border-brand-ink/10"
                     >
                         <x-slot:actions>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                         </x-slot:actions>
                     </x-workspace-panel-head>
                     <div class="px-4 py-3.5 sm:px-5">
@@ -188,7 +188,7 @@
                                     >
                                         <span class="min-w-0 truncate text-sm font-semibold text-brand-ink">{{ $card['label'] }}</span>
                                         <span @class([
-                                            'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                            'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                             'border-emerald-200 bg-emerald-50 text-emerald-700' => $card['linked'],
                                             'border-amber-200 bg-amber-50 text-amber-800' => ! $card['linked'],
                                         ])>
@@ -202,7 +202,7 @@
                                         </span>
                                     </button>
                                     @if ($card['linked'])
-                                        <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
+                                        <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-xs text-brand-moss">
                                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                                                 <span class="inline-flex items-center gap-1">
                                                     <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
@@ -216,7 +216,7 @@
                                             @if (($card['installed_roles'] ?? []) !== [])
                                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                     @foreach ($card['installed_roles'] as $role)
-                                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink ring-1 ring-brand-ink/8">
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-ink ring-1 ring-brand-ink/8">
                                                             @if ($role['count'] > 1)
                                                                 {{ $role['count'] }}× {{ $role['label'] }}
                                                             @else
@@ -227,7 +227,7 @@
                                                 </div>
                                             @endif
                                             @if (($card['installed_locations'] ?? []) !== [])
-                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-brand-moss">
+                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-brand-moss">
                                                     <span class="inline-flex items-center gap-1 font-medium text-brand-mist">
                                                         <x-heroicon-o-map-pin class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                         {{ __('Installed in') }}
@@ -250,7 +250,7 @@
                                     @unless ($card['linked'])
                                         <x-add-provider-credential-link
                                             :provider="$card['id']"
-                                            class="!mt-3 !inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-2.5 !py-1 !text-[11px] !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
+                                            class="!mt-3 !inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-2.5 !py-1 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
                                         >
                                             <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             {{ __('Connect') }}
@@ -351,7 +351,7 @@
                                  beside the title rather than a fourth line. --}}
                             @if ($selectedServerRole)
                                 <x-slot:actions>
-                                    <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sage/15 px-2 text-[10px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                                    <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sage/15 px-2 text-2xs font-semibold text-brand-forest ring-1 ring-brand-sage/25">
                                         <x-heroicon-m-sparkles class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('Sized for :role', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
                                     </span>
@@ -380,7 +380,7 @@
                             class="border-b border-brand-ink/10"
                         >
                             <x-slot:actions>
-                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
+                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
                             </x-slot:actions>
                         </x-workspace-panel-head>
                         <div class="px-4 py-3.5 sm:px-5">
@@ -394,7 +394,7 @@
                                                 wire:click="loadDoVpcs"
                                                 wire:loading.attr="disabled"
                                                 wire:target="loadDoVpcs"
-                                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                                class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
                                             >
                                                 <span wire:loading.remove wire:target="loadDoVpcs">{{ empty($form->do_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
                                                 <span wire:loading wire:target="loadDoVpcs">{{ __('Loading…') }}</span>
@@ -477,7 +477,7 @@
                                                 wire:click="loadVultrVpcs"
                                                 wire:loading.attr="disabled"
                                                 wire:target="loadVultrVpcs"
-                                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                                class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
                                             >
                                                 <span wire:loading.remove wire:target="loadVultrVpcs">{{ empty($form->vultr_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
                                                 <span wire:loading wire:target="loadVultrVpcs">{{ __('Loading…') }}</span>
@@ -537,7 +537,7 @@
                         class="border-b border-brand-ink/10"
                     >
                         <x-slot:actions>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                         </x-slot:actions>
                     </x-workspace-panel-head>
                     <div class="px-4 py-3.5 sm:px-5">
