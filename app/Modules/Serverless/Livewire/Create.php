@@ -66,6 +66,8 @@ class Create extends Component
     {
         abort_unless(Feature::active('surface.serverless'), 404);
 
+        $this->mounting = true;
+
         $user = auth()->user();
         $org = $user?->currentOrganization();
         if ($org === null) {
@@ -139,6 +141,23 @@ class Create extends Component
      */
     public string $runtime = 'auto';
 
+    /**
+     * A prefilled repo whose detection hasn't run yet. Set when the form is
+     * seeded during mount(); consumed by {@see runPendingAutoDetect} via the
+     * blade's wire:init so the repo clone lands after first paint.
+     */
+    public bool $autoDetectPending = false;
+
+    /**
+     * True only while mount() is running. Lets the prefill paths tell "seeded
+     * on page load" (defer the clone — it must not block first paint) from
+     * "operator clicked a demo tile" (a round trip is already in flight, so
+     * detect inline and let the button spin). Not a public property, so it is
+     * never hydrated — every subsequent request starts false, which is exactly
+     * what the click path wants.
+     */
+    private bool $mounting = false;
+
     /** The shaferllc demo repo behind the one-click PHP demo. */
     public const PHP_DEMO_REPO = 'shaferllc/dply-demo-php-function';
 
@@ -195,6 +214,41 @@ class Create extends Component
         $this->git_ref_kind = 'branch';
         $this->repoScanState = 'idle';
         $this->refPickerOpen = false;
+
+        // Picking a repo through the Git picker auto-detects (see
+        // ManagesServerlessCreateGit's onRepositorySelected / onManualRepoUrlChanged);
+        // a demo prefill is just as much "a repo was chosen", so it detects too
+        // rather than leaving the panel empty until the operator clicks Detect.
+        // The demo pins its own runtime via runtimeOverridesTouched, so the
+        // result only populates the panel — it never stomps that pin.
+        if ($this->mounting) {
+            $this->autoDetectPending = true;
+
+            return;
+        }
+
+        $this->detectFromRepository();
+    }
+
+    /**
+     * Run the detection a mount-time prefill deferred. Fired by wire:init, so
+     * the page paints first and the clone happens in a follow-up request —
+     * detection can take tens of seconds on a big repo and must never sit in
+     * the initial render path. No-ops on every later call.
+     */
+    public function runPendingAutoDetect(): void
+    {
+        if (! $this->autoDetectPending) {
+            return;
+        }
+
+        $this->autoDetectPending = false;
+
+        if (trim($this->git_repository_url) === '') {
+            return;
+        }
+
+        $this->detectFromRepository();
     }
 
     /**
