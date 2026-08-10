@@ -43,6 +43,15 @@ final class ServerStateUpdated implements ShouldBroadcast, ShouldQueue
     }
 
     /**
+     * Fan-out lane. A fleet-wide state sweep can queue dozens of these at once;
+     * ahead of a deploy job they add up to a visibly stalled progress bar.
+     */
+    public function broadcastQueue(): string
+    {
+        return (string) config('dply.queues.background');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function broadcastWith(): array

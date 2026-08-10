@@ -41,6 +41,17 @@ trait ManagesServerlessCreateGit
     protected function onRepositoryAutoselected(): void
     {
         $this->maybeSeedAppNameFromRepo();
+
+        // Auto-select fires inside mount(), where a synchronous repo clone would
+        // hold up first paint — hand it to wire:init instead. It also fires when
+        // an account is linked mid-form, and there the click is already waiting
+        // on a round trip, so detect inline.
+        if ($this->mounting) {
+            $this->autoDetectPending = true;
+
+            return;
+        }
+
         $this->detectFromRepository();
     }
 

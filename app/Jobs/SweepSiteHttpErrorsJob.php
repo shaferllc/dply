@@ -45,7 +45,10 @@ class SweepSiteHttpErrorsJob implements ShouldBeUnique, ShouldQueue
      */
     public int $uniqueFor = 360;
 
-    public function __construct(public string $siteId) {}
+    public function __construct(public string $siteId)
+    {
+        $this->onQueue(config('dply.queues.background'));
+    }
 
     public function uniqueId(): string
     {

@@ -35,11 +35,12 @@ class CollectServerlessUsageCommand extends Command
         $result = $collector->collectForDate($date, $dryRun);
 
         $this->info(sprintf(
-            '%s managed serverless usage for %s — %d function(s), %d invocation(s)',
+            '%s managed serverless usage for %s — %d function(s), %d invocation(s), %s GiB-second(s)',
             $dryRun ? '[dry-run]' : 'Collected',
             $date->toDateString(),
             $result['sites'],
             $result['invocations'],
+            number_format($result['gib_seconds']),
         ));
 
         return self::SUCCESS;

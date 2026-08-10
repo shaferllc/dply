@@ -88,7 +88,9 @@ return [
     'systemd_inventory_schedule_enabled' => (bool) env('SERVER_SYSTEMD_INVENTORY_SCHEDULE_ENABLED', true),
 
     /** Optional queue name for systemd inventory jobs (Horizon must list it when set). */
-    'sync_queue' => env('SERVER_SYSTEMD_SYNC_QUEUE', 'dply'),
+    // Background lane: an SSH systemd inventory takes 5-15s and nobody is
+    // watching it. See config/dply.php → queues.
+    'sync_queue' => env('SERVER_SYSTEMD_SYNC_QUEUE', 'dply-background'),
 
     /*
     | Merged with Organization.services_preferences via array_replace_recursive.

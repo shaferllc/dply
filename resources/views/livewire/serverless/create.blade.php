@@ -167,7 +167,7 @@
                                             <p class="mt-0.5 text-xs text-brand-moss">{{ __('Preview the runtime dply detects in this repo before you deploy.') }}</p>
                                         </div>
                                         @php
-                                            $detectTargets = 'detectFromRepository,git_repository_url,git_branch,repository_selection,source_control_account_id,repo_source,selectRefPickerValue';
+                                            $detectTargets = 'detectFromRepository,runPendingAutoDetect,loadPhpDemo,loadLaravelDemo,git_repository_url,git_branch,repository_selection,source_control_account_id,repo_source,selectRefPickerValue';
                                         @endphp
                                         <button
                                             type="button"
@@ -184,9 +184,19 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="min-w-0 px-5 py-3.5 sm:px-6">
+                            {{-- A repo prefilled during mount (the ?starter= demo tiles) hasn't
+                                 been detected yet; wire:init runs it after first paint so the
+                                 clone never sits in the initial render path. Once primed, no
+                                 wire:init is emitted. --}}
+                            <div class="min-w-0 px-5 py-3.5 sm:px-6" @if ($autoDetectPending) wire:init="runPendingAutoDetect" @endif>
                                 <div class="rounded-xl border border-brand-ink/8 bg-brand-cream/40 p-3 dark:border-brand-mist/15 dark:bg-zinc-800/50">
-                                    @include('livewire.partials._runtime-detection-panel')
+                                    <div wire:loading.flex wire:target="{{ $detectTargets }}" class="items-center justify-center gap-2 px-4 py-6 text-sm text-brand-moss">
+                                        <x-spinner size="sm" variant="muted" />
+                                        {{ __('Detecting runtime…') }}
+                                    </div>
+                                    <div wire:loading.remove wire:target="{{ $detectTargets }}">
+                                        @include('livewire.partials._runtime-detection-panel')
+                                    </div>
                                 </div>
                             </div>
                         </section>

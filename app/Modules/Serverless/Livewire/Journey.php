@@ -13,6 +13,7 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -68,6 +69,16 @@ class Journey extends Component
      */
     public bool $embedded = false;
 
+    /**
+     * Request-scoped identity cache. Livewire rebuilds the component on every
+     * poll, so these never persist across requests — they only stop the same
+     * row being re-fetched by each method that needs it, and let the initial
+     * page load reuse the models the controller already resolved for routing.
+     */
+    private ?Server $serverMemo = null;
+
+    private ?Site $siteMemo = null;
+
     public function mount(Server $server, Site $site, bool $embedded = false): void
     {
         abort_unless($site->server_id === $server->id, 404);
@@ -77,16 +88,21 @@ class Journey extends Component
         $this->serverId = $server->id;
         $this->siteId = $site->id;
         $this->embedded = $embedded;
+
+        // The controller already loaded both to route and authorize — adopt
+        // them instead of re-selecting the same two rows on first render.
+        $this->serverMemo = $server;
+        $this->siteMemo = $site;
     }
 
     private function server(): Server
     {
-        return Server::findOrFail($this->serverId);
+        return $this->serverMemo ??= Server::findOrFail($this->serverId);
     }
 
     private function site(): Site
     {
-        return Site::findOrFail($this->siteId);
+        return $this->siteMemo ??= Site::findOrFail($this->siteId);
     }
 
     private function latestDeployment(): ?SiteDeployment
@@ -492,6 +508,10 @@ class Journey extends Component
         $repoLabel = $this->repositoryLabel((string) ($site->git_repository_url ?? ''));
 
         return view('livewire.serverless.journey', [
+            'workspaceUrl' => ServerlessWorkspaceUrl::show($site),
+            // Where a just-shipped function actually needs attention next. Only
+            // built once it's live — before that the page has one job.
+            'nextSteps' => $live ? $this->nextSteps($site) : [],
             'server' => $server,
             'site' => $site,
             'deployment' => $deployment,
@@ -520,6 +540,43 @@ class Journey extends Component
             'repoLabel' => $repoLabel,
             'failedStepLabel' => is_array($failedStep) ? (string) ($failedStep['label'] ?? '') : '',
         ]);
+    }
+
+    /**
+     * The setup a freshly-deployed function usually still needs. Ordered by how
+     * often it's the actual next thing: an app that just went live typically
+     * needs its secrets before anything else.
+     *
+     * @return list<array{label: string, body: string, icon: string, href: string}>
+     */
+    private function nextSteps(Site $site): array
+    {
+        return [
+            [
+                'label' => __('Environment'),
+                'body' => __('Add the env vars and secrets your app expects.'),
+                'icon' => 'heroicon-o-key',
+                'href' => route('serverless.environment', $site),
+            ],
+            [
+                'label' => __('Domains & routing'),
+                'body' => __('Put it behind your own domain instead of the raw URL.'),
+                'icon' => 'heroicon-o-globe-alt',
+                'href' => route('serverless.routing', $site),
+            ],
+            [
+                'label' => __('Schedule & workers'),
+                'body' => __('Run crons and background queue workers.'),
+                'icon' => 'heroicon-o-clock',
+                'href' => route('serverless.schedule', $site),
+            ],
+            [
+                'label' => __('Logs & errors'),
+                'body' => __('Watch requests land and catch failures early.'),
+                'icon' => 'heroicon-o-document-text',
+                'href' => route('serverless.logs', $site),
+            ],
+        ];
     }
 
     /**
