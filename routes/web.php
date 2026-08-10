@@ -542,13 +542,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/billing/analytics', BillingAnalytics::class)->name('billing.analytics');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
-    // Legacy org-scoped Realtime URLs. Not Route::redirect — these switch the
-    // active organization first so a bookmark for org B does not land on org
-    // A's page (docs/adr/managed-services-tier.md, decision 8).
+    // Legacy org-scoped Realtime and Queue URLs. Not Route::redirect — these
+    // switch the active organization first so a bookmark for org B does not
+    // land on org A's page (docs/adr/managed-services-tier.md, decision 8).
+    // Both products now live in the Services row at session-scoped URLs.
     Route::get('organizations/{organization}/realtime', [OrgScopedRedirectController::class, 'realtime'])
         ->name('organizations.realtime');
     Route::get('organizations/{organization}/realtime/{realtimeApp}', [OrgScopedRedirectController::class, 'realtimeApp'])
         ->name('organizations.realtime.show');
+    Route::get('organizations/{organization}/queues', [OrgScopedRedirectController::class, 'queues'])
+        ->name('organizations.queues');
+    Route::get('organizations/{organization}/queues/{queueNamespace}', [OrgScopedRedirectController::class, 'queueNamespace'])
+        ->name('organizations.queues.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
