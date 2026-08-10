@@ -8,7 +8,6 @@ use App\Livewire\Sites\DeploymentDetail;
 use App\Livewire\Sites\DeploymentsList;
 use App\Livewire\Sites\SiteEnvironment;
 use App\Livewire\Sites\Errors as SitesErrors;
-use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\ServerlessRouting;
@@ -111,9 +110,19 @@ final class ServerlessWorkspaceController
         return $this->mountLeaf($site, SitesErrors::class);
     }
 
-    public function logs(Site $site): Response
+    /**
+     * A function has no VM, so the BYO site logs workspace has
+     * nothing to read — it lists `/var/log/nginx/…` paths that can only ever
+     * render "SSH blocked / Unavailable". Route through the workspace shell's
+     * `logs` section instead, which mounts `serverless.logs-panel`: activations,
+     * visits, runtime output and deploy logs, all DB-backed from
+     * `function_invocations`, no SSH involved.
+     */
+    public function logs(Site $site): mixed
     {
-        return $this->mountLeaf($site, SitesLogs::class);
+        $this->guardFunctionSite($site);
+
+        return app(SiteWorkspaceController::class)($site->server, $site, 'logs');
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Models\Concerns\Site;
 
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessDeploymentConfigResolver;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -88,6 +89,25 @@ trait ManagesServerless
     }
 
     /**
+     * The deployed action's name on the host, or '' when it has never been
+     * deployed. Falls back to the trailing segment of the invocation URL for
+     * functions deployed before the name was persisted.
+     */
+    public function serverlessActionName(): string
+    {
+        $config = $this->serverlessConfig();
+
+        $name = trim((string) ($config['action_name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        $url = trim((string) ($config['action_url'] ?? ''));
+
+        return $url === '' ? '' : basename(rtrim($url, '/'));
+    }
+
+    /**
      * The function's globally-unique friendly slug — the one that gives it a
      * clean dply-hosted URL ({app}/fn/{slug}) instead of the raw DigitalOcean
      * Functions invocation URL. Generated and persisted on first access.
@@ -151,25 +171,19 @@ trait ManagesServerless
     }
 
     /**
-     * The function's live hostname — its proxy slug under a deterministically
-     * chosen DPLY_TESTING_DOMAINS entry (e.g. orders-api.dply.cc), matching
-     * how VM sites get a testing hostname. Null when no testing domains are
-     * configured, in which case the path URL (/fn/{slug}) is the address.
+     * The function's live hostname — its proxy slug under the dedicated
+     * serverless apex (e.g. orders-api.dply-serverless.cloud), matching how VM
+     * sites get a testing hostname. Every function gets one: the apex defaults
+     * to dply-serverless.cloud even with no env configuration, so this never
+     * falls back to the /fn/{slug} path URL.
+     *
+     * {@see ServerlessTestingDomains} owns the apex pool — deliberately
+     * separate from the shared DPLY_TESTING_DOMAINS preview pool.
      */
     public function serverlessFunctionHost(): ?string
     {
-        $domains = array_values(array_filter(
-            (array) config('services.digitalocean.testing_domains', []),
-            static fn ($domain): bool => is_string($domain) && trim($domain) !== '',
-        ));
-
-        if ($domains === []) {
-            return null;
-        }
-
-        $domain = trim((string) $domains[abs(crc32((string) $this->getKey())) % count($domains)]);
-
-        return $this->ensureServerlessProxySlug().'.'.$domain;
+        return $this->ensureServerlessProxySlug()
+            .'.'.ServerlessTestingDomains::apexFor($this->getKey());
     }
 
     /**

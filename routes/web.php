@@ -237,6 +237,7 @@ use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
 use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
@@ -340,15 +341,12 @@ Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
     ->name('serverless.proxy');
 
 // Live function hostnames: a deployed function answers at
-// {slug}.{DPLY_TESTING_DOMAINS entry}. Each configured testing domain gets a
-// wildcard-subdomain route that proxies to the function. (Production needs
-// *.{domain} DNS + TLS pointed at the dply app for these to resolve.)
-foreach ((array) config('services.digitalocean.testing_domains', []) as $functionDomain) {
-    $functionDomain = trim((string) $functionDomain);
-    if ($functionDomain === '') {
-        continue;
-    }
-
+// {slug}.dply-serverless.cloud. Each routable apex gets a wildcard-subdomain
+// route that proxies to the function — the serverless apex plus the legacy
+// DPLY_TESTING_DOMAINS pool, so functions minted before the dedicated apex
+// existed keep answering on their old hostnames. (Production needs *.{domain}
+// DNS + TLS pointed at the dply app for these to resolve.)
+foreach (ServerlessTestingDomains::routable() as $functionDomain) {
     Route::domain('{slug}.'.$functionDomain)
         ->any('/{path?}', ServerlessFunctionProxyController::class)
         ->where('path', '.*')

@@ -5,7 +5,7 @@
 
 <li
     wire:key="serverless-{{ $function->id }}"
-    class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-4 transition-colors last:border-b-0 hover:bg-brand-sand/15 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-6"
+    class="flex flex-col gap-2 border-b border-brand-ink/10 px-5 py-3 transition-colors last:border-b-0 hover:bg-brand-sand/15 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-6"
 >
     <div class="flex min-w-0 flex-1 items-start gap-3">
         <div class="min-w-0 flex-1">
@@ -19,12 +19,12 @@
                 @else
                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $function->name }}</span>
                 @endif
-                <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold {{ $function->statusBadgeClass }}">
+                <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-semibold {{ $function->statusBadgeClass }}">
                     {{ $function->statusLabel }}
                 </span>
             </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                 <span class="inline-flex max-w-full items-center gap-1 truncate font-mono">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                     <span class="truncate">{{ $function->repositoryUrl ?? '—' }}</span>

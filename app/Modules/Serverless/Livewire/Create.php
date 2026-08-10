@@ -92,6 +92,16 @@ class Create extends Component
             $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
             $this->refreshRepositories($repositoryBrowser);
         }
+
+        // `?starter=…` — the starter page's demo tiles land here prefilled, so
+        // the operator only picks a region/credential before hitting Create.
+        // Runs last: the demo prefill deliberately overrides the Git picker
+        // defaults set above.
+        match ((string) request()->query('starter', '')) {
+            'laravel' => $this->loadLaravelDemo(),
+            'php' => $this->loadPhpDemo(),
+            default => null,
+        };
     }
 
     protected function afterLinkedSourceControlAccountsRefreshed(): void

@@ -233,7 +233,7 @@ return [
         // Exit criteria: SQS-compatible API verified against Laravel's stock
         // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
         // (docs/adr/dply-queue.md).
-        'queue' => env('FEATURE_SURFACE_QUEUE', false),
+        'queue' => env('FEATURE_SURFACE_QUEUE', true),
     ],
 
     /*

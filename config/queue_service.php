@@ -30,7 +30,7 @@ return [
     |
     */
 
-    'enabled' => filter_var(env('DPLY_QUEUE_ENABLED', false), FILTER_VALIDATE_BOOL),
+    'enabled' => filter_var(env('DPLY_QUEUE_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------

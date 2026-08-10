@@ -35,7 +35,9 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $siteUptimeMonitorId,
         public ?string $userId = null,
-    ) {}
+    ) {
+        $this->onQueue(config('dply.queues.background'));
+    }
 
     /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
     public int $uniqueFor = 120;
