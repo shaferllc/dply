@@ -254,6 +254,42 @@
                                                     {{ __('Edge') }}
                                                 </x-coming-soon-dropdown-link>
                                             @endfeature
+
+                                            {{-- Services sits under Compute here for the same reason
+                                                 <x-services-index-nav> sits under <x-compute-index-nav>:
+                                                 managed capabilities your apps lean on, as opposed to the
+                                                 compute they run on. Keep this list in step with that
+                                                 component. See docs/adr/managed-services-tier.md. --}}
+                                            <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Services') }}</p>
+                                            @feature('workspace.backups')
+                                                <x-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Backups') }}
+                                                </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Backups') }}
+                                                </x-coming-soon-dropdown-link>
+                                            @endfeature
+                                            <x-dropdown-link :href="route('realtime.index')" :description="__('Pusher-compatible channels')">
+                                                <x-slot name="icon">
+                                                    <x-heroicon-o-signal class="{{ $hi }}" />
+                                                </x-slot>
+                                                {{ __('Realtime') }}
+                                            </x-dropdown-link>
+                                            @feature('surface.queue')
+                                                <x-dropdown-link :href="route('queues.index')" :description="__('Background jobs, no workers')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-queue-list class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Queues') }}
+                                                </x-dropdown-link>
+                                            @endfeature
                                         </div>
 
                                         {{-- Apps + Org --}}
@@ -272,21 +308,6 @@
                                                     </x-slot>
                                                     {{ __('Projects') }}
                                                 </x-dropdown-link>
-                                            @endfeature
-                                            @feature('workspace.backups')
-                                                <x-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Backups') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Backups') }}
-                                                </x-coming-soon-dropdown-link>
                                             @endfeature
                                             @if (production_data_mirror_available())
                                                 <x-dropdown-link
@@ -591,21 +612,9 @@
                         {{ __('Edge') }}
                     </x-coming-soon-responsive-nav-link>
                 @endfeature
-                <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>
-                <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Sites') }}
-                </x-responsive-nav-link>
-                @feature('surface.projects')
-                    <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Projects') }}
-                    </x-responsive-nav-link>
-                @endfeature
+                {{-- Mirrors the desktop dropdown's Services group and
+                     <x-services-index-nav>; keep all three in step. --}}
+                <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Services') }}</p>
                 @feature('workspace.backups')
                     <x-responsive-nav-link :href="route('backups.databases')" :active="request()->routeIs('backups.*')">
                         <x-slot name="icon">
@@ -620,6 +629,35 @@
                         </x-slot>
                         {{ __('Backups') }}
                     </x-coming-soon-responsive-nav-link>
+                @endfeature
+                <x-responsive-nav-link :href="route('realtime.index')" :active="request()->routeIs('realtime.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-signal class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Realtime') }}
+                </x-responsive-nav-link>
+                @feature('surface.queue')
+                    <x-responsive-nav-link :href="route('queues.index')" :active="request()->routeIs('queues.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-queue-list class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Queues') }}
+                    </x-responsive-nav-link>
+                @endfeature
+                <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>
+                <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Sites') }}
+                </x-responsive-nav-link>
+                @feature('surface.projects')
+                    <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-rectangle-stack class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Projects') }}
+                    </x-responsive-nav-link>
                 @endfeature
                 @if (production_data_mirror_available())
                     <x-responsive-nav-link :href="production_data_mirror_entry_url()" :active="request()->routeIs('live.*')">
