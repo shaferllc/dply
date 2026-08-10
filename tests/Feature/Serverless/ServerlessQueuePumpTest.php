@@ -44,6 +44,10 @@ function pumpSite(array $queueConfig = ['enabled' => true]): Site
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        // A backend the pump will actually drain. Without this the pump
+        // correctly refuses (see ServerlessQueueBackendTest) and every
+        // slot assertion below would be testing the refusal instead.
+        'env_file_content' => "QUEUE_CONNECTION=redis\nREDIS_HOST=redis.example\n",
         'meta' => [
             'runtime_profile' => 'digitalocean_functions_web',
             'serverless' => [

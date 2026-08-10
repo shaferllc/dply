@@ -4,6 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless;
 
+use App\Modules\Serverless\Livewire\BackgroundPanel;
+use App\Modules\Serverless\Livewire\CachePanel;
+use App\Modules\Serverless\Livewire\Create;
+use App\Modules\Serverless\Livewire\DatabasePanel;
+use App\Modules\Serverless\Livewire\DnsPanel;
+use App\Modules\Serverless\Livewire\Glue;
+use App\Modules\Serverless\Livewire\Index;
+use App\Modules\Serverless\Livewire\Journey;
+use App\Modules\Serverless\Livewire\LogsPanel;
+use App\Modules\Serverless\Livewire\PlatformPanel;
+use App\Modules\Serverless\Livewire\RollbackPanel;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -31,6 +42,7 @@ class ServerlessServiceProvider extends ServiceProvider
             $this->commands([
                 Console\CollectServerlessUsageCommand::class,
                 Console\ServerlessTickCommand::class,
+                Console\ServerlessQueueDoctorCommand::class,
                 Console\BackfillFunctionActionsCommand::class,
                 Console\PruneFunctionInvocationsCommand::class,
             ]);
@@ -39,16 +51,16 @@ class ServerlessServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Livewire::component('serverless.create', \App\Modules\Serverless\Livewire\Create::class);
-        Livewire::component('serverless.glue', \App\Modules\Serverless\Livewire\Glue::class);
-        Livewire::component('serverless.index', \App\Modules\Serverless\Livewire\Index::class);
-        Livewire::component('serverless.journey', \App\Modules\Serverless\Livewire\Journey::class);
-        Livewire::component('serverless.background-panel', \App\Modules\Serverless\Livewire\BackgroundPanel::class);
-        Livewire::component('serverless.cache-panel', \App\Modules\Serverless\Livewire\CachePanel::class);
-        Livewire::component('serverless.database-panel', \App\Modules\Serverless\Livewire\DatabasePanel::class);
-        Livewire::component('serverless.dns-panel', \App\Modules\Serverless\Livewire\DnsPanel::class);
-        Livewire::component('serverless.logs-panel', \App\Modules\Serverless\Livewire\LogsPanel::class);
-        Livewire::component('serverless.platform-panel', \App\Modules\Serverless\Livewire\PlatformPanel::class);
-        Livewire::component('serverless.rollback-panel', \App\Modules\Serverless\Livewire\RollbackPanel::class);
+        Livewire::component('serverless.create', Create::class);
+        Livewire::component('serverless.glue', Glue::class);
+        Livewire::component('serverless.index', Index::class);
+        Livewire::component('serverless.journey', Journey::class);
+        Livewire::component('serverless.background-panel', BackgroundPanel::class);
+        Livewire::component('serverless.cache-panel', CachePanel::class);
+        Livewire::component('serverless.database-panel', DatabasePanel::class);
+        Livewire::component('serverless.dns-panel', DnsPanel::class);
+        Livewire::component('serverless.logs-panel', LogsPanel::class);
+        Livewire::component('serverless.platform-panel', PlatformPanel::class);
+        Livewire::component('serverless.rollback-panel', RollbackPanel::class);
     }
 }

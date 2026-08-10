@@ -104,6 +104,16 @@ final class ServerlessQueuePump
             return 0;
         }
 
+        // Refuse to drain a backend whose store is not shared across
+        // invocations. Draining anyway is not merely useless: on `sync` it
+        // burns an invocation per wake to process nothing, and on SQLite each
+        // concurrent slot works a different database. Both look healthy from
+        // the outside, which is exactly why this is a hard stop rather than a
+        // warning.
+        if (! app(ServerlessQueueBackend::class)->canDrain($site)) {
+            return 0;
+        }
+
         $opened = 0;
         while ($opened < max(1, $ramp) && $this->tryOpenSlot($site)) {
             ServerlessQueueSlotJob::dispatch($site->id);

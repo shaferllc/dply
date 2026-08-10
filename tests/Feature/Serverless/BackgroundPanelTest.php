@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Modules\Serverless\Jobs\ServerlessQueueSlotJob;
 use App\Modules\Serverless\Livewire\BackgroundPanel;
 use App\Modules\Serverless\Models\ServerlessFailedJob;
+use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -21,7 +22,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 /** @return array{0: User, 1: Site} */
-function panelSite(array $queueConfig = ['enabled' => true]): array
+function panelSite(array $queueConfig = ['enabled' => true], string $env = "QUEUE_CONNECTION=redis\nREDIS_HOST=redis.example\n"): array
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -47,6 +48,7 @@ function panelSite(array $queueConfig = ['enabled' => true]): array
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        'env_file_content' => $env,
         'meta' => [
             'runtime_profile' => 'digitalocean_functions_web',
             'serverless' => [
@@ -272,4 +274,77 @@ test('clearing removes this site failures and leaves others', function () {
 
     expect(ServerlessFailedJob::query()->where('site_id', $site->id)->count())->toBe(0);
     expect(ServerlessFailedJob::query()->find($foreign->id))->not->toBeNull();
+});
+
+test('it explains the block when QUEUE_CONNECTION is unset', function () {
+    // The silent failure: unset means the handler defaults to sync, jobs run
+    // inline, nothing is queued, and every drain reports zero while looking
+    // healthy. The pump refuses to drain it; this is where that is explained.
+    [$user, $site] = panelSite(['enabled' => true], "APP_ENV=production\n");
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertSee('dply is not draining this function')
+        ->assertSee('nothing is ever queued');
+});
+
+test('it explains the block when QUEUE_CONNECTION is sync', function () {
+    [$user, $site] = panelSite(['enabled' => true], "QUEUE_CONNECTION=sync\n");
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertSee('dply is not draining this function');
+});
+
+test('it explains the block for a sqlite queue', function () {
+    [$user, $site] = panelSite(['enabled' => true], "QUEUE_CONNECTION=database\nDB_CONNECTION=sqlite\n");
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertSee('dply is not draining this function')
+        ->assertSee('per-container');
+});
+
+test('it does not warn on a real queue connection', function () {
+    [$user, $site] = panelSite();
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertDontSee('dply is not draining this function');
+});
+
+test('it does not warn when background processing is off', function () {
+    // Nothing is draining anyway — the warning would just be noise.
+    [$user, $site] = panelSite(['enabled' => false], "QUEUE_CONNECTION=sync\n");
+    $meta = $site->meta;
+    $meta['serverless']['background_enabled'] = false;
+    $site->forceFill(['meta' => $meta])->save();
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertDontSee('dply is not draining this function');
+});
+
+test('it offers the provisioned redis as a one-click fix', function () {
+    [$user, $site] = panelSite(['enabled' => true], "QUEUE_CONNECTION=sync\nREDIS_HOST=redis.example\n");
+    $meta = $site->meta;
+    $meta['serverless']['cache'] = ['status' => 'online'];
+    $site->forceFill(['meta' => $meta])->save();
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertSee('Use the provisioned Redis')
+        ->call('useProvisionedRedis');
+
+    expect(app(ServerlessQueueBackend::class)
+        ->classify($site->fresh())['connection'])->toBe('redis');
+});
+
+test('with no redis online it tells you to provision one instead', function () {
+    [$user, $site] = panelSite(['enabled' => true], "QUEUE_CONNECTION=sync\n");
+
+    Livewire::actingAs($user)
+        ->test(BackgroundPanel::class, ['site' => $site])
+        ->assertDontSee('Use the provisioned Redis')
+        ->assertSee('Provision a Redis cache');
 });

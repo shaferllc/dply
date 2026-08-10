@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Jobs;
 
 use App\Models\Site;
-use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -109,6 +110,17 @@ class ProvisionServerlessCacheJob implements ShouldQueue
         $cache['port'] = $connection['port'];
         unset($cache['error']);
         $this->persist($site->fresh() ?? $site, $cache);
+
+        // A function cannot run a queue on `sync` or on SQLite — the first
+        // never enqueues, the second loses jobs between containers, and both
+        // fail silently. Now that a shared Redis exists, adopt it for the
+        // queue too — but only when the current backend is one of those
+        // broken defaults. An operator pointing the queue at their own SQS or
+        // Redis has made a choice, and silently repointing it would be a
+        // worse failure than the one being fixed.
+        if (app(ServerlessQueueBackend::class)->adoptRedisIfBroken($site->fresh() ?? $site)) {
+            Log::info('serverless.cache.queue_adopted_redis', ['site_id' => $site->id]);
+        }
     }
 
     /**

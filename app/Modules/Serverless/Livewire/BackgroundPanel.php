@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\Serverless\Models\ServerlessFailedJob;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
+use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -236,11 +237,36 @@ class BackgroundPanel extends Component
         $site->forceFill(['meta' => $meta])->save();
     }
 
-    public function render(ServerlessQueuePump $pump): View
+    /**
+     * Point the queue at the provisioned Redis.
+     *
+     * The one-click fix for the two backends that cannot work on a function.
+     * Offered only when a Redis is actually online — otherwise the operator
+     * needs to provision one first, which the panel says instead.
+     */
+    public function useProvisionedRedis(ServerlessQueueBackend $backend): void
+    {
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        if (! $backend->wireRedis($site)) {
+            $this->toastError(__('No provisioned Redis is online for this function yet.'));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Queue pointed at the provisioned Redis. Redeploy to apply it to the running function.'));
+    }
+
+    public function render(ServerlessQueuePump $pump, ServerlessQueueBackend $backend): View
     {
         $site = $this->site();
         $serverless = is_array($site->meta['serverless'] ?? null) ? $site->meta['serverless'] : [];
         $config = $pump->config($site);
+
+        // One classifier behind the panel, the pump, and the doctor, so the
+        // UI can never call a backend healthy that the pump refuses to drain.
+        $queue = $backend->classify($site);
 
         return view('livewire.serverless.background-panel', [
             'enabled' => (bool) ($serverless['background_enabled'] ?? false),
@@ -249,6 +275,11 @@ class BackgroundPanel extends Component
             'queueEnabled' => $config['enabled'],
             'activeSlots' => $pump->activeSlots($site),
             'maxConcurrencyCeiling' => ServerlessQueuePump::MAX_CONCURRENCY_CEILING,
+            'queueConnection' => $queue['connection'],
+            'queueState' => $queue['state'],
+            'queueReason' => $queue['reason'],
+            'queueBlocked' => ! $backend->canDrain($site),
+            'canUseRedis' => $queue['fixable_with_redis'],
         ]);
     }
 }

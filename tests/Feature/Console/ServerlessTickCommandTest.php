@@ -33,6 +33,10 @@ function functionSite(string $status, array $serverless): Site
     return Site::factory()->create([
         'server_id' => $server->id,
         'status' => $status,
+        // The pump refuses to drain an unusable queue backend, so give the
+        // fixture a shareable one — otherwise the wake assertion below would
+        // be testing that refusal rather than the tick.
+        'env_file_content' => "QUEUE_CONNECTION=redis\nREDIS_HOST=redis.example\n",
         'meta' => ['serverless' => array_merge(['action_name' => 'laravel-demo'], $serverless)],
     ]);
 }

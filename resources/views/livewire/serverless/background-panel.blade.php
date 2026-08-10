@@ -19,6 +19,44 @@
             </div>
         @endunless
 
+        {{-- Both failing backends are silent: `sync` never enqueues, and
+             SQLite loses jobs between containers. The pump refuses to drain
+             either, so this explains the refusal rather than letting the
+             panel look healthy while nothing happens. --}}
+        @if ($enabled && $queueBlocked)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                <p class="font-semibold">
+                    {{ __('Queued jobs will not run — dply is not draining this function.') }}
+                </p>
+                <p class="mt-0.5">{{ $queueReason }}</p>
+                <p class="mt-0.5">
+                    {{ __('A function drains its queue with several concurrent invocations, so the queue has to live somewhere all of them can reach.') }}
+                </p>
+
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    @if ($canUseRedis)
+                        <button type="button" wire:click="useProvisionedRedis" wire:loading.attr="disabled" wire:target="useProvisionedRedis"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-2.5 py-1 text-2xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:opacity-60">
+                            <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                            <span wire:loading.remove wire:target="useProvisionedRedis">{{ __('Use the provisioned Redis') }}</span>
+                            <span wire:loading wire:target="useProvisionedRedis">{{ __('Wiring…') }}</span>
+                        </button>
+                    @else
+                        <span class="text-2xs">
+                            {{ __('Provision a Redis cache for this function on the Resources tab, and dply will point the queue at it automatically.') }}
+                        </span>
+                    @endif
+                </div>
+            </div>
+        @elseif ($enabled && $queueState === 'unknown')
+            {{-- Not blocked: an unrecognised driver backed by a real service
+                 is perfectly valid, and refusing it would be worse than the
+                 risk. Say so rather than pretending to have checked. --}}
+            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
+                {{ $queueReason }}
+            </div>
+        @endif
+
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Background processing') }}</p>
