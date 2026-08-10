@@ -17,8 +17,13 @@
         : [
             ['route' => 'sites.index', 'match' => 'sites.index', 'label' => __('Sites'), 'icon' => 'globe-alt'],
             ['route' => 'servers.index', 'match' => 'servers.index', 'label' => __('Servers'), 'icon' => 'server'],
-            ['route' => 'projects.index', 'match' => 'projects.*', 'label' => __('Projects'), 'icon' => 'folder'],
-            ['route' => 'fleet.index', 'match' => 'fleet.*', 'label' => __('Fleet'), 'icon' => 'rectangle-stack', 'feature' => 'surface.fleet'],
+            // Projects and Fleet are deliberately absent: this row is labelled
+            // Compute, and neither is compute — Projects is a grouping container,
+            // Fleet a cross-server view. Both keep header entry points (Projects
+            // under Apps, Fleet via the featured "Fleet ops" link and the Org
+            // group's Fleet health, which reaches fleet.index through
+            // livewire/fleet/_tabs). Don't re-add them here without renaming the
+            // row.
             // Backups moved to the Services row — it is a managed capability,
             // not compute (docs/adr/managed-services-tier.md, decision 1).
             ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt'],
@@ -35,12 +40,17 @@
     column. Differentiation is carried by weight, not by shape: white ground
     against the services row's sand tint, larger type, larger icons, and an
     ink-toned label against the services row's muted moss.
+
+    The production variant is labelled Production, not Compute: it still
+    carries Projects, because live.projects.index has no other entry point
+    anywhere in the app (the header dropdown links the local projects.index),
+    and a row containing a grouping container cannot honestly claim Compute.
 --}}
 
 <nav class="border-b border-brand-ink/10 bg-white" aria-label="{{ $surface === 'production' ? __('Production') : __('Workspace') }}">
     <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <span class="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-brand-ink/60 sm:inline sm:w-20">
-            {{ __('Compute') }}
+            {{ $surface === 'production' ? __('Production') : __('Compute') }}
         </span>
         <div class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto sm:gap-1" style="-webkit-overflow-scrolling: touch;">
             @foreach ($items as $item)
