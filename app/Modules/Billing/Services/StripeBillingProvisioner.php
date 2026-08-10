@@ -81,6 +81,12 @@ class StripeBillingProvisioner
     // and standard_realtime_tier_starter_yearly.
     public const ROLE_REALTIME_TIER_PREFIX = 'standard_realtime_tier_';
 
+    public const ROLE_QUEUE_PRODUCT = 'standard_queue_product';
+
+    // Per capacity-tier queue price roles, e.g. standard_queue_tier_standard
+    // and standard_queue_tier_standard_yearly.
+    public const ROLE_QUEUE_TIER_PREFIX = 'standard_queue_tier_';
+
     public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
     public function __construct(private StripeClient $stripe) {}
@@ -364,6 +370,49 @@ class StripeBillingProvisioner
             }
         }
 
+        // dply Queue — one product, one monthly + yearly price per capacity
+        // tier. Prices come from config('queue_service.tiers'); each tier is
+        // billed per billable namespace. Namespaces attached to a dply
+        // Serverless site never reach a Stripe line at all: the billing
+        // computer drops them before quantities are counted, so there is no
+        // "free" price to provision here (docs/adr/managed-services-tier.md,
+        // decisions 4 and 5).
+        $queueTiers = (array) config('queue_service.tiers', []);
+        if ($queueTiers !== []) {
+            $queueProduct = $this->upsertProduct(
+                name: 'dply Queue namespace',
+                description: 'Per-namespace fee for dply Queue — a managed, SQS-compatible job queue hosted by dply. Covers the job store, visibility/lease handling, failed-job retention, and the dashboard. Billed per namespace, priced by capacity tier. Included at no charge for namespaces serving a dply Serverless site.',
+                role: self::ROLE_QUEUE_PRODUCT,
+            );
+            $result[self::ROLE_QUEUE_PRODUCT] = $queueProduct->id;
+
+            foreach ($queueTiers as $slug => $tier) {
+                $tierCents = (int) ($tier['price_cents'] ?? 0);
+                if ($tierCents <= 0) {
+                    continue;
+                }
+                $label = (string) ($tier['label'] ?? ucfirst((string) $slug));
+                $monthlyRole = self::ROLE_QUEUE_TIER_PREFIX.$slug;
+                $yearlyRole = $monthlyRole.'_yearly';
+
+                $result[$monthlyRole] = $this->upsertRecurringPrice(
+                    productId: $queueProduct->id,
+                    amount: $tierCents,
+                    interval: 'month',
+                    nickname: 'Queue '.$label.' — Monthly',
+                    role: $monthlyRole,
+                )->id;
+
+                $result[$yearlyRole] = $this->upsertRecurringPrice(
+                    productId: $queueProduct->id,
+                    amount: $this->annualAmount($tierCents, $annualPct),
+                    interval: 'year',
+                    nickname: 'Queue '.$label.' — Yearly',
+                    role: $yearlyRole,
+                )->id;
+            }
+        }
+
         $enterpriseProduct = $this->upsertProduct(
             name: 'dply Enterprise',
             description: 'dply for larger fleets and procurement-led rollouts. Includes everything in Standard, plus volume pricing on per-server fees, SSO, audit log access, a custom MSA, dedicated support, and rollout planning. Pricing is negotiated per deal.',
@@ -410,6 +459,20 @@ class StripeBillingProvisioner
                     $lines[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($slug).'_YEARLY='.$id;
                 } else {
                     $lines[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($suffix).'='.$id;
+                }
+
+                continue;
+            }
+
+            // Queue tier price roles → STRIPE_PRICE_STANDARD_QUEUE_{TIER}[_YEARLY].
+            // Same reason as above: claim the prefix before the plan branches.
+            if (str_starts_with($role, self::ROLE_QUEUE_TIER_PREFIX)) {
+                $suffix = substr($role, strlen(self::ROLE_QUEUE_TIER_PREFIX));
+                if (str_ends_with($suffix, '_yearly')) {
+                    $slug = substr($suffix, 0, -strlen('_yearly'));
+                    $lines[] = 'STRIPE_PRICE_STANDARD_QUEUE_'.strtoupper($slug).'_YEARLY='.$id;
+                } else {
+                    $lines[] = 'STRIPE_PRICE_STANDARD_QUEUE_'.strtoupper($suffix).'='.$id;
                 }
 
                 continue;

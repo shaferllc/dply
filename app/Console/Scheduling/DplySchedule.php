@@ -67,6 +67,7 @@ use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
 use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
@@ -215,6 +216,15 @@ final class DplySchedule
         $schedule->command(CollectRealtimeUsageCommand::class)
             ->hourly()
             ->name('realtime-usage-today')
+            ->withoutOverlapping();
+
+        // dply Queue throughput rollup. Observational — a namespace is priced by
+        // its capacity tier, so a missed run costs a gap in a sparkline and
+        // nothing else. The flush upserts the day's running total, so the next
+        // pass heals a skipped one (docs/adr/managed-services-tier.md, dec. 6).
+        $schedule->command(FlushQueueUsageCommand::class)
+            ->hourly()
+            ->name('queue-usage-flush')
             ->withoutOverlapping();
 
         // dply Logs ingest metering (read-only; no billing yet). Hourly keeps the

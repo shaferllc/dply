@@ -48,8 +48,17 @@ class Realtime extends Component
 
     public bool $confirmCreateCharge = false;
 
-    public function mount(Organization $organization): void
+    /**
+     * Session-scoped like every other product index (Edge, Cloud, Serverless);
+     * the organization is no longer a route parameter. Legacy
+     * `/organizations/{org}/realtime` URLs switch the session first — see
+     * {@see \App\Http\Controllers\OrgScopedRedirectController}.
+     */
+    public function mount(): void
     {
+        $organization = auth()->user()?->currentOrganization();
+        abort_if($organization === null, 403);
+
         $this->organization = $organization;
         $this->authorize('view', $organization);
         $this->createTier = (string) config('realtime.default_tier', 'starter');
@@ -235,12 +244,14 @@ class Realtime extends Component
                 : new Collection,
             'featureActive' => Feature::for($this->organization)->active('surface.realtime'),
             'canManage' => auth()->user()?->can('update', $this->organization) ?? false,
+            // Product breadcrumbs, matching Backups/Edge. The organization crumb
+            // went with the org-settings shell: the active org is now the
+            // session's, so naming it here would imply a choice the URL no
+            // longer offers.
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
                 ['label' => __('Realtime'), 'icon' => 'signal'],
             ],
-            'orgShellSection' => 'realtime',
         ]);
     }
 }

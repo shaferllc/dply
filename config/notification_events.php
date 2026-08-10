@@ -91,6 +91,16 @@ return [
                 'server.logs.alert_triggered' => 'Log alert triggered',
             ],
         ],
+        'queue' => [
+            'label' => 'dply Queue notifications',
+            'events' => [
+                // A queue's price follows the site it serves, so it can change
+                // without anyone touching the queue. Telling the customer is
+                // what keeps that from arriving as a surprise on an invoice.
+                'queue.namespace.became_billable' => 'Queue namespace started billing',
+                'queue.namespace.became_free' => 'Queue namespace became free',
+            ],
+        ],
         'deploy_window' => [
             'label' => 'Deploy window notifications',
             'events' => [

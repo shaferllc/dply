@@ -1,5 +1,5 @@
 <div class="contents">
-    <x-compute-index-nav surface="local" />
+    <x-workspace-nav surface="local" />
 
     <x-projects-index-page
         :rows="$rows"

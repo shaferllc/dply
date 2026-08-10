@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue;
 
+use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Livewire\QueueNamespaceShow;
+use App\Modules\Queue\Livewire\Queues;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Observers\QueueNamespaceBillingObserver;
 use App\Modules\Queue\Services\PostgresQueueStore;
 use App\Policies\QueueNamespacePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 /**
  * dply Queue module wiring (docs/adr/modular-monolith-structure.md).
@@ -29,10 +34,23 @@ class QueueServiceProvider extends ServiceProvider
         // value would be Horizon compatibility via a real RESP endpoint, not
         // throughput — a much larger job than a second binding here.
         $this->app->bind(QueueStore::class, PostgresQueueStore::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                FlushQueueUsageCommand::class,
+            ]);
+        }
     }
 
     public function boot(): void
     {
         Gate::policy(QueueNamespace::class, QueueNamespacePolicy::class);
+
+        // Registered here rather than in AppServiceProvider (where Realtime's
+        // equivalent still lives) so the module carries its own wiring.
+        QueueNamespace::observe(QueueNamespaceBillingObserver::class);
+
+        Livewire::component('queues', Queues::class);
+        Livewire::component('queue-namespace-show', QueueNamespaceShow::class);
     }
 }

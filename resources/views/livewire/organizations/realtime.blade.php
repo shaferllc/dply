@@ -8,15 +8,17 @@
     $money = fn (int $cents): string => '$'.number_format($cents / 100, 2);
 @endphp
 
-<div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell
-            :organization="$organization"
-            section="realtime"
+<div class="contents">
+    <x-workspace-nav surface="local" />
+
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
+        <x-breadcrumb-trail :items="$breadcrumbs" />
+
+        <x-profile-shell
+            dense
             :title="__('Realtime')"
             :description="__('Managed Pusher-compatible relay for your apps. Each active app is billed monthly by its connection tier and added to this workspace subscription.')"
             icon="heroicon-o-signal"
-            :breadcrumb="$breadcrumbs"
         >
             <x-slot:actions>
                 @if ($featureActive && $canManage && $apps->isNotEmpty())
@@ -112,7 +114,7 @@
                         <article class="relative px-5 py-5 transition-colors hover:bg-brand-sand/15 sm:px-6" @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
                             {{-- Stretched link: the whole card clicks through to the app's detail
                                  page; the action buttons below sit above it via z-10. --}}
-                            <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate
+                            <a href="{{ route('realtime.show', $app) }}" wire:navigate
                                 class="absolute inset-0 z-0 rounded-[inherit]" aria-label="{{ __('View :name', ['name' => $app->name]) }}"></a>
                             <div class="relative z-10 flex flex-wrap items-start justify-between gap-4 pointer-events-none">
                                 <div class="min-w-0">
@@ -167,7 +169,7 @@
                     @endforeach
                 </section>
             @endif
-        </x-organization-shell>
+        </x-profile-shell>
     </div>
 
     {{-- Tier-change modal --}}

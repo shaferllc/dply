@@ -41,7 +41,10 @@ class PostgresQueueStore implements QueueStore
 
     private const FAILED = 'dply_queue_failed_jobs';
 
-    public function __construct(private readonly QueuePayloadInspector $inspector) {}
+    public function __construct(
+        private readonly QueuePayloadInspector $inspector,
+        private readonly QueueUsageCounter $usage,
+    ) {}
 
     public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0): string
     {
@@ -84,6 +87,12 @@ class PostgresQueueStore implements QueueStore
         }
 
         $this->connection()->table(self::JOBS)->insert($rows);
+
+        // Counted after the insert committed, so the chart never shows jobs
+        // that were never enqueued. Observational only — the counter swallows
+        // its own failures and nothing bills from it
+        // (docs/adr/managed-services-tier.md, decision 6).
+        $this->usage->record($namespace, count($rows));
 
         return $ids;
     }

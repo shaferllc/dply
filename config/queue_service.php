@@ -89,20 +89,73 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Capacity tiers
+    |--------------------------------------------------------------------------
+    |
+    | A namespace is priced by the capacity it reserves, exactly as a Realtime
+    | app is priced by its connection tier — see config/realtime.php, whose
+    | shape this mirrors deliberately so both managed services bill through one
+    | mechanism.
+    |
+    | NOT metered per job. Metering was considered and rejected for v1: it
+    | requires exactly-once-ish accounting because the number lands on an
+    | invoice, and `requests_per_minute` already caps COGS structurally (600rpm
+    | is a ~26M request/month ceiling). Counters still exist, but they are
+    | observational and feed the UI only. See docs/adr/managed-services-tier.md,
+    | decision 6, which amends docs/adr/dply-queue.md decision 9.
+    |
+    | `max_queue_depth` and `requests_per_minute` are enforced at the data
+    | plane; the price is what the customer buys by raising them.
+    |
+    */
+
+    'tiers' => [
+        'standard' => [
+            'label' => 'Standard',
+            'max_queue_depth' => 100_000,
+            'requests_per_minute' => 600,
+            'price_cents' => 900,
+        ],
+        'pro' => [
+            'label' => 'Pro',
+            'max_queue_depth' => 500_000,
+            'requests_per_minute' => 1_200,
+            'price_cents' => 2_900,
+        ],
+    ],
+
+    // Yearly prices are not listed here: StripeBillingProvisioner derives them
+    // from the monthly amount with the standard annual discount, the same way
+    // Realtime's tiers do. One discount policy, one place to change it.
+
+    'default_tier' => env('DPLY_QUEUE_DEFAULT_TIER', 'standard'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Billing
     |--------------------------------------------------------------------------
     |
-    | Metered on jobs PUSHED — not API requests, which would bill the customer
-    | for dply's polling design and reward us for not improving it.
+    | A namespace is free when it serves a dply Serverless site and billed
+    | otherwise — Serverless is the product Queue exists to unblock, and
+    | charging for that namespace would re-erect the barrier the product
+    | removes. Cloud, BYO and Edge customers have working alternatives, so for
+    | them this is a convenience purchase and bills from namespace #1.
     |
-    | Ships dark: disabled, rate zero. Same staging as Logs.
+    | Billability is derived LIVE from the namespace's attached site, never
+    | stamped at creation: the rule is about what a queue currently serves, not
+    | how its row came to exist. A site-less namespace (an external Laravel app)
+    | is billable. See docs/adr/managed-services-tier.md, decisions 4 and 5.
+    |
+    | `enabled` is the master safety and stays false until the predicate, the
+    | Stripe tier prices and the flip notification are all in place — and then
+    | through the free beta. ServerlessQueueProvisioner already auto-creates
+    | namespaces the moment `surface.queue` opens, so flipping this early
+    | charges Serverless customers for what they were told was included.
     |
     */
 
     'billing' => [
         'enabled' => filter_var(env('DPLY_QUEUE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOL),
-        'per_million_jobs_cents' => (int) env('DPLY_QUEUE_PER_MILLION_JOBS_CENTS', 0),
-        'markup_percent' => (int) env('DPLY_QUEUE_MARKUP_PERCENT', 0),
     ],
 
     /*
@@ -114,43 +167,34 @@ return [
     | — the fail-open convention from ServerLogEntitlement: nothing is enforced
     | until a number is deliberately set.
     |
+    | Capacity (depth, rate) lives on the TIER, not the plan: under per-resource
+    | pricing the price is the limiter, which is why config/realtime.php carries
+    | no per-plan app cap either. What remains here is whether the org may use
+    | the product at all, how many namespaces it may hold, and the payload
+    | ceiling that protects the store from any single push.
+    |
     */
 
     'entitlements' => [
         'defaults' => [
             'available' => true,
             'tier' => 'standard',
-            'monthly_included_jobs' => 1_000_000,
-            'overage_per_million_jobs_cents' => 0,
             'max_namespaces' => 1,
-            'max_queue_depth' => 100_000,
             'max_payload_bytes' => 262_144,
-            'requests_per_minute' => 600,
-            'hard_cap_jobs' => 0,
         ],
 
         'plans' => [
             'free' => [
                 'max_namespaces' => 1,
-                'max_queue_depth' => 10_000,
-                'monthly_included_jobs' => 100_000,
-                'requests_per_minute' => 120,
             ],
             'starter' => [
                 'max_namespaces' => 2,
-                'max_queue_depth' => 50_000,
             ],
             'pro' => [
                 'max_namespaces' => 10,
-                'max_queue_depth' => 500_000,
-                'monthly_included_jobs' => 5_000_000,
-                'requests_per_minute' => 1_200,
             ],
             'business' => [
                 'max_namespaces' => 0,
-                'max_queue_depth' => 2_000_000,
-                'monthly_included_jobs' => 25_000_000,
-                'requests_per_minute' => 3_000,
             ],
         ],
     ],

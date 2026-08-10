@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\ServerLogUsageDaily;
 use App\Models\Site;
 use App\Modules\Logs\Services\ServerLogEntitlements;
+use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Realtime\Models\RealtimeApp;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -365,6 +366,34 @@ class OrganizationBillingStateComputer
                 });
         }
 
+        // dply Queue namespaces — billed per capacity tier, and free when the
+        // namespace serves a dply Serverless site (QueueNamespace::isBillable()).
+        // Dark until DPLY_QUEUE_BILLING_ENABLED, which must stay off until this
+        // predicate ships: ServerlessQueueProvisioner auto-creates namespaces
+        // the moment surface.queue opens, so billing-before-predicate would
+        // charge Serverless customers for what they were told was included.
+        // See docs/adr/managed-services-tier.md, decisions 4, 5 and 11.
+        $queueTierQuantities = [];
+        $queueBillableNamespaceIds = [];
+        if ((bool) config('queue_service.billing.enabled', false)) {
+            $organization->queueNamespaces()
+                ->where('status', QueueNamespace::STATUS_ACTIVE)
+                ->where('created_at', '<=', $ageCutoff)
+                // Eager-loaded because isBillable() reads the site's backend;
+                // without it this is an N+1 across every namespace in the org.
+                ->with('site:id,serverless_backend')
+                ->get(['id', 'site_id', 'tier'])
+                ->each(function (QueueNamespace $namespace) use (&$queueTierQuantities, &$queueBillableNamespaceIds): void {
+                    if (! $namespace->isBillable()) {
+                        return;
+                    }
+
+                    $slug = $namespace->tierConfig()->slug;
+                    $queueTierQuantities[$slug] = ($queueTierQuantities[$slug] ?? 0) + 1;
+                    $queueBillableNamespaceIds[] = (string) $namespace->id;
+                });
+        }
+
         [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
         $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
         $edgeUsageEstimate = $this->usageCostCalculator->estimate($usageTotals, $edgeCount);
@@ -440,6 +469,8 @@ class OrganizationBillingStateComputer
             edgeUsageEstimate: $edgeUsageEstimate,
             realtimeTierQuantities: $realtimeTierQuantities,
             lookoutTierQuantities: $lookoutTierQuantities,
+            queueTierQuantities: $queueTierQuantities,
+            queueBillableNamespaceIds: $queueBillableNamespaceIds,
             serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
             serverLogUsageEstimate: $serverLogUsageEstimate,
         );

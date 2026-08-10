@@ -15,28 +15,23 @@ use App\Modules\Logs\Services\ServerLogEntitlement;
  * its fail-open convention: a limit of 0 means "no limit", so nothing is
  * enforced until a number is deliberately set. A queue that silently starts
  * rejecting pushes is worse than one that costs us a little.
+ *
+ * Scope note: this answers "what may this ORG do" — may it use the product,
+ * how many namespaces may it hold, how large may one message be. Capacity
+ * (depth, request rate) is not here: it belongs to the namespace's
+ * {@see QueueTier}, because a namespace is priced per resource and the price
+ * is the limiter. See docs/adr/managed-services-tier.md, decision 6.
  */
 final class QueueEntitlement
 {
     public function __construct(
         public readonly string $planKey,
         public readonly bool $available,
+        /** Tier a newly created namespace starts on. */
         public readonly string $tier,
-        /** Jobs included per month before overage. 0 = unlimited. */
-        public readonly int $monthlyIncludedJobs,
-        public readonly int $overagePerMillionJobsCents,
         /** 0 = unlimited. */
         public readonly int $maxNamespaces,
-        /** Push rejection threshold, guarding the shared table. 0 = unlimited. */
-        public readonly int $maxQueueDepth,
         public readonly int $maxPayloadBytes,
-        /** Per-namespace API rate limit. */
-        public readonly int $requestsPerMinute,
-        /**
-         * Customer-protecting ceiling on jobs pushed per month. 0 = disabled
-         * (fail open — never reject), so this does nothing until set.
-         */
-        public readonly int $hardCapJobs = 0,
     ) {}
 
     /**
@@ -50,24 +45,20 @@ final class QueueEntitlement
         return new self(
             planKey: $planKey,
             available: (bool) ($merged['available'] ?? true),
-            tier: (string) ($merged['tier'] ?? 'standard'),
-            monthlyIncludedJobs: max(0, (int) ($merged['monthly_included_jobs'] ?? 0)),
-            overagePerMillionJobsCents: max(0, (int) ($merged['overage_per_million_jobs_cents'] ?? 0)),
+            tier: (string) ($merged['tier'] ?? config('queue_service.default_tier', 'standard')),
             maxNamespaces: max(0, (int) ($merged['max_namespaces'] ?? 0)),
-            maxQueueDepth: max(0, (int) ($merged['max_queue_depth'] ?? 0)),
             maxPayloadBytes: max(0, (int) ($merged['max_payload_bytes'] ?? 262144)),
-            requestsPerMinute: max(1, (int) ($merged['requests_per_minute'] ?? 600)),
-            hardCapJobs: max(0, (int) ($merged['hard_cap_jobs'] ?? 0)),
         );
     }
 
-    public function hasQueueDepthLimit(): bool
+    public function hasNamespaceLimit(): bool
     {
-        return $this->maxQueueDepth > 0;
+        return $this->maxNamespaces > 0;
     }
 
-    public function hasHardCap(): bool
+    /** The capacity a namespace created under this entitlement starts with. */
+    public function defaultTier(): QueueTier
     {
-        return $this->hardCapJobs > 0;
+        return QueueTier::resolve($this->tier);
     }
 }

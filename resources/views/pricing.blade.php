@@ -36,6 +36,15 @@
         $cloud = (int) config('subscription.standard.cloud_cents', 500) / 100;
         $edge = (int) config('subscription.standard.edge_cents', 200) / 100;
 
+        // Managed services are priced per resource by tier, so the headline is
+        // the cheapest tier in each table rather than a single configured cent
+        // value like the hosting products above.
+        $realtimeTiers = collect((array) config('realtime.tiers', []))->pluck('price_cents')->filter();
+        $realtime = ($realtimeTiers->min() ?: 1500) / 100;
+
+        $queueTiers = collect((array) config('queue_service.tiers', []))->pluck('price_cents')->filter();
+        $queue = ($queueTiers->min() ?: 900) / 100;
+
         $freePlan = $plans->firstWhere('key', 'free');
         $starterPlan = $plans->firstWhere('key', 'starter');
 
@@ -239,6 +248,76 @@
             </div>
         </section>
 
+        {{-- Managed services — the things apps lean on, priced per resource.
+             Kept separate from the hosting products above: these are not places
+             to run an app, and Queue's Serverless carve-out needs room to be
+             stated plainly rather than buried in a card. --}}
+        @php
+            $managedServices = [
+                [
+                    'name' => 'Realtime',
+                    'flag' => 'surface.realtime',
+                    'price' => $realtime,
+                    'unit' => 'per app / mo',
+                    'desc' => 'A Pusher-compatible WebSocket relay. Drop-in for Laravel Echo or Reverb — no relay to run. Priced by connection tier, capped at the tier so a traffic spike costs connections, never a surprise invoice.',
+                    'icon' => 'heroicon-o-signal',
+                ],
+                [
+                    'name' => 'Queues',
+                    'flag' => 'surface.queue',
+                    'price' => $queue,
+                    'unit' => 'per queue / mo',
+                    'desc' => 'A managed job queue Laravel talks to with its built-in SQS driver — nothing to install, no Redis to provision. Priced by capacity, never per job: ten jobs or ten million costs the same.',
+                    'icon' => 'heroicon-o-queue-list',
+                ],
+            ];
+
+            \Laravel\Pennant\Feature::loadMissing(array_column($managedServices, 'flag'));
+        @endphp
+        <section class="pb-12 px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-5xl">
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-brand-ink">Services your apps lean on</h2>
+                    <p class="mt-2 text-brand-moss">Managed infrastructure that isn't a place to run an app. Add them to any paid plan; each is priced per resource by tier.</p>
+                </div>
+                <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                    @foreach ($managedServices as $service)
+                        @php $comingSoon = ! \Laravel\Pennant\Feature::active($service['flag']); @endphp
+                        <div @class([
+                            'relative rounded-2xl border border-brand-ink/10 bg-white/80 p-6',
+                            'opacity-75' => $comingSoon,
+                        ])>
+                            <div class="flex items-start justify-between gap-2">
+                                <x-dynamic-component :component="$service['icon']" class="h-7 w-7 text-brand-gold" aria-hidden="true" />
+                                @if ($comingSoon)
+                                    <span class="inline-flex items-center rounded-full bg-brand-gold/15 px-2.5 py-0.5 text-xs font-medium text-brand-gold ring-1 ring-inset ring-brand-gold/25">Coming soon</span>
+                                @endif
+                            </div>
+                            <h3 class="mt-3 text-base font-semibold text-brand-ink">{{ $service['name'] }}</h3>
+                            <div class="mt-2 flex items-baseline gap-1">
+                                <span class="text-sm font-medium text-brand-moss">from</span>
+                                <span class="text-2xl font-bold text-brand-ink">${{ number_format($service['price'], 0) }}</span>
+                                <span class="text-sm text-brand-moss">{{ $service['unit'] }}</span>
+                            </div>
+                            <p class="mt-2 text-sm text-brand-moss">{{ $service['desc'] }}</p>
+
+                            @if ($service['name'] === 'Queues')
+                                {{-- The single most important sentence on this page for
+                                     Queue. Given its own band because "$9/queue" and
+                                     "free with Serverless" on the same card is exactly
+                                     where a reader decides the pricing is either
+                                     generous or confusing. --}}
+                                <p class="mt-3 flex items-start gap-1.5 rounded-lg bg-brand-sage/10 p-2.5 text-sm font-medium text-brand-forest ring-1 ring-inset ring-brand-sage/25">
+                                    <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span>Free on Serverless. Sites you deploy to dply Serverless get a queue automatically at no charge — the per-queue price applies to Cloud, Edge, and your own servers.</span>
+                                </p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+
         @feature('global.billing_enabled')
             @include('partials.pricing-calculator')
         @else
@@ -281,6 +360,10 @@
                 [
                     'q' => 'How does managed Edge / Cloud / Serverless billing work?',
                     'a' => 'They bill à la carte on top of any paid plan, each starting from a flat per-unit fee: Edge from $' . number_format($edge, 0) . '/site (plus metered CDN delivery on dply\'s managed Cloudflare for high-traffic sites), Cloud from $' . number_format($cloud, 0) . '/app (a platform fee plus the metered DigitalOcean compute, workers, and databases your app runs on, at cost plus margin), and Serverless from $' . number_format($serverless, 0) . '/function. Serverless has two modes: bring your own FaaS account (AWS Lambda, Cloudflare Workers, etc.) and your provider bills the compute directly, or let dply host it — then the flat fee covers the platform and dply meters invocations plus any managed database or cache at cost plus margin. They require a paid plan.',
+                ],
+                [
+                    'q' => 'Why is Queues free on Serverless but paid everywhere else?',
+                    'a' => 'Because a serverless app can\'t queue at all without a shared job store — the defaults either drop jobs silently or never enqueue them. Making you buy something before your queue works would be a bad first deploy, so on dply Serverless a queue comes with the site at no charge. On Cloud, Edge, or your own servers you already have a working option (Redis on a box you run), so there dply Queue is a convenience you\'re choosing, and it\'s priced from $' . number_format($queue, 0) . '/queue/mo by capacity tier. If a site later moves off Serverless, its queue moves onto that price — and we tell you when it happens, before it reaches an invoice.',
                 ],
                 [
                     'q' => 'How do you handle Enterprise / large fleets?',

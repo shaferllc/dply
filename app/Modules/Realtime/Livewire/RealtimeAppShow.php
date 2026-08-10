@@ -41,8 +41,17 @@ class RealtimeAppShow extends Component
     /** Current live connection count from the last stats read (transient). */
     public ?int $liveConnections = null;
 
-    public function mount(Organization $organization, RealtimeApp $realtimeApp): void
+    /**
+     * The organization comes from the session, not the URL. The ownership check
+     * below is what keeps `/realtime/{app}` from leaking another org's app to
+     * anyone who guesses a ULID — it is now the only thing doing that job, so
+     * it 404s rather than 403s: whether the id exists is not ours to confirm.
+     */
+    public function mount(RealtimeApp $realtimeApp): void
     {
+        $organization = auth()->user()?->currentOrganization();
+        abort_if($organization === null, 403);
+
         $this->authorize('view', $organization);
         abort_unless($realtimeApp->organization_id === $organization->id, 404);
 
@@ -113,7 +122,7 @@ class RealtimeAppShow extends Component
         $this->dispatch('close-modal', 'realtime-delete-modal');
     }
 
-    public function deleteApp(DeleteRealtimeApp $action)
+    public function deleteApp(DeleteRealtimeApp $action): void
     {
         $this->authorize('update', $this->organization);
 
@@ -121,7 +130,8 @@ class RealtimeAppShow extends Component
 
         $this->toastSuccess(__('Broadcasting app deleted. It no longer counts toward your bill.'));
 
-        return $this->redirect(route('organizations.realtime', $this->organization), navigate: true);
+        // Livewire's redirect() returns void and skips the render.
+        $this->redirect(route('realtime.index'), navigate: true);
     }
 
     /**
@@ -192,11 +202,9 @@ class RealtimeAppShow extends Component
             'canManage' => auth()->user()?->can('update', $this->organization) ?? false,
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
-                ['label' => __('Realtime'), 'href' => route('organizations.realtime', $this->organization), 'icon' => 'signal'],
+                ['label' => __('Realtime'), 'href' => route('realtime.index'), 'icon' => 'signal'],
                 ['label' => $this->app->name, 'icon' => 'signal'],
             ],
-            'orgShellSection' => 'realtime',
         ]);
     }
 }
