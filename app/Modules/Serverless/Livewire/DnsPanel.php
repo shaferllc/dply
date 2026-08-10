@@ -7,18 +7,20 @@ namespace App\Modules\Serverless\Livewire;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
  * Surface and retry DNS provisioning for a serverless function's friendly
- * hostname ({slug}.{testing-domain}). The deployer already calls the
+ * hostname ({slug}.dply-serverless.cloud). The deployer already calls the
  * provisioner on every deploy, but two cases make the result invisible:
- *  - Skipped (missing DIGITALOCEAN_TOKEN or DPLY_TESTING_DOMAINS not set) —
- *    operator never sees why the hostname doesn't resolve.
+ *  - Skipped (missing DIGITALOCEAN_TOKEN, or the apex isn't a zone the token
+ *    owns) — operator never sees why the hostname doesn't resolve.
  *  - Failed (DO API errored, e.g. zone not actually owned by the token) —
  *    same problem.
  *
@@ -61,17 +63,20 @@ class DnsPanel extends Component
         match ($status) {
             'ready' => $this->toastSuccess(__('DNS record created. Resolution may take a minute to propagate.')),
             'failed' => $this->toastError(__('DNS provisioning failed. See the panel below for details.')),
-            'skipped' => $this->toastError(__('DNS skipped — fix the missing DigitalOcean token or DPLY_TESTING_DOMAINS configuration, then retry.')),
+            'skipped' => $this->toastError(__('DNS skipped — fix the missing DigitalOcean token or DPLY_SERVERLESS_TESTING_DOMAINS configuration, then retry.')),
             default => $this->toastSuccess($result),
         };
     }
 
     /**
-     * Last-resort path: delete every DO record at the target name (regardless
-     * of type), then retry provisioning. Used when the standard purge can't
+     * Last-resort path: delete every record at the target name (regardless of
+     * type), then retry provisioning. Used when the standard purge can't
      * resolve the conflict — most commonly because something at that name
-     * was created via DO's web UI or another tool, and our matcher doesn't
-     * recognize it as something we should clear automatically.
+     * was created via the provider's web UI or another tool, and our matcher
+     * doesn't recognize it as something we should clear automatically.
+     *
+     * Deletes through whichever API hosts the zone: Cloudflare for the
+     * serverless apex, DigitalOcean for legacy-pool hostnames.
      */
     public function forcePurgeAndProvision(DigitalOceanService $do, ServerlessFunctionDnsProvisioner $provisioner): void
     {
@@ -79,9 +84,8 @@ class DnsPanel extends Component
         $this->authorize('update', $site);
 
         $host = $site->serverlessFunctionHost();
-        $token = trim((string) config('services.digitalocean.token'));
-        if ($host === null || $token === '') {
-            $this->toastError(__('Cannot force-purge — missing function hostname or DigitalOcean token.'));
+        if ($host === null) {
+            $this->toastError(__('Cannot force-purge — the function has no hostname yet.'));
 
             return;
         }
@@ -93,6 +97,55 @@ class DnsPanel extends Component
             return;
         }
         $recordName = (string) Str::beforeLast($host, '.'.$zone);
+
+        $deleted = ServerlessTestingDomains::dnsProviderForZone($zone) === 'cloudflare'
+            ? $this->forcePurgeCloudflare($zone, $host)
+            : $this->forcePurgeDigitalOcean($zone, $recordName);
+
+        if ($deleted === null) {
+            return;
+        }
+
+        $this->toastSuccess(__('Force-deleted :n record(s) at this name. Re-running the provisioner…', ['n' => $deleted]));
+        $provisioner->provision($site);
+    }
+
+    /**
+     * @return int|null  Null when the purge could not run (toast already sent).
+     */
+    private function forcePurgeCloudflare(string $zone, string $host): ?int
+    {
+        $token = ServerlessTestingDomains::cloudflareApiToken();
+        if ($token === '') {
+            $this->toastError(__('Cannot force-purge — no Cloudflare API token configured for this zone.'));
+
+            return null;
+        }
+
+        $cloudflare = new CloudflareDnsService($token);
+        $deleted = 0;
+
+        foreach (['CNAME', 'A', 'AAAA', 'TXT'] as $type) {
+            foreach ($cloudflare->listDnsRecords($zone, $type, $host) as $record) {
+                $recordId = trim((string) ($record['id'] ?? ''));
+                if ($recordId !== '') {
+                    $cloudflare->deleteDnsRecord($zone, $recordId);
+                    $deleted++;
+                }
+            }
+        }
+
+        return $deleted;
+    }
+
+    private function forcePurgeDigitalOcean(string $zone, string $recordName): ?int
+    {
+        $token = trim((string) config('services.digitalocean.token'));
+        if ($token === '') {
+            $this->toastError(__('Cannot force-purge — no DigitalOcean token configured.'));
+
+            return null;
+        }
 
         // Delete every record at this name. The instance the constructor
         // hands us is the app-scoped service; switch to a token-specific
@@ -116,21 +169,12 @@ class DnsPanel extends Component
             }
         }
 
-        $this->toastSuccess(__('Force-deleted :n record(s) at this name. Re-running the provisioner…', ['n' => $deleted]));
-        $provisioner->provision($site);
+        return $deleted;
     }
 
     private function zoneForHost(string $host): ?string
     {
-        $domains = (array) config('services.digitalocean.testing_domains', []);
-        foreach ($domains as $domain) {
-            $domain = strtolower(trim((string) $domain));
-            if ($domain !== '' && str_ends_with($host, '.'.$domain)) {
-                return $domain;
-            }
-        }
-
-        return null;
+        return ServerlessTestingDomains::zoneForHost($host);
     }
 
     public function render(): View

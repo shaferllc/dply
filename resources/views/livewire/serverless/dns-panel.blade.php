@@ -128,7 +128,7 @@
                             {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN, then retry.') }}
                             @break
                         @case('unconfigured_zone')
-                            {{ __('Hostname zone isn’t in DPLY_TESTING_DOMAINS. Add it, then retry.') }}
+                            {{ __('Hostname zone isn’t in DPLY_SERVERLESS_TESTING_DOMAINS. Add it, then retry.') }}
                             @break
                         @default
                             {{ __('See deploy log for details.') }}
