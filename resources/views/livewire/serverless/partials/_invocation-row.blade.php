@@ -4,6 +4,15 @@
     $excerpt = trim((string) $invocation->result_excerpt);
     $contextPairs = $invocation->contextPairs();
     $hasDetail = count($logLines) > 0 || $excerpt !== '' || count($contextPairs) > 0;
+    $pending = $invocation->state === \App\Modules\Serverless\Models\FunctionInvocation::STATE_PENDING;
+
+    // waitTime is queueing before a container took the activation; initTime is
+    // cold-start initialisation inside it. Together they explain a slow
+    // invocation that spent almost no time in the handler.
+    $timings = array_filter([
+        __('queued') => $invocation->wait_time_ms,
+        __('cold start') => $invocation->init_time_ms,
+    ], fn ($ms) => $ms !== null && $ms > 0);
 @endphp
 <li class="py-3 first:pt-0 last:pb-0">
     <details>
@@ -13,9 +22,10 @@
         ])>
             <span @class([
                 'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold',
-                'bg-brand-forest/15 text-brand-forest' => $invocation->success,
-                'bg-rose-100 text-rose-700' => ! $invocation->success,
-            ])>{{ $invocation->success ? __('OK') : __('Error') }}</span>
+                'bg-brand-sand text-brand-moss' => $pending,
+                'bg-brand-forest/15 text-brand-forest' => ! $pending && $invocation->success,
+                'bg-rose-100 text-rose-700' => ! $pending && ! $invocation->success,
+            ])>{{ $pending ? __('Running') : ($invocation->success ? __('OK') : __('Error')) }}</span>
 
             <span class="font-mono text-xs text-brand-ink">{{ $invocation->method }} {{ \Illuminate\Support\Str::limit((string) $invocation->path, 64) }}</span>
 
@@ -23,7 +33,13 @@
                 <span class="font-mono text-xs text-brand-moss">HTTP {{ $invocation->status_code }}</span>
             @endif
 
-            <span class="text-xs text-brand-moss">{{ $invocation->duration_ms }}ms</span>
+            @unless ($pending)
+                <span class="text-xs text-brand-moss">{{ $invocation->duration_ms }}ms</span>
+            @endunless
+
+            @foreach ($timings as $label => $ms)
+                <span class="text-xs text-brand-moss/70">{{ $label }} {{ $ms }}ms</span>
+            @endforeach
 
             @if ($invocation->task)
                 <span class="inline-flex items-center rounded-md bg-brand-sand px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $invocation->task }}</span>

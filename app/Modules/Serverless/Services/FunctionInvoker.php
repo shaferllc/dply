@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Services;
 
-use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Serverless\Models\FunctionInvocation;
+use App\Modules\Serverless\Support\ActivationRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -115,6 +116,9 @@ class FunctionInvoker
         return FunctionInvocation::query()->create([
             'site_id' => $site->id,
             'source' => $source,
+            // The invocation never reached the function — there is no
+            // activation to collect, now or later.
+            'state' => FunctionInvocation::STATE_FAILED,
             'task' => $task,
             'method' => strtoupper((string) ($owArgs['__ow_method'] ?? 'GET')),
             'path' => '/'.ltrim((string) ($owArgs['__ow_path'] ?? ''), '/'),
@@ -132,77 +136,27 @@ class FunctionInvoker
     /**
      * Persist one activation as a FunctionInvocation row.
      *
+     * The record is parsed by {@see ActivationRecord} — the same parser the
+     * async poller uses, so a blocking and a polled invocation of the same
+     * function produce identical rows.
+     *
      * @param  array<string, mixed> $owArgs
      * @param  array<string, mixed> $activation
      */
     private function record(Site $site, string $source, ?string $task, array $owArgs, array $activation): FunctionInvocation
     {
-        // OpenWhisk records an `initTime` annotation only on a cold start.
-        $cold = false;
-        foreach ((array) data_get($activation, 'annotations', []) as $annotation) {
-            if (is_array($annotation) && ($annotation['key'] ?? null) === 'initTime'
-                && (int) ($annotation['value'] ?? 0) > 0) {
-                $cold = true;
-                break;
-            }
-        }
-
-        $result = data_get($activation, 'response.result');
-        // The handler returns {statusCode, headers, body}; prefer that as the
-        // HTTP status, falling back to OpenWhisk's own success/error split.
-        $statusCode = (int) (data_get($activation, 'response.result.statusCode')
-            ?? (data_get($activation, 'response.success') === true ? 200 : 500));
-
-        return FunctionInvocation::query()->create([
+        return FunctionInvocation::query()->create(array_merge([
             'site_id' => $site->id,
             'source' => $source,
             'task' => $task,
             'method' => strtoupper((string) ($owArgs['__ow_method'] ?? 'GET')),
             'path' => '/'.ltrim((string) ($owArgs['__ow_path'] ?? ''), '/'),
-            'status_code' => $statusCode > 0 ? $statusCode : null,
-            'success' => (bool) data_get($activation, 'response.success', false),
-            'duration_ms' => (int) ($activation['duration'] ?? 0),
-            'cold' => $cold,
-            'activation_id' => (string) ($activation['activationId'] ?? '') ?: null,
-            'log_lines' => array_values(array_filter((array) data_get($activation, 'logs', []), 'is_string')),
-            'result_excerpt' => $this->excerpt($result),
             'created_at' => Carbon::now(),
-        ]);
-    }
-
-    /**
-     * A bounded, human-readable excerpt of the activation result. The handler
-     * returns {statusCode, headers, body}; the body is the useful part, so
-     * prefer it and fall back to the whole result for any other shape.
-     */
-    private function excerpt(mixed $result): ?string
-    {
-        if ($result === null) {
-            return null;
-        }
-
-        if (is_array($result) && isset($result['body']) && is_string($result['body'])) {
-            return Str::limit($result['body'], self::RESULT_EXCERPT_BYTES);
-        }
-
-        $text = is_string($result)
-            ? $result
-            : (string) json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-        return Str::limit($text, self::RESULT_EXCERPT_BYTES);
+        ], ActivationRecord::fromArray($activation)->toRowAttributes()));
     }
 
     private function actionName(Site $site): string
     {
-        $cfg = $site->serverlessConfig();
-        $name = trim((string) ($cfg['action_name'] ?? ''));
-        if ($name !== '') {
-            return $name;
-        }
-
-        // Fall back to the trailing segment of the deployed web URL.
-        $url = trim((string) ($cfg['action_url'] ?? ''));
-
-        return $url === '' ? '' : basename(rtrim($url, '/'));
+        return $site->serverlessActionName();
     }
 }

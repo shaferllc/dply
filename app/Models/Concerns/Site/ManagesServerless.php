@@ -88,6 +88,25 @@ trait ManagesServerless
     }
 
     /**
+     * The deployed action's name on the host, or '' when it has never been
+     * deployed. Falls back to the trailing segment of the invocation URL for
+     * functions deployed before the name was persisted.
+     */
+    public function serverlessActionName(): string
+    {
+        $config = $this->serverlessConfig();
+
+        $name = trim((string) ($config['action_name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        $url = trim((string) ($config['action_url'] ?? ''));
+
+        return $url === '' ? '' : basename(rtrim($url, '/'));
+    }
+
+    /**
      * The function's globally-unique friendly slug — the one that gives it a
      * clean dply-hosted URL ({app}/fn/{slug}) instead of the raw DigitalOcean
      * Functions invocation URL. Generated and persisted on first access.

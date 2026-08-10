@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
-use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
-
 /**
  * Enumerates the OpenWhisk actions a checked-out repository declares.
  *
@@ -64,58 +61,48 @@ final class ServerlessActionDiscovery
     }
 
     /**
-     * Parse an OpenWhisk `project.yml` into action descriptors. Returns an
+     * Turn the repository's `project.yml` into action descriptors. Returns an
      * empty list when there is no manifest, it cannot be parsed, or it
      * declares no actions — so discovery falls through to the next rule.
      *
-     * @param  array<string, mixed> $capabilities
+     * The manifest carries far more than names: limits, bound parameters,
+     * annotations, web exposure, and packaging filters all come through on
+     * the descriptor so the deployer can honour what the repo asked for.
+     *
      * @return array<int, array<string, mixed>>
      */
     private function fromProjectManifest(string $workingDirectory): array
     {
-        $manifestPath = null;
-        foreach (['project.yml', 'project.yaml'] as $candidate) {
-            if (is_file($workingDirectory.'/'.$candidate)) {
-                $manifestPath = $workingDirectory.'/'.$candidate;
-                break;
-            }
-        }
-
-        if ($manifestPath === null) {
+        $manifest = ServerlessProjectManifest::fromDirectory($workingDirectory);
+        if ($manifest === null) {
             return [];
         }
 
-        try {
-            $parsed = Yaml::parse((string) file_get_contents($manifestPath));
-        } catch (ParseException) {
-            return [];
-        }
-
-        $packages = is_array($parsed['packages'] ?? null) ? $parsed['packages'] : [];
         $descriptors = [];
 
-        foreach ($packages as $packageName => $package) {
-            $actions = is_array($package['actions'] ?? null) ? $package['actions'] : [];
+        foreach ($manifest->actions() as $action) {
+            $runtime = (string) $action['runtime'];
 
-            foreach ($actions as $actionName => $action) {
-                $action = is_array($action) ? $action : [];
-                $functionPath = trim((string) ($action['function'] ?? ''));
-                $runtime = trim((string) ($action['runtime'] ?? ''));
-
-                $descriptors[] = [
-                    'name' => (string) $actionName,
-                    'package' => (string) $packageName,
-                    'language' => $this->languageForRuntime($runtime),
-                    'runtime' => $runtime,
-                    'entrypoint' => trim((string) ($action['main'] ?? '')) ?: 'main',
-                    'entry_file' => $functionPath !== '' ? basename($functionPath) : '',
-                    'source_subdir' => $functionPath !== '' ? trim((string) (pathinfo($functionPath, PATHINFO_DIRNAME)), '.') : '',
-                    'deploy_kind' => 'raw',
-                    'build_command' => '',
-                    'confidence' => 'high',
-                    'source' => 'project_yml',
-                ];
-            }
+            $descriptors[] = [
+                'name' => (string) $action['name'],
+                'package' => (string) $action['package'],
+                'language' => $this->languageForRuntime($runtime),
+                'runtime' => $runtime,
+                'entrypoint' => (string) $action['entrypoint'],
+                'entry_file' => (string) $action['entry_file'],
+                'source_subdir' => (string) $action['source_subdir'],
+                'deploy_kind' => 'raw',
+                'build_command' => (string) $action['build'],
+                'confidence' => 'high',
+                'source' => 'project_yml',
+                'environment' => $action['environment'],
+                'parameters' => $action['parameters'],
+                'annotations' => $action['annotations'],
+                'web_mode' => $action['web_mode'],
+                'limits' => $action['limits'],
+                'include' => $action['include'],
+                'exclude' => $action['exclude'],
+            ];
         }
 
         return $descriptors;

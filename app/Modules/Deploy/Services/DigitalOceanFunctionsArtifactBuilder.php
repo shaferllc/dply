@@ -285,6 +285,121 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
+     * Zip one action's own source directory out of an already-checked-out
+     * repository.
+     *
+     * {@see build()} produces the Site's primary artifact from the repo root.
+     * A multi-function project has further actions living in subdirectories of
+     * that same checkout, and each deploys as its own OpenWhisk action — so
+     * each needs its own zip, cut from the tree build() already prepared
+     * (dependencies installed, adapters injected, env written).
+     *
+     * `$include` / `$exclude` are the manifest's packaging filters. An
+     * `include` list is a whitelist — only those paths are packaged, which is
+     * how a function ships a static asset that lives outside its own tree.
+     *
+     * @param  string  $sourceSubdir  Repo-relative directory holding the action.
+     * @param  list<string>  $include  Repo-relative paths to add on top of the action directory.
+     * @param  list<string>  $exclude  Additional exclusion patterns.
+     * @return string The artifact path.
+     */
+    public function packageAction(
+        Site $site,
+        string $workingDirectory,
+        string $sourceSubdir,
+        string $actionName,
+        array $include = [],
+        array $exclude = [],
+    ): string {
+        $sourceSubdir = trim($sourceSubdir, '/');
+        if ($sourceSubdir === '') {
+            throw new \RuntimeException('An additional action needs its own source directory.');
+        }
+
+        $realWorkingDirectory = realpath($workingDirectory);
+        $sourcePath = realpath($workingDirectory.'/'.$sourceSubdir);
+
+        // A manifest is repo-controlled input, so a `function:` path of
+        // `../../etc` must not be able to package anything outside the
+        // checkout.
+        if ($realWorkingDirectory === false || $sourcePath === false
+            || ! str_starts_with($sourcePath, $realWorkingDirectory.DIRECTORY_SEPARATOR)) {
+            throw new \RuntimeException('Action source directory escapes the repository: '.$sourceSubdir);
+        }
+
+        if (! is_dir($sourcePath)) {
+            throw new \RuntimeException('Action source directory does not exist: '.$sourceSubdir);
+        }
+
+        $artifactDirectory = storage_path('app/serverless-artifacts/'.$site->id);
+        File::ensureDirectoryExists($artifactDirectory);
+
+        $slug = Str::slug($actionName) ?: 'action';
+        $artifactPath = $artifactDirectory.'/'.$slug.'-'.now()->format('YmdHis').'.zip';
+
+        $exclusions = array_values(array_unique(array_merge($this->zipExclusions($workingDirectory), $exclude)));
+        $this->zipPath($sourcePath, $artifactPath, $exclusions);
+
+        // Manifest `include` paths are resolved against the repo root, not the
+        // action directory — that is what makes them useful: a shared assets/
+        // or lib/ directory can be pulled into several functions' zips.
+        foreach ($include as $path) {
+            $this->addIncludedPath($artifactPath, $realWorkingDirectory, (string) $path);
+        }
+
+        return $artifactPath;
+    }
+
+    /**
+     * Add one manifest `include` entry to an already-built action zip.
+     *
+     * A missing path is skipped rather than fatal: a manifest that lists an
+     * optional asset directory should not break the deploy of a function that
+     * works without it.
+     */
+    private function addIncludedPath(string $artifactPath, string $workingDirectory, string $path): void
+    {
+        $path = trim($path, '/');
+        if ($path === '') {
+            return;
+        }
+
+        $realPath = realpath($workingDirectory.'/'.$path);
+        if ($realPath === false || ! str_starts_with($realPath, $workingDirectory.DIRECTORY_SEPARATOR)) {
+            return;
+        }
+
+        $zip = new ZipArchive;
+        if ($zip->open($artifactPath) !== true) {
+            return;
+        }
+
+        if (is_file($realPath)) {
+            $zip->addFile($realPath, $path);
+        } elseif (is_dir($realPath)) {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($realPath, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            foreach ($iterator as $item) {
+                $relative = ltrim(str_replace($realPath, '', $item->getPathname()), DIRECTORY_SEPARATOR);
+                $localName = str_replace(DIRECTORY_SEPARATOR, '/', $path.'/'.$relative);
+
+                if ($item->isDir()) {
+                    $zip->addEmptyDir($localName);
+
+                    continue;
+                }
+
+                $zip->addFile($item->getPathname(), $localName);
+            }
+        }
+
+        $zip->close();
+    }
+
+    /**
      * Delete built artifact zips for the site that aren't in $keepPaths — the
      * retained rollback set (DO Functions keeps the last few in
      * artifact_history; Lambda keeps only the latest). Called after a
