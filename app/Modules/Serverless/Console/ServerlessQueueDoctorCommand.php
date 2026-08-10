@@ -110,6 +110,39 @@ class ServerlessQueueDoctorCommand extends Command
             $notes[] = 'Using the database queue — the app needs a `jobs` table (php artisan queue:table + migrate) and a database reachable from the function.';
         }
 
+        /**
+         * The gaps that are NOT the queue, and are the likeliest way this
+         * product still disappoints someone.
+         *
+         * Three of Laravel's most-used queue features are backed by the
+         * CACHE, not the queue, and the failed-job store defaults to the
+         * app's own database. Fixing the queue and leaving these silent
+         * reproduces — one layer up, and worse, because WithoutOverlapping
+         * *looks* like it works — the exact failure class this command was
+         * written to eliminate.
+         */
+        // When dply Queue is wired, the injected handler registers a shared
+        // lock store and a server-side failed-job provider, so both gaps are
+        // closed rather than merely reported.
+        $dplyQueueWired = trim((string) ($env['DPLY_QUEUE_URL'] ?? '')) !== ''
+            && trim((string) ($env['DPLY_QUEUE_SECRET'] ?? '')) !== '';
+
+        $cacheStore = trim((string) ($env['CACHE_STORE'] ?? $env['CACHE_DRIVER'] ?? ''));
+        $cacheIsPerContainer = $cacheStore === '' || in_array($cacheStore, ['array', 'file'], true);
+
+        if ($cacheIsPerContainer && ! $dplyQueueWired) {
+            $notes[] = 'The cache store is '.($cacheStore === '' ? 'unset (the handler defaults it to `array`)' : '`'.$cacheStore.'`')
+                .', which is per-container on a function. `ShouldBeUnique`, `WithoutOverlapping`, and `RateLimited` are backed by the cache, not the queue — with a per-container store they silently do nothing while appearing to work. Point CACHE_STORE at redis, or move this function to dply Queue, which ships a shared lock store.';
+        }
+
+        $dbConnection = trim((string) ($env['DB_CONNECTION'] ?? ''));
+
+        if (($dbConnection === '' || $dbConnection === 'sqlite') && ! $dplyQueueWired) {
+            $notes[] = 'Failed jobs are written to the app\'s own database, which here is '
+                .($dbConnection === '' ? 'unset (Laravel defaults to SQLite)' : 'SQLite')
+                .' — a per-container file that vanishes with the container. A job that exhausts its attempts will disappear without a trace. Use a networked database, or dply Queue, whose failures are recorded server-side.';
+        }
+
         if (! $deployed) {
             $problems[] = 'The function has never deployed — there is no invocation URL to drain against.';
         }

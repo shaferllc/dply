@@ -13,6 +13,7 @@ use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -36,11 +37,32 @@ test('creating a namespace mints a usable credential and reveals it once', funct
     $result = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders');
 
     expect($result['namespace']->isActive())->toBeTrue();
-    expect($result['plaintext'])->toStartWith('dplyq_');
 
-    // The plaintext is never recoverable from the row — only its hash is kept.
+    // The access key id is the public half — AWS-shaped, safe to display.
+    expect($result['credential']->accessKeyId())->toStartWith('dplyq');
+    expect(strlen($result['credential']->accessKeyId()))->toBe(20);
+
+    // The hash still matches the secret: it remains the lookup/cache key and
+    // the comparison for the native bearer path.
     expect($result['credential']->token_hash)->toBe(hash('sha256', $result['plaintext']));
-    expect($result['credential']->getAttributes())->not->toHaveKey('token');
+
+    // The secret itself is recoverable — SigV4 needs it — but only through the
+    // encrypted cast, never as ciphertext.
+    expect($result['credential']->fresh()->secret)->toBe($result['plaintext']);
+});
+
+test('the secret is encrypted at rest, not stored in the clear', function () {
+    // Reversible storage is forced by SigV4 (an HMAC over a shared secret),
+    // so the protection is encryption rather than hashing — the same tradeoff
+    // RealtimeApp::app_secret makes. The raw column must never be readable.
+    $result = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders');
+
+    $raw = DB::table('dply_queue_credentials')
+        ->where('id', $result['credential']->id)
+        ->value('secret');
+
+    expect($raw)->not->toBe($result['plaintext']);
+    expect($raw)->not->toContain($result['plaintext']);
 });
 
 test('the credential cache key is derivable from the stored row', function () {
@@ -181,7 +203,6 @@ test('the masked token identifies a credential without exposing it', function ()
 
     $masked = $result['credential']->maskedToken();
 
-    expect($masked)->toStartWith('dplyq_');
-    expect($result['plaintext'])->not->toBe($masked);
-    expect(strlen($masked))->toBeLessThan(strlen($result['plaintext']));
+    expect($masked)->toStartWith('dplyq');
+    expect($masked)->not->toContain($result['plaintext']);
 });

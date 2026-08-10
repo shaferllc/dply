@@ -19,6 +19,9 @@
  * Do not edit in the user's repo — dply overwrites this file on every deploy.
  */
 
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Lock;
+use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Queue\Factory;
@@ -27,6 +30,7 @@ use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobQueued;
+use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Monolog\Handler\StreamHandler;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -114,6 +118,12 @@ if (! function_exists('main')) {
             /** @var Application $app */
             $app = require $root.'/bootstrap/app.php';
             $app->useStoragePath($storage);
+
+            // Register the dply Queue connection, the shared lock store, and
+            // the failed-job provider, if this function has a namespace.
+            dply_do_functions_register_queue($app, $envFile);
+            dply_do_functions_register_queue_locks($app, $envFile);
+            dply_do_functions_register_failed_jobs($app, $envFile);
 
             // dply background tick — run the Laravel scheduler or a queue
             // worker instead of handling an HTTP request. The scheduler runs
@@ -281,6 +291,335 @@ if (! function_exists('dply_do_functions_command')) {
         }
 
         throw new RuntimeException('dply command rejected: unknown task "'.$task.'".');
+    }
+}
+
+if (! function_exists('dply_do_functions_register_queue')) {
+    /**
+     * Define the `dply` queue connection from the injected DPLY_QUEUE_* env.
+     *
+     * dply Queue speaks the SQS wire protocol, so this is Laravel's own `sqs`
+     * driver pointed at us — no package, no custom driver, nothing for the
+     * customer to install.
+     *
+     * Registered here rather than by asking the app to edit config/queue.php,
+     * for two reasons found the hard way:
+     *
+     *  1. A stock Laravel `sqs` connection has no `endpoint` key, and without
+     *     one the AWS SDK routes to real AWS no matter what SQS_PREFIX says.
+     *  2. That connection reads AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+     *     Repurposing those for the queue would hand the app's S3 credentials
+     *     to dply — so this defines a SEPARATE connection and leaves the
+     *     app's AWS config untouched.
+     *
+     * No-ops when the env is absent, so a function without a queue namespace
+     * behaves exactly as before.
+     *
+     * @param  array<string, string>  $envFile  parsed bundled .env
+     */
+    function dply_do_functions_register_queue(mixed $app, array $envFile): void
+    {
+        $resolve = static fn (string $key): string => trim(
+            (string) ($envFile[$key] ?? (getenv($key) ?: ''))
+        );
+
+        $url = $resolve('DPLY_QUEUE_URL');
+        $key = $resolve('DPLY_QUEUE_KEY');
+        $secret = $resolve('DPLY_QUEUE_SECRET');
+
+        if ($url === '' || $key === '' || $secret === '') {
+            return;
+        }
+
+        try {
+            $config = $app->make('config');
+
+            $config->set('queue.connections.dply', [
+                'driver' => 'sqs',
+                'key' => $key,
+                'secret' => $secret,
+                // Laravel builds the queue URL as prefix/queue, and the SDK
+                // needs `endpoint` to actually send it here.
+                'prefix' => rtrim($url, '/'),
+                'endpoint' => rtrim($url, '/'),
+                'queue' => $resolve('DPLY_QUEUE_DEFAULT') !== '' ? $resolve('DPLY_QUEUE_DEFAULT') : 'default',
+                'suffix' => '',
+                'region' => $resolve('DPLY_QUEUE_REGION') !== '' ? $resolve('DPLY_QUEUE_REGION') : 'us-east-1',
+                'after_commit' => false,
+            ]);
+        } catch (Throwable) {
+            // A queue that cannot be registered must not stop the app from
+            // serving HTTP. The backend classifier and queue-doctor surface
+            // the misconfiguration instead.
+        }
+    }
+}
+
+if (! function_exists('dply_queue_http')) {
+    /**
+     * One blocking JSON call to a dply-native queue endpoint.
+     *
+     * Bearer-authenticated: these are not SQS operations, so there is nothing
+     * to sign and no signer to ship. Blocking, unlike the fire-and-forget log
+     * and wake calls — a lock answer the caller ignores is not a lock.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|null null on any transport failure
+     */
+    function dply_queue_http(string $base, string $secret, string $method, string $path, array $payload = []): ?array
+    {
+        $url = rtrim($base, '/').$path;
+
+        try {
+            $ch = curl_init($url);
+            if ($ch === false) {
+                return null;
+            }
+
+            $body = (string) json_encode($payload);
+
+            curl_setopt_array($ch, [
+                CURLOPT_CUSTOMREQUEST => $method,
+                CURLOPT_POSTFIELDS => $method === 'GET' ? null : $body,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'Authorization: Bearer '.$secret,
+                ],
+                CURLOPT_TIMEOUT_MS => 3000,
+                CURLOPT_CONNECTTIMEOUT_MS => 1000,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_NOSIGNAL => true,
+            ]);
+
+            $response = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+
+            if (! is_string($response) || $status >= 400) {
+                return null;
+            }
+
+            $decoded = json_decode($response, true);
+
+            return is_array($decoded) ? $decoded : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+}
+
+if (! function_exists('dply_do_functions_register_queue_locks')) {
+    /**
+     * Register a cache store whose locks are shared across invocations.
+     *
+     * `ShouldBeUnique`, `WithoutOverlapping`, and `RateLimited` are backed by
+     * Laravel's CACHE, not its queue. On a function the cache store defaults
+     * to `array` — per-invocation — so all three silently do nothing: every
+     * lock is granted, every duplicate runs, and nothing errors or logs. That
+     * is a worse failure than the queue one, because it looks like it works.
+     *
+     * This registers a `dply` cache driver whose lock methods talk to the
+     * namespace's shared lock table. Only the lock half is backed; ordinary
+     * cache get/put stay in-memory, because a general managed cache is a
+     * different product. Laravel only needs `LockProvider` for the three
+     * features above.
+     *
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_register_queue_locks(mixed $app, array $envFile): void
+    {
+        $resolve = static fn (string $key): string => trim(
+            (string) ($envFile[$key] ?? (getenv($key) ?: ''))
+        );
+
+        $base = $resolve('DPLY_QUEUE_URL');
+        $secret = $resolve('DPLY_QUEUE_SECRET');
+
+        if ($base === '' || $secret === '') {
+            return;
+        }
+
+        try {
+            $manager = $app->make('cache');
+
+            $manager->extend('dply', function ($container) use ($base, $secret) {
+                $store = new class($base, $secret) extends ArrayStore
+                {
+                    public function __construct(private string $base, private string $secret)
+                    {
+                        parent::__construct();
+                    }
+
+                    public function lock($name, $seconds = 0, $owner = null)
+                    {
+                        return new class($this->base, $this->secret, (string) $name, (int) $seconds, $owner) extends Lock
+                        {
+                            public function __construct(
+                                private string $base,
+                                private string $secret,
+                                string $name,
+                                int $seconds,
+                                $owner = null,
+                            ) {
+                                parent::__construct($name, $seconds, $owner);
+                            }
+
+                            public function acquire()
+                            {
+                                $result = dply_queue_http($this->base, $this->secret, 'POST', '/locks/acquire', [
+                                    'name' => $this->name,
+                                    'owner' => $this->owner,
+                                    // A zero-second lock means "until
+                                    // released"; give the server a real TTL so
+                                    // a crashed holder cannot wedge the queue.
+                                    'seconds' => $this->seconds > 0 ? $this->seconds : 300,
+                                ]);
+
+                                // Unreachable dply must NOT grant the lock.
+                                // Failing closed means a job is skipped;
+                                // failing open means it runs twice, which is
+                                // exactly what the caller asked to prevent.
+                                return (bool) ($result['acquired'] ?? false);
+                            }
+
+                            public function release()
+                            {
+                                $result = dply_queue_http($this->base, $this->secret, 'POST', '/locks/release', [
+                                    'name' => $this->name,
+                                    'owner' => $this->owner,
+                                ]);
+
+                                return (bool) ($result['released'] ?? false);
+                            }
+
+                            public function forceRelease()
+                            {
+                                dply_queue_http($this->base, $this->secret, 'POST', '/locks/force-release', [
+                                    'name' => $this->name,
+                                ]);
+                            }
+
+                            protected function getCurrentOwner()
+                            {
+                                $result = dply_queue_http($this->base, $this->secret, 'POST', '/locks/owner', [
+                                    'name' => $this->name,
+                                ]);
+
+                                return $result['owner'] ?? null;
+                            }
+                        };
+                    }
+                };
+
+                return new Repository($store);
+            });
+
+            // Only take over the cache when the app has not chosen a shared
+            // store of its own. An app already on Redis has a working lock
+            // provider and should keep it.
+            $current = (string) $app->make('config')->get('cache.default', 'array');
+
+            if (in_array($current, ['array', 'file', ''], true)) {
+                $app->make('config')->set('cache.stores.dply', ['driver' => 'dply']);
+                $app->make('config')->set('cache.default', 'dply');
+            }
+        } catch (Throwable) {
+            // A lock store that cannot be registered must not stop the app
+            // serving HTTP; the queue-doctor reports the gap instead.
+        }
+    }
+}
+
+if (! function_exists('dply_do_functions_register_failed_jobs')) {
+    /**
+     * Record failed jobs in dply instead of the app's own database.
+     *
+     * Laravel's default provider writes to `failed_jobs` in the app database.
+     * On a function backed by SQLite that is a per-container `/tmp` file, so a
+     * job that exhausts its attempts is written and then disappears with the
+     * container — nothing to inspect, nothing to retry.
+     *
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_register_failed_jobs(mixed $app, array $envFile): void
+    {
+        $resolve = static fn (string $key): string => trim(
+            (string) ($envFile[$key] ?? (getenv($key) ?: ''))
+        );
+
+        $base = $resolve('DPLY_QUEUE_URL');
+        $secret = $resolve('DPLY_QUEUE_SECRET');
+
+        if ($base === '' || $secret === '') {
+            return;
+        }
+
+        try {
+            $app->singleton('queue.failer', fn () => new class($base, $secret) implements FailedJobProviderInterface
+            {
+                public function __construct(private string $base, private string $secret) {}
+
+                public function log($connection, $queue, $payload, $exception)
+                {
+                    $decoded = json_decode((string) $payload, true);
+
+                    dply_queue_http($this->base, $this->secret, 'POST', '/failed-jobs', [
+                        'uuid' => is_array($decoded) ? ($decoded['uuid'] ?? null) : null,
+                        'queue' => $queue,
+                        'payload' => $payload,
+                        'exception' => (string) $exception,
+                        'attempts' => is_array($decoded) ? ($decoded['attempts'] ?? 0) : 0,
+                    ]);
+
+                    return null;
+                }
+
+                public function all()
+                {
+                    $result = dply_queue_http($this->base, $this->secret, 'GET', '/failed-jobs');
+
+                    return array_map(
+                        static fn (array $row): object => (object) $row,
+                        $result['failed_jobs'] ?? [],
+                    );
+                }
+
+                public function find($id)
+                {
+                    $result = dply_queue_http($this->base, $this->secret, 'GET', '/failed-jobs/'.rawurlencode((string) $id));
+
+                    return isset($result['failed_job']) ? (object) $result['failed_job'] : null;
+                }
+
+                public function forget($id)
+                {
+                    $result = dply_queue_http($this->base, $this->secret, 'DELETE', '/failed-jobs/'.rawurlencode((string) $id));
+
+                    return (bool) ($result['forgotten'] ?? false);
+                }
+
+                public function flush($hours = null)
+                {
+                    dply_queue_http($this->base, $this->secret, 'POST', '/failed-jobs/flush', [
+                        'hours' => $hours,
+                    ]);
+                }
+
+                public function prune(DateTimeInterface $before)
+                {
+                    $hours = max(1, (int) ceil((time() - $before->getTimestamp()) / 3600));
+
+                    $result = dply_queue_http($this->base, $this->secret, 'POST', '/failed-jobs/flush', [
+                        'hours' => $hours,
+                    ]);
+
+                    return (int) ($result['flushed'] ?? 0);
+                }
+            });
+        } catch (Throwable) {
+            // Same reasoning as the lock store: never break serving.
+        }
     }
 }
 

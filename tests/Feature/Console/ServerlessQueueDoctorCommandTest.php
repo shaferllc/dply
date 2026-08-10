@@ -209,3 +209,79 @@ test('it reports an unknown site cleanly', function () {
         ->expectsOutputToContain('Site not found')
         ->assertFailed();
 });
+
+test('it flags a per-container cache store as a silent WithoutOverlapping trap', function () {
+    // ShouldBeUnique / WithoutOverlapping / RateLimited are backed by the
+    // CACHE, not the queue. With a per-container store they do nothing at all
+    // while appearing to work — a worse bug than the one dply Queue fixes,
+    // because it looks healthy.
+    $site = doctorSite("QUEUE_CONNECTION=redis\nCACHE_STORE=array\nDB_CONNECTION=pgsql\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->expectsOutputToContain('silently do nothing')
+        ->assertSuccessful();
+});
+
+test('an unset cache store is flagged too, since the handler defaults it to array', function () {
+    $site = doctorSite("QUEUE_CONNECTION=redis\nDB_CONNECTION=pgsql\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->expectsOutputToContain('per-container on a function')
+        ->assertSuccessful();
+});
+
+test('a shared cache store is not flagged', function () {
+    $site = doctorSite("QUEUE_CONNECTION=redis\nCACHE_STORE=redis\nDB_CONNECTION=pgsql\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->doesntExpectOutputToContain('silently do nothing')
+        ->assertSuccessful();
+});
+
+test('it flags failed jobs vanishing into a per-container SQLite file', function () {
+    $site = doctorSite("QUEUE_CONNECTION=redis\nCACHE_STORE=redis\nDB_CONNECTION=sqlite\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->expectsOutputToContain('disappear without a trace')
+        ->assertSuccessful();
+});
+
+test('a networked database is not flagged for failed jobs', function () {
+    $site = doctorSite("QUEUE_CONNECTION=redis\nCACHE_STORE=redis\nDB_CONNECTION=pgsql\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->doesntExpectOutputToContain('disappear without a trace')
+        ->assertSuccessful();
+});
+
+test('the dply queue connection passes the backend check', function () {
+    $site = doctorSite("QUEUE_CONNECTION=dply\nCACHE_STORE=redis\nDB_CONNECTION=pgsql\nDPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->assertSuccessful();
+});
+
+test('dply Queue closes the cache and failed-job gaps rather than reporting them', function () {
+    // The handler registers a shared lock store and a server-side failed-job
+    // provider when a namespace is wired, so neither warning applies — even
+    // though the cache store and database still look per-container.
+    $site = doctorSite("QUEUE_CONNECTION=dply\nCACHE_STORE=array\nDB_CONNECTION=sqlite\n"
+        ."DPLY_QUEUE_URL=https://queue.dply.test/api/queue/v1/ns\nDPLY_QUEUE_SECRET=s3cret\n"
+        ."DPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->doesntExpectOutputToContain('silently do nothing')
+        ->doesntExpectOutputToContain('disappear without a trace')
+        ->assertSuccessful();
+});
+
+test('the gaps are still reported when dply Queue is not wired', function () {
+    // Same per-container cache and SQLite, but no namespace — both warn.
+    $site = doctorSite("QUEUE_CONNECTION=redis\nCACHE_STORE=array\nDB_CONNECTION=sqlite\n"
+        ."DPLY_COMMAND_SECRET=s\nDPLY_QUEUE_WAKE_URL=https://x/y\n");
+
+    $this->artisan('dply:serverless:queue-doctor', ['site' => $site->id])
+        ->expectsOutputToContain('silently do nothing')
+        ->expectsOutputToContain('disappear without a trace')
+        ->assertSuccessful();
+});

@@ -59,6 +59,7 @@ class QueueCredential extends Model
         'name',
         'token_prefix',
         'token_hash',
+        'secret',
         'scopes',
         'expires_at',
         'revoked_at',
@@ -70,6 +71,11 @@ class QueueCredential extends Model
     protected function casts(): array
     {
         return [
+            // Encrypted, not hashed: SigV4 is an HMAC over a shared secret, so
+            // the server has to be able to recompute it. Same tradeoff as
+            // RealtimeApp::app_secret, for the same reason. The hash below is
+            // retained for lookup, caching, and the native bearer path.
+            'secret' => 'encrypted',
             'scopes' => 'array',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
@@ -100,6 +106,9 @@ class QueueCredential extends Model
      * sha256 the cache key IS the stored column, so revocation is an exact
      * single-key eviction. Same reasoning as `EdgeDeployHook`.
      *
+     * Returns the access key id and the secret — the pair a client puts in
+     * AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY. The secret is shown once.
+     *
      * @param  list<string>  $scopes
      * @return array{credential: self, plaintext: string}
      */
@@ -110,14 +119,19 @@ class QueueCredential extends Model
         ?string $userId = null,
         ?Carbon $expiresAt = null,
     ): array {
-        $plaintext = 'dplyq_'.Str::random(48);
+        // The prefix doubles as the public access key id — it is what a client
+        // puts in AWS_ACCESS_KEY_ID, and what the server looks the credential
+        // up by. Unique and indexed, so resolution is one probe.
+        $accessKeyId = 'dplyq'.Str::lower(Str::random(15));
+        $plaintext = Str::random(48);
 
         $credential = self::query()->create([
             'namespace_id' => $namespace->id,
             'organization_id' => $namespace->organization_id,
             'name' => trim($name) !== '' ? trim($name) : __('Queue credential'),
-            'token_prefix' => substr($plaintext, 0, 16),
+            'token_prefix' => $accessKeyId,
             'token_hash' => self::hash($plaintext),
+            'secret' => $plaintext,
             'scopes' => array_values(array_unique($scopes)),
             'expires_at' => $expiresAt,
             'created_by_user_id' => $userId,
@@ -166,6 +180,16 @@ class QueueCredential extends Model
         $scopes = $this->scopes ?? [];
 
         return $scopes === [] || in_array($scope, $scopes, true);
+    }
+
+    /**
+     * The public access key id — what the client sends as
+     * AWS_ACCESS_KEY_ID, and what the server resolves the credential by.
+     * Safe to display in full; it is an identifier, not a secret.
+     */
+    public function accessKeyId(): string
+    {
+        return $this->token_prefix;
     }
 
     /** Display form: enough to identify a credential, never enough to use it. */

@@ -2,19 +2,23 @@
 
 use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
-use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
+use App\Http\Middleware\AuthenticateQueueCredential;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
-use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureProductionDataMirror;
+use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\RedirectServerlessByoWorkspace;
-use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
-use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
+use App\Http\Middleware\StampDebugReference;
+use App\Http\Middleware\ValidateBundleServiceToken;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
+use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
+use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
+use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Support\Debug\DebugExceptionDetail;
 use App\Support\DplyRuntime;
 use App\Support\Http\ScannerProbePaths;
 use App\Support\MachineCallbackPaths;
@@ -52,15 +56,16 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Stamp X-Dply-Ref (the Lookout occurrence id) on 5xx responses so a
         // reference can be quoted by users and resolved by admins.
-        $middleware->append(\App\Http\Middleware\StampDebugReference::class);
+        $middleware->append(StampDebugReference::class);
 
         $middleware->alias([
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
-            'bundle.service' => \App\Http\Middleware\ValidateBundleServiceToken::class,
+            'bundle.service' => ValidateBundleServiceToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
+            'auth.queue' => AuthenticateQueueCredential::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
@@ -106,8 +111,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Stash a short exception summary for the branded 500 page's
         // collapsible "Technical details" panel (signed-in operators).
         // Runs on every render path (return null = keep default handling).
-        $exceptions->render(function (\Throwable $e) {
-            \App\Support\Debug\DebugExceptionDetail::remember($e);
+        $exceptions->render(function (Throwable $e) {
+            DebugExceptionDetail::remember($e);
 
             return null;
         });

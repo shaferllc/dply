@@ -8,12 +8,15 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Services\ServerlessQueueProvisioner;
 use App\Modules\Serverless\Jobs\ServerlessQueueSlotJob;
 use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
@@ -197,4 +200,87 @@ test('the pump drains once the backend is repaired', function () {
 
     expect(app(ServerlessQueuePump::class)->wake($site->fresh()))->toBe(ServerlessQueuePump::WAKE_RAMP);
     Bus::assertDispatched(ServerlessQueueSlotJob::class);
+});
+
+test('the dply connection is shareable', function () {
+    expect(backend()->classify(backendSite("QUEUE_CONNECTION=dply\n"))['state'])
+        ->toBe(ServerlessQueueBackend::STATE_SHAREABLE);
+    expect(backend()->canDrain(backendSite("QUEUE_CONNECTION=dply\n")))->toBeTrue();
+});
+
+test('repairIfBroken prefers dply Queue over Redis', function () {
+    // The product's entry point. Before dply Queue, a broken backend could
+    // only be fixed by provisioning a paid Redis; now a namespace is a row and
+    // is usable immediately, so it wins even when Redis is already online.
+    config([
+        'queue_service.enabled' => true,
+        'queue_service.public_url' => 'https://queue.dply.test/api/queue/v1',
+    ]);
+    $site = backendSite("QUEUE_CONNECTION=sync\n".REDIS_ENV, ['status' => 'online']);
+    Feature::define('surface.queue', fn (): bool => true);
+
+    expect(backend()->repairIfBroken($site))->toBe('dply');
+
+    $fresh = $site->fresh();
+    expect(backend()->classify($fresh)['connection'])->toBe('dply');
+    expect((string) $fresh->env_file_content)->toContain('DPLY_QUEUE_URL=');
+    expect((string) $fresh->env_file_content)->toContain('DPLY_QUEUE_KEY=');
+});
+
+test('repairIfBroken falls back to Redis when dply Queue is unavailable', function () {
+    config(['queue_service.enabled' => false]);
+    $site = backendSite("QUEUE_CONNECTION=sync\n".REDIS_ENV, ['status' => 'online']);
+
+    expect(backend()->repairIfBroken($site))->toBe('redis');
+    expect(backend()->classify($site->fresh())['connection'])->toBe('redis');
+});
+
+test('repairIfBroken never touches a working backend', function () {
+    config([
+        'queue_service.enabled' => true,
+        'queue_service.public_url' => 'https://queue.dply.test/api/queue/v1',
+    ]);
+    Feature::define('surface.queue', fn (): bool => true);
+    $site = backendSite("QUEUE_CONNECTION=sqs\n");
+
+    expect(backend()->repairIfBroken($site))->toBeNull();
+    expect(backend()->classify($site->fresh())['connection'])->toBe('sqs');
+});
+
+test('repairIfBroken reports null when nothing is available', function () {
+    config(['queue_service.enabled' => false]);
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+
+    expect(backend()->repairIfBroken($site))->toBeNull();
+});
+
+test('wiring a site twice reuses its namespace and credential', function () {
+    // Re-minting on every deploy would churn credentials for no reason and
+    // burn the two-live-credential rotation budget.
+    config([
+        'queue_service.enabled' => true,
+        'queue_service.public_url' => 'https://queue.dply.test/api/queue/v1',
+    ]);
+    Feature::define('surface.queue', fn (): bool => true);
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+
+    $provisioner = app(ServerlessQueueProvisioner::class);
+    expect($provisioner->wire($site))->toBeTrue();
+    $first = (string) $site->fresh()->env_file_content;
+
+    expect($provisioner->wire($site->fresh()))->toBeTrue();
+    $second = (string) $site->fresh()->env_file_content;
+
+    expect(QueueNamespace::query()->where('site_id', $site->id)->count())->toBe(1);
+    expect($second)->toBe($first);
+});
+
+test('dply Queue is not offered without a public url', function () {
+    // Same reachability rule as log ingest: a function on DigitalOcean cannot
+    // reach a local *.test address, so the feature is simply not offered.
+    config(['queue_service.enabled' => true, 'queue_service.public_url' => '', 'dply.public_app_url' => '']);
+    Feature::define('surface.queue', fn (): bool => true);
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+
+    expect(app(ServerlessQueueProvisioner::class)->available($site))->toBeFalse();
 });

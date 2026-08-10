@@ -6,6 +6,7 @@ namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Queue\Services\ServerlessQueueProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 
 /**
@@ -45,13 +46,21 @@ final class ServerlessQueueBackend
     /** Some other driver dply cannot vouch for either way. */
     public const STATE_UNKNOWN = 'unknown';
 
-    /** Drivers whose store is always reachable from every container. */
-    private const SHAREABLE_DRIVERS = ['redis', 'sqs', 'beanstalkd'];
+    /**
+     * Drivers whose store is always reachable from every container.
+     *
+     * `dply` is the managed queue — a connection dply provisions and the
+     * injected handler registers, so it is shareable by construction.
+     */
+    private const SHAREABLE_DRIVERS = ['dply', 'redis', 'sqs', 'beanstalkd'];
 
     /** Database drivers that are a real network service. */
     private const NETWORKED_DATABASES = ['mysql', 'mariadb', 'pgsql', 'sqlsrv'];
 
-    public function __construct(private readonly ServerlessEnvironmentPreparer $environment) {}
+    public function __construct(
+        private readonly ServerlessEnvironmentPreparer $environment,
+        private readonly ServerlessQueueProvisioner $provisioner,
+    ) {}
 
     /**
      * Classify the site's queue backend.
@@ -169,25 +178,60 @@ final class ServerlessQueueBackend
         return true;
     }
 
+    /** Whether this backend is one dply knows cannot work here. */
+    public function isBroken(Site $site): bool
+    {
+        return in_array(
+            $this->classify($site)['state'],
+            [self::STATE_INERT, self::STATE_UNSHARED],
+            true,
+        );
+    }
+
     /**
      * Adopt the provisioned Redis for the queue, but only when the current
      * backend is provably broken.
      *
-     * Called after Redis finishes provisioning. Deliberately conservative: an
-     * operator who has pointed the queue at their own SQS or Redis has made a
-     * choice, and silently repointing it at ours would be a worse failure
-     * than the one being fixed. A `sync`/SQLite backend is not a choice — it
-     * is the default, and it does not work here.
+     * Deliberately conservative: an operator who has pointed the queue at
+     * their own SQS or Redis has made a choice, and silently repointing it at
+     * ours would be a worse failure than the one being fixed. A `sync`/SQLite
+     * backend is not a choice — it is the default, and it does not work here.
      */
     public function adoptRedisIfBroken(Site $site): bool
     {
-        $state = $this->classify($site)['state'];
-
-        if (! in_array($state, [self::STATE_INERT, self::STATE_UNSHARED], true)) {
+        if (! $this->isBroken($site)) {
             return false;
         }
 
         return $this->wireRedis($site);
+    }
+
+    /**
+     * Repair a broken queue backend with whatever is available, preferring
+     * dply Queue.
+     *
+     * This is the product's entry point. Before dply Queue existed the only
+     * remedy on offer was "go provision a managed Redis", which meant every
+     * serverless Laravel app needed a paid database before its queue worked at
+     * all. A namespace is created synchronously and is usable immediately, so
+     * it is both the better answer and the faster one.
+     *
+     * Redis remains the fallback for an org that cannot have dply Queue (plan
+     * gating, or the surface flag off) but already has a cluster online.
+     *
+     * @return 'dply'|'redis'|null what it was repaired with, or null
+     */
+    public function repairIfBroken(Site $site): ?string
+    {
+        if (! $this->isBroken($site)) {
+            return null;
+        }
+
+        if ($this->provisioner->wire($site)) {
+            return 'dply';
+        }
+
+        return $this->wireRedis($site) ? 'redis' : null;
     }
 
     /**

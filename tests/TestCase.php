@@ -25,6 +25,23 @@ abstract class TestCase extends BaseTestCase
      */
     protected bool $dropTypes = true;
 
+    /**
+     * Roll back the dply Queue data plane between tests, not just the primary
+     * connection.
+     *
+     * `RefreshDatabase` transacts only the default connection, so rows written
+     * to `dply_queue` (jobs, locks, failed jobs) survived into the next test.
+     * Namespace-scoped queries hid it; anything counting rows outright did
+     * not. Listing the connection here restores per-test isolation for every
+     * current and future queue test, rather than each one remembering to
+     * clean up after itself.
+     *
+     * `null` is the default connection and must stay first.
+     *
+     * @var list<string|null>
+     */
+    protected $connectionsToTransact = [null, 'dply_queue'];
+
     protected function setUp(): void
     {
         $this->guardAgainstDestructiveDatabaseTarget();

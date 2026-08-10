@@ -40,9 +40,15 @@ return new class extends Migration
 
             $table->string('name', 80);
 
-            // Shown in the UI so an operator can tell two live credentials
-            // apart during a rotation without revealing either.
-            $table->string('token_prefix', 16)->index();
+            /**
+             * The public access key id — what a client puts in
+             * AWS_ACCESS_KEY_ID, and what the server resolves by. 20 chars to
+             * match AWS's own format (`dplyq` + 15), with headroom in the
+             * column. Safe to display in full: it is an identifier, not a
+             * secret, and it is how an operator tells two live credentials
+             * apart during a rotation.
+             */
+            $table->string('token_prefix', 32)->unique();
 
             // sha256 hex. Unique so resolution is one index probe with no
             // prefix scan and no per-candidate hashing.

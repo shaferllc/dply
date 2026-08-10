@@ -80,6 +80,7 @@ use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
 use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
+use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
 use App\Modules\Referrals\Listeners\ProcessReferralInvoicePayment;
@@ -141,6 +142,7 @@ use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Sites\SiteSyncPeersResolver;
 use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -151,6 +153,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
 use Livewire\Blaze\Blaze;
@@ -367,12 +370,12 @@ class AppServiceProvider extends ServiceProvider
         // in database/factories/ (namespace Database\Factories). Laravel's default
         // resolver would look for Database\Factories\Modules\<Domain>\Models\<X>Factory;
         // map module models back to the flat Database\Factories\<X>Factory.
-        \Illuminate\Database\Eloquent\Factories\Factory::guessFactoryNamesUsing(function (string $modelName): string {
-            $relative = \Illuminate\Support\Str::startsWith($modelName, 'App\\Models\\')
-                ? \Illuminate\Support\Str::after($modelName, 'App\\Models\\')
+        Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            $relative = Str::startsWith($modelName, 'App\\Models\\')
+                ? Str::after($modelName, 'App\\Models\\')
                 : (str_starts_with($modelName, 'App\\Modules\\')
                     ? class_basename($modelName)
-                    : \Illuminate\Support\Str::after($modelName, 'App\\'));
+                    : Str::after($modelName, 'App\\'));
 
             return 'Database\\Factories\\'.$relative.'Factory';
         });
@@ -689,6 +692,26 @@ class AppServiceProvider extends ServiceProvider
             $sid = $request->input('server_id');
 
             return Limit::perMinute(120)->by(is_string($sid) && $sid !== '' ? 'gmp:'.$sid : 'gmp-ip:'.$request->ip());
+        });
+
+        // dply Queue data plane. Keyed by namespace so one tenant's drain loop
+        // cannot starve another's — same reasoning as function-log-ingest. The
+        // ceiling is an entitlement, not a constant, so a plan that pays for
+        // throughput gets it; AuthenticateQueueCredential sets the context
+        // before this runs.
+        //
+        // Emphatically NOT `throttle:api` (60/min): one polling worker would
+        // exhaust that in seconds.
+        RateLimiter::for('dply-queue', function (Request $request) {
+            $context = $request->attributes->get('queue_context');
+
+            if ($context instanceof QueueRequestContext) {
+                return Limit::perMinute($context->requestsPerMinute)->by('dq:'.$context->namespaceId());
+            }
+
+            // Unauthenticated: a tight IP limit, so credential stuffing cannot
+            // ride the generous per-namespace allowance.
+            return Limit::perMinute(60)->by('dq-ip:'.$request->ip());
         });
     }
 

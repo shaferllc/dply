@@ -118,8 +118,15 @@ class ProvisionServerlessCacheJob implements ShouldQueue
         // broken defaults. An operator pointing the queue at their own SQS or
         // Redis has made a choice, and silently repointing it would be a
         // worse failure than the one being fixed.
-        if (app(ServerlessQueueBackend::class)->adoptRedisIfBroken($site->fresh() ?? $site)) {
-            Log::info('serverless.cache.queue_adopted_redis', ['site_id' => $site->id]);
+        // Prefers dply Queue when the org has it, falling back to this Redis
+        // otherwise — see ServerlessQueueBackend::repairIfBroken().
+        $repairedWith = app(ServerlessQueueBackend::class)->repairIfBroken($site->fresh() ?? $site);
+
+        if ($repairedWith !== null) {
+            Log::info('serverless.cache.queue_repaired', [
+                'site_id' => $site->id,
+                'backend' => $repairedWith,
+            ]);
         }
     }
 

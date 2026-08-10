@@ -2,18 +2,7 @@
 
 use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
-use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeAccessApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeAliasApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeCacheApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeDeploymentApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeDomainApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeLintApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeLogApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgePreviewApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeSiteApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeUsageApiController;
-use App\Modules\Edge\Http\Controllers\Api\EdgeEnvController;
+use App\Http\Controllers\Api\BundleEntitlementsController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
@@ -29,6 +18,21 @@ use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteEnvApiController;
 use App\Http\Controllers\Api\SiteResourceApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
+use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeAccessApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeAliasApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeCacheApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeDeploymentApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeDomainApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeEnvController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeLintApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeLogApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgePreviewApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeSiteApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeUsageApiController;
+use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
+use App\Modules\Queue\Http\Controllers\QueueLockController;
+use App\Modules\Queue\Http\Controllers\SqsCompatibilityController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -64,7 +68,7 @@ Route::prefix('v1')->group(function (): void {
     // Bundled-products entitlement pull (reconcile backstop) — service-token auth,
     // called by tracely/Lookout. Dark until BUNDLE_ENTITLEMENTS_API_TOKEN is set.
     Route::middleware('bundle.service')->group(function (): void {
-        Route::get('/orgs/{organization}/entitlements', [\App\Http\Controllers\Api\BundleEntitlementsController::class, 'show'])
+        Route::get('/orgs/{organization}/entitlements', [BundleEntitlementsController::class, 'show'])
             ->middleware('throttle:120,1');
     });
 
@@ -291,3 +295,54 @@ Route::prefix('v1')->group(function (): void {
         });
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| dply Queue data plane
+|--------------------------------------------------------------------------
+|
+| The SQS-compatible surface. Sits OUTSIDE the /v1 group on purpose:
+|
+|   - Auth is SigV4 with a per-namespace credential, not an ApiToken bearer.
+|     `auth.api` resolves a User, bcrypt-checks, and writes last_used_at on
+|     every call — all wrong for a credential presented hundreds of times a
+|     minute from inside a container.
+|   - `throttle:api` is 60/min. One polling queue worker would exhaust that in
+|     seconds, so this uses its own entitlement-driven, namespace-keyed limiter.
+|
+| One route for every action: the AWS JSON protocol dispatches on the
+| X-Amz-Target header, not the path, so the SDK posts everything to the queue
+| URL itself.
+|
+| CSRF exemption comes from App\Support\MachineCallbackPaths (`api/queue/*`),
+| the same canonical list the guest gates read.
+|
+*/
+Route::prefix('queue/v1')
+    ->middleware(['auth.queue', 'throttle:dply-queue'])
+    ->group(function (): void {
+        // dply-native endpoints. Registered BEFORE the SQS catch-all, which
+        // would otherwise swallow `/locks/...` as a queue name.
+        //
+        // These are not SQS operations, so they take a bearer token rather
+        // than a SigV4 signature — there is no compatibility contract to
+        // honour, and requiring a signature would mean shipping a signer into
+        // every customer app.
+        Route::post('/locks/acquire', [QueueLockController::class, 'acquire'])->name('queue.locks.acquire');
+        Route::post('/locks/release', [QueueLockController::class, 'release'])->name('queue.locks.release');
+        Route::post('/locks/force-release', [QueueLockController::class, 'forceRelease'])->name('queue.locks.force-release');
+        Route::post('/locks/owner', [QueueLockController::class, 'owner'])->name('queue.locks.owner');
+
+        // Failed jobs. Backs a FailedJobProviderInterface in the app, so a job
+        // that exhausts its attempts is recorded here instead of in a
+        // per-container SQLite file that vanishes with the container.
+        Route::get('/failed-jobs', [QueueFailedJobController::class, 'index'])->name('queue.failed.index');
+        Route::post('/failed-jobs', [QueueFailedJobController::class, 'store'])->name('queue.failed.store');
+        Route::post('/failed-jobs/flush', [QueueFailedJobController::class, 'flush'])->name('queue.failed.flush');
+        Route::get('/failed-jobs/{id}', [QueueFailedJobController::class, 'show'])->name('queue.failed.show');
+        Route::delete('/failed-jobs/{id}', [QueueFailedJobController::class, 'destroy'])->name('queue.failed.destroy');
+
+        Route::post('/{queue?}', SqsCompatibilityController::class)
+            ->where('queue', '[A-Za-z0-9._-]{1,128}')
+            ->name('queue.sqs');
+    });

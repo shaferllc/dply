@@ -37,14 +37,24 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
    `RealtimeApp` — ULID doubling as the data-plane id, `provisioning/active/
    failed/paused`, tier limits enforced at the data plane. Not scoped to a Site;
    any Laravel app can hold one.
-3. **Credentials** = a separate `QueueCredential` type using
-   `hash('sha256', $plaintext)` + prefix, following `EdgeDeployHook`. **Not
-   `ApiToken`.** Its bcrypt hash is salted, so a cache key cannot be derived
-   from the stored row and revocation could only wait out a TTL; it also writes
-   `last_used_at` per request, requires a `User`, and carries org-wide
-   abilities. A 48-char CSPRNG secret has no brute-force surface, so the slow
-   KDF buys nothing and costs the design. Two credentials may be live per
-   namespace, because a `.env` only reaches the app on the next deploy.
+3. **Credentials** = a separate `QueueCredential` type, **not `ApiToken`**.
+   Its bcrypt hash is salted, so a cache key cannot be derived from the stored
+   row and revocation could only wait out a TTL; it also writes `last_used_at`
+   per request, requires a `User`, and carries org-wide abilities. Two
+   credentials may be live per namespace, because a `.env` only reaches the app
+   on the next deploy.
+
+   **Amended 2026-08-10 (during M3):** the secret is **encrypted at rest, not
+   hashed**. SigV4 is an HMAC over a shared secret, so the server must be able
+   to recompute it; a hash has nothing to compare against. This is the same
+   tradeoff `RealtimeApp::app_secret` makes for Pusher, and it is forced by the
+   protocol rather than chosen. `token_hash` is retained as the cache-key
+   source, so the exact-eviction revocation property is unchanged, and
+   `token_prefix` doubles as the public access key id. Cost, stated plainly: a
+   database dump plus a leaked `APP_KEY` now exposes secrets, where a hash
+   would have exposed nothing. That is inherent to any shared-secret signing
+   scheme and is why these credentials are scoped to one namespace and one
+   product.
 4. **Visibility** = one `visible_at` column, not `available_at` + `reserved_at`.
    Laravel's `DatabaseQueue` expresses availability as a disjunction across two
    timestamps, which is not indexable as one range. Push, reserve, and release
@@ -75,6 +85,23 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
 10. **Gating** = `surface.queue` in `config/features.php`; pricing dials,
     entitlements, and the kill switch in a new `config/queue_service.php`, per
     the layering rules at `config/features.php:11-26`.
+
+11. **Client wiring** = a dedicated `dply` queue *connection* using the `sqs`
+    driver, registered at runtime by the injected handler. Not the app's
+    existing `sqs` connection.
+
+    Two findings force this. First, a stock Laravel `config/queue.php` has no
+    `endpoint` key in its `sqs` block, and without one the AWS SDK routes to
+    real AWS regardless of `SQS_PREFIX` — verified. Second, that block reads
+    `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, so pointing it at dply would
+    hijack the credentials the app uses for S3 and everything else.
+
+    For apps dply deploys, the handler already boots the framework, so it can
+    define the connection from `DPLY_QUEUE_*` before the kernel runs — nothing
+    for the customer to edit and no shared AWS credentials disturbed. An
+    external app adds one line (`'endpoint' => env('AWS_ENDPOINT')`) or waits
+    for the companion package. The "no package" claim survives; the "nothing
+    but env vars" claim does not, and should not be made for external apps.
 
 ## Boundaries
 
