@@ -2,10 +2,10 @@
     $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
 @endphp
 
-<div class="dply-card overflow-hidden">
+{{-- Embedded strip inside the Overview card — no card of its own. --}}
+<div class="border-t border-brand-ink/10">
     <x-workspace-panel-head
         dense
-        class="border-b border-brand-ink/10"
         icon="heroicon-o-clock"
         :title="__('Scheduler & queue')"
         :count="$enabled ? __('on') : __('off')"

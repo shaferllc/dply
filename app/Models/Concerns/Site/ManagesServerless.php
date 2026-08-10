@@ -173,6 +173,34 @@ trait ManagesServerless
     }
 
     /**
+     * The function's canonical public address, in the same priority order the
+     * routing screen lists its invocation URLs: live hostname first, then the
+     * /fn/{slug} path, then the raw provider invocation URL as a last resort.
+     * Null before the first deploy has produced any of them.
+     *
+     * {@see \App\Models\Concerns\Site\ResolvesSiteUrls::visitUrl()} can't answer
+     * this — a function has no site_domains row and no testing hostname, so it
+     * returns null and callers fall back to the site *name*, which reads as a
+     * broken URL in the workspace header.
+     */
+    public function serverlessPublicUrl(): ?string
+    {
+        $host = trim((string) ($this->serverlessFunctionHost() ?? ''));
+        if ($host !== '') {
+            return 'https://'.$host;
+        }
+
+        $slug = trim((string) ($this->serverlessConfig()['proxy_slug'] ?? ''));
+        if ($slug !== '') {
+            return url('fn/'.$slug);
+        }
+
+        $actionUrl = trim((string) ($this->serverlessConfig()['action_url'] ?? ''));
+
+        return $actionUrl !== '' ? $actionUrl : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serverlessResolvedConfig(): array

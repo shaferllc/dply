@@ -30,70 +30,81 @@
     $customDomainCount = is_array($routing['custom_domains'] ?? null)
         ? count(array_filter($routing['custom_domains'], fn ($d) => is_array($d) && ($d['dns_status'] ?? null) === 'ready'))
         : 0;
+
+    $strip = 'border-t border-brand-ink/10 px-4 py-3 sm:px-5';
+    $statLabel = 'text-2xs font-semibold uppercase tracking-wide text-brand-moss/70';
 @endphp
 
-<section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Serverless') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('HTTP-triggered function on DigitalOcean Functions.') }}</p>
-        </div>
-        <span class="inline-flex shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
-    </div>
+{{-- Merged chrome: one outer card, sand identity header, every section a
+     hairline strip — the function summary, cost, and the four resource panels
+     used to be five floating cards stacked on a space-y-6 rhythm. --}}
+<section class="dply-card min-w-0 overflow-hidden p-0">
+    <x-workspace-panel-head
+        dense
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-bolt"
+        :title="__('Function')"
+        :note="__('HTTP-triggered function on DigitalOcean Functions.')"
+    >
+        <x-slot:actions>
+            <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-semibold {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="space-y-5 px-6 py-6 sm:px-7">
-    <div x-data="{ copied: false }">
-        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Function URL') }}</p>
-        <div class="mt-1 flex items-center gap-2">
-            <code class="flex-1 min-w-0 truncate rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 text-sm text-brand-ink">{{ $friendlyUrl }}</code>
+    {{-- URL + the actions that belong to it, on one line. --}}
+    <div class="px-4 py-3 sm:px-5" x-data="{ copied: false }">
+        <div class="flex items-center gap-2">
+            <span class="shrink-0 rounded-md bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('URL') }}</span>
+            <a href="{{ $friendlyUrl }}" target="_blank" rel="noopener noreferrer"
+               class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink underline-offset-2 hover:text-brand-sage hover:underline"
+               title="{{ $friendlyUrl }}">{{ preg_replace('#^https?://#', '', $friendlyUrl) }}</a>
             <button type="button"
                     x-on:click="navigator.clipboard.writeText(@js($friendlyUrl)); copied = true; setTimeout(() => copied = false, 1500)"
-                    class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
-                <span x-show="!copied">{{ __('Copy') }}</span>
-                <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                    class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink"
+                    :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'">
+                <x-heroicon-o-clipboard class="h-4 w-4" aria-hidden="true" />
             </button>
             <a href="{{ $friendlyUrl }}" target="_blank" rel="noopener noreferrer"
-               class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
-                {{ __('Open') }}
+               title="{{ __('Open function') }}"
+               class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
+                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
             </a>
+            <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
         </div>
         @if ($invocationUrl !== '')
-            <p class="mt-1.5 truncate text-xs text-brand-moss/60">{{ __('Direct:') }} <span class="font-mono">{{ $invocationUrl }}</span></p>
+            <p class="mt-1 truncate text-2xs text-brand-moss/60" title="{{ $invocationUrl }}">{{ __('Direct:') }} <span class="font-mono">{{ $invocationUrl }}</span></p>
         @else
-            <p class="mt-1.5 text-xs text-brand-moss/60">{{ __('Live once the first deploy completes.') }}</p>
+            <p class="mt-1 text-2xs text-brand-moss/60">{{ __('Live once the first deploy completes.') }}</p>
         @endif
     </div>
 
-    <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
-        <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Runtime') }}</dt>
-            <dd class="mt-0.5 text-brand-ink">{{ $runtime !== '' ? $runtime : '—' }}</dd>
+    {{-- Combined stat strip rather than a card of its own. --}}
+    <dl class="{{ $strip }} grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-4">
+        <div class="min-w-0">
+            <dt class="{{ $statLabel }}">{{ __('Runtime') }}</dt>
+            <dd class="mt-0.5 truncate text-xs text-brand-ink">{{ $runtime !== '' ? $runtime : '—' }}</dd>
         </div>
-        <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Repository') }}</dt>
-            <dd class="mt-0.5 truncate text-brand-ink">{{ $site->git_repository_url ?: '—' }}</dd>
+        <div class="min-w-0">
+            <dt class="{{ $statLabel }}">{{ __('Repository') }}</dt>
+            <dd class="mt-0.5 truncate text-xs text-brand-ink" title="{{ $site->git_repository_url }}">{{ $site->git_repository_url ?: '—' }}</dd>
         </div>
-        <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Last deployed') }}</dt>
-            <dd class="mt-0.5 text-brand-ink">
+        <div class="min-w-0">
+            <dt class="{{ $statLabel }}">{{ __('Last deployed') }}</dt>
+            <dd class="mt-0.5 truncate text-xs text-brand-ink">
                 {{ $lastDeployedAt ? \Illuminate\Support\Carbon::parse($lastDeployedAt)->diffForHumans() : __('Never') }}
             </dd>
         </div>
-        <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Revision') }}</dt>
-            <dd class="mt-0.5 text-brand-ink">{{ $revision !== '' ? $revision : '—' }}</dd>
+        <div class="min-w-0">
+            <dt class="{{ $statLabel }}">{{ __('Revision') }}</dt>
+            <dd class="mt-0.5 truncate text-xs text-brand-ink">{{ $revision !== '' ? $revision : '—' }}</dd>
         </div>
     </dl>
 
     <a href="{{ route('sites.routing', ['server' => $server, 'site' => $site]) }}"
        wire:navigate
-       class="flex items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm transition-colors hover:border-brand-ink/25 hover:bg-brand-sand/30">
+       class="{{ $strip }} flex items-center justify-between gap-3 transition-colors hover:bg-brand-sand/20">
         <div class="min-w-0">
-            <p class="font-semibold text-brand-ink">{{ __('Routing') }}</p>
+            <p class="text-sm font-semibold text-brand-ink">{{ __('Routing') }}</p>
             <p class="mt-0.5 text-xs text-brand-moss">
                 @php
                     $dnsBadge = match ($dnsStatus) {
@@ -113,15 +124,44 @@
         <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-moss" />
     </a>
 
-    <div class="flex flex-wrap items-center gap-3 pt-1">
+    {{-- Cost: total on the header line, lines underneath — no second card. --}}
+    <div class="{{ $strip }}">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="{{ $statLabel }}">{{ __('Cost estimate') }}</p>
+            <p class="text-sm font-bold text-brand-ink">≈ ${{ number_format($costEstimate['total'], 2) }}{{ __('/mo') }}</p>
+        </div>
+        <dl class="mt-1.5 divide-y divide-brand-ink/8">
+            @foreach ($costEstimate['lines'] as $line)
+                <div class="flex items-center justify-between gap-3 py-1.5 text-xs">
+                    <dt class="min-w-0 truncate text-brand-moss">
+                        {{ $line['label'] }}
+                        <span class="text-brand-moss/50">· {{ __('billed by :who', ['who' => $line['billed_by']]) }}</span>
+                    </dt>
+                    <dd class="shrink-0 font-medium tabular-nums text-brand-ink">${{ number_format($line['amount'], 2) }}{{ __('/mo') }}</dd>
+                </div>
+            @endforeach
+        </dl>
+        <p class="mt-1.5 text-2xs text-brand-moss/60">
+            {{ __('Estimated. dply bills the function fee; DigitalOcean bills any database or Redis clusters directly. Function invocation usage is metered separately by DigitalOcean.') }}
+        </p>
+    </div>
+
+    {{-- Resource panels render their own hairline strips (embedded chrome), so
+         they continue the card rather than stacking four more floating cards. --}}
+    @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
+    @livewire('serverless.cache-panel', ['site' => $site], key('serverless-cache-'.$site->id))
+    @livewire('serverless.background-panel', ['site' => $site], key('serverless-bg-'.$site->id))
+    @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
+
+    <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
         @if ($isActive)
             {{-- The function is live — redeploys + history belong on the
                  Deployments tab. Overview stays a glance, not an action bar. --}}
             <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}"
                wire:navigate
-               class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-forest hover:underline">
+               class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">
                 {{ __('Manage deploys') }}
-                <x-heroicon-o-arrow-right class="h-4 w-4" />
+                <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
             </a>
         @else
             {{-- Not live yet — the first deploy is the operator's next step. --}}
@@ -129,54 +169,14 @@
                     wire:click="redeployServerlessFunction"
                     wire:loading.attr="disabled"
                     wire:target="redeployServerlessFunction"
-                    class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
+                    class="inline-flex items-center rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
                 <span wire:loading.remove wire:target="redeployServerlessFunction">{{ $isFailed ? __('Retry deploy') : __('Deploy function') }}</span>
                 <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
             </button>
             <a href="{{ \App\Support\Serverless\ServerlessWorkspaceUrl::journey($site) }}"
-               class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+               class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
                 {{ __('Deploy journey') }}
             </a>
         @endif
     </div>
-    </div>
 </section>
-
-<div class="dply-card mt-6 p-6 sm:p-8">
-    <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Cost estimate') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">≈ ${{ number_format($costEstimate['total'], 2) }}{{ __('/mo') }}</h2>
-        </div>
-    </div>
-    <dl class="mt-3 divide-y divide-brand-ink/10">
-        @foreach ($costEstimate['lines'] as $line)
-            <div class="flex items-center justify-between py-2 text-sm">
-                <dt class="text-brand-moss">
-                    {{ $line['label'] }}
-                    <span class="text-brand-moss/50">· {{ __('billed by :who', ['who' => $line['billed_by']]) }}</span>
-                </dt>
-                <dd class="font-medium text-brand-ink">${{ number_format($line['amount'], 2) }}{{ __('/mo') }}</dd>
-            </div>
-        @endforeach
-    </dl>
-    <p class="mt-3 text-xs text-brand-moss/60">
-        {{ __('Estimated. dply bills the function fee; DigitalOcean bills any database or Redis clusters directly. Function invocation usage is metered separately by DigitalOcean.') }}
-    </p>
-</div>
-
-<div class="mt-6">
-    @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
-</div>
-
-<div class="mt-6">
-    @livewire('serverless.cache-panel', ['site' => $site], key('serverless-cache-'.$site->id))
-</div>
-
-<div class="mt-6">
-    @livewire('serverless.background-panel', ['site' => $site], key('serverless-bg-'.$site->id))
-</div>
-
-<div class="mt-6">
-    @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
-</div>
