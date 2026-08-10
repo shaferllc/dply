@@ -42,7 +42,7 @@
 
                 // Nothing scheduled and nothing ever run means this org has not
                 // started — show the onboarding splash instead of empty tables.
-                $neverUsed = request()->boolean('splash') || ($schedules->isEmpty() && $recentRuns->isEmpty());
+                $neverUsed = $schedules->isEmpty() && $recentRuns->isEmpty();
             @endphp
 
             <x-profile-shell
