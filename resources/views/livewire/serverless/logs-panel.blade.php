@@ -106,13 +106,24 @@
                         <input type="text" wire:model="testPath" placeholder="/"
                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 font-mono text-xs">
                     </label>
+                    @if ($supportsAsync)
+                        <label class="flex items-center gap-1.5 pb-1.5 text-xs text-brand-moss">
+                            <input type="checkbox" wire:model="testAsync" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage">
+                            <span class="font-semibold">{{ __('Async') }}</span>
+                        </label>
+                    @endif
                     <button type="button" wire:click="sendTestRequest" wire:loading.attr="disabled" wire:target="sendTestRequest"
                             class="inline-flex items-center rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
                         <span wire:loading.remove wire:target="sendTestRequest">{{ __('Send') }}</span>
                         <span wire:loading wire:target="sendTestRequest">{{ __('Invoking…') }}</span>
                     </button>
                 </div>
-                <p class="mt-2 text-xs text-brand-moss/60">{{ __('A test invocation runs the function once and is billed like any invocation.') }}</p>
+                <p class="mt-2 text-xs text-brand-moss/60">
+                    {{ __('A test invocation runs the function once and is billed like any invocation.') }}
+                    @if ($supportsAsync)
+                        {{ __('Async starts it and collects the result when it finishes — the only way to test a function whose timeout exceeds 60 seconds.') }}
+                    @endif
+                </p>
             @endif
         </div>
 
@@ -121,7 +132,11 @@
                 {{ __('No activations recorded yet. Background ticks land here automatically; or send a test request above.') }}
             </div>
         @else
-            <ul class="divide-y divide-brand-ink/10">
+            {{-- An async invocation's row is written before its result exists;
+                 poll while any are still in flight so it fills itself in. --}}
+            <ul @class(['divide-y divide-brand-ink/10'])
+                @if ($pendingActivations > 0) wire:poll.5s="refreshLogs" @endif
+            >
                 @foreach ($activations as $invocation)
                     @include('livewire.serverless.partials._invocation-row', ['invocation' => $invocation])
                 @endforeach

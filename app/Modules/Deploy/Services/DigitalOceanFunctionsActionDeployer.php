@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Support\FunctionConfiguration;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Support\Facades\Http;
 
@@ -19,6 +20,7 @@ final class DigitalOceanFunctionsActionDeployer
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessFunctionDnsProvisioner $dnsProvisioner,
         private readonly ServerlessDeployHookRunner $hookRunner,
+        private readonly ServerlessMultiActionDeployer $multiActionDeployer,
     ) {}
 
     /**
@@ -31,7 +33,12 @@ final class DigitalOceanFunctionsActionDeployer
         $this->assertFunctionsHost($site->server);
 
         $buildResult = $this->artifactBuilder->build($site);
-        $result = $this->pushArtifact($site, $buildResult['artifact_path'], $buildResult['output']);
+        $result = $this->pushArtifact(
+            $site,
+            $buildResult['artifact_path'],
+            $buildResult['output'],
+            $buildResult['working_directory'],
+        );
 
         // after_activate hooks — the action is uploaded and smoke-tested, so
         // the function is live; run post-deploy shell (warm-up, notify, …).
@@ -140,9 +147,13 @@ final class DigitalOceanFunctionsActionDeployer
      * Upload an artifact zip to the OpenWhisk action and record the result.
      * Shared by a fresh deploy and a rollback.
      *
+     * `$workingDirectory` is the checkout the artifact came from, present only
+     * on a fresh deploy — a rollback re-pushes a stored zip and has no tree to
+     * discover sibling functions in.
+     *
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
-    private function pushArtifact(Site $site, string $artifactPath, string $buildOutput): array
+    private function pushArtifact(Site $site, string $artifactPath, string $buildOutput, ?string $workingDirectory = null): array
     {
         $server = $site->server;
         $siteMeta = is_array($site->meta) ? $site->meta : [];
@@ -189,11 +200,17 @@ final class DigitalOceanFunctionsActionDeployer
         // framework cold start needs far more than OpenWhisk's stock 3s/256MB.
         $limits = $site->serverlessLimits();
 
+        // How the function is exposed over HTTP (web/raw/off, CORS, endpoint
+        // secret) and what parameters are bound to it. Operator-owned on the
+        // Runtime tab; absent config resolves to a plain web function, which
+        // is what every function deployed before this existed already is.
+        $functionConfiguration = FunctionConfiguration::fromSiteConfig($site->serverlessConfig());
+
         $this->progress->active($site, 'upload', 'Uploading to DigitalOcean Functions', 'Namespace '.$namespace);
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(300)
             ->acceptJson()
-            ->put($url.'?overwrite=true', [
+            ->put($url.'?overwrite=true', array_filter([
                 'exec' => [
                     'kind' => $kind,
                     'binary' => true,
@@ -202,15 +219,14 @@ final class DigitalOceanFunctionsActionDeployer
                 ],
                 // Without web-export the action exists but is not reachable
                 // over HTTP — the invocation URL would 404.
-                'annotations' => [
-                    ['key' => 'web-export', 'value' => true],
-                ],
+                'annotations' => $functionConfiguration->annotations(),
+                'parameters' => $functionConfiguration->parameterPairs(),
                 'limits' => [
                     'timeout' => $limits['timeout'],
                     'memory' => $limits['memory'],
                     'concurrency' => $limits['concurrency'],
                 ],
-            ]);
+            ], static fn (array $value): bool => $value !== []));
 
         if ($response->status() === 401 || $response->status() === 403) {
             throw new \RuntimeException(
@@ -257,9 +273,30 @@ final class DigitalOceanFunctionsActionDeployer
             // Snapshot the limits actually pushed to OpenWhisk so the Runtime
             // tab can show when saved limits are pending a redeploy.
             'deployed_limits' => $limits,
+            // Same for the HTTP-exposure config — minus the endpoint secret,
+            // which stays in the `web` block rather than being copied into a
+            // second place it would have to be rotated out of.
+            'deployed_web' => array_diff_key($functionConfiguration->toWebArray(), ['auth_secret' => null]),
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
+
+        // A repository can declare more than one function. The primary is now
+        // live; deploy its siblings from the same checkout and record every
+        // action, so the workspace's action list matches the namespace.
+        $additionalActions = ['deployed' => [], 'failed' => [], 'output' => ''];
+        if ($workingDirectory !== null) {
+            $additionalActions = $this->multiActionDeployer->deploy($site, $workingDirectory, [
+                'api_host' => $apiHost,
+                'namespace' => $namespace,
+                'access_key' => $accessKey,
+                'package' => $package,
+                'primary_action' => $actionName,
+                'primary_runtime' => $kind,
+                'primary_entrypoint' => $entrypoint,
+                'primary_url' => (string) $siteMeta['serverless']['action_url'],
+            ]);
+        }
 
         // Local cleanup: keep only the retained rollback set on disk so the
         // artifact dir stops growing by one zip per deploy. Keyed strictly off
@@ -282,7 +319,7 @@ final class DigitalOceanFunctionsActionDeployer
         // caught here — and shown on the deploy journey — instead of by the
         // operator hitting the URL. The deploy itself still succeeds: the
         // action IS deployed; this only reports whether it answers.
-        $health = $this->smokeTest($site, (string) $siteMeta['serverless']['action_url']);
+        $health = $this->smokeTest($site, (string) $siteMeta['serverless']['action_url'], $functionConfiguration);
 
         return [
             'output' => implode("\n", array_filter([
@@ -293,6 +330,7 @@ final class DigitalOceanFunctionsActionDeployer
                 'Action: '.$actionName,
                 'Runtime: '.$kind,
                 $revisionId ? 'Revision: '.$revisionId : null,
+                $additionalActions['output'] !== '' ? $additionalActions['output'] : null,
                 $dnsStatus,
                 'Health check: '.$health,
             ])),
@@ -339,17 +377,31 @@ final class DigitalOceanFunctionsActionDeployer
      * `verify` journey sub-step. A 2xx/3xx means it boots and answers; any
      * other status — or an unreachable host — is surfaced. This never fails
      * the deploy: the action IS deployed; this only reports whether it runs.
+     *
+     * A non-web function has no URL to test, and a secured one rejects an
+     * unauthenticated GET with a 401 that says nothing about whether the code
+     * boots — so the check adapts to how the function is exposed.
      */
-    private function smokeTest(Site $site, string $actionUrl): string
+    private function smokeTest(Site $site, string $actionUrl, FunctionConfiguration $configuration): string
     {
         if ($actionUrl === '') {
             return 'skipped (no invocation URL).';
         }
 
+        if (! $configuration->isWebEnabled()) {
+            $this->progress->done($site, 'verify', 'Skipped the health check', 'HTTP access is turned off for this function');
+
+            return 'skipped (function is not exposed over HTTP).';
+        }
+
         $this->progress->active($site, 'verify', 'Verifying the function');
 
         try {
-            $status = Http::timeout(30)->get($actionUrl)->status();
+            $request = Http::timeout(30);
+            if ($configuration->isSecured()) {
+                $request = $request->withHeaders(['X-Require-Whisk-Auth' => (string) $configuration->authSecret]);
+            }
+            $status = $request->get($actionUrl)->status();
         } catch (\Throwable $e) {
             $this->progress->step($site, 'verify', 'Function is unreachable', ServerlessDeployProgress::STATE_FAILED, $e->getMessage());
 

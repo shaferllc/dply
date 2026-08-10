@@ -45,6 +45,7 @@ class ServerlessServiceProvider extends ServiceProvider
                 Console\ServerlessQueueDoctorCommand::class,
                 Console\BackfillFunctionActionsCommand::class,
                 Console\PruneFunctionInvocationsCommand::class,
+                Console\ServerlessManifestCommand::class,
             ]);
         }
     }

@@ -77,6 +77,58 @@ if (! function_exists('dply_raw_report')) {
     }
 }
 
+if (! function_exists('dply_cors_headers')) {
+    /**
+     * The response headers for a CORS policy dply bound as a default
+     * parameter. An origin outside the policy gets no CORS headers at all —
+     * that IS the rejection; inventing a header would defeat the allow-list.
+     *
+     * @param  array<string, mixed>  $policy
+     * @param  array<string, mixed>  $args
+     * @return array<string, string>
+     */
+    function dply_cors_headers(array $policy, array $args): array
+    {
+        $requestHeaders = is_array($args['__ow_headers'] ?? null) ? $args['__ow_headers'] : [];
+        $origin = trim((string) ($requestHeaders['origin'] ?? $requestHeaders['Origin'] ?? ''));
+        $allowed = is_array($policy['allow_origins'] ?? null) ? $policy['allow_origins'] : ['*'];
+        $credentials = (bool) ($policy['allow_credentials'] ?? false);
+
+        if (in_array('*', $allowed, true)) {
+            // `*` cannot be combined with credentials, so echo the caller's
+            // origin when credentials are in play.
+            $allowOrigin = ($credentials && $origin !== '') ? $origin : '*';
+        } elseif ($origin !== '' && in_array($origin, $allowed, true)) {
+            $allowOrigin = $origin;
+        } else {
+            return [];
+        }
+
+        $headers = ['Access-Control-Allow-Origin' => $allowOrigin];
+        if ($allowOrigin !== '*') {
+            $headers['Vary'] = 'Origin';
+        }
+        foreach ([
+            'allow_methods' => 'Access-Control-Allow-Methods',
+            'allow_headers' => 'Access-Control-Allow-Headers',
+            'expose_headers' => 'Access-Control-Expose-Headers',
+        ] as $key => $header) {
+            $values = is_array($policy[$key] ?? null) ? $policy[$key] : [];
+            if ($values !== []) {
+                $headers[$header] = implode(', ', $values);
+            }
+        }
+        if ($credentials) {
+            $headers['Access-Control-Allow-Credentials'] = 'true';
+        }
+        if (($policy['max_age'] ?? null) !== null) {
+            $headers['Access-Control-Max-Age'] = (string) $policy['max_age'];
+        }
+
+        return $headers;
+    }
+}
+
 if (! function_exists('dplyMain')) {
     /**
      * @param  array<string, mixed>  $args
@@ -84,6 +136,17 @@ if (! function_exists('dplyMain')) {
      */
     function dplyMain(array $args): array
     {
+        $policy = is_array($args['__dply_cors'] ?? null) ? $args['__dply_cors'] : null;
+
+        // With web-custom-options in force the platform stops answering
+        // preflight, so the function has to — before the user's handler,
+        // which knows nothing about CORS.
+        if ($policy !== null && strtoupper((string) ($args['__ow_method'] ?? 'GET')) === 'OPTIONS') {
+            dply_raw_report($args, 204, 0);
+
+            return ['statusCode' => 204, 'headers' => dply_cors_headers($policy, $args), 'body' => ''];
+        }
+
         $start = microtime(true);
         $thrown = null;
         try {
@@ -102,6 +165,13 @@ if (! function_exists('dplyMain')) {
 
         if ($thrown !== null) {
             throw $thrown;
+        }
+
+        // The handler's own headers win — a function that sets its own CORS
+        // header has made a deliberate choice the policy shouldn't overwrite.
+        if ($policy !== null) {
+            $existing = is_array($result['headers'] ?? null) ? $result['headers'] : [];
+            $result['headers'] = $existing + dply_cors_headers($policy, $args);
         }
 
         return $result;

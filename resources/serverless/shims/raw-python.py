@@ -64,8 +64,62 @@ def _dply_report(args, status, duration_ms):
         pass
 
 
+def _dply_cors_policy(args):
+    """The CORS policy dply binds as a default parameter.
+
+    Absent means the platform is still answering preflight itself, so the
+    shim stays out of the way entirely.
+    """
+    policy = (args or {}).get("__dply_cors")
+    return policy if isinstance(policy, dict) else None
+
+
+def _dply_cors_headers(policy, args):
+    request_headers = (args or {}).get("__ow_headers") or {}
+    origin = request_headers.get("origin") or request_headers.get("Origin") or ""
+    allowed = policy.get("allow_origins") or ["*"]
+
+    # An origin outside the policy gets no CORS headers at all — that IS the
+    # rejection; inventing a header here would defeat the allow-list.
+    if "*" in allowed:
+        # `*` cannot be combined with credentials, so echo the caller's
+        # origin when credentials are in play.
+        allow_origin = origin if (policy.get("allow_credentials") and origin) else "*"
+    elif origin and origin in allowed:
+        allow_origin = origin
+    else:
+        return {}
+
+    headers = {"Access-Control-Allow-Origin": allow_origin}
+    if allow_origin != "*":
+        headers["Vary"] = "Origin"
+    if policy.get("allow_methods"):
+        headers["Access-Control-Allow-Methods"] = ", ".join(policy["allow_methods"])
+    if policy.get("allow_headers"):
+        headers["Access-Control-Allow-Headers"] = ", ".join(policy["allow_headers"])
+    if policy.get("expose_headers"):
+        headers["Access-Control-Expose-Headers"] = ", ".join(policy["expose_headers"])
+    if policy.get("allow_credentials"):
+        headers["Access-Control-Allow-Credentials"] = "true"
+    if policy.get("max_age") is not None:
+        headers["Access-Control-Max-Age"] = str(policy["max_age"])
+
+    return headers
+
+
 def dplyMain(args):
     args = args or {}
+
+    policy = _dply_cors_policy(args)
+    method = str(args.get("__ow_method", "GET")).upper()
+
+    # With web-custom-options in force the platform stops answering
+    # preflight, so the function has to — before the user's handler, which
+    # knows nothing about CORS.
+    if policy is not None and method == "OPTIONS":
+        _dply_report(args, 204, 0)
+        return {"statusCode": 204, "headers": _dply_cors_headers(policy, args), "body": ""}
+
     start = time.time()
     thrown = None
     try:
@@ -80,4 +134,12 @@ def dplyMain(args):
 
     if thrown is not None:
         raise thrown
+
+    # The handler's own headers win — a function that sets its own CORS
+    # header has made a deliberate choice the policy shouldn't overwrite.
+    if policy is not None and isinstance(result, dict):
+        merged = _dply_cors_headers(policy, args)
+        merged.update(result.get("headers") or {})
+        result["headers"] = merged
+
     return result

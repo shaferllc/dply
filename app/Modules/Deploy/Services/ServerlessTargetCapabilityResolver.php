@@ -6,6 +6,8 @@ namespace App\Modules\Deploy\Services;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Serverless\Contracts\ServerlessFeature;
+use App\Modules\Serverless\Services\ServerlessFeatureMatrix;
 
 final class ServerlessTargetCapabilityResolver
 {
@@ -21,7 +23,8 @@ final class ServerlessTargetCapabilityResolver
      *     default_python_runtime: string,
      *     default_entrypoint: string,
      *     default_package: string,
-     *     host_label: string
+     *     host_label: string,
+     *     features: list<string>
      * }
      */
     /** @return array<string, mixed> */
@@ -44,7 +47,8 @@ final class ServerlessTargetCapabilityResolver
      *     default_python_runtime: string,
      *     default_entrypoint: string,
      *     default_package: string,
-     *     host_label: string
+     *     host_label: string,
+     *     features: list<string>
      * }
      */
     /** @return array<string, mixed> */
@@ -68,6 +72,7 @@ final class ServerlessTargetCapabilityResolver
                 'default_entrypoint' => 'public/index.php',
                 'default_package' => '',
                 'host_label' => 'AWS Lambda',
+                'features' => self::featureValues(ServerlessFeatureMatrix::awsLambda()),
             ];
         }
 
@@ -83,6 +88,7 @@ final class ServerlessTargetCapabilityResolver
             'default_entrypoint' => '',
             'default_package' => '',
             'host_label' => 'Unknown',
+            'features' => [],
         ];
     }
 
@@ -102,7 +108,8 @@ final class ServerlessTargetCapabilityResolver
      *     default_python_runtime: string,
      *     default_entrypoint: string,
      *     default_package: string,
-     *     host_label: string
+     *     host_label: string,
+     *     features: list<string>
      * }
      */
     /** @return array<string, mixed> */
@@ -125,6 +132,23 @@ final class ServerlessTargetCapabilityResolver
             'default_entrypoint' => 'main',
             'default_package' => 'default',
             'host_label' => 'DigitalOcean Functions',
+            'features' => self::featureValues(ServerlessFeatureMatrix::digitalOceanFunctions()),
         ];
+    }
+
+    /**
+     * Feature enums flattened to their string values — capability maps travel
+     * into Livewire component state and Blade, where an enum instance would
+     * have to be unwrapped at every use site.
+     *
+     * @param  list<ServerlessFeature>  $features
+     * @return list<string>
+     */
+    private static function featureValues(array $features): array
+    {
+        return array_values(array_map(
+            static fn (ServerlessFeature $feature): string => $feature->value,
+            $features,
+        ));
     }
 }

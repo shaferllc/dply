@@ -34,6 +34,60 @@ use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Monolog\Handler\StreamHandler;
 use Symfony\Component\HttpFoundation\Response;
 
+if (! function_exists('dply_do_functions_cors_headers')) {
+    /**
+     * Response headers for the CORS policy dply binds as a default parameter
+     * when the operator takes CORS over from the platform.
+     *
+     * An origin outside the policy gets no CORS headers at all — that IS the
+     * rejection; inventing a header would defeat the allow-list.
+     *
+     * @param  array<string, mixed>  $policy
+     * @param  array<string, mixed>  $args
+     * @return array<string, string>
+     */
+    function dply_do_functions_cors_headers(array $policy, array $args): array
+    {
+        $requestHeaders = is_array($args['__ow_headers'] ?? null) ? $args['__ow_headers'] : [];
+        $origin = trim((string) ($requestHeaders['origin'] ?? $requestHeaders['Origin'] ?? ''));
+        $allowed = is_array($policy['allow_origins'] ?? null) ? $policy['allow_origins'] : ['*'];
+        $credentials = (bool) ($policy['allow_credentials'] ?? false);
+
+        if (in_array('*', $allowed, true)) {
+            // `*` cannot be combined with credentials, so echo the caller's
+            // origin when credentials are in play.
+            $allowOrigin = ($credentials && $origin !== '') ? $origin : '*';
+        } elseif ($origin !== '' && in_array($origin, $allowed, true)) {
+            $allowOrigin = $origin;
+        } else {
+            return [];
+        }
+
+        $headers = ['Access-Control-Allow-Origin' => $allowOrigin];
+        if ($allowOrigin !== '*') {
+            $headers['Vary'] = 'Origin';
+        }
+        foreach ([
+            'allow_methods' => 'Access-Control-Allow-Methods',
+            'allow_headers' => 'Access-Control-Allow-Headers',
+            'expose_headers' => 'Access-Control-Expose-Headers',
+        ] as $key => $header) {
+            $values = is_array($policy[$key] ?? null) ? $policy[$key] : [];
+            if ($values !== []) {
+                $headers[$header] = implode(', ', array_map('strval', $values));
+            }
+        }
+        if ($credentials) {
+            $headers['Access-Control-Allow-Credentials'] = 'true';
+        }
+        if (($policy['max_age'] ?? null) !== null) {
+            $headers['Access-Control-Max-Age'] = (string) $policy['max_age'];
+        }
+
+        return $headers;
+    }
+}
+
 if (! function_exists('main')) {
     /**
      * @param  array<string, mixed>  $args
@@ -41,6 +95,20 @@ if (! function_exists('main')) {
      */
     function main(array $args): array
     {
+        $corsPolicy = is_array($args['__dply_cors'] ?? null) ? $args['__dply_cors'] : null;
+
+        // With web-custom-options in force the platform stops answering
+        // preflight, so the function has to. Answered before the framework
+        // boots: a preflight carries no session and no route to resolve, and
+        // a cold Laravel boot is the most expensive thing in this file.
+        if ($corsPolicy !== null && strtoupper((string) ($args['__ow_method'] ?? 'GET')) === 'OPTIONS') {
+            return [
+                'statusCode' => 204,
+                'headers' => dply_do_functions_cors_headers($corsPolicy, $args),
+                'body' => '',
+            ];
+        }
+
         $root = __DIR__;
         $storage = '/tmp/dply-storage';
         $bootstrapCache = $storage.'/bootstrap';
@@ -173,6 +241,13 @@ if (! function_exists('main')) {
             $headers = [];
             foreach ($response->headers->allPreserveCaseWithoutCookies() as $name => $values) {
                 $headers[$name] = implode(', ', array_map('strval', (array) $values));
+            }
+
+            // The app's own headers win — a route (or a CORS middleware the
+            // app already runs) that sets its own header has made a
+            // deliberate choice the policy shouldn't overwrite.
+            if ($corsPolicy !== null) {
+                $headers += dply_do_functions_cors_headers($corsPolicy, $args);
             }
 
             // Report this request to dply's ingest endpoint. Skipped for

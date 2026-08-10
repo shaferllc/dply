@@ -3,16 +3,19 @@
         'inspector' => __('Inspector'),
         'triggers' => __('Triggers'),
         'console' => __('Console'),
+        'credentials' => __('Credentials'),
     ];
     $tabIcons = [
         'inspector' => 'heroicon-o-cube',
         'triggers' => 'heroicon-o-clock',
         'console' => 'heroicon-o-command-line',
+        'credentials' => 'heroicon-o-key',
     ];
     $tabNotes = [
         'inspector' => __('Deployed action and namespace inventory — live from OpenWhisk.'),
         'triggers' => __('Schedules, triggers, and rules for this function.'),
         'console' => __('Send a test request. Results also appear on Logs.'),
+        'credentials' => __('The namespace access key dply uses to reach this function.'),
     ];
 
     /** Pull a list payload out of an OpenWhisk {ok,error,data} result. */
@@ -404,5 +407,66 @@
                 @endif
             </div>
         @endif
+
+    {{-- ── Credentials ─────────────────────────────────────────────────── --}}
+    @elseif ($tab === 'credentials')
+        <div class="border-b border-brand-ink/10">
+            <div class="{{ $stripHead }}">
+                <h3 class="text-xs font-semibold text-brand-ink">{{ __('Namespace access') }}</h3>
+            </div>
+            <div class="{{ $panelPad }} space-y-3">
+                <dl class="grid grid-cols-1 overflow-hidden rounded-lg border border-brand-ink/10 sm:grid-cols-3">
+                    @foreach ([
+                        __('Namespace') => $namespace ?: '—',
+                        __('API host') => $apiHost ?: '—',
+                        __('Access key ID') => $accessKeyId ?: '—',
+                    ] as $label => $value)
+                        <div class="min-w-0 border-b border-r border-brand-ink/10 bg-brand-sand/20 px-3 py-2 last:border-b-0">
+                            <dt class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $label }}</dt>
+                            <dd class="mt-0.5 truncate font-mono text-xs text-brand-ink" title="{{ $value }}">{{ $value }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-2xs text-brand-moss">
+                        {{ __('The secret half of the key is stored and never shown. Checking asks the namespace whether the key still works.') }}
+                    </p>
+                    <button type="button" wire:click="verifyCredentials" wire:loading.attr="disabled" wire:target="verifyCredentials"
+                        class="dply-btn dply-btn-xs dply-btn-outline shrink-0">
+                        <span wire:loading.remove wire:target="verifyCredentials">{{ __('Check credentials') }}</span>
+                        <span wire:loading wire:target="verifyCredentials">{{ __('Checking…') }}</span>
+                    </button>
+                </div>
+
+                @if ($credentialCheck !== null)
+                    <div @class([
+                        'rounded-lg border px-3 py-2 text-xs',
+                        'border-brand-forest/30 bg-brand-forest/10 text-brand-forest' => $credentialCheck['ok'],
+                        'border-rose-200 bg-rose-50 text-rose-700' => ! $credentialCheck['ok'],
+                    ])>
+                        @if ($credentialCheck['ok'])
+                            {{ __('The key works — the namespace reports :count action(s).', ['count' => $credentialCheck['actions']]) }}
+                        @else
+                            {{ $credentialCheck['error'] }}
+                        @endif
+                    </div>
+                @endif
+
+                {{-- DigitalOcean exposes no REST API for minting or revoking
+                     namespace keys, so these are the real path — dply cannot
+                     do it on the operator's behalf and shouldn't pretend to. --}}
+                <div class="border-t border-brand-ink/10 pt-3">
+                    <p class="mb-2 text-2xs text-brand-moss">
+                        {{ __('Keys are created and revoked with doctl or in the DigitalOcean control panel. After rotating, update the host credentials in dply.') }}
+                    </p>
+                    <x-cli-snippet :commands="[
+                        ['label' => __('List keys'), 'command' => 'doctl serverless key list'.($namespace ? ' --namespace '.$namespace : '')],
+                        ['label' => __('Create a key'), 'command' => 'doctl serverless key create --name dply'.($namespace ? ' --namespace '.$namespace : '')],
+                        ['label' => __('Revoke a key'), 'command' => 'doctl serverless key delete <key-id>'.($namespace ? ' --namespace '.$namespace : '')],
+                    ]" />
+                </div>
+            </div>
+        </div>
     @endif
 </section>

@@ -55,10 +55,20 @@ class FunctionInvocation extends Model
     /** Organic HTTP traffic, reported by the function handler's ingest POST. */
     public const SOURCE_WEB = 'web';
 
+    /** Started asynchronously; the outcome is not known yet. */
+    public const STATE_PENDING = 'pending';
+
+    /** The activation record has been collected. */
+    public const STATE_COMPLETED = 'completed';
+
+    /** The invocation never produced a record — the poller gave up. */
+    public const STATE_FAILED = 'failed';
+
     protected $fillable = [
         'site_id',
         'function_action_id',
         'source',
+        'state',
         'task',
         'method',
         'path',
@@ -66,8 +76,11 @@ class FunctionInvocation extends Model
         'success',
         'duration_ms',
         'cold',
+        'wait_time_ms',
+        'init_time_ms',
         'activation_id',
         'log_lines',
+        'activation',
         'context',
         'result_excerpt',
         'created_at',
@@ -81,7 +94,10 @@ class FunctionInvocation extends Model
             'cold' => 'boolean',
             'status_code' => 'integer',
             'duration_ms' => 'integer',
+            'wait_time_ms' => 'integer',
+            'init_time_ms' => 'integer',
             'log_lines' => 'array',
+            'activation' => 'array',
             'context' => 'array',
             'created_at' => 'datetime',
         ];
@@ -118,6 +134,24 @@ class FunctionInvocation extends Model
     public function scopeOrganic(Builder $query): Builder
     {
         return $query->where('source', self::SOURCE_WEB);
+    }
+
+    /**
+     * Rows whose outcome is known. Aggregates (duration, error rate, cold
+     * starts) must use this — an in-flight async row carries a zero duration
+     * that would drag every average down.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeSettled(Builder $query): Builder
+    {
+        return $query->where('state', '!=', self::STATE_PENDING);
+    }
+
+    public function isPending(): bool
+    {
+        return $this->state === self::STATE_PENDING;
     }
 
     /** Normalised log lines, always a list of strings. */

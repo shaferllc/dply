@@ -92,8 +92,59 @@ function dplyReport(args, status, durationMs) {
   }
 }
 
+/**
+ * The CORS policy dply binds as a default parameter when the operator takes
+ * CORS over from the platform. Absent means the platform is still answering
+ * preflight itself, so the adapter stays out of the way entirely.
+ */
+function dplyCorsHeaders(policy, args) {
+  const headers = {};
+  const requestHeaders = (args && args.__ow_headers) || {};
+  const origin = requestHeaders.origin || requestHeaders.Origin || '';
+  const allowed = Array.isArray(policy.allow_origins) ? policy.allow_origins : ['*'];
+
+  // An origin outside the policy gets no CORS headers at all — that IS the
+  // rejection; inventing a header here would defeat the allow-list.
+  let allowOrigin = null;
+  if (allowed.indexOf('*') !== -1) {
+    allowOrigin = policy.allow_credentials && origin ? origin : '*';
+  } else if (origin && allowed.indexOf(origin) !== -1) {
+    allowOrigin = origin;
+  }
+  if (!allowOrigin) return headers;
+
+  headers['Access-Control-Allow-Origin'] = allowOrigin;
+  if (allowOrigin !== '*') headers['Vary'] = 'Origin';
+  if (Array.isArray(policy.allow_methods) && policy.allow_methods.length) {
+    headers['Access-Control-Allow-Methods'] = policy.allow_methods.join(', ');
+  }
+  if (Array.isArray(policy.allow_headers) && policy.allow_headers.length) {
+    headers['Access-Control-Allow-Headers'] = policy.allow_headers.join(', ');
+  }
+  if (Array.isArray(policy.expose_headers) && policy.expose_headers.length) {
+    headers['Access-Control-Expose-Headers'] = policy.expose_headers.join(', ');
+  }
+  if (policy.allow_credentials) headers['Access-Control-Allow-Credentials'] = 'true';
+  if (policy.max_age !== undefined && policy.max_age !== null) {
+    headers['Access-Control-Max-Age'] = String(policy.max_age);
+  }
+
+  return headers;
+}
+
 async function dplyMain(args) {
   args = args || {};
+
+  const policy = args.__dply_cors && typeof args.__dply_cors === 'object' ? args.__dply_cors : null;
+
+  // With web-custom-options in force the platform stops answering preflight,
+  // so the function has to — before the app, which may well 404 an OPTIONS
+  // route it never registered.
+  if (policy && String(args.__ow_method || 'GET').toUpperCase() === 'OPTIONS') {
+    dplyReport(args, 204, 0);
+    return { statusCode: 204, headers: dplyCorsHeaders(policy, args), body: '' };
+  }
+
   const start = Date.now();
 
   let response;
@@ -111,9 +162,14 @@ async function dplyMain(args) {
   dplyReport(args, status, Date.now() - start);
 
   if (thrown) throw thrown;
+
+  // The app's own headers win — a route that sets its own CORS header has
+  // made a deliberate choice the policy shouldn't overwrite.
+  const responseHeaders = (response && response.headers) || {};
+
   return {
     statusCode: status,
-    headers: (response && response.headers) || {},
+    headers: policy ? Object.assign({}, dplyCorsHeaders(policy, args), responseHeaders) : responseHeaders,
     body: response && response.body !== undefined ? response.body : '',
   };
 }
