@@ -121,7 +121,6 @@ return [
         'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', true),
     ],
 
-
     /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a
     | Livewire component under app/Livewire/Servers/Workspace*.php.
@@ -228,6 +227,13 @@ return [
         'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
         'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
         'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', true),
+        // dply Queue — the managed job queue. Default off: the control plane
+        // exists but the data plane does not yet. Runtime dials and pricing
+        // live in config/queue_service.php, per the layering rules above.
+        // Exit criteria: SQS-compatible API verified against Laravel's stock
+        // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
+        // (docs/adr/dply-queue.md).
+        'queue' => env('FEATURE_SURFACE_QUEUE', false),
     ],
 
     /*

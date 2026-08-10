@@ -3,6 +3,7 @@
         $live => 'live',
         $cancelled => 'cancelled',
         $failed => 'failed',
+        $deployPaused => 'paused',
         default => 'active',
     };
 @endphp
@@ -34,13 +35,15 @@
                             'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1',
                             'bg-brand-forest/15 text-brand-forest ring-brand-forest/25' => $statusTone === 'live',
                             'bg-rose-100 text-rose-700 ring-rose-200' => $statusTone === 'failed',
-                            'bg-amber-100 text-amber-800 ring-amber-200' => $statusTone === 'cancelled',
+                            'bg-amber-100 text-amber-800 ring-amber-200' => $statusTone === 'cancelled' || $statusTone === 'paused',
                             'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => $statusTone === 'active',
                         ])>
                             @if ($statusTone === 'live')
                                 <x-heroicon-o-check-circle class="h-6 w-6" aria-hidden="true" />
                             @elseif ($statusTone === 'failed')
                                 <x-heroicon-o-exclamation-triangle class="h-6 w-6" aria-hidden="true" />
+                            @elseif ($statusTone === 'paused')
+                                <x-heroicon-o-credit-card class="h-6 w-6" aria-hidden="true" />
                             @elseif ($statusTone === 'cancelled')
                                 <x-heroicon-o-pause-circle class="h-6 w-6" aria-hidden="true" />
                             @else
@@ -78,7 +81,7 @@
                             'inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ring-1 sm:self-end',
                             'bg-emerald-100 text-emerald-800 ring-emerald-200' => $statusTone === 'live',
                             'bg-rose-100 text-rose-800 ring-rose-200' => $statusTone === 'failed',
-                            'bg-amber-100 text-amber-900 ring-amber-200' => $statusTone === 'cancelled',
+                            'bg-amber-100 text-amber-900 ring-amber-200' => $statusTone === 'cancelled' || $statusTone === 'paused',
                             'bg-sky-100 text-sky-800 ring-sky-200' => $statusTone === 'active',
                         ])>
                             @if ($statusTone === 'active')
@@ -94,9 +97,13 @@
                         </span>
                         <p class="text-sm text-brand-moss sm:text-right">
                             <span class="font-semibold tabular-nums text-brand-ink">{{ $percent }}%</span>
-                            <span class="text-brand-moss/70">·</span>
-                            {{ $elapsedLabel }}
-                            <span class="font-mono tabular-nums">{{ $elapsedHuman }}</span>
+                            {{-- A paused deploy never started, so a running clock
+                                 would read as progress that isn't happening. --}}
+                            @unless ($deployPaused)
+                                <span class="text-brand-moss/70">·</span>
+                                {{ $elapsedLabel }}
+                                <span class="font-mono tabular-nums">{{ $elapsedHuman }}</span>
+                            @endunless
                         </p>
                     </div>
                 </div>
@@ -106,13 +113,13 @@
                         'h-full rounded-full transition-all duration-500',
                         'bg-brand-forest' => $statusTone === 'live',
                         'bg-rose-500' => $statusTone === 'failed',
-                        'bg-amber-400' => $statusTone === 'cancelled',
+                        'bg-amber-400' => $statusTone === 'cancelled' || $statusTone === 'paused',
                         'bg-brand-gold' => $statusTone === 'active',
                     ]) style="width: {{ max($percent, $statusTone === 'active' ? 4 : 0) }}%"></div>
                 </div>
 
                 {{-- Primary actions in the header so retry is always obvious --}}
-                @if ($namespaceState === 'failed' || $deployState === 'failed' || $live || $cancellable)
+                @if ($namespaceState === 'failed' || $deployState === 'failed' || $live || $cancellable || $deployPaused)
                     <div class="mt-4 flex flex-wrap items-center gap-2">
                         @if ($cancellable)
                             <button type="button" wire:click="openCancelModal"
@@ -173,6 +180,29 @@
                     </div>
                 @endif
             </div>
+
+            {{-- Billing-pause callout. The namespace is already provisioned and
+                 paid for; only the build/deploy is withheld — say so plainly and
+                 point at the one action that unblocks it. --}}
+            @if ($deployPaused)
+                <div class="border-b border-brand-ink/10 bg-amber-50/80 px-5 py-4 sm:px-6">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-brand-ink">{{ __('Deploys are paused for this organization') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                {{ __('Your function was created and its namespace is ready, but the build was not started because this organization can\'t run billed work right now. Add a payment method and deploy — nothing here is lost.') }}
+                            </p>
+                        </div>
+                        @if ($billingUrl)
+                            <a href="{{ $billingUrl }}" wire:navigate
+                               class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                                <x-heroicon-o-credit-card class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Add a payment method') }}
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endif
 
             {{-- Failure / cancelled / live callout --}}
             @if ($failed || $cancelled || $live)
@@ -249,6 +279,7 @@
                                         'bg-brand-forest text-white' => $stage['state'] === 'done',
                                         'bg-brand-gold text-brand-ink ring-brand-gold/30' => $stage['state'] === 'active',
                                         'bg-rose-500 text-white' => $stage['state'] === 'failed',
+                                        'bg-amber-400 text-amber-950' => $stage['state'] === 'blocked',
                                         'bg-white text-brand-mist ring-1 ring-brand-ink/15 !ring-1' => $stage['state'] === 'pending',
                                     ])>
                                         @if ($stage['state'] === 'done')
@@ -257,6 +288,8 @@
                                             <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" />
                                         @elseif ($stage['state'] === 'failed')
                                             <x-heroicon-s-x-mark class="h-4 w-4" />
+                                        @elseif ($stage['state'] === 'blocked')
+                                            <x-heroicon-s-pause class="h-4 w-4" />
                                         @else
                                             {{ $loop->iteration }}
                                         @endif
@@ -275,6 +308,8 @@
                                                 <span class="rounded-full bg-rose-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800">{{ __('Failed') }}</span>
                                             @elseif ($stage['state'] === 'done')
                                                 <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800">{{ __('Done') }}</span>
+                                            @elseif ($stage['state'] === 'blocked')
+                                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">{{ __('Paused') }}</span>
                                             @endif
                                         </div>
                                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $stage['detail'] }}</p>

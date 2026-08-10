@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -24,11 +25,17 @@ use Livewire\Component;
  * State is derived, not stored: each poll re-reads the host Server, the
  * function Site, and the latest SiteDeployment, then folds them into four
  * ordered stages. Nothing here writes deploy state — the jobs own that.
+ *
+ * One of those derived states is "paused": RunSiteDeploymentJob drops a
+ * human-triggered deploy on the floor when the owning org can't run billed
+ * work, deliberately leaving no SiteDeployment row behind. Without deriving
+ * that here the page has nothing to read and spins on "deploying" forever.
  */
 #[Layout('layouts.app')]
 class Journey extends Component
 {
     use DispatchesToastNotifications;
+    use GuardsBilledDeploys;
 
     public string $serverId = '';
 
@@ -124,6 +131,14 @@ class Journey extends Component
     {
         $site = $this->site();
         $this->authorize('update', $site);
+
+        // RunSiteDeploymentJob silently no-ops a human-triggered deploy for a
+        // pause-blocked org. Bail here instead, so the click gets an answer
+        // rather than pinning sinceDeploymentId and polling for a row that is
+        // never written.
+        if ($this->blockedByDeployPause($site)) {
+            return;
+        }
 
         $this->sinceDeploymentId = $this->latestDeployment()?->id ?? '';
         RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
@@ -223,6 +238,18 @@ class Journey extends Component
         $deployStatus = $deployment?->status;
         $deployRunning = $deployStatus === SiteDeployment::STATUS_RUNNING;
 
+        // Billing pause. Read off the org, not off a skipped deployment row —
+        // the interactive path leaves no row at all, so a row-based check would
+        // miss exactly the case that strands this page. Only meaningful before
+        // the function is live: an already-live function stays live while the
+        // org is paused, and only its redeploy button is gated.
+        $deployPaused = ! $siteActive
+            && ! $deployRunning
+            && $this->deploysArePaused($site);
+        $billingUrl = $deployPaused && $site->organization !== null
+            ? route('billing.show', $site->organization)
+            : null;
+
         // "Live" means the function is up AND nothing is mid-deploy — so a
         // redeploy of an already-live function correctly reads as in-flight
         // rather than instantly "done".
@@ -256,6 +283,7 @@ class Journey extends Component
         $deployState = match (true) {
             $namespaceState !== 'done' => 'pending',
             $deployRunning => 'active',
+            $deployPaused => 'blocked',
             $deployStatus === SiteDeployment::STATUS_FAILED || $siteFailed => 'failed',
             $deployStatus === SiteDeployment::STATUS_SUCCESS || $siteActive => 'done',
             default => 'active',
@@ -287,9 +315,11 @@ class Journey extends Component
             [
                 'key' => 'deploy',
                 'label' => __('Building & deploying'),
-                'detail' => $deployState === 'failed'
-                    ? __('The deploy failed — see the log below.')
-                    : __('Checking out the repo, building the artifact, pushing the action.'),
+                'detail' => match ($deployState) {
+                    'failed' => __('The deploy failed — see the log below.'),
+                    'blocked' => __('Deploys are paused for this organization — nothing was built.'),
+                    default => __('Checking out the repo, building the artifact, pushing the action.'),
+                },
                 'state' => $deployState,
             ],
             [
@@ -309,7 +339,9 @@ class Journey extends Component
         }
 
         $failed = $namespaceState === 'failed' || $deployState === 'failed';
-        $shouldPoll = $bridging || (! $live && ! $failed);
+        // A paused deploy is a resting state, not an in-flight one — polling it
+        // would just re-render the same banner every 3s until the tab is closed.
+        $shouldPoll = $bridging || (! $live && ! $failed && $deployState !== 'blocked');
 
         // A deploy can be cancelled while its step pipeline is running.
         $cancellable = $deployState === 'active' && $deployStatus === SiteDeployment::STATUS_RUNNING;
@@ -345,6 +377,7 @@ class Journey extends Component
             $live => __('Function is live'),
             $cancelled => __('Deploy cancelled'),
             $failed => __('Deploy failed'),
+            $deployState === 'blocked' => __('Deploys are paused'),
             $deployState === 'active' => __('Building & deploying…'),
             $namespaceState === 'active' => __('Provisioning namespace…'),
             default => __('Starting deploy…'),
@@ -352,9 +385,11 @@ class Journey extends Component
 
         // Page title — the panel is reused for both an in-flight deploy and
         // the resting "this is the last deploy" view.
-        $title = ($live && ! $bridging)
-            ? __('Latest deployment')
-            : __('Deploying :name', ['name' => $site->name]);
+        $title = match (true) {
+            $live && ! $bridging => __('Latest deployment'),
+            $deployState === 'blocked' => $site->name,
+            default => __('Deploying :name', ['name' => $site->name]),
+        };
 
         // Function facts — populated progressively as the deploy resolves them.
         $facts = [
@@ -388,6 +423,8 @@ class Journey extends Component
             'live' => $live,
             'failed' => $failed,
             'cancelled' => $cancelled,
+            'deployPaused' => $deployState === 'blocked',
+            'billingUrl' => $billingUrl,
             'cancellable' => $cancellable,
             'shouldPoll' => $shouldPoll,
             'namespaceState' => $namespaceState,

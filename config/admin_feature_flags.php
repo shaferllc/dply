@@ -180,6 +180,15 @@ return [
                 ],
             ],
         ],
+        'queue' => [
+            'title' => 'Queue',
+            'description' => 'The managed job queue any Laravel app can point at.',
+            'groups' => [
+                'Surface' => [
+                    'surface.queue' => 'dply Queue',
+                ],
+            ],
+        ],
         'platform' => [
             'title' => 'Platform',
             'description' => 'Cross-line org surfaces and launch workflows.',

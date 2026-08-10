@@ -257,6 +257,18 @@ class Create extends Component
             return null;
         }
 
+        // Creating a function is only half the act — the create chain
+        // immediately provisions a real (billable) DO Functions namespace and
+        // then hands off to RunSiteDeploymentJob, which drops the deploy for a
+        // pause-blocked org. Letting the create through would leave a namespace
+        // standing and a function that can never go live, so stop at the door.
+        if (! $org->canDeploy()) {
+            $this->dispatch('billing-paused');
+            $this->toastError(__('Deploys are paused — add a payment method before creating a serverless app.'));
+
+            return null;
+        }
+
         // A stray "managed" pick when the option isn't actually available
         // would fail downstream — coerce it back to BYO so validation reflects
         // what the user can really do.
