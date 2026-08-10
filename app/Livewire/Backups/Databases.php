@@ -48,19 +48,36 @@ class Databases extends Component
             fn ($q) => $q->whereIn('server_id', $serverIds),
         );
 
+        // This page is the Backups overview, so every headline number spans both
+        // engines — database dumps and site file archives. The per-site detail
+        // still lives on the Files tab.
+        $sites = Site::query()->whereIn('server_id', $serverIds)->get(['id', 'name', 'server_id']);
+        $filesBase = SiteFileBackup::whereIn('site_id', $sites->pluck('id'));
+
         $completed7d = (clone $backupsBase)
             ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
             ->where('created_at', '>=', $sevenDaysAgo)
-            ->count();
+            ->count()
+            + (clone $filesBase)
+                ->where('status', SiteFileBackup::STATUS_COMPLETED)
+                ->where('created_at', '>=', $sevenDaysAgo)
+                ->count();
 
         $failed7d = (clone $backupsBase)
             ->where('status', ServerDatabaseBackup::STATUS_FAILED)
             ->where('created_at', '>=', $sevenDaysAgo)
-            ->count();
+            ->count()
+            + (clone $filesBase)
+                ->where('status', SiteFileBackup::STATUS_FAILED)
+                ->where('created_at', '>=', $sevenDaysAgo)
+                ->count();
 
         $storageBytes = (clone $backupsBase)
             ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
-            ->sum('bytes');
+            ->sum('bytes')
+            + (clone $filesBase)
+                ->where('status', SiteFileBackup::STATUS_COMPLETED)
+                ->sum('bytes');
 
         $activeSchedules = ServerBackupSchedule::whereIn('server_id', $serverIds)
             ->where('is_active', true)
@@ -76,9 +93,10 @@ class Databases extends Component
         // path into each one's backups workspace.
         $unprotectedServers = $servers->whereNotIn('id', $serversWithSchedule)->values();
 
-        $lastSuccessAt = (clone $backupsBase)
-            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
-            ->max('created_at');
+        $lastSuccessAt = collect([
+            (clone $backupsBase)->where('status', ServerDatabaseBackup::STATUS_COMPLETED)->max('created_at'),
+            (clone $filesBase)->where('status', SiteFileBackup::STATUS_COMPLETED)->max('created_at'),
+        ])->filter()->map(fn ($at) => Carbon::parse($at))->max();
 
         $schedules = ServerBackupSchedule::with(['server', 'backupConfiguration'])
             ->whereIn('server_id', $serverIds)
@@ -86,15 +104,30 @@ class Databases extends Component
             ->orderByDesc('last_run_at')
             ->get();
 
-        $recentRuns = (clone $backupsBase)
-            ->with(['serverDatabase.server', 'backupConfiguration'])
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        $recentRuns = $this->recentRuns(clone $backupsBase, clone $filesBase);
 
         $destinations = $org->backupConfigurations()->orderBy('name')->get();
 
-        $activity = $this->dailyActivity(clone $backupsBase);
+        $activity = $this->dailyActivity([clone $backupsBase, clone $filesBase]);
+
+        $archives = (clone $filesBase)
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->with('site.server')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        // One row per site, newest archive first — the summary the overview shows
+        // in place of the full per-site table on the Files tab.
+        $archivedSites = $archives
+            ->unique('site_id')
+            ->take(4)
+            ->map(fn (SiteFileBackup $backup) => [
+                'site' => $backup->site,
+                'at' => $backup->created_at,
+                'bytes' => $backup->bytes,
+            ])
+            ->values();
 
         $databases = ServerDatabase::query()
             ->whereIn('server_id', $serverIds)
@@ -120,6 +153,11 @@ class Databases extends Component
                 'coverage' => $serverCount > 0 ? (int) round($protectedCount / $serverCount * 100) : 0,
                 'lastSuccessAt' => $lastSuccessAt ? Carbon::parse($lastSuccessAt) : null,
             ],
+            'files' => [
+                'sites' => $sites->count(),
+                'archivedSites' => $archives->unique('site_id')->count(),
+                'recent' => $archivedSites,
+            ],
             'unprotectedServers' => $unprotectedServers,
             'activity' => $activity,
             'schedules' => $schedules,
@@ -129,25 +167,86 @@ class Databases extends Component
     }
 
     /**
+     * The newest runs from both engines, flattened into one shape the overview
+     * feed can render without caring which model a row came from.
+     *
+     * @param  Builder<ServerDatabaseBackup>  $backups
+     * @param  Builder<SiteFileBackup>  $files
+     * @return list<array{key: string, kind: string, status: string, name: string, context: string, bytes: ?int, destination: string, at: Carbon}>
+     */
+    private function recentRuns(Builder $backups, Builder $files): array
+    {
+        $limit = 25;
+
+        $rows = $backups
+            ->with(['serverDatabase.server', 'backupConfiguration'])
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (ServerDatabaseBackup $run) => [
+                'key' => 'db-'.$run->id,
+                'kind' => 'database',
+                'status' => $run->status,
+                'name' => $run->serverDatabase->name,
+                'context' => $run->serverDatabase->server->name,
+                'bytes' => (int) $run->bytes,
+                'destination' => (string) ($run->backupConfiguration->name ?? __('Server default')),
+                'at' => $run->created_at,
+            ]);
+
+        $archives = $files
+            ->with('site.server')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (SiteFileBackup $run) => [
+                'key' => 'files-'.$run->id,
+                'kind' => 'files',
+                'status' => $run->status,
+                'name' => $run->site->name,
+                'context' => $run->site->server->name,
+                'bytes' => $run->bytes !== null ? (int) $run->bytes : null,
+                'destination' => (string) ($run->storage_kind === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER
+                    ? __('On the server')
+                    : __('Control plane')),
+                'at' => $run->created_at,
+            ]);
+
+        return $rows
+            ->concat($archives)
+            ->sortByDesc('at')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Completed/failed run counts per day for the last two weeks, zero-filled so
      * the hero strip always renders 14 cells regardless of how sparse the data is.
      *
-     * @param  Builder<ServerDatabaseBackup>  $backups
+     * @param  list<Builder<ServerDatabaseBackup>|Builder<SiteFileBackup>>  $sources
      * @return list<array{date: Carbon, completed: int, failed: int}>
      */
-    private function dailyActivity(Builder $backups): array
+    private function dailyActivity(array $sources): array
     {
         $days = 14;
 
-        $rows = $backups
-            ->where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
-            ->selectRaw('date(created_at) as day, status, count(*) as total')
-            ->groupBy('day', 'status')
-            ->get();
-
         $counts = [];
-        foreach ($rows as $row) {
-            $counts[(string) $row->day][(string) $row->status] = (int) $row->total;
+        foreach ($sources as $source) {
+            // toBase(): these rows are aggregates, not models — hydrating them
+            // into ServerDatabaseBackup/SiteFileBackup would be a lie.
+            $rows = $source
+                ->where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
+                ->selectRaw('date(created_at) as day, status, count(*) as total')
+                ->groupBy('day', 'status')
+                ->toBase()
+                ->get();
+
+            foreach ($rows as $row) {
+                $day = (string) $row->day;
+                $status = (string) $row->status;
+                $counts[$day][$status] = ($counts[$day][$status] ?? 0) + (int) $row->total;
+            }
         }
 
         $activity = [];

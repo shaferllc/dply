@@ -1,8 +1,10 @@
-@props(['active' => 'databases'])
+@props(['active' => 'overview'])
 
 <nav class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto sm:gap-1" style="-webkit-overflow-scrolling: touch;" aria-label="{{ __('Backups sections') }}">
+    {{-- /backups is the overview hub — it spans database dumps *and* file
+         archives — so the deep views are what the other tabs point at. --}}
     @foreach ([
-        ['key' => 'databases', 'route' => 'backups.databases', 'label' => __('Databases'), 'icon' => 'circle-stack'],
+        ['key' => 'overview', 'route' => 'backups.databases', 'label' => __('Overview'), 'icon' => 'squares-2x2'],
         ['key' => 'files', 'route' => 'backups.files', 'label' => __('Files'), 'icon' => 'folder'],
         ['key' => 'storage', 'route' => 'profile.backup-configurations', 'label' => __('Storage'), 'icon' => 'archive-box'],
     ] as $item)

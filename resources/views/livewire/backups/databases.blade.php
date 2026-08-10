@@ -19,7 +19,7 @@
                 icon="heroicon-o-archive-box"
             >
                 <x-slot:tabs>
-                    <x-backups-subnav active="databases" />
+                    <x-backups-subnav active="overview" />
                 </x-slot:tabs>
                 <div class="px-3 py-3 sm:px-4">
                     <x-backups-preview-panel compact />
@@ -42,13 +42,13 @@
 
                 // Nothing scheduled and nothing ever run means this org has not
                 // started — show the onboarding splash instead of empty tables.
-                $neverUsed = $schedules->isEmpty() && $recentRuns->isEmpty();
+                $neverUsed = $schedules->isEmpty() && empty($recentRuns);
             @endphp
 
             <x-profile-shell
                 dense
                 :title="__('Backups')"
-                :description="__('Scheduled dumps, on-demand downloads, and off-box storage for every database in :org.', ['org' => $organization->name])"
+                :description="__('Database dumps and site archives across :org — scheduled, on demand, and shipped to storage you own.', ['org' => $organization->name])"
                 icon="heroicon-o-archive-box"
             >
                 <x-slot:actions>
@@ -134,10 +134,10 @@
                             </div>
                             <p class="mt-2 text-xs text-brand-moss">
                                 @if ($activityTotal === 0)
-                                    {{ __('No database backup runs in the last 14 days.') }}
+                                    {{ __('No backup runs in the last 14 days.') }}
                                 @else
                                     {{ trans_choice(':count run|:count runs', $activityTotal, ['count' => number_format($activityTotal)]) }}
-                                    {{ __('across every server in this workspace.') }}
+                                    {{ __('across databases and site files.') }}
                                 @endif
                             </p>
                         </div>
@@ -191,7 +191,7 @@
                 </x-slot:stats>
 
                 <x-slot:tabs>
-                    <x-backups-subnav active="databases" />
+                    <x-backups-subnav active="overview" />
                 </x-slot:tabs>
 
                 {{-- Unprotected servers — the one thing worth acting on from here. --}}
@@ -426,10 +426,10 @@
                             class="border-b border-brand-ink/10"
                             icon="heroicon-o-circle-stack"
                             :title="__('Recent runs')"
-                            :note="__('Last 25 database backup runs across all servers.')"
+                            :note="__('Last 25 database dumps and file archives across all servers.')"
                         />
 
-                        @if ($recentRuns->isEmpty())
+                        @if (empty($recentRuns))
                             <div class="px-3 py-6 text-center sm:px-4">
                                 <x-heroicon-o-circle-stack class="mx-auto h-7 w-7 text-brand-mist" aria-hidden="true" />
                                 <p class="mt-2 text-sm text-brand-moss">{{ __('No backup runs yet.') }}</p>
@@ -438,34 +438,41 @@
                             <ul class="divide-y divide-brand-ink/8">
                                 @foreach ($recentRuns as $run)
                                     @php
-                                        $runTone = match ($run->status) {
+                                        $runTone = match ($run['status']) {
                                             'completed' => ['bg-brand-sage/15 text-brand-forest', 'heroicon-m-check', __('Done')],
                                             'failed' => ['bg-brand-rust/10 text-brand-rust', 'heroicon-m-x-mark', __('Failed')],
                                             default => ['bg-brand-gold/20 text-amber-800', 'heroicon-m-ellipsis-horizontal', __('Pending')],
                                         };
                                     @endphp
-                                    <li wire:key="run-{{ $run->id }}" class="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-sand/10 sm:px-4">
+                                    <li wire:key="run-{{ $run['key'] }}" class="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-sand/10 sm:px-4">
                                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg {{ $runTone[0] }}">
                                             <x-dynamic-component :component="$runTone[1]" class="h-4 w-4" aria-hidden="true" />
                                         </span>
                                         <div class="min-w-0 flex-1">
-                                            <p class="truncate text-sm font-medium text-brand-ink">
-                                                {{ $run->serverDatabase?->name ?? '—' }}
-                                                <span class="text-brand-mist">{{ __('on') }}</span>
-                                                {{ $run->serverDatabase?->server?->name ?? '—' }}
+                                            <p class="flex items-center gap-1.5 truncate text-sm font-medium text-brand-ink">
+                                                <span @class([
+                                                    'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
+                                                    'bg-brand-forest/10 text-brand-forest' => $run['kind'] === 'database',
+                                                    'bg-brand-gold/20 text-amber-800' => $run['kind'] !== 'database',
+                                                ])>{{ $run['kind'] === 'database' ? __('DB') : __('Files') }}</span>
+                                                <span class="truncate">
+                                                    {{ $run['name'] }}
+                                                    <span class="text-brand-mist">{{ __('on') }}</span>
+                                                    {{ $run['context'] }}
+                                                </span>
                                             </p>
                                             <p class="mt-0.5 truncate text-xs text-brand-mist">
                                                 {{ $runTone[2] }}
-                                                · {{ $run->bytes ? \Illuminate\Support\Number::fileSize((int) $run->bytes) : __('no artifact') }}
-                                                · {{ $run->backupConfiguration?->name ?? __('Server default') }}
+                                                · {{ $run['bytes'] ? \Illuminate\Support\Number::fileSize((int) $run['bytes']) : __('no artifact') }}
+                                                · {{ $run['destination'] }}
                                             </p>
                                         </div>
                                         <time
                                             class="shrink-0 text-xs text-brand-moss"
-                                            datetime="{{ $run->created_at->toIso8601String() }}"
-                                            title="{{ $run->created_at->format('Y-m-d H:i:s') }}"
+                                            datetime="{{ $run['at']->toIso8601String() }}"
+                                            title="{{ $run['at']->format('Y-m-d H:i:s') }}"
                                         >
-                                            {{ $run->created_at->diffForHumans(short: true) }}
+                                            {{ $run['at']->diffForHumans(short: true) }}
                                         </time>
                                     </li>
                                 @endforeach
@@ -510,6 +517,77 @@
                     </section>
 
                     <section class="bg-white">
+                        <x-workspace-panel-head
+                            dense
+                            class="border-b border-brand-ink/10"
+                            icon="heroicon-o-folder"
+                            :title="__('Site files')"
+                            :note="__('Full-site archives, queued per site.')"
+                        >
+                            <x-slot:actions>
+                                <a
+                                    href="{{ route('backups.files') }}"
+                                    wire:navigate
+                                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    {{ __('Open') }}
+                                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                </a>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
+
+                        @if ($files['recent']->isEmpty())
+                            <div class="px-3 py-6 text-center sm:px-4">
+                                <x-heroicon-o-folder class="mx-auto h-7 w-7 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2 text-sm text-brand-moss">{{ __('No site archives yet.') }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">
+                                    {{ trans_choice(':count site is ready to archive|:count sites are ready to archive', $files['sites'], ['count' => $files['sites']]) }}
+                                </p>
+                                <a
+                                    href="{{ route('backups.files') }}"
+                                    wire:navigate
+                                    class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink"
+                                >
+                                    {{ __('Archive a site') }}
+                                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                </a>
+                            </div>
+                        @else
+                            <p class="px-3 pt-3 text-xs text-brand-moss sm:px-4">
+                                {{ __(':archived of :total sites have an archive.', [
+                                    'archived' => $files['archivedSites'],
+                                    'total' => $files['sites'],
+                                ]) }}
+                            </p>
+                            <ul class="mt-1 divide-y divide-brand-ink/8">
+                                @foreach ($files['recent'] as $archive)
+                                    <li wire:key="archive-{{ $archive['site']?->id ?? $loop->index }}" class="flex items-center gap-3 px-3 py-2 sm:px-4">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
+                                            <x-heroicon-o-folder class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium text-brand-ink">{{ $archive['site']?->name ?? '—' }}</p>
+                                            <p class="truncate text-xs text-brand-mist">
+                                                {{ $archive['site']?->server?->name ?? '—' }}
+                                                @if ($archive['bytes'])
+                                                    · {{ \Illuminate\Support\Number::fileSize((int) $archive['bytes']) }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <time
+                                            class="shrink-0 text-xs text-brand-moss"
+                                            datetime="{{ $archive['at']->toIso8601String() }}"
+                                            title="{{ $archive['at']->format('Y-m-d H:i:s') }}"
+                                        >
+                                            {{ $archive['at']->diffForHumans(short: true) }}
+                                        </time>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </section>
+
+                    <section class="bg-white lg:col-span-2">
                         <x-workspace-panel-head
                             dense
                             class="border-b border-brand-ink/10"
