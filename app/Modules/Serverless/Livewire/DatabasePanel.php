@@ -7,6 +7,7 @@ namespace App\Modules\Serverless\Livewire;
 use App\Modules\Serverless\Jobs\ProvisionServerlessDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Support\Sites\SiteRegistry;
 use App\Modules\Serverless\Services\ServerlessCostEstimator;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -37,7 +38,9 @@ class DatabasePanel extends Component
 
     private function site(): Site
     {
-        return Site::findOrFail($this->siteId);
+        // Through the registry: the sibling serverless panels on this page each
+        // resolved the same row, so one render issued the sites SELECT per panel.
+        return app(SiteRegistry::class)->findOrFail($this->siteId);
     }
 
     public function provision(): void

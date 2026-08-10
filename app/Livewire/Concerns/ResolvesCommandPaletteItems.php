@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Servers\ServerRegistry;
 use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
@@ -243,10 +244,15 @@ trait ResolvesCommandPaletteItems
             return $this->scopedSiteMemo[$key];
         }
 
-        return $this->scopedSiteMemo[$key] = Site::query()
+        $site = Site::query()
             ->whereIn('server_id', $org->serverIds())
-            ->with('server')
             ->find($id);
+
+        // Shared Server instance rather than a per-call eager load — see
+        // ServerRegistry; the site page resolved this same row already.
+        app(ServerRegistry::class)->attachTo($site);
+
+        return $this->scopedSiteMemo[$key] = $site;
     }
 
     /** Org-scoped server lookup. */

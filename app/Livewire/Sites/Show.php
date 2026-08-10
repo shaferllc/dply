@@ -35,6 +35,7 @@ use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Servers\ServerPhpManager;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Sites\SiteShowViewData;
+use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -391,7 +392,11 @@ class Show extends Component
             $this->server->setRelation('organization', $org);
         }
 
-        $workspace = $this->site->workspace;
+        // Through the registry, not `$this->site->workspace`: the policy already
+        // resolved this workspace for another Site instance this request, and a
+        // raw belongsTo here re-SELECTs the same row. The memo also means the
+        // `organization` we set below lands on the instance everyone else holds.
+        $workspace = app(WorkspaceRegistry::class)->for($this->site);
         if (
             $workspace !== null
             && (string) $workspace->organization_id === (string) $org->id

@@ -140,6 +140,8 @@ use App\Support\Debug\TaskRunnerBroadcastBridge;
 use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Sites\SiteSyncPeersResolver;
+use App\Support\Servers\ServerRegistry;
+use App\Support\Sites\SiteRegistry;
 use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -213,6 +215,16 @@ class AppServiceProvider extends ServiceProvider
         // $workspace->organization. Resolving through one shared Workspace
         // instance per id collapses both PK lookups to a single query.
         $this->app->scoped(WorkspaceRegistry::class);
+
+        // Scoped, same reasoning for `servers`: the platform panel, sync peers
+        // and the command palette each eager-load ->with('server') for the same
+        // site, so one render issued the identical servers SELECT three times.
+        $this->app->scoped(ServerRegistry::class);
+
+        // Scoped: the serverless workspace stacks sibling panels (platform,
+        // database, cache, background, rollback) that each resolved the same
+        // Site by id. Panels needing post-write state still call ->fresh().
+        $this->app->scoped(SiteRegistry::class);
 
         // Scoped: the Deploy sidebar and the Deploy-tab panel both read
         // pendingFor() on one render, each firing the scheduled_deploys SELECT.

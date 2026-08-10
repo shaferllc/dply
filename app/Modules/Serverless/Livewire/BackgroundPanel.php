@@ -6,6 +6,7 @@ namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Support\Sites\SiteRegistry;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\Serverless\Models\ServerlessFailedJob;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
@@ -51,7 +52,9 @@ class BackgroundPanel extends Component
 
     private function site(): Site
     {
-        return Site::findOrFail($this->siteId);
+        // Through the registry: the sibling serverless panels on this page each
+        // resolved the same row, so one render issued the sites SELECT per panel.
+        return app(SiteRegistry::class)->findOrFail($this->siteId);
     }
 
     public function toggle(): void
