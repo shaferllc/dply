@@ -17,40 +17,39 @@
         'runtime' => 'heroicon-o-command-line',
         'deploy' => 'heroicon-o-rocket-launch',
     ];
+    $tabNotes = [
+        'activations' => __('Invocations dply made itself — background ticks and test requests, each carrying the function\'s runtime logs.'),
+        'visits' => __('Organic HTTP traffic — every request real users made, reported by the function as it served them.'),
+        'runtime' => __('Application stdout, stderr & Laravel log lines from recent invocations — oldest first.'),
+        'deploy' => __('Build, push, and release steps from every recorded deploy of this function.'),
+    ];
+    $panelPad = 'px-3 py-3.5 sm:px-4';
 @endphp
 <div class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $tabs[$tab] }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                @switch($tab)
-                    @case('visits')
-                        {{ __('Organic HTTP traffic — every request real users made, reported by the function as it served them.') }}
-                        @break
-                    @case('runtime')
-                        {{ __('Application stdout, stderr & Laravel log lines from recent invocations — oldest first.') }}
-                        @break
-                    @case('deploy')
-                        {{ __('Build, push, and release steps from every recorded deploy of this function.') }}
-                        @break
-                    @default
-                        {{ __('Invocations dply made itself — background ticks and test requests. Each carries the function\'s runtime logs.') }}
-                @endswitch
-            </p>
-        </div>
-        <button type="button" wire:click="refreshLogs" wire:loading.attr="disabled"
-                class="ml-auto shrink-0 inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
-            {{ __('Refresh') }}
-        </button>
-    </div>
+    {{-- Dense head: the header here is pure chrome over a tab strip, so it takes
+         the one-line variant — the tall icon-badge + "LOGS" eyebrow + title +
+         prose stack cost four rows to say what the breadcrumb already said. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-document-text"
+        :title="$tabs[$tab]"
+        :note="$tabNotes[$tab] ?? null"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <button type="button" wire:click="refreshLogs" wire:loading.attr="disabled"
+                    class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
+                {{ __('Refresh') }}
+            </button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7 space-y-5">
-    {{-- Tab bar — every log source a DigitalOcean Functions host exposes. --}}
-    <x-server-workspace-tablist :aria-label="__('Log sources')" class="!mb-0">
+    <div class="{{ $panelPad }} space-y-3">
+    {{-- Tab bar — every log source a DigitalOcean Functions host exposes.
+         Explicit !mb: this build's `space-y-*` sets margin-BOTTOM on non-last
+         children, so an `!mb-*` here replaces that gap rather than adding to it.
+         The strip carries its own border + fill, so it needs the room. --}}
+    <x-server-workspace-tablist :aria-label="__('Log sources')" class="!mb-4">
         @foreach ($tabs as $key => $label)
             <x-server-workspace-tab
                 id="logs-tab-{{ $key }}"
@@ -66,33 +65,35 @@
 
     {{-- ── Activations ─────────────────────────────────────────────────── --}}
     @if ($tab === 'activations')
-        @if ($activations->isNotEmpty())
-            <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                @foreach ([
-                    ['label' => __('Invocations'), 'value' => $metrics['total']],
-                    ['label' => __('Error rate'), 'value' => $metrics['error_rate'].'%'],
-                    ['label' => __('Avg duration'), 'value' => $metrics['avg_duration'].'ms'],
-                    ['label' => __('Cold starts'), 'value' => $metrics['cold_starts']],
-                ] as $card)
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-moss/70">{{ $card['label'] }}</dt>
-                        <dd class="mt-0.5 text-lg font-bold text-brand-ink">{{ $card['value'] }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-        @endif
-
-        {{-- Send test request --}}
-        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
+        {{-- Metrics + the test-request control share one strip: four numbers and a
+             button don't each need a card. Was 4 tall tiles over a full-width
+             banner; now one row. --}}
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1.5">
+            @if ($activations->isNotEmpty())
+                <dl class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    @foreach ([
+                        ['label' => __('Invocations'), 'value' => $metrics['total']],
+                        ['label' => __('Error rate'), 'value' => $metrics['error_rate'].'%'],
+                        ['label' => __('Avg duration'), 'value' => $metrics['avg_duration'].'ms'],
+                        ['label' => __('Cold starts'), 'value' => $metrics['cold_starts']],
+                    ] as $card)
+                        <div class="flex items-baseline gap-1.5">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ $card['label'] }}</dt>
+                            <dd class="text-xs font-bold tabular-nums text-brand-ink">{{ $card['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            @else
                 <p class="text-xs text-brand-moss">{{ __('Invoke the function now to generate an activation and see its logs.') }}</p>
-                <button type="button" wire:click="toggleTestForm"
-                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
-                    {{ $testFormOpen ? __('Cancel') : __('Send test request') }}
-                </button>
-            </div>
+            @endif
+
+            <button type="button" wire:click="toggleTestForm"
+                    class="ml-auto shrink-0 inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
+                {{ $testFormOpen ? __('Cancel') : __('Send test request') }}
+            </button>
+
             @if ($testFormOpen)
-                <div class="mt-3 flex flex-wrap items-end gap-2">
+                <div class="flex w-full flex-wrap items-end gap-2 border-t border-brand-ink/10 pt-2">
                     <label class="text-xs text-brand-moss">
                         <span class="block font-semibold">{{ __('Method') }}</span>
                         <select wire:model="testMethod" class="mt-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-xs">
@@ -118,7 +119,8 @@
                         <span wire:loading wire:target="sendTestRequest">{{ __('Invoking…') }}</span>
                     </button>
                 </div>
-                <p class="mt-2 text-xs text-brand-moss/60">
+                {{-- w-full: the strip is flex-wrap now, so this has to claim its own row. --}}
+                <p class="w-full text-2xs text-brand-moss/60">
                     {{ __('A test invocation runs the function once and is billed like any invocation.') }}
                     @if ($supportsAsync)
                         {{ __('Async starts it and collects the result when it finishes — the only way to test a function whose timeout exceeds 60 seconds.') }}
@@ -128,7 +130,7 @@
         </div>
 
         @if ($activations->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+            <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                 {{ __('No activations recorded yet. Background ticks land here automatically; or send a test request above.') }}
             </div>
         @else
@@ -146,7 +148,7 @@
     {{-- ── Visits ──────────────────────────────────────────────────────── --}}
     @elseif ($tab === 'visits')
         @if ($visits->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+            <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                 {{ __('No visits recorded yet. Organic requests appear here once the deployed function reports them — redeploy if this function predates log shipping.') }}
             </div>
         @else
@@ -160,34 +162,34 @@
     {{-- ── Runtime output ──────────────────────────────────────────────── --}}
     @elseif ($tab === 'runtime')
         @if (count($runtimeLines) === 0)
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+            <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                 {{ __('No runtime output yet — no recent invocation has written to stdout, stderr, or the Laravel log.') }}
             </div>
         @else
-            <p class="text-xs text-brand-moss/60">{{ __(':n lines from recent invocations, oldest first.', ['n' => count($runtimeLines)]) }}</p>
-            <pre class="max-h-[28rem] overflow-auto rounded-lg bg-brand-ink p-4 text-xs leading-relaxed text-brand-cream">{{ implode("\n", $runtimeLines) }}</pre>
+            <p class="text-2xs text-brand-moss/60">{{ __(':n lines from recent invocations, oldest first.', ['n' => count($runtimeLines)]) }}</p>
+            <pre class="max-h-[26rem] overflow-auto rounded-lg bg-brand-ink p-2.5 text-xs leading-snug text-brand-cream">{{ implode("\n", $runtimeLines) }}</pre>
         @endif
 
     {{-- ── Deploy logs ─────────────────────────────────────────────────── --}}
     @elseif ($tab === 'deploy')
         @if ($deployments->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+            <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                 {{ __('No deploys recorded yet — this function has not been deployed.') }}
             </div>
         @else
-            <ul class="space-y-2">
+            <ul class="space-y-1.5">
                 @foreach ($deployments as $deployment)
                     @php
                         $serverlessSteps = $deployment->phaseSteps('serverless');
                         $rawOutput = trim((string) ($deployment->log_output ?? ''));
                     @endphp
-                    <li class="relative rounded-xl border border-brand-ink/10 bg-white p-3">
+                    <li class="relative rounded-lg border border-brand-ink/10 bg-white p-2.5">
                         {{-- Detail link as a sibling overlay, not nested in the summary
                              (a summary element is itself a button; nesting an anchor
                              trips the "interactive element within a summary" a11y warning). --}}
                         <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}"
                            wire:navigate
-                           class="absolute right-3 top-3 z-10 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs text-brand-moss hover:bg-brand-sand"
+                           class="absolute right-2.5 top-2.5 z-10 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs text-brand-moss hover:bg-brand-sand"
                            title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                         <details>
                             <summary class="cursor-pointer list-none">
@@ -207,7 +209,7 @@
                                     @endif
                                 </div>
                             </summary>
-                            <div class="mt-3 space-y-3">
+                            <div class="mt-2 space-y-2">
                                 @if (count($serverlessSteps) > 0)
                                     <ul class="space-y-1">
                                         @foreach ($serverlessSteps as $step)
@@ -241,7 +243,7 @@
                                 @if ($rawOutput !== '')
                                     <div>
                                         <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Deploy output') }}</p>
-                                        <pre class="mt-1 max-h-64 overflow-auto rounded-lg bg-brand-ink p-3 text-xs leading-relaxed text-brand-cream">{{ $rawOutput }}</pre>
+                                        <pre class="mt-1 max-h-56 overflow-auto rounded-lg bg-brand-ink p-2.5 text-xs leading-snug text-brand-cream">{{ $rawOutput }}</pre>
                                     </div>
                                 @elseif (count($serverlessSteps) === 0)
                                     <p class="text-xs text-brand-moss/60">{{ __('No step detail or output captured for this deploy.') }}</p>

@@ -131,6 +131,24 @@ return [
     | platform token when a serverless-specific one isn't set.
     */
     'testing_dns' => [
+        /*
+         | How the apex answers for function hostnames:
+         |
+         |  wildcard  A single `*.{apex}` record (created once, by hand, in the
+         |            Cloudflare dashboard and pointed at the dply app) already
+         |            resolves every function. dply makes NO DNS API calls and
+         |            needs NO DNS credential — it just records the hostname as
+         |            live. Universal SSL covers one wildcard level, so TLS
+         |            needs nothing either. This is the default.
+         |
+         |  auto      dply writes one record per function through the DNS API.
+         |            Needs a token with Zone:DNS:Edit on the apex
+         |            (DPLY_SERVERLESS_CF_API_TOKEN).
+         |
+         | Applies only to the serverless apex; legacy DPLY_TESTING_DOMAINS
+         | hostnames always use the DigitalOcean API path.
+         */
+        'mode' => strtolower(trim((string) env('DPLY_SERVERLESS_TESTING_DNS_MODE', 'wildcard'))),
         'provider' => strtolower(trim((string) env('DPLY_SERVERLESS_TESTING_DNS_PROVIDER', 'cloudflare'))),
         'cloudflare_api_token' => env(
             'DPLY_SERVERLESS_CF_API_TOKEN',

@@ -195,6 +195,7 @@ class DnsPanel extends Component
             'error' => (string) ($dns['error'] ?? ''),
             'recordsAtName' => $recordsAtName,
             'coveredByWildcard' => (bool) ($dns['covered_by_wildcard'] ?? false),
+            'wildcardMode' => ($dns['dns_provider'] ?? '') === 'wildcard',
             'provisionedAt' => $dns['provisioned_at'] ?? null,
         ]);
     }

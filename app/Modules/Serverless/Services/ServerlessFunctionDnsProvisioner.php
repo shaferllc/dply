@@ -53,6 +53,25 @@ final class ServerlessFunctionDnsProvisioner
             return 'DNS: skipped — '.$host.' is not on a configured serverless apex.';
         }
 
+        // Wildcard mode: a hand-created `*.{apex}` record already answers for
+        // every function, so there is nothing to create and no credential to
+        // need. Record the hostname as live and make no API call.
+        if (ServerlessTestingDomains::usesWildcard($zone)) {
+            $this->store($site, [
+                'status' => 'ready',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'record_type' => 'CNAME',
+                'record_data' => '*.'.$zone,
+                'covered_by_wildcard' => true,
+                'dns_provider' => 'wildcard',
+                'provisioned_at' => now()->toIso8601String(),
+            ]);
+
+            return 'DNS: covered by *.'.$zone.' — no record needed.';
+        }
+
         // The serverless apex (dply-serverless.cloud) is a Cloudflare zone;
         // legacy pool hostnames stay on the DigitalOcean path.
         if (ServerlessTestingDomains::dnsProviderForZone($zone) === 'cloudflare') {

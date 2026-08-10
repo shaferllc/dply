@@ -82,6 +82,23 @@ final class ServerlessTestingDomains
     }
 
     /**
+     * True when this zone is served by a hand-created `*.{apex}` record, so
+     * dply should not touch the DNS API at all — the hostname is already live
+     * the moment the slug exists.
+     *
+     * Only the serverless apex can be in wildcard mode; legacy shared-pool
+     * zones carry per-site records and always go through the provider API.
+     */
+    public static function usesWildcard(string $zone): bool
+    {
+        if (! in_array(strtolower(trim($zone)), self::all(), true)) {
+            return false;
+        }
+
+        return strtolower(trim((string) config('serverless.testing_dns.mode', 'wildcard'))) === 'wildcard';
+    }
+
+    /**
      * Which DNS API writes records for a hostname on this zone.
      *
      * The serverless apex is a Cloudflare zone, so its records go through the

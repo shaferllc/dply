@@ -14,10 +14,10 @@
         __('cold start') => $invocation->init_time_ms,
     ], fn ($ms) => $ms !== null && $ms > 0);
 @endphp
-<li class="py-3 first:pt-0 last:pb-0">
+<li class="py-1.5 first:pt-0 last:pb-0">
     <details>
         <summary @class([
-            'flex flex-wrap items-center gap-2 list-none',
+            'flex flex-wrap items-center gap-x-2 gap-y-1 list-none',
             'cursor-pointer' => $hasDetail,
         ])>
             <span @class([
@@ -61,7 +61,7 @@
         </summary>
 
         @if (count($contextPairs) > 0)
-            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg bg-brand-sand/30 p-3 sm:grid-cols-3">
+            <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-brand-sand/30 p-2.5 sm:grid-cols-3">
                 @foreach ($contextPairs as $label => $value)
                     <div class="min-w-0">
                         <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss/60">{{ $label }}</dt>
@@ -72,11 +72,11 @@
         @endif
 
         @if ($excerpt !== '')
-            <pre class="mt-2 max-h-48 overflow-auto rounded-lg bg-brand-sand/40 p-3 text-xs leading-relaxed text-brand-ink">{{ $excerpt }}</pre>
+            <pre class="mt-1.5 max-h-48 overflow-auto rounded-lg bg-brand-sand/40 p-2.5 text-xs leading-snug text-brand-ink">{{ $excerpt }}</pre>
         @endif
 
         @if (count($logLines) > 0)
-            <pre class="mt-2 max-h-48 overflow-auto rounded-lg bg-brand-ink p-3 text-xs leading-relaxed text-brand-cream">{{ implode("\n", $logLines) }}</pre>
+            <pre class="mt-1.5 max-h-48 overflow-auto rounded-lg bg-brand-ink p-2.5 text-xs leading-snug text-brand-cream">{{ implode("\n", $logLines) }}</pre>
         @endif
     </details>
 </li>

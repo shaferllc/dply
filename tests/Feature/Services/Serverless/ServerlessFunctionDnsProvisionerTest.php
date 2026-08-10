@@ -6,6 +6,7 @@ namespace Tests\Feature\Services\Serverless\ServerlessFunctionDnsProvisionerTest
 
 use App\Models\Site;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -19,6 +20,7 @@ function useDigitalOceanZone(): void
 {
     config([
         'serverless.testing_domains' => ['dply.host'],
+        'serverless.testing_dns.mode' => 'auto',
         'serverless.testing_dns.provider' => 'digitalocean',
         'serverless.testing_dns_target' => null,
         'services.digitalocean.token' => 'dop_v1_test',
@@ -26,9 +28,16 @@ function useDigitalOceanZone(): void
     ]);
 }
 
+/** Per-function records via the Cloudflare API, rather than the default wildcard. */
+function useCloudflareApiMode(): void
+{
+    config(['serverless.testing_dns.mode' => 'auto']);
+}
+
 beforeEach(function () {
     config([
         'serverless.testing_domains' => ['dply-serverless.cloud'],
+        'serverless.testing_dns.mode' => 'wildcard',
         'serverless.testing_dns.provider' => 'cloudflare',
         'serverless.testing_dns.cloudflare_api_token' => 'cf_test_token',
         'serverless.testing_dns_target' => null,
@@ -36,6 +45,46 @@ beforeEach(function () {
         'services.digitalocean.token' => 'dop_v1_test',
         'services.digitalocean.serverless_function_dns_target' => null,
     ]);
+});
+
+test('wildcard mode marks the hostname live without calling any dns api', function () {
+    Http::fake();
+
+    $site = Site::factory()->create(['name' => 'Orders API']);
+    $slug = $site->ensureServerlessProxySlug();
+
+    $status = app(ServerlessFunctionDnsProvisioner::class)->provision($site->fresh());
+
+    $dns = $site->fresh()->serverlessConfig()['dns'] ?? [];
+    expect($dns['status'])->toBe('ready');
+    expect($dns['hostname'])->toBe($slug.'.dply-serverless.cloud');
+    expect($dns['covered_by_wildcard'])->toBeTrue();
+    expect($dns['dns_provider'])->toBe('wildcard');
+    $this->assertStringContainsString('covered by *.dply-serverless.cloud', (string) $status);
+
+    // The whole point: no credential needed, no API traffic.
+    Http::assertNothingSent();
+});
+
+test('wildcard mode needs no cloudflare token at all', function () {
+    config(['serverless.testing_dns.cloudflare_api_token' => null]);
+    Http::fake();
+
+    $site = Site::factory()->create(['name' => 'Orders API']);
+    $site->ensureServerlessProxySlug();
+
+    app(ServerlessFunctionDnsProvisioner::class)->provision($site->fresh());
+
+    expect($site->fresh()->serverlessConfig()['dns']['status'] ?? null)->toBe('ready');
+    Http::assertNothingSent();
+});
+
+test('wildcard mode never applies to a zone outside the serverless apex pool', function () {
+    // Guards the blast radius: `mode` must not silently mark hostnames on the
+    // shared BYO pool as live without a real record behind them.
+    expect(ServerlessTestingDomains::usesWildcard('dply-serverless.cloud'))->toBeTrue();
+    expect(ServerlessTestingDomains::usesWildcard('dply.host'))->toBeFalse();
+    expect(ServerlessTestingDomains::usesWildcard('on-dply.site'))->toBeFalse();
 });
 
 test('every function gets a hostname on the dedicated serverless apex', function () {
@@ -54,6 +103,7 @@ test('the serverless apex defaults to dply-serverless.cloud with no env configur
 });
 
 test('it creates a cloudflare cname to the apex when the record is missing', function () {
+    useCloudflareApiMode();
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones?*' => Http::response([
             'success' => true,
@@ -84,6 +134,7 @@ test('it creates a cloudflare cname to the apex when the record is missing', fun
 });
 
 test('it treats a cloudflare wildcard record as covering the hostname', function () {
+    useCloudflareApiMode();
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones?*' => Http::response([
             'success' => true,
@@ -115,6 +166,7 @@ test('it treats a cloudflare wildcard record as covering the hostname', function
 });
 
 test('it creates a cloudflare a record when an explicit ip target is configured', function () {
+    useCloudflareApiMode();
     config(['serverless.testing_dns_target' => '203.0.113.10']);
 
     Http::fake([
@@ -138,6 +190,7 @@ test('it creates a cloudflare a record when an explicit ip target is configured'
 });
 
 test('it skips when no cloudflare token is configured for the apex', function () {
+    useCloudflareApiMode();
     config(['serverless.testing_dns.cloudflare_api_token' => null]);
     Http::fake();
 
@@ -154,6 +207,7 @@ test('it skips when no cloudflare token is configured for the apex', function ()
 });
 
 test('it skips when the apex is not a zone the cloudflare token can reach', function () {
+    useCloudflareApiMode();
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones?*' => Http::response(['success' => true, 'result' => []], 200),
     ]);
