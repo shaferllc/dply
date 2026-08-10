@@ -369,6 +369,12 @@ class Create extends Component
 
         return view('livewire.serverless.create', [
             'credentials' => $credentials,
+            // Creating a function immediately provisions billable infrastructure
+            // and deploys, so a pause-blocked org can't start one at all. Shown
+            // as a disabled form rather than a rejection on submit — the whole
+            // point is that nothing gets stood up.
+            'organization' => $org,
+            'deploysPaused' => $org !== null && ! $org->canDeploy(),
             'functionFee' => app(ServerlessCostEstimator::class)->functionFee(),
             'managedAvailable' => $this->managedAvailable(),
             'runtimes' => $this->runtimeOptions(),

@@ -136,6 +136,17 @@
                                 <span wire:loading.remove wire:target="retryProvision">{{ __('Retry provisioning') }}</span>
                                 <span wire:loading wire:target="retryProvision">{{ __('Retrying…') }}</span>
                             </button>
+
+                            {{-- A namespace that won't provision is the other
+                                 dead end — retrying may never help, so offer the
+                                 way out alongside the retry. --}}
+                            @can('delete', $site)
+                                <button type="button" wire:click="openDeleteFunctionModal"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50">
+                                    <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Delete function') }}
+                                </button>
+                            @endcan
                         @elseif ($deployState === 'failed')
                             <button type="button" wire:click="retryDeploy" wire:loading.attr="disabled" wire:target="retryDeploy"
                                     class="inline-flex items-center gap-1.5 rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-70">
@@ -193,13 +204,24 @@
                                 {{ __('Your function was created and its namespace is ready, but the build was not started because this organization can\'t run billed work right now. Add a payment method and deploy — nothing here is lost.') }}
                             </p>
                         </div>
-                        @if ($billingUrl)
-                            <a href="{{ $billingUrl }}" wire:navigate
-                               class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
-                                <x-heroicon-o-credit-card class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Add a payment method') }}
-                            </a>
-                        @endif
+                        <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+                            @if ($billingUrl)
+                                <a href="{{ $billingUrl }}" wire:navigate
+                                   class="inline-flex items-center gap-1.5 rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                                    <x-heroicon-o-credit-card class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Add a payment method') }}
+                                </a>
+                            @endif
+                            {{-- The other way out: don't pay, don't keep the
+                                 namespace. Never gated on billing. --}}
+                            @can('delete', $site)
+                                <button type="button" wire:click="openDeleteFunctionModal"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50">
+                                    <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Delete function') }}
+                                </button>
+                            @endcan
+                        </div>
                     </div>
                 </div>
             @endif
@@ -500,6 +522,45 @@
                     <button type="button" wire:click="deleteFailedDeployment" wire:loading.attr="disabled"
                             class="inline-flex items-center rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-70">
                         {{ __('Delete run') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Destructive: removes the function AND its namespace. Type-to-confirm,
+         matching the site-removal flow elsewhere. --}}
+    @if ($confirmingDeleteFunction)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="serverless-delete-fn-title">
+            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeDeleteFunctionModal"></div>
+            <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-xl">
+                <div class="border-b border-brand-ink/10 bg-rose-50/70 px-5 py-4">
+                    <h3 id="serverless-delete-fn-title" class="text-base font-semibold text-brand-ink">{{ __('Delete this function?') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ __('Removes the function, its deploy history, and its DigitalOcean Functions namespace. This cannot be undone.') }}
+                    </p>
+                </div>
+                <div class="px-5 py-4">
+                    <label for="serverless-delete-fn-name" class="block text-sm font-medium text-brand-ink">
+                        {{ __('Type :name to confirm', ['name' => $site->name]) }}
+                    </label>
+                    <input id="serverless-delete-fn-name" type="text" wire:model="deleteFunctionConfirmName"
+                           autocomplete="off" autofocus
+                           class="mt-1.5 w-full rounded-xl border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage" />
+                    @error('deleteFunctionConfirmName')
+                        <p class="mt-1.5 text-sm text-rose-700">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div class="flex justify-end gap-2 border-t border-brand-ink/10 px-5 py-4">
+                    <button type="button" wire:click="closeDeleteFunctionModal"
+                            class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/40">
+                        {{ __('Cancel') }}
+                    </button>
+                    <button type="button" wire:click="deleteFunction" wire:loading.attr="disabled" wire:target="deleteFunction"
+                            class="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-70">
+                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="deleteFunction" aria-hidden="true" />
+                        <span wire:loading.remove wire:target="deleteFunction">{{ __('Delete function') }}</span>
+                        <span wire:loading wire:target="deleteFunction">{{ __('Deleting…') }}</span>
                     </button>
                 </div>
             </div>

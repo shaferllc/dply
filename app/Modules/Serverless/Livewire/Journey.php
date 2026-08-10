@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
+use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -54,6 +55,12 @@ class Journey extends Component
 
     /** Whether the delete-failed-run confirmation modal is open. */
     public bool $confirmingDeleteDeployment = false;
+
+    /** Whether the delete-the-whole-function confirmation modal is open. */
+    public bool $confirmingDeleteFunction = false;
+
+    /** Type-to-confirm box for the destructive function delete. */
+    public string $deleteFunctionConfirmName = '';
 
     /**
      * Rendered as a panel inside another page (the Deployments tab) rather
@@ -219,6 +226,76 @@ class Journey extends Component
         $deployment->delete();
 
         $this->toastSuccess(__('Failed run deleted.'));
+    }
+
+    public function openDeleteFunctionModal(): void
+    {
+        $this->authorize('delete', $this->site());
+        $this->deleteFunctionConfirmName = '';
+        $this->resetValidation();
+        $this->confirmingDeleteFunction = true;
+    }
+
+    public function closeDeleteFunctionModal(): void
+    {
+        $this->confirmingDeleteFunction = false;
+        $this->deleteFunctionConfirmName = '';
+        $this->resetValidation();
+    }
+
+    /**
+     * Delete the function outright, along with its DigitalOcean Functions
+     * namespace.
+     *
+     * The escape hatch for a function that can't go forward: a namespace that
+     * won't provision, or — the case this was written for — a deploy the org
+     * isn't allowed to run. Both leave a function that exists, bills for its
+     * namespace, and will never serve a request. Deleting the deploy row isn't
+     * enough there, because the deploy never got as far as writing one.
+     *
+     * Deliberately NOT gated on the billing pause: this is the exit ramp, and
+     * paywalling the way out is how orgs end up paying for infrastructure they
+     * asked to be rid of.
+     */
+    public function deleteFunction(DeleteServerlessFunction $action): mixed
+    {
+        $site = $this->site();
+        $this->authorize('delete', $site);
+
+        if (trim($this->deleteFunctionConfirmName) !== $site->name) {
+            $this->addError('deleteFunctionConfirmName', __('Type the function name exactly to confirm.'));
+
+            return null;
+        }
+
+        $organization = $site->organization;
+        $name = $site->name;
+
+        // Audit before the delete — afterwards the subject is gone and the
+        // entry would have nothing to point at.
+        if ($organization !== null) {
+            audit_log($organization, auth()->user(), 'serverless.function_deleted', $site, null, [
+                'name' => $name,
+                'server_id' => $site->server_id,
+            ]);
+        }
+
+        $result = $action->handle($site);
+
+        $this->confirmingDeleteFunction = false;
+
+        // A namespace dply couldn't reach is the operator's problem to finish,
+        // so name it rather than reporting a clean success.
+        if ($result['remote_error'] !== null) {
+            $this->toastError(__('Deleted :name from dply, but its DigitalOcean namespace could not be removed — delete it in the DigitalOcean console. (:error)', [
+                'name' => $name,
+                'error' => $result['remote_error'],
+            ]));
+        } else {
+            $this->toastSuccess(__('Deleted :name.', ['name' => $name]));
+        }
+
+        return $this->redirect(route('serverless.index'), navigate: true);
     }
 
     public function render(): View

@@ -50,6 +50,27 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
+     * Delete a DigitalOcean Functions namespace — the teardown counterpart of
+     * {@see createFunctionsNamespace()}. Returns true on a successful delete,
+     * false on a 404 (already gone) so teardown is idempotent, mirroring
+     * {@see deleteDatabaseCluster()}.
+     *
+     * A namespace outlives the function deployed into it, so removing the dply
+     * Site is not enough — without this the customer keeps paying DigitalOcean
+     * for an empty namespace nothing references.
+     */
+    public function deleteFunctionsNamespace(string $namespace): bool
+    {
+        $response = $this->request('delete', '/functions/namespaces/'.$namespace);
+        if ($response->status() === 404) {
+            return false;
+        }
+        $this->assertSuccess($response, 'delete functions namespace');
+
+        return true;
+    }
+
+    /**
      * List the DigitalOcean Functions scheduled triggers in a namespace.
      *
      * @return list<array<string, mixed>>

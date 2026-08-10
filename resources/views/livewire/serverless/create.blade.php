@@ -7,6 +7,19 @@
 
     <x-livewire-validation-errors class="mt-4" />
 
+    {{-- Creating a function provisions a billable namespace and deploys
+         immediately, so a pause-blocked org is stopped here rather than being
+         allowed to stand up infrastructure it can't use. --}}
+    @if ($deploysPaused)
+        <x-trial-pause-banner :organization="$organization" class="mt-4" />
+        <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4">
+            <p class="text-sm font-semibold text-brand-ink">{{ __('You can\'t create a serverless app right now') }}</p>
+            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                {{ __('Creating one provisions a DigitalOcean Functions namespace and starts a deploy — both are billed work, which is paused for this organization. Add a payment method and this form unlocks.') }}
+            </p>
+        </div>
+    @endif
+
     <form wire:submit="create" class="mt-4">
         <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
             <div class="min-w-0">
@@ -249,7 +262,9 @@
                             </a>
                             @if (! ($credentials->isEmpty() && ! $managedAvailable))
                                 <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="create">
+                                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="create"
+                                                      :disabled="$deploysPaused"
+                                                      :title="$deploysPaused ? __('Deploys are paused — add a payment method to continue.') : null">
                                         <span wire:loading.remove wire:target="create" class="inline-flex items-center gap-2 whitespace-nowrap">
                                             <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Create & deploy') }}

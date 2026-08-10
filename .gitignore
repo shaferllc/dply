@@ -47,3 +47,5 @@ storage/app/vultr-control-plane*.json
 **/caddy
 frankenphp
 frankenphp-worker.php
+
+storage/blaze/traces/
