@@ -6,276 +6,258 @@ namespace App\Modules\Queue\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
-use App\Modules\Billing\Services\QueueUsageCostCalculator;
-use App\Modules\Queue\Actions\DeleteQueueNamespace;
-use App\Modules\Queue\Actions\RevokeQueueCredential;
 use App\Modules\Queue\Actions\RotateQueueCredential;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
-use App\Modules\Queue\Services\QueueUsageMeter;
-use App\Modules\Queue\Support\QueueEntitlements;
-use App\Policies\QueueNamespacePolicy;
+use App\Modules\Queue\Services\QueueFailedJobReader;
+use App\Modules\Queue\Support\QueueEndpoint;
+use App\Modules\Queue\Support\QueueTier;
 use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Throwable;
 
 /**
- * One dply Queue namespace: its endpoint, what an app puts in `.env` to reach
- * it, live depth, month-to-date volume, and its credentials.
+ * Per-namespace detail — credentials, wiring, live depth, throughput, and
+ * failed jobs.
  *
- * Credentials are the reason this page exists separately from the list. A queue
- * credential can drain a production queue, so minting and revoking are gated on
- * admin access ({@see QueueNamespacePolicy::manageCredentials()})
- * and the plaintext is shown exactly once — dply keeps an encrypted copy
- * because SigV4 must recompute the HMAC, but showing it again would turn a
- * database read into a credential disclosure.
- *
- * Rotation is two-step by design, not by omission: a credential lives in a
- * `.env` that only reaches the running app on its next deploy, so mint-then-
- * revoke is the only sequence that does not guarantee an outage. `last_used_at`
- * on the old credential is what tells the operator the redeploy has landed.
+ * The failed-jobs panel is the reason this page is not just a status readout.
+ * Horizon is hard-wired to RedisQueue, so a Cloud or BYO customer adopting dply
+ * Queue loses their dashboard — and under the pricing model they are exactly
+ * who pays for this. See docs/adr/managed-services-tier.md, decision 9.
  */
-#[Layout('layouts.app')]
 class QueueNamespaceShow extends Component
 {
     use DispatchesToastNotifications;
 
     public Organization $organization;
 
-    public QueueNamespace $queueNamespace;
+    public QueueNamespace $namespace;
 
-    /** Name for the credential about to be minted. */
-    public string $credentialName = '';
+    public string $selectedTier = '';
 
-    /**
-     * The one and only time a secret is displayed. Held in component state for
-     * this render only — never persisted, never re-derivable from the page.
-     */
-    public ?string $revealedSecret = null;
-
-    public ?string $revealedCredentialId = null;
-
-    /** The credential open in the revoke-confirmation modal, if any. */
-    public ?string $revokingCredentialId = null;
+    public bool $confirmTierCharge = false;
 
     public bool $confirmingDelete = false;
 
-    public string $deleteConfirmation = '';
+    /** Plaintext secret, shown once immediately after a rotation. */
+    public ?string $freshSecret = null;
 
-    public function mount(Organization $organization, QueueNamespace $queueNamespace): void
+    #[Url]
+    public string $tab = 'overview';
+
+    /** Failed job open in the detail modal, if any. */
+    public ?string $inspectingJobId = null;
+
+    public function mount(QueueNamespace $queueNamespace): void
     {
-        $this->authorize('view', $organization);
+        $organization = auth()->user()?->currentOrganization();
+        abort_if($organization === null, 403);
+
+        // The session supplies the org, so this ownership check is the only
+        // thing standing between a guessed ULID and another org's queue. 404
+        // rather than 403: whether the id exists is not ours to confirm.
         abort_unless($queueNamespace->organization_id === $organization->id, 404);
 
+        $this->authorize('view', $queueNamespace);
+
         $this->organization = $organization;
-        $this->queueNamespace = $queueNamespace;
+        $this->namespace = $queueNamespace;
+        $this->selectedTier = $queueNamespace->tierConfig()->slug;
+    }
 
-        // Handed over by the create flow, which minted the first credential
-        // and has nowhere else to show it.
-        $flashed = session('queue.revealed_secret');
+    public function startTierChange(): void
+    {
+        $this->selectedTier = $this->namespace->tierConfig()->slug;
+        $this->confirmTierCharge = false;
+        $this->dispatch('open-modal', 'queue-tier-modal');
+    }
 
-        if (is_string($flashed) && $flashed !== '') {
-            $this->revealedSecret = $flashed;
-            $this->revealedCredentialId = (string) session('queue.revealed_credential_id');
+    public function cancelTierChange(): void
+    {
+        $this->reset(['confirmTierCharge']);
+        $this->selectedTier = $this->namespace->tierConfig()->slug;
+        $this->dispatch('close-modal', 'queue-tier-modal');
+    }
+
+    public function changeTier(): void
+    {
+        $this->authorize('update', $this->namespace);
+
+        $tiers = QueueTier::all();
+
+        if (! array_key_exists($this->selectedTier, $tiers)) {
+            $this->toastError(__('Pick a capacity tier.'));
+
+            return;
         }
+
+        $current = $this->namespace->tierConfig();
+        $target = $tiers[$this->selectedTier];
+
+        if ($target->slug === $current->slug) {
+            $this->toastWarning(__('This queue is already on the :tier tier.', ['tier' => $current->label]));
+
+            return;
+        }
+
+        // Only ask for consent when the bill actually goes up — and only when
+        // the namespace is billable at all. A Serverless-attached queue moving
+        // tiers changes its capacity and nothing else.
+        $raisesBill = $this->namespace->isBillable() && $target->priceCents > $current->priceCents;
+
+        if ($raisesBill && ! $this->confirmTierCharge) {
+            $this->toastError(__('Confirm the new monthly charge to upgrade.'));
+
+            return;
+        }
+
+        // Depth is stamped on the row, not read from config at push time, so a
+        // tier move has to rewrite it or the new capacity never takes effect.
+        $this->namespace->forceFill([
+            'tier' => $target->slug,
+            'max_queue_depth' => $target->hasQueueDepthLimit() ? $target->maxQueueDepth : null,
+        ])->save();
+
+        $this->namespace->refresh();
+
+        $this->toastSuccess(__('Queue moved to the :tier tier.', ['tier' => $target->label]));
+        $this->cancelTierChange();
     }
 
-    public function startMint(): void
+    public function rotateCredential(RotateQueueCredential $action): void
     {
-        $this->authorize('manageCredentials', $this->queueNamespace);
-
-        $this->credentialName = '';
-        $this->dispatch('open-modal', 'queue-credential-modal');
-    }
-
-    public function cancelMint(): void
-    {
-        $this->reset('credentialName');
-        $this->dispatch('close-modal', 'queue-credential-modal');
-    }
-
-    /**
-     * Mint a second live credential so the app can be redeployed onto it
-     * before the old one is revoked.
-     */
-    public function mintCredential(RotateQueueCredential $action): void
-    {
-        $this->authorize('manageCredentials', $this->queueNamespace);
+        $this->authorize('manageCredentials', $this->namespace);
 
         try {
-            // Enforces the two-live-credential cap — a third would mean an
-            // earlier rotation was abandoned, leaving a secret live forever.
-            $minted = $action->handle(
-                $this->queueNamespace,
-                trim($this->credentialName) !== '' ? trim($this->credentialName) : null,
-                auth()->id(),
-            );
+            $rotated = $action->handle($this->namespace, __('Rotated credential'), auth()->id());
         } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
         }
 
-        $this->revealedSecret = $minted['plaintext'];
-        $this->revealedCredentialId = $minted['credential']->id;
+        $this->freshSecret = $rotated['plaintext'];
+        $this->namespace->refresh();
 
-        $this->cancelMint();
-
-        $this->toastSuccess(__('Credential minted. Copy the secret now — it is not shown again.'));
-    }
-
-    public function dismissSecret(): void
-    {
-        $this->reset(['revealedSecret', 'revealedCredentialId']);
-    }
-
-    public function confirmRevoke(string $credentialId): void
-    {
-        $this->authorize('manageCredentials', $this->queueNamespace);
-
-        $this->revokingCredentialId = $this->findCredential($credentialId)->id;
-        $this->dispatch('open-modal', 'queue-revoke-modal');
-    }
-
-    public function cancelRevoke(): void
-    {
-        $this->reset('revokingCredentialId');
-        $this->dispatch('close-modal', 'queue-revoke-modal');
-    }
-
-    public function revokeCredential(RevokeQueueCredential $action): void
-    {
-        $this->authorize('manageCredentials', $this->queueNamespace);
-
-        $credential = $this->findCredential((string) $this->revokingCredentialId);
-        $action->handle($credential);
-
-        $this->cancelRevoke();
-
-        $this->toastSuccess(__('Credential revoked. Any app still using it will start failing immediately.'));
+        $this->toastSuccess(__('New credential minted. Copy the secret now — it is shown once.'));
     }
 
     public function confirmDelete(): void
     {
         $this->confirmingDelete = true;
-        $this->deleteConfirmation = '';
         $this->dispatch('open-modal', 'queue-delete-modal');
     }
 
     public function cancelDelete(): void
     {
         $this->confirmingDelete = false;
-        $this->reset('deleteConfirmation');
         $this->dispatch('close-modal', 'queue-delete-modal');
     }
 
-    public function deleteNamespace(DeleteQueueNamespace $action)
+    public function deleteNamespace(): void
     {
-        $this->authorize('delete', $this->queueNamespace);
+        $this->authorize('delete', $this->namespace);
 
-        if (trim($this->deleteConfirmation) !== $this->queueNamespace->name) {
-            $this->toastError(__('Type the queue’s name to confirm.'));
+        $this->namespace->delete();
 
-            return null;
+        $this->toastSuccess(__('Queue deleted. It no longer counts toward your bill.'));
+
+        // Livewire's redirect() returns void and skips the render — nothing to
+        // return, and returning it would hand back null.
+        $this->redirect(route('queues.index'), navigate: true);
+    }
+
+    public function inspectJob(string $id): void
+    {
+        $this->inspectingJobId = $id;
+        $this->dispatch('open-modal', 'queue-failed-job-modal');
+    }
+
+    public function closeJob(): void
+    {
+        $this->inspectingJobId = null;
+        $this->dispatch('close-modal', 'queue-failed-job-modal');
+    }
+
+    public function retryJob(string $id, QueueFailedJobReader $reader): void
+    {
+        $this->authorize('update', $this->namespace);
+
+        if (! $reader->retry($this->namespace, $id)) {
+            $this->toastError(__('Could not retry that job — it may already have been retried or deleted.'));
+
+            return;
         }
 
-        $action->handle($this->queueNamespace);
-
-        $this->toastSuccess(__('Queue deleted.'));
-
-        return $this->redirect(route('organizations.queues', $this->organization), navigate: true);
+        $this->closeJob();
+        $this->toastSuccess(__('Job pushed back onto the queue.'));
     }
 
-    public function togglePause(): void
+    public function forgetJob(string $id, QueueFailedJobReader $reader): void
     {
-        $this->authorize('update', $this->queueNamespace);
+        $this->authorize('update', $this->namespace);
 
-        $paused = $this->queueNamespace->status === QueueNamespace::STATUS_PAUSED;
+        $reader->forget($this->namespace, $id);
 
-        $this->queueNamespace->forceFill([
-            'status' => $paused ? QueueNamespace::STATUS_ACTIVE : QueueNamespace::STATUS_PAUSED,
-        ])->save();
-
-        $this->queueNamespace->refresh();
-
-        $this->toastSuccess($paused
-            ? __('Queue resumed — it is accepting pushes again.')
-            : __('Queue paused. New pushes are rejected; anything already queued still drains.'));
+        $this->closeJob();
+        $this->toastSuccess(__('Failed job deleted.'));
     }
 
-    /** Resolve a credential id, scoped to this namespace (404 otherwise). */
-    private function findCredential(string $credentialId): QueueCredential
+    public function render(QueueFailedJobReader $reader): View
     {
-        return $this->queueNamespace->credentials()->findOrFail($credentialId);
-    }
+        $store = app(QueueStore::class);
 
-    /** The base URL an app's queue client posts to. */
-    private function endpoint(): string
-    {
-        $configured = trim((string) config('queue_service.public_url', ''));
-
-        if ($configured === '') {
-            $public = trim((string) config('dply.public_app_url', ''));
-
-            if ($public === '') {
-                return '';
-            }
-
-            if (preg_match('~^https?://~i', $public) !== 1) {
-                $public = 'https://'.$public;
-            }
-
-            $configured = rtrim($public, '/').'/api/queue/v1';
+        // The store lives on a separate connection; it being unreachable must
+        // degrade this page to "unknown", not 500 it.
+        try {
+            $depth = $store->depth($this->namespace);
+        } catch (Throwable) {
+            $depth = null;
         }
-
-        return rtrim($configured, '/').'/'.$this->queueNamespace->id;
-    }
-
-    public function render(
-        QueueStore $store,
-        QueueUsageMeter $meter,
-        QueueEntitlements $entitlements,
-        QueueUsageCostCalculator $cost,
-    ): View {
-        $depth = null;
 
         try {
-            $depth = $store->depth($this->queueNamespace)->toArray();
-        } catch (Throwable $e) {
-            // Separate connection, separate failure modes — see Queues::render().
+            $failedJobs = $reader->recent($this->namespace);
+            $failedJobsAvailable = true;
+        } catch (Throwable) {
+            $failedJobs = [];
+            $failedJobsAvailable = false;
         }
 
-        $entitlement = $entitlements->for($this->organization);
-        $usedJobs = $meter->monthToDateJobs($this->organization);
+        $inspecting = null;
+        foreach ($failedJobs as $job) {
+            if ($job['id'] === $this->inspectingJobId) {
+                $inspecting = $job;
+                break;
+            }
+        }
 
-        $credentials = $this->queueNamespace->credentials()
-            ->orderByDesc('created_at')
-            ->get();
-
-        return view('livewire.organizations.queue-namespace', [
-            'endpoint' => $this->endpoint(),
+        return view('livewire.queues.show', [
             'depth' => $depth,
-            'credentials' => $credentials,
-            'liveCredentialCount' => $credentials->filter(
-                fn (QueueCredential $credential): bool => $credential->isUsable()
-            )->count(),
-            'maxLiveCredentials' => RotateQueueCredential::MAX_LIVE_CREDENTIALS,
-            'entitlement' => $entitlement,
-            'usedJobs' => $usedJobs,
-            'overIncluded' => $cost->isOverIncluded($entitlement, $usedJobs),
-            'billingLive' => $cost->isEnabled(),
-            'canManageCredentials' => auth()->user()?->can('manageCredentials', $this->queueNamespace) ?? false,
-            'canUpdate' => auth()->user()?->can('update', $this->queueNamespace) ?? false,
-            'canDelete' => auth()->user()?->can('delete', $this->queueNamespace) ?? false,
+            'tier' => $this->namespace->tierConfig(),
+            'tiers' => QueueTier::all(),
+            'endpoint' => QueueEndpoint::forNamespace($this->namespace),
+            'credentials' => $this->namespace->credentials()->orderByDesc('created_at')->get(),
+            'liveCredential' => $this->namespace->liveCredentials()->first(),
+            'billable' => $this->namespace->isBillable(),
+            'billingEnabled' => (bool) config('queue_service.billing.enabled', false),
+            'throughput' => $reader->dailyThroughput($this->namespace),
+            'failedJobs' => $failedJobs,
+            'failedJobsAvailable' => $failedJobsAvailable,
+            // Whether dply is the app's failed-job store at all. For apps dply
+            // wires this is true; an external app keeps failures in its own DB
+            // until it opts in, and the panel has to say so rather than imply
+            // zero failures.
+            'ownsFailedJobs' => $this->namespace->site_id !== null,
+            'inspectingJob' => $inspecting,
+            'canManage' => auth()->user()?->can('update', $this->namespace) ?? false,
+            'canManageCredentials' => auth()->user()?->can('manageCredentials', $this->namespace) ?? false,
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
-                ['label' => __('Queues'), 'href' => route('organizations.queues', $this->organization), 'icon' => 'queue-list'],
-                ['label' => $this->queueNamespace->name, 'icon' => 'queue-list'],
+                ['label' => __('Queues'), 'href' => route('queues.index'), 'icon' => 'queue-list'],
+                ['label' => $this->namespace->name, 'icon' => 'queue-list'],
             ],
-            'orgShellSection' => 'queues',
         ]);
     }
 }

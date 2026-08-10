@@ -28,7 +28,7 @@
 @endphp
 
 <div class="contents">
-    <x-compute-index-nav surface="local" />
+    <x-workspace-nav surface="local" />
 
     <div class="dply-page-shell {{ $width }} py-8 sm:py-10">
         <x-breadcrumb-trail :items="$crumbs" wrapperClass="mb-5" />

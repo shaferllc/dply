@@ -750,7 +750,7 @@
                                 {{-- Jump from a managed broadcasting binding to the relay app's own page
                                      (credentials, live stats, connected sites, tier). --}}
                                 @if ($type === 'broadcasting' && $attached && $binding->target_type === 'realtime_app' && (auth()->user()?->can('view', $site->organization) ?? false))
-                                    <a href="{{ route('organizations.realtime.show', [$site->organization, $binding->target_id]) }}" wire:navigate
+                                    <a href="{{ route('realtime.show', $binding->target_id) }}" wire:navigate
                                         title="{{ __('Manage the relay app (credentials, stats, tier).') }}"
                                         class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage app') }}

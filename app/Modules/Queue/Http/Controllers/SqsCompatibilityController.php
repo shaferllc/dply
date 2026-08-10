@@ -354,13 +354,19 @@ class SqsCompatibilityController extends Controller
             }
         }
 
-        if ($entitlement->hasQueueDepthLimit()) {
+        // Depth comes from the namespace row, not the org's plan: capacity is
+        // bought per namespace by tier, and the row holds what was bought.
+        // Reading it live from config would let a tier re-price shrink a
+        // running queue underneath the customer.
+        $maxDepth = (int) ($context->namespace->max_queue_depth ?? 0);
+
+        if ($maxDepth > 0) {
             $depth = $this->store->depth($context->namespace)->total();
 
-            if ($depth + count($bodies) > $entitlement->maxQueueDepth) {
+            if ($depth + count($bodies) > $maxDepth) {
                 return $this->error(
                     'OverLimit',
-                    'This queue is at its depth limit of '.$entitlement->maxQueueDepth.' messages. Drain it or upgrade the plan.',
+                    'This queue is at its depth limit of '.$maxDepth.' messages. Drain it or move it to a larger tier.',
                     403,
                 );
             }

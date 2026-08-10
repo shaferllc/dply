@@ -43,6 +43,7 @@ class PostgresQueueStore implements QueueStore
 
     public function __construct(
         private readonly QueuePayloadInspector $inspector,
+        private readonly QueueUsageCounter $usage,
         private readonly QueueUsageMeter $meter,
     ) {}
 
@@ -88,9 +89,17 @@ class PostgresQueueStore implements QueueStore
 
         $this->connection()->table(self::JOBS)->insert($rows);
 
-        // Metered here rather than at the HTTP edge: this is the one place
-        // every push funnels through, so a future transport cannot forget to
-        // count. The meter never throws — see QueueUsageMeter::record().
+        // Counted after the insert committed, so neither series ever shows jobs
+        // that were never enqueued. Both recorders swallow their own failures:
+        // observability must not be able to fail a customer's push.
+        //
+        // Two of them, deliberately. The per-namespace counter feeds the
+        // dashboard sparkline; the per-org meter is the original decision-9
+        // rollup. Neither is a billing input any more — a namespace is priced by
+        // capacity tier (docs/adr/managed-services-tier.md, decision 6) — so the
+        // meter is now retained data collection rather than an invoice source.
+        // Collapsing the two is follow-up work, not a merge-time call.
+        $this->usage->record($namespace, count($rows));
         $this->meter->record($namespace, count($rows));
 
         return $ids;

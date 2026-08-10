@@ -303,6 +303,19 @@ return [
                 'growth' => env('STRIPE_PRICE_STANDARD_LOOKOUT_GROWTH_YEARLY', ''),
                 'scale' => env('STRIPE_PRICE_STANDARD_LOOKOUT_SCALE_YEARLY', ''),
             ],
+            // dply Queue — one line per namespace capacity tier. Tier
+            // definitions/prices live in config('queue_service.tiers'); these are
+            // the Stripe price IDs the syncer drives to the BILLABLE namespace
+            // count. Namespaces serving a dply Serverless site are free and never
+            // reach a line here (docs/adr/managed-services-tier.md, decision 4).
+            'queue_tiers' => [
+                'standard' => env('STRIPE_PRICE_STANDARD_QUEUE_STANDARD', ''),
+                'pro' => env('STRIPE_PRICE_STANDARD_QUEUE_PRO', ''),
+            ],
+            'queue_tiers_yearly' => [
+                'standard' => env('STRIPE_PRICE_STANDARD_QUEUE_STANDARD_YEARLY', ''),
+                'pro' => env('STRIPE_PRICE_STANDARD_QUEUE_PRO_YEARLY', ''),
+            ],
             // --- Legacy size-tier Stripe prices (retired with the migration) ---
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
             'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),

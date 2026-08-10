@@ -19,7 +19,8 @@
             ['route' => 'servers.index', 'match' => 'servers.index', 'label' => __('Servers'), 'icon' => 'server'],
             ['route' => 'projects.index', 'match' => 'projects.*', 'label' => __('Projects'), 'icon' => 'folder'],
             ['route' => 'fleet.index', 'match' => 'fleet.*', 'label' => __('Fleet'), 'icon' => 'rectangle-stack', 'feature' => 'surface.fleet'],
-            ['route' => 'backups.databases', 'match' => 'backups.*', 'label' => __('Backups'), 'icon' => 'archive-box', 'feature' => 'workspace.backups'],
+            // Backups moved to the Services row — it is a managed capability,
+            // not compute (docs/adr/managed-services-tier.md, decision 1).
             ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt'],
             ['route' => 'cloud.index', 'match' => 'cloud.*', 'label' => __('Cloud'), 'icon' => 'cloud'],
             ['route' => 'serverless.index', 'match' => 'serverless.*', 'label' => __('Serverless'), 'icon' => 'cpu-chip'],

@@ -10,6 +10,7 @@ use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Support\QueueEndpoint;
 use App\Modules\Queue\Support\QueueDepth;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
@@ -200,30 +201,11 @@ final class ServerlessQueueProvisioner
     /** The base URL the app's queue client posts to. */
     private function endpointFor(QueueNamespace $namespace): string
     {
-        return rtrim($this->publicUrl(), '/').'/'.$namespace->id;
+        return QueueEndpoint::forNamespace($namespace);
     }
 
     private function publicUrl(): string
     {
-        $configured = trim((string) config('queue_service.public_url', ''));
-
-        if ($configured !== '') {
-            return $configured;
-        }
-
-        // Same reachability rule as the serverless log-ingest URL: a function
-        // on DigitalOcean cannot reach a local *.test address, so an unset
-        // public URL means the feature is simply not offered.
-        $public = trim((string) config('dply.public_app_url', ''));
-
-        if ($public === '') {
-            return '';
-        }
-
-        if (preg_match('~^https?://~i', $public) !== 1) {
-            $public = 'https://'.$public;
-        }
-
-        return rtrim($public, '/').'/api/queue/v1';
+        return QueueEndpoint::base();
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
+use App\Http\Controllers\OrgScopedRedirectController;
 use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\ServerCredentialShareController;
 use App\Http\Controllers\ServerlessQueueWakeController;
@@ -228,8 +229,8 @@ use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
-use App\Modules\Queue\Livewire\QueueNamespaceShow as OrganizationsQueueNamespace;
-use App\Modules\Queue\Livewire\Queues as OrganizationsQueues;
+use App\Modules\Queue\Livewire\Queues as QueuesIndex;
+use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
@@ -541,10 +542,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/billing/analytics', BillingAnalytics::class)->name('billing.analytics');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
-    Route::livewire('organizations/{organization}/realtime', OrganizationsRealtime::class)->name('organizations.realtime');
-    Route::livewire('organizations/{organization}/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('organizations.realtime.show');
-    Route::livewire('organizations/{organization}/queues', OrganizationsQueues::class)->name('organizations.queues');
-    Route::livewire('organizations/{organization}/queues/{queueNamespace}', OrganizationsQueueNamespace::class)->name('organizations.queues.show');
+    // Legacy org-scoped Realtime URLs. Not Route::redirect — these switch the
+    // active organization first so a bookmark for org B does not land on org
+    // A's page (docs/adr/managed-services-tier.md, decision 8).
+    Route::get('organizations/{organization}/realtime', [OrgScopedRedirectController::class, 'realtime'])
+        ->name('organizations.realtime');
+    Route::get('organizations/{organization}/realtime/{realtimeApp}', [OrgScopedRedirectController::class, 'realtimeApp'])
+        ->name('organizations.realtime.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
@@ -552,6 +556,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/backups', BackupsDatabases::class)->name('backups.databases');
     Route::redirect('/backups/databases', '/backups', 301);
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
+
+    // Managed services — session-scoped like every other product surface.
+    Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');
+    Route::livewire('/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('realtime.show');
+
+    Route::middleware('feature:surface.queue')->group(function (): void {
+        Route::livewire('/queues', QueuesIndex::class)->name('queues.index');
+        Route::livewire('/queues/{queueNamespace}', QueuesShow::class)->name('queues.show');
+    });
 
     Route::middleware('feature:surface.scripts')->group(function (): void {
         Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');

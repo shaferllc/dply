@@ -6,34 +6,24 @@ namespace App\Modules\Queue\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
-use App\Modules\Billing\Services\QueueUsageCostCalculator;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
-use App\Modules\Queue\Actions\DeleteQueueNamespace;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueNamespace;
-use App\Modules\Queue\Services\QueueUsageMeter;
-use App\Modules\Queue\Services\ServerlessQueueProvisioner;
+use App\Modules\Queue\Support\QueueEndpoint;
 use App\Modules\Queue\Support\QueueEntitlements;
+use App\Modules\Queue\Support\QueueTier;
 use Illuminate\Contracts\View\View;
-use Laravel\Pennant\Feature;
-use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Throwable;
 
 /**
- * Org-level control plane for dply Queue — the managed job queue.
+ * The dply Queue index — the org's managed job queues, what they cost, and how
+ * deep they are right now.
  *
- * Lists the organization's namespaces with the two numbers that matter
- * operationally (depth now, jobs pushed this month) and the endpoint an app
- * points at. Credential management lives on the per-namespace page: minting a
- * secret is the security-sensitive act here, and it deserves its own surface
- * rather than a row in a list.
- *
- * Sites dply deploys get a namespace provisioned automatically
- * ({@see ServerlessQueueProvisioner}); this page is
- * where an external app gets one, and where any of them are managed after.
+ * Session-scoped like every other product index (Edge, Cloud, Serverless); the
+ * route group already gates on `surface.queue`, so the off-state is a 404 and
+ * this component only runs when Queue is live for the org.
  */
-#[Layout('layouts.app')]
 class Queues extends Component
 {
     use DispatchesToastNotifications;
@@ -43,50 +33,43 @@ class Queues extends Component
     /** Create-namespace modal. */
     public string $createName = '';
 
+    public string $createTier = '';
+
+    /** Re-consent required when the namespace being created will be billed. */
+    public bool $confirmCreateCharge = false;
+
     /** The namespace open in the delete-confirmation modal, if any. */
-    public ?string $deletingNamespaceId = null;
+    public ?string $deletingId = null;
 
-    /**
-     * Typed by the operator to arm the delete. Deleting a namespace destroys
-     * queued jobs, which no amount of undo brings back.
-     */
-    public string $deleteConfirmation = '';
-
-    public function mount(Organization $organization): void
+    public function mount(): void
     {
-        $this->authorize('view', $organization);
+        $organization = auth()->user()?->currentOrganization();
+        abort_if($organization === null, 403);
+
         $this->organization = $organization;
+        $this->authorize('viewAny', QueueNamespace::class);
+        $this->createTier = (string) config('queue_service.default_tier', 'standard');
     }
 
     public function startCreate(): void
     {
         $this->authorize('create', QueueNamespace::class);
 
-        if (! $this->available()) {
-            $this->toastError(__('dply Queue isn’t enabled for this workspace.'));
-
-            return;
-        }
-
-        $this->reset('createName');
+        $this->createName = '';
+        $this->createTier = (string) config('queue_service.default_tier', 'standard');
+        $this->confirmCreateCharge = false;
         $this->dispatch('open-modal', 'queue-create-modal');
     }
 
     public function cancelCreate(): void
     {
-        $this->reset('createName');
+        $this->reset(['createName', 'confirmCreateCharge']);
         $this->dispatch('close-modal', 'queue-create-modal');
     }
 
     public function createNamespace(CreateQueueNamespace $action): void
     {
         $this->authorize('create', QueueNamespace::class);
-
-        if (! $this->available()) {
-            $this->toastError(__('dply Queue isn’t enabled for this workspace.'));
-
-            return;
-        }
 
         $name = trim($this->createName);
 
@@ -96,149 +79,104 @@ class Queues extends Component
             return;
         }
 
+        // A namespace created from this page has no site attached, so it always
+        // bills — the free path is Serverless-attached namespaces, which are
+        // created by the deploy, not here. Consent is unconditional rather than
+        // price-conditional for exactly that reason.
+        if (! $this->confirmCreateCharge) {
+            $this->toastError(__('Confirm the monthly charge to create this queue.'));
+
+            return;
+        }
+
         try {
-            // The action enforces the plan's namespace ceiling and throws with
-            // a message written for the operator, so it is shown as-is rather
-            // than replaced with something vaguer.
-            $created = $action->handle($this->organization, $name, userId: auth()->id());
+            $action->handle($this->organization, $name, null, auth()->id());
         } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
         }
 
+        $this->toastSuccess(__('Queue created. Copy its credentials to point an app at it.'));
         $this->cancelCreate();
-
-        // Straight to the namespace page, carrying the plaintext in the session
-        // rather than the URL — the secret is shown exactly once, and a query
-        // string would put it in browser history and any proxy log on the way.
-        session()->flash('queue.revealed_secret', $created['plaintext']);
-        session()->flash('queue.revealed_credential_id', $created['credential']->id);
-
-        $this->redirect(
-            route('organizations.queues.show', [$this->organization, $created['namespace']]),
-            navigate: true,
-        );
     }
 
-    public function confirmDelete(string $namespaceId): void
+    public function confirmDelete(string $id): void
     {
-        $this->deletingNamespaceId = $this->findNamespace($namespaceId)->id;
-        $this->deleteConfirmation = '';
+        $this->deletingId = $id;
         $this->dispatch('open-modal', 'queue-delete-modal');
     }
 
     public function cancelDelete(): void
     {
-        $this->reset(['deletingNamespaceId', 'deleteConfirmation']);
+        $this->deletingId = null;
         $this->dispatch('close-modal', 'queue-delete-modal');
     }
 
-    public function deleteNamespace(DeleteQueueNamespace $action): void
+    public function deleteNamespace(): void
     {
-        $namespace = $this->findNamespace((string) $this->deletingNamespaceId);
-        $this->authorize('delete', $namespace);
+        $namespace = QueueNamespace::query()->find($this->deletingId);
 
-        if (trim($this->deleteConfirmation) !== $namespace->name) {
-            $this->toastError(__('Type the queue’s name to confirm.'));
+        if (! $namespace instanceof QueueNamespace || $namespace->organization_id !== $this->organization->id) {
+            $this->toastError(__('That queue no longer exists.'));
+            $this->cancelDelete();
 
             return;
         }
 
-        $result = $action->handle($namespace);
+        $this->authorize('delete', $namespace);
 
+        $namespace->delete();
+
+        $this->toastSuccess(__('Queue deleted. It no longer counts toward your bill.'));
         $this->cancelDelete();
-
-        $this->toastSuccess(trans_choice(
-            '{0}Queue deleted.|{1}Queue deleted, along with :count job still in it.|[2,*]Queue deleted, along with :count jobs still in it.',
-            $result['jobs'],
-            ['count' => number_format($result['jobs'])],
-        ));
     }
 
-    /**
-     * Stop accepting pushes without touching what is already queued.
-     *
-     * Receives keep working while paused, so the way an operator empties a
-     * paused queue is to let their workers drain it.
-     */
-    public function togglePause(string $namespaceId): void
+    public function render(): View
     {
-        $namespace = $this->findNamespace($namespaceId);
-        $this->authorize('update', $namespace);
-
-        $paused = $namespace->status === QueueNamespace::STATUS_PAUSED;
-
-        $namespace->forceFill([
-            'status' => $paused ? QueueNamespace::STATUS_ACTIVE : QueueNamespace::STATUS_PAUSED,
-        ])->save();
-
-        $this->toastSuccess($paused
-            ? __('Queue resumed — it is accepting pushes again.')
-            : __('Queue paused. New pushes are rejected; anything already queued still drains.'));
-    }
-
-    /** Resolve a namespace id, scoped to this organization (404 otherwise). */
-    private function findNamespace(string $namespaceId): QueueNamespace
-    {
-        return QueueNamespace::query()
-            ->where('organization_id', $this->organization->id)
-            ->findOrFail($namespaceId);
-    }
-
-    /** The same two-key gate the provisioner applies: platform on, org flagged. */
-    private function available(): bool
-    {
-        return (bool) config('queue_service.enabled', false)
-            && Feature::for($this->organization)->active('surface.queue');
-    }
-
-    public function render(
-        QueueStore $store,
-        QueueUsageMeter $meter,
-        QueueEntitlements $entitlements,
-        QueueUsageCostCalculator $cost,
-    ): View {
-        $namespaces = QueueNamespace::query()
-            ->where('organization_id', $this->organization->id)
-            ->with('site:id,name,server_id')
-            ->orderByDesc('created_at')
+        $namespaces = $this->organization->queueNamespaces()
+            ->with('site:id,name,serverless_backend')
+            ->orderBy('created_at')
             ->get();
 
-        // Depth is a live count per namespace on a separate connection. It
-        // degrades to null rather than taking the page down — an unreadable
-        // number is worth less than a page that renders.
+        $store = app(QueueStore::class);
+
+        // Depth is read per namespace off the dply_queue connection. Cheap
+        // enough at the counts a plan allows (max_namespaces is single digits),
+        // and a failure here must degrade to "unknown" rather than take the
+        // page down — the store is a separate database and can be unreachable
+        // while the control plane is fine.
         $depths = [];
         foreach ($namespaces as $namespace) {
             try {
-                $depths[$namespace->id] = $store->depth($namespace)->toArray();
-            } catch (Throwable $e) {
+                $depths[$namespace->id] = $store->depth($namespace);
+            } catch (Throwable) {
                 $depths[$namespace->id] = null;
             }
         }
 
-        $entitlement = $entitlements->for($this->organization);
-        $usedJobs = $meter->monthToDateJobs($this->organization);
+        $entitlement = app(QueueEntitlements::class)->for($this->organization);
+        $billableCount = $namespaces->filter(fn (QueueNamespace $n): bool => $n->isBillable())->count();
 
-        return view('livewire.organizations.queues', [
+        return view('livewire.queues.index', [
             'namespaces' => $namespaces,
             'depths' => $depths,
+            'tiers' => QueueTier::all(),
             'entitlement' => $entitlement,
-            'usedJobs' => $usedJobs,
-            'overIncluded' => $cost->isOverIncluded($entitlement, $usedJobs),
-            'estimate' => $cost->estimate($entitlement, $usedJobs),
-            'billingLive' => $cost->isEnabled(),
-            'featureActive' => $this->available(),
+            'billableCount' => $billableCount,
+            'freeCount' => $namespaces->count() - $billableCount,
+            'monthlyCents' => $namespaces->sum(fn (QueueNamespace $n): int => $n->priceCents()),
+            'billingEnabled' => (bool) config('queue_service.billing.enabled', false),
+            'endpointBase' => QueueEndpoint::base(),
+            'atLimit' => $entitlement->hasNamespaceLimit() && $namespaces->count() >= $entitlement->maxNamespaces,
             'canManage' => auth()->user()?->can('create', QueueNamespace::class) ?? false,
-            'deletingNamespace' => $this->deletingNamespaceId !== null
-                ? $namespaces->firstWhere('id', $this->deletingNamespaceId)
+            'deletingNamespace' => $this->deletingId !== null
+                ? $namespaces->firstWhere('id', $this->deletingId)
                 : null,
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
                 ['label' => __('Queues'), 'icon' => 'queue-list'],
             ],
-            'orgShellSection' => 'queues',
         ]);
     }
 }

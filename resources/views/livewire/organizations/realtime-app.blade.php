@@ -19,15 +19,17 @@
     ];
 @endphp
 
-<div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell
-            :organization="$organization"
-            section="realtime"
+<div class="contents">
+    <x-workspace-nav surface="local" />
+
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
+        <x-breadcrumb-trail :items="$breadcrumbs" />
+
+        <x-profile-shell
+            dense
             :title="$app->name"
             :description="$app->host()"
             icon="heroicon-o-signal"
-            :breadcrumb="$breadcrumbs"
         >
             <x-slot:actions>
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
@@ -227,7 +229,7 @@
                     @endforelse
                 </div>
             </section>
-        </x-organization-shell>
+        </x-profile-shell>
     </div>
 
     {{-- Tier-change modal --}}
