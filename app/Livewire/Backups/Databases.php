@@ -14,6 +14,8 @@ use App\Models\Site;
 use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
 use Laravel\Pennant\Feature;
@@ -37,7 +39,8 @@ class Databases extends Component
             return view('livewire.backups.databases', ['featureActive' => false]);
         }
 
-        $serverIds = $org->servers()->pluck('id');
+        $servers = $org->servers()->orderBy('name')->get();
+        $serverIds = $servers->pluck('id');
         $sevenDaysAgo = now()->subDays(7);
 
         $backupsBase = ServerDatabaseBackup::whereHas(
@@ -68,7 +71,14 @@ class Databases extends Component
             ->distinct()
             ->pluck('server_id');
 
-        $unprotectedServers = $serverIds->diff($serversWithSchedule)->count();
+        // The landing hero leads with protection coverage, so we keep the actual
+        // unprotected servers around (not just the count) to offer a one-click
+        // path into each one's backups workspace.
+        $unprotectedServers = $servers->whereNotIn('id', $serversWithSchedule)->values();
+
+        $lastSuccessAt = (clone $backupsBase)
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->max('created_at');
 
         $schedules = ServerBackupSchedule::with(['server', 'backupConfiguration'])
             ->whereIn('server_id', $serverIds)
@@ -84,11 +94,16 @@ class Databases extends Component
 
         $destinations = $org->backupConfigurations()->orderBy('name')->get();
 
+        $activity = $this->dailyActivity(clone $backupsBase);
+
         $databases = ServerDatabase::query()
             ->whereIn('server_id', $serverIds)
             ->with('server')
             ->orderBy('name')
             ->get();
+
+        $serverCount = $servers->count();
+        $protectedCount = $serverCount - $unprotectedServers->count();
 
         return view('livewire.backups.databases', [
             'featureActive' => true,
@@ -99,12 +114,55 @@ class Databases extends Component
                 'failed7d' => $failed7d,
                 'storage' => Number::fileSize((int) $storageBytes),
                 'activeSchedules' => $activeSchedules,
-                'unprotectedServers' => $unprotectedServers,
+                'unprotectedServers' => $unprotectedServers->count(),
+                'servers' => $serverCount,
+                'protectedServers' => $protectedCount,
+                'coverage' => $serverCount > 0 ? (int) round($protectedCount / $serverCount * 100) : 0,
+                'lastSuccessAt' => $lastSuccessAt ? Carbon::parse($lastSuccessAt) : null,
             ],
+            'unprotectedServers' => $unprotectedServers,
+            'activity' => $activity,
             'schedules' => $schedules,
             'recentRuns' => $recentRuns,
             'destinations' => $destinations,
         ]);
+    }
+
+    /**
+     * Completed/failed run counts per day for the last two weeks, zero-filled so
+     * the hero strip always renders 14 cells regardless of how sparse the data is.
+     *
+     * @param  Builder<ServerDatabaseBackup>  $backups
+     * @return list<array{date: Carbon, completed: int, failed: int}>
+     */
+    private function dailyActivity(Builder $backups): array
+    {
+        $days = 14;
+
+        $rows = $backups
+            ->where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
+            ->selectRaw('date(created_at) as day, status, count(*) as total')
+            ->groupBy('day', 'status')
+            ->get();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row->day][(string) $row->status] = (int) $row->total;
+        }
+
+        $activity = [];
+        for ($ago = $days - 1; $ago >= 0; $ago--) {
+            $date = now()->subDays($ago)->startOfDay();
+            $key = $date->toDateString();
+
+            $activity[] = [
+                'date' => $date,
+                'completed' => $counts[$key][ServerDatabaseBackup::STATUS_COMPLETED] ?? 0,
+                'failed' => $counts[$key][ServerDatabaseBackup::STATUS_FAILED] ?? 0,
+            ];
+        }
+
+        return $activity;
     }
 
     public function toggleSchedule(string $scheduleId): void
