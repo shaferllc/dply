@@ -89,4 +89,16 @@ interface QueueStore
 
     /** Drop every job in a queue. Returns how many were removed. */
     public function clear(QueueNamespace $namespace, string $queue): int;
+
+    /**
+     * Drop everything belonging to a namespace — every queue, plus its failed
+     * jobs. For teardown only.
+     *
+     * The job tables live on a separate connection from the namespace row, so
+     * no foreign key can cascade this. Deleting a namespace without it would
+     * leave rows nothing can ever reach or bill for.
+     *
+     * @return array{jobs: int, failed: int}
+     */
+    public function purge(QueueNamespace $namespace): array;
 }

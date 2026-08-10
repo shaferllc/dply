@@ -287,6 +287,42 @@ test('the depth limit rejects a push instead of accepting it', function () {
         ->assertJsonPath('__type', 'com.amazonaws.sqs#OverLimit');
 });
 
+test('a paused namespace rejects pushes', function () {
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessage', ['MessageBody' => 'before'])->assertOk();
+
+    $ctx['namespace']->forceFill(['status' => QueueNamespace::STATUS_PAUSED])->save();
+
+    sqsCall($ctx, 'SendMessage', ['MessageBody' => 'after'])
+        ->assertStatus(403)
+        ->assertJsonPath('__type', 'com.amazonaws.sqs#RequestThrottled');
+});
+
+test('a paused namespace still lets workers drain what is already queued', function () {
+    // Pause stops the inflow; it does not strand the backlog. Draining is how
+    // an operator empties a paused queue, so receives have to keep working.
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessage', ['MessageBody' => 'queued'])->assertOk();
+    $ctx['namespace']->forceFill(['status' => QueueNamespace::STATUS_PAUSED])->save();
+
+    $received = sqsCall($ctx, 'ReceiveMessage')->assertOk();
+
+    expect($received->json('Messages'))->toHaveCount(1);
+});
+
+test('a failed namespace is sealed completely', function () {
+    // Unlike paused, `failed` means there is nothing behind the namespace to
+    // reach — so its credentials stop authenticating at all.
+    $ctx = sqsNamespace();
+    $ctx['namespace']->forceFill(['status' => QueueNamespace::STATUS_FAILED])->save();
+
+    sqsCall($ctx, 'ReceiveMessage')
+        ->assertStatus(403)
+        ->assertJsonPath('__type', 'com.amazon.coral.service#InvalidClientTokenId');
+});
+
 test('an oversized payload is rejected', function () {
     $ctx = sqsNamespace(['max_payload_bytes' => 64]);
 

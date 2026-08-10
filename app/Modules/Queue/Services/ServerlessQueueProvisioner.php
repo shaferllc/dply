@@ -7,8 +7,10 @@ namespace App\Modules\Queue\Services;
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
+use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Support\QueueDepth;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
 use Throwable;
@@ -33,6 +35,7 @@ final class ServerlessQueueProvisioner
     public function __construct(
         private readonly CreateQueueNamespace $create,
         private readonly ServerlessEnvironmentPreparer $environment,
+        private readonly QueueStore $store,
     ) {}
 
     /**
@@ -94,9 +97,60 @@ final class ServerlessQueueProvisioner
             && Feature::for($organization)->active('surface.queue');
     }
 
-    private function namespaceFor(Site $site): ?QueueNamespace
+    /**
+     * The site's managed queue as the workspace needs to render it.
+     *
+     * Null when the site has no namespace — the panel then offers to create
+     * one, rather than reporting an empty queue that does not exist.
+     *
+     * Deliberately not gated on {@see available()}: a namespace that was
+     * provisioned before the flag moved is still draining real jobs, and
+     * hiding it would strand them. The gate decides what may be *created*.
+     *
+     * Depth is read live from the job store, which is a separate connection
+     * with its own failure modes. It degrades to null rather than taking the
+     * workspace down — an unreadable count is an observation the panel can
+     * omit, not a reason the page cannot render.
+     *
+     * @return array{namespace: QueueNamespace, endpoint: string, depth: ?QueueDepth}|null
+     */
+    public function describe(Site $site): ?array
+    {
+        $namespace = $this->existingNamespace($site);
+
+        if ($namespace === null) {
+            return null;
+        }
+
+        $depth = null;
+
+        try {
+            $depth = $this->store->depth($namespace);
+        } catch (Throwable $e) {
+            Log::warning('queue.depth_unavailable', [
+                'site_id' => $site->id,
+                'namespace_id' => $namespace->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'namespace' => $namespace,
+            'endpoint' => $this->endpointFor($namespace),
+            'depth' => $depth,
+        ];
+    }
+
+    private function existingNamespace(Site $site): ?QueueNamespace
     {
         $existing = QueueNamespace::query()->where('site_id', $site->id)->first();
+
+        return $existing instanceof QueueNamespace ? $existing : null;
+    }
+
+    private function namespaceFor(Site $site): ?QueueNamespace
+    {
+        $existing = $this->existingNamespace($site);
 
         if ($existing instanceof QueueNamespace) {
             return $existing;

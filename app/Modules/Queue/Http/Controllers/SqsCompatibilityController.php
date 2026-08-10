@@ -325,6 +325,17 @@ class SqsCompatibilityController extends Controller
      */
     private function guardPush(QueueRequestContext $context, array $bodies): ?JsonResponse
     {
+        // A paused namespace rejects pushes but keeps serving receives, so an
+        // operator (or a plan downgrade) can stop the inflow without stranding
+        // the jobs already in the queue — draining is how it gets emptied.
+        if (! $context->namespace->acceptsPushes()) {
+            return $this->error(
+                'RequestThrottled',
+                'This queue is paused and is not accepting new messages. Resume it from the dply dashboard.',
+                403,
+            );
+        }
+
         $organization = $context->namespace->organization;
 
         if ($organization === null) {

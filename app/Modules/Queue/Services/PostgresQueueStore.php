@@ -41,7 +41,10 @@ class PostgresQueueStore implements QueueStore
 
     private const FAILED = 'dply_queue_failed_jobs';
 
-    public function __construct(private readonly QueuePayloadInspector $inspector) {}
+    public function __construct(
+        private readonly QueuePayloadInspector $inspector,
+        private readonly QueueUsageMeter $meter,
+    ) {}
 
     public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0): string
     {
@@ -84,6 +87,11 @@ class PostgresQueueStore implements QueueStore
         }
 
         $this->connection()->table(self::JOBS)->insert($rows);
+
+        // Metered here rather than at the HTTP edge: this is the one place
+        // every push funnels through, so a future transport cannot forget to
+        // count. The meter never throws — see QueueUsageMeter::record().
+        $this->meter->record($namespace, count($rows));
 
         return $ids;
     }
@@ -285,6 +293,18 @@ class PostgresQueueStore implements QueueStore
             ->where('namespace_id', $namespace->id)
             ->where('queue', $this->normalizeQueue($queue))
             ->delete();
+    }
+
+    public function purge(QueueNamespace $namespace): array
+    {
+        return [
+            'jobs' => $this->connection()->table(self::JOBS)
+                ->where('namespace_id', $namespace->id)
+                ->delete(),
+            'failed' => $this->connection()->table(self::FAILED)
+                ->where('namespace_id', $namespace->id)
+                ->delete(),
+        ];
     }
 
     /**

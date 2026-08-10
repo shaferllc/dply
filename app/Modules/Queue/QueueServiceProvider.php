@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue;
 
+use App\Modules\Queue\Console\MeterQueueUsageCommand;
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Livewire\QueueNamespaceShow;
+use App\Modules\Queue\Livewire\Queues;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\PostgresQueueStore;
 use App\Policies\QueueNamespacePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 /**
  * dply Queue module wiring (docs/adr/modular-monolith-structure.md).
@@ -34,5 +38,14 @@ class QueueServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(QueueNamespace::class, QueueNamespacePolicy::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([MeterQueueUsageCommand::class]);
+        }
+
+        // Moving a component into a module stops Livewire's auto-discovery, so
+        // its alias is re-registered here (tests/Feature/LivewireAliasGuardTest).
+        Livewire::component('organizations.queues', Queues::class);
+        Livewire::component('organizations.queue-namespace-show', QueueNamespaceShow::class);
     }
 }

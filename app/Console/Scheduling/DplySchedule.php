@@ -67,6 +67,7 @@ use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
 use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Queue\Console\MeterQueueUsageCommand;
 use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
@@ -228,6 +229,16 @@ final class DplySchedule
         $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday'])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // dply Queue push metering (read-only; no billing yet). One flush covers
+        // every live day at once — the counters hold running totals and the rows
+        // are written absolute, so there is no separate finalize pass to run and
+        // nothing to lose if a flush is missed. Ten past the hour keeps it clear
+        // of the log meter above.
+        $schedule->command(MeterQueueUsageCommand::class)
+            ->hourlyAt(10)
+            ->name('queue-usage-flush')
             ->withoutOverlapping();
 
         // dply Logs alerting (paid tier): evaluate enabled alert rules against the

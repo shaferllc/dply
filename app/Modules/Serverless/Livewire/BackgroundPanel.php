@@ -238,6 +238,29 @@ class BackgroundPanel extends Component
     }
 
     /**
+     * Give the function a managed dply Queue and point it there.
+     *
+     * The preferred repair for both broken backends, and the reason the panel
+     * leads with it: a namespace is a row, so it exists the moment this
+     * returns — where "provision a Redis" is a paid cluster and a wait. The
+     * env lands in the site's `.env`, so it reaches the running function on
+     * the next deploy, same as every other managed resource.
+     */
+    public function useDplyQueue(ServerlessQueueBackend $backend): void
+    {
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        if (! $backend->wireDplyQueue($site)) {
+            $this->toastError(__('dply Queue is not available for this organization yet.'));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Managed queue created and wired. Redeploy to apply it to the running function.'));
+    }
+
+    /**
      * Point the queue at the provisioned Redis.
      *
      * The one-click fix for the two backends that cannot work on a function.
@@ -267,6 +290,7 @@ class BackgroundPanel extends Component
         // One classifier behind the panel, the pump, and the doctor, so the
         // UI can never call a backend healthy that the pump refuses to drain.
         $queue = $backend->classify($site);
+        $managed = $backend->managedQueue($site);
 
         return view('livewire.serverless.background-panel', [
             'enabled' => (bool) ($serverless['background_enabled'] ?? false),
@@ -280,6 +304,22 @@ class BackgroundPanel extends Component
             'queueReason' => $queue['reason'],
             'queueBlocked' => ! $backend->canDrain($site),
             'canUseRedis' => $queue['fixable_with_redis'],
+            'canUseDply' => $queue['fixable_with_dply'],
+
+            // Flattened to primitives: the view needs an endpoint and three
+            // counts, not a model it could lazily load half the schema off.
+            'managedQueue' => $managed === null ? null : [
+                'id' => $managed['namespace']->id,
+                'name' => $managed['namespace']->name,
+                'status' => $managed['namespace']->status,
+                'endpoint' => $managed['endpoint'],
+                'depth' => $managed['depth']?->toArray(),
+            ],
+
+            // A namespace can outlive the connection pointing at it — someone
+            // may edit QUEUE_CONNECTION by hand in the Environment panel. Say
+            // which is true rather than inferring one from the other.
+            'usingManagedQueue' => $queue['connection'] === 'dply',
         ]);
     }
 }

@@ -106,6 +106,22 @@ class QueueNamespace extends Model
     }
 
     /**
+     * Whether a credential for this namespace may authenticate at all.
+     *
+     * Broader than {@see acceptsPushes()} on purpose. A paused namespace stops
+     * the inflow but stays reachable, because draining is how an operator
+     * empties one — sealing it completely would strand the very backlog that
+     * pausing exists to let them work through.
+     *
+     * `failed` is sealed: it means dply could not stand the namespace up, so
+     * there is nothing behind it to reach.
+     */
+    public function isReachable(): bool
+    {
+        return in_array($this->status, [self::STATUS_ACTIVE, self::STATUS_PAUSED], true);
+    }
+
+    /**
      * Invalidate every cached credential for this namespace at once.
      *
      * Cached credential tuples carry the epoch they were minted under, so

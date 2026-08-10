@@ -228,6 +228,8 @@ use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
+use App\Modules\Queue\Livewire\QueueNamespaceShow as OrganizationsQueueNamespace;
+use App\Modules\Queue\Livewire\Queues as OrganizationsQueues;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
@@ -543,6 +545,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
     Route::livewire('organizations/{organization}/realtime', OrganizationsRealtime::class)->name('organizations.realtime');
     Route::livewire('organizations/{organization}/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('organizations.realtime.show');
+    Route::livewire('organizations/{organization}/queues', OrganizationsQueues::class)->name('organizations.queues');
+    Route::livewire('organizations/{organization}/queues/{queueNamespace}', OrganizationsQueueNamespace::class)->name('organizations.queues.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');

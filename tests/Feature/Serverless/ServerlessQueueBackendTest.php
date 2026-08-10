@@ -8,6 +8,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\ServerlessQueueProvisioner;
 use App\Modules\Serverless\Jobs\ServerlessQueueSlotJob;
@@ -16,6 +18,7 @@ use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
@@ -273,6 +276,117 @@ test('wiring a site twice reuses its namespace and credential', function () {
 
     expect(QueueNamespace::query()->where('site_id', $site->id)->count())->toBe(1);
     expect($second)->toBe($first);
+});
+
+/** The two-key gate the provisioner enforces: platform configured AND org flagged. */
+function enableDplyQueue(): void
+{
+    config([
+        'queue_service.enabled' => true,
+        'queue_service.public_url' => 'https://queue.dply.test/api/queue/v1',
+    ]);
+    Feature::define('surface.queue', fn (): bool => true);
+}
+
+test('a broken backend is offered dply Queue when the org has it', function () {
+    // What the panel branches on. Unlike Redis this does not depend on any
+    // infrastructure being online — there is nothing to provision first.
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+    expect(backend()->classify($site)['fixable_with_dply'])->toBeFalse();
+
+    enableDplyQueue();
+
+    expect(backend()->classify($site)['fixable_with_dply'])->toBeTrue();
+});
+
+test('a sqlite backend is offered dply Queue', function () {
+    enableDplyQueue();
+
+    expect(backend()->classify(backendSite("QUEUE_CONNECTION=database\nDB_CONNECTION=sqlite\n"))['fixable_with_dply'])
+        ->toBeTrue();
+});
+
+test('a working backend is offered no repair at all', function () {
+    // Both flags are false on a shareable backend: offering to repoint a queue
+    // that works would be the more destructive answer.
+    enableDplyQueue();
+    $state = backend()->classify(backendSite("QUEUE_CONNECTION=sqs\n".REDIS_ENV, ['status' => 'online']));
+
+    expect($state['fixable_with_dply'])->toBeFalse();
+    expect($state['fixable_with_redis'])->toBeFalse();
+});
+
+test('wireDplyQueue creates a namespace and points the connection at it', function () {
+    enableDplyQueue();
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+
+    expect(backend()->wireDplyQueue($site))->toBeTrue();
+
+    $fresh = $site->fresh();
+    expect(backend()->classify($fresh)['connection'])->toBe('dply');
+    expect(backend()->canDrain($fresh))->toBeTrue();
+    expect(QueueNamespace::query()->where('site_id', $site->id)->count())->toBe(1);
+});
+
+test('wireDplyQueue refuses when the org does not have dply Queue', function () {
+    config(['queue_service.enabled' => false]);
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+
+    expect(backend()->wireDplyQueue($site))->toBeFalse();
+    expect(QueueNamespace::query()->where('site_id', $site->id)->count())->toBe(0);
+});
+
+test('managedQueue is null until a namespace exists', function () {
+    enableDplyQueue();
+
+    expect(backend()->managedQueue(backendSite("QUEUE_CONNECTION=sync\n")))->toBeNull();
+});
+
+test('managedQueue reports the endpoint and live depth', function () {
+    enableDplyQueue();
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+    backend()->wireDplyQueue($site);
+
+    $described = backend()->managedQueue($site->fresh());
+    $namespace = $described['namespace'];
+
+    // The ULID is the data-plane id, so it is the endpoint's last segment —
+    // nothing translates between a public name and an internal one.
+    expect($described['endpoint'])->toBe('https://queue.dply.test/api/queue/v1/'.$namespace->id);
+    expect($described['depth']->total())->toBe(0);
+
+    app(QueueStore::class)->push($namespace, 'default', envelopeFor('App\\Jobs\\SendInvoice'));
+
+    expect(backend()->managedQueue($site->fresh())['depth']->pending)->toBe(1);
+});
+
+/** A realistic Laravel job envelope — the store reads `timeout` off it. */
+function envelopeFor(string $class): string
+{
+    return (string) json_encode([
+        'uuid' => (string) Str::uuid(),
+        'displayName' => $class,
+        'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+        'maxTries' => 3,
+        'timeout' => 60,
+        'data' => ['commandName' => $class, 'command' => 'O:0:"":0:{}'],
+    ]);
+}
+
+test('a namespace outlives a connection pointed elsewhere by hand', function () {
+    // The panel shows the queue whenever it exists: someone editing
+    // QUEUE_CONNECTION in the Environment panel does not delete the backlog,
+    // and hiding it is how an operator loses one.
+    enableDplyQueue();
+    $site = backendSite("QUEUE_CONNECTION=sync\n");
+    backend()->wireDplyQueue($site);
+
+    app(ServerlessEnvironmentPreparer::class)
+        ->mergeKeys($site->fresh(), ['QUEUE_CONNECTION' => 'sqs']);
+
+    $fresh = $site->fresh();
+    expect(backend()->classify($fresh)['connection'])->toBe('sqs');
+    expect(backend()->managedQueue($fresh))->not->toBeNull();
 });
 
 test('dply Queue is not offered without a public url', function () {

@@ -152,6 +152,18 @@
                         {{ __('Realtime') }}
                     </a>
                 @endif
+                {{-- Shown once a queue exists even if the flag later moves, so a
+                     live queue never becomes unreachable from the nav. --}}
+                @if (\Laravel\Pennant\Feature::for($org)->active('surface.queue') || \App\Modules\Queue\Models\QueueNamespace::query()->where('organization_id', $org->id)->exists())
+                    <a
+                        href="{{ route('organizations.queues', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('queues')])
+                    >
+                        <x-heroicon-o-queue-list class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Queues') }}
+                    </a>
+                @endif
                 @can('viewAny', \App\Models\ProviderCredential::class)
                     <a
                         href="{{ route('organizations.credentials', $org) }}"
