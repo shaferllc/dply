@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Realtime\Models\RealtimeApp;
 use AppModulesRealtimeModelsRealtimeApp;
 
@@ -221,6 +222,12 @@ class Organization extends Model
     public function lookoutProjects(): HasMany
     {
         return $this->hasMany(LookoutProject::class);
+    }
+
+    /** @return HasMany<QueueNamespace, $this> */
+    public function queueNamespaces(): HasMany
+    {
+        return $this->hasMany(QueueNamespace::class);
     }
 
     /** @return HasMany<OrganizationBillingSnapshot, $this> */

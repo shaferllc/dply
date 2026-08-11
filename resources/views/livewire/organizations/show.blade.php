@@ -57,7 +57,7 @@
             'show' => $canViewChannels,
         ],
         [
-            'label' => __('Provider credentials'),
+            'label' => __('Credentials'),
             'description' => __('Encrypted tokens for clouds, DNS, CDN.'),
             'href' => route('organizations.credentials', $organization),
             'icon' => 'heroicon-o-key',

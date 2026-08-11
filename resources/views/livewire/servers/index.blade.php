@@ -5,7 +5,7 @@
     @endif
     class="contents"
 >
-    <x-compute-index-nav surface="local" />
+    <x-workspace-nav surface="local" />
 
     <x-servers-index-page
         :grouped-rows="$groupedRows"
@@ -122,7 +122,7 @@
                         <div class="flex shrink-0 flex-wrap gap-2 sm:items-center">
                             <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
                                 <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Provider credentials') }}
+                                {{ __('Credentials') }}
                             </a>
                             <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />

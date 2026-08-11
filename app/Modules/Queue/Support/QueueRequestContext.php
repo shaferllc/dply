@@ -29,6 +29,23 @@ final readonly class QueueRequestContext
         return $this->namespace->id;
     }
 
+    /**
+     * The allowance for polling reads, which is deliberately larger than the
+     * tier's write rate.
+     *
+     * An empty ReceiveMessage costs one indexed query and changes nothing, so
+     * pricing it the same as a push or a delete would mean a customer buys
+     * throughput and then spends it on workers finding an empty queue. The
+     * multiplier is what lets a fleet poll attentively without eating the
+     * budget the drain itself needs.
+     */
+    public function pollsPerMinute(): int
+    {
+        $multiplier = max(1, (int) config('queue_service.rate.poll_multiplier', 4));
+
+        return $this->requestsPerMinute * $multiplier;
+    }
+
     public function organizationId(): ?string
     {
         return $this->namespace->organization_id;

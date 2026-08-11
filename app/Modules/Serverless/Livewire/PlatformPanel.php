@@ -7,6 +7,8 @@ namespace App\Modules\Serverless\Livewire;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
+use App\Support\Servers\ServerRegistry;
+use App\Support\Sites\SiteRegistry;
 use App\Modules\Serverless\Services\FunctionInvoker;
 use App\Modules\Serverless\Services\FunctionScheduleService;
 use App\Modules\Serverless\Services\OpenWhiskClient;
@@ -333,7 +335,13 @@ class PlatformPanel extends Component
 
     private function site(): Site
     {
-        return Site::with('server')->findOrFail($this->siteId);
+        // Registry on both sides: the sibling panels resolve this same site,
+        // and sync peers / the command palette resolve this same server. Each
+        // used to be its own SELECT.
+        $site = app(SiteRegistry::class)->findOrFail($this->siteId);
+        app(ServerRegistry::class)->attachTo($site);
+
+        return $site;
     }
 
     private function client(Site $site): OpenWhiskClient

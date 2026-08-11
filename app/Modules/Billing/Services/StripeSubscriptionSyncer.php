@@ -59,6 +59,9 @@ class StripeSubscriptionSyncer
         $this->reconcileRealtimeTierLines($subscription, $desired, $changes);
         // Managed Lookout — one line per project tier in use.
         $this->reconcileLookoutTierLines($subscription, $desired, $changes);
+        // dply Queue — one line per capacity tier in use. Serverless-attached
+        // namespaces never appear: they are free and dropped upstream.
+        $this->reconcileQueueTierLines($subscription, $desired, $changes);
         $this->reconcileCloudResourceLine($subscription, $desired, $changes);
         $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
@@ -314,6 +317,55 @@ class StripeSubscriptionSyncer
     private function allLookoutTierPriceIds(Subscription $subscription): array
     {
         $bucket = $this->isYearly($subscription) ? 'lookout_tiers_yearly' : 'lookout_tiers';
+        $ids = [];
+        foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
+            $ids[(string) $tier] = (string) ($priceId ?? '');
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Reconcile dply Queue lines per capacity tier. The computer has already
+     * dropped Serverless-attached namespaces (they ride free) and zeroed
+     * everything when queue_service.billing.enabled is off, so this drives each
+     * configured tier price to the count of namespaces that actually bill.
+     *
+     * Because billability is derived rather than stamped, a site converting
+     * Serverless → Cloud shows up here as a quantity going 0 → 1 with no
+     * namespace having changed. That is intended; the customer is told
+     * separately by the flip notifier.
+     *
+     * @param  list<array<string, mixed>>  $changes
+     */
+    private function reconcileQueueTierLines(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        foreach ($this->allQueueTierPriceIds($subscription) as $tier => $priceId) {
+            if ($priceId === '') {
+                continue;
+            }
+
+            $desiredQty = max(0, $desired->queueTierQuantities[$tier] ?? 0);
+            $current = $this->currentQuantity($subscription, $priceId);
+            $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+            if ($change !== null) {
+                $changes[] = ['tier' => 'queue:'.$tier] + $change;
+            }
+        }
+    }
+
+    /**
+     * Configured Stripe price IDs for every queue capacity tier at the
+     * subscription's interval, keyed by tier slug.
+     *
+     * @return array<string, string>
+     */
+    private function allQueueTierPriceIds(Subscription $subscription): array
+    {
+        $bucket = $this->isYearly($subscription) ? 'queue_tiers_yearly' : 'queue_tiers';
         $ids = [];
         foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
             $ids[(string) $tier] = (string) ($priceId ?? '');

@@ -33,6 +33,14 @@ final class OrganizationBillingSnapshotWriter
                     'cloud' => $state->cloudCount,
                     'edge' => $state->edgeCount,
                     'realtime' => $state->realtimeCount,
+                    'queue' => $state->queueCount,
+                    // Not a count: the identities behind it. dply Queue derives
+                    // billability from the site a namespace serves rather than
+                    // stamping it, so this is the only record of WHICH
+                    // namespaces we charged for in a cycle — both the audit
+                    // trail and the thing the flip notifier diffs against.
+                    // See docs/adr/managed-services-tier.md, decisions 5 and 7.
+                    'queue_billable_namespace_ids' => $state->queueBillableNamespaceIds,
                 ],
                 'edge_usage_cents' => $state->edgeUsageSubtotalCents,
                 'subscription_interval' => $this->subscriptionInterval($organization),
@@ -55,6 +63,7 @@ final class OrganizationBillingSnapshotWriter
             'edge_cents' => $state->edgeSubtotalCents,
             'edge_usage_cents' => $state->edgeUsageSubtotalCents,
             'realtime_cents' => $state->realtimeSubtotalCents,
+            'queue_cents' => $state->queueSubtotalCents,
         ];
     }
 

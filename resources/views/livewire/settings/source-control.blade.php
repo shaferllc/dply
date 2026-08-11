@@ -31,7 +31,7 @@
             @if (auth()->user()->currentOrganization())
                 <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Server providers') }}
+                    {{ __('Credentials') }}
                 </x-outline-link>
             @endif
         </x-slot:actions>

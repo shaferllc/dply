@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Backups;
 
 use App\Modules\Backups\Console\DbBackupCommand;
+use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Backups\Console\RunBackupScheduleCommand;
@@ -31,6 +32,7 @@ class BackupsServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DbBackupCommand::class,
+                DispatchDueBackupSchedulesCommand::class,
                 PruneBackupDownloadStagingsCommand::class,
                 PruneBackupsCommand::class,
                 RunBackupScheduleCommand::class,

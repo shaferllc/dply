@@ -142,24 +142,18 @@
                         {{ __('Notification channels') }}
                     </a>
                 @endcan
-                @if (\Laravel\Pennant\Feature::for($org)->active('surface.realtime') || $org->realtimeApps()->exists())
-                    <a
-                        href="{{ route('organizations.realtime', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('realtime')])
-                    >
-                        <x-heroicon-o-signal class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Realtime') }}
-                    </a>
-                @endif
+                {{-- Realtime and Queues moved to the Services nav row (/realtime,
+                     /queues). They are products, not organization settings — see
+                     docs/adr/managed-services-tier.md, decision 1. The old
+                     org-scoped URLs still resolve, via OrgScopedRedirectController. --}}
                 @can('viewAny', \App\Models\ProviderCredential::class)
                     <a
                         href="{{ route('organizations.credentials', $org) }}"
                         wire:navigate
                         @class([$navBase, $link('providers')])
                     >
-                        <x-heroicon-o-server class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Server providers') }}
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Credentials') }}
                     </a>
                 @endcan
                 @can('view', $org)

@@ -5,6 +5,7 @@ use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\CliInstallController;
 use App\Http\Controllers\CloudDeployWebhookController;
+use App\Http\Controllers\Credentials\BackupStorageOAuthController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\EnvoyAdminProxyController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
+use App\Http\Controllers\OrgScopedRedirectController;
 use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\ServerCredentialShareController;
 use App\Http\Controllers\ServerlessQueueWakeController;
@@ -144,7 +146,9 @@ use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
-use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
+use App\Livewire\Backups\Overview as BackupsOverview;
+use App\Livewire\Backups\Snapshots as BackupsSnapshots;
+use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -228,6 +232,8 @@ use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
+use App\Modules\Queue\Livewire\Queues as QueuesIndex;
+use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
@@ -517,7 +523,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/profile/ssh-keys', SettingsSshKeys::class)->name('profile.ssh-keys');
     Route::livewire('/profile/api-keys', SettingsApiKeys::class)->name('profile.api-keys');
     Route::livewire('/profile/cli', SettingsCliAuthentications::class)->name('profile.cli');
-    Route::livewire('/profile/backup-configurations', SettingsBackupConfigurations::class)->name('profile.backup-configurations');
+    // Destinations moved into the product they configure (/backups/storage).
+    // The old profile URL keeps its route NAME so ~14 existing links resolve;
+    // it now redirects. See docs/adr/backups-as-a-product.md, decision 13.
+    Route::redirect('/profile/backup-configurations', '/backups/storage', 301)->name('profile.backup-configurations');
     Route::livewire('/profile/notification-channels', SettingsNotificationChannels::class)->name('profile.notification-channels');
     Route::livewire('/profile/notification-channels/bulk-assign', BulkNotificationAssignments::class)->name('profile.notification-channels.bulk-assign');
     Route::livewire('/profile/delete-account', ProfileDeleteAccount::class)->name('profile.delete-account');
@@ -539,15 +548,38 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/billing/analytics', BillingAnalytics::class)->name('billing.analytics');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
-    Route::livewire('organizations/{organization}/realtime', OrganizationsRealtime::class)->name('organizations.realtime');
-    Route::livewire('organizations/{organization}/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('organizations.realtime.show');
+    // Legacy org-scoped Realtime and Queue URLs. Not Route::redirect — these
+    // switch the active organization first so a bookmark for org B does not
+    // land on org A's page (docs/adr/managed-services-tier.md, decision 8).
+    // Both products now live in the Services row at session-scoped URLs.
+    Route::get('organizations/{organization}/realtime', [OrgScopedRedirectController::class, 'realtime'])
+        ->name('organizations.realtime');
+    Route::get('organizations/{organization}/realtime/{realtimeApp}', [OrgScopedRedirectController::class, 'realtimeApp'])
+        ->name('organizations.realtime.show');
+    Route::get('organizations/{organization}/queues', [OrgScopedRedirectController::class, 'queues'])
+        ->name('organizations.queues');
+    Route::get('organizations/{organization}/queues/{queueNamespace}', [OrgScopedRedirectController::class, 'queueNamespace'])
+        ->name('organizations.queues.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
-    Route::livewire('/backups', BackupsDatabases::class)->name('backups.databases');
-    Route::redirect('/backups/databases', '/backups', 301);
+    // Backups is a five-tab product: an overview hub plus one tab per capture
+    // type, and the destinations they ship to. docs/adr/backups-as-a-product.md
+    Route::livewire('/backups', BackupsOverview::class)->name('backups.overview');
+    Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
+    Route::livewire('/backups/snapshots', BackupsSnapshots::class)->name('backups.snapshots');
+    Route::livewire('/backups/storage', BackupsStorage::class)->name('backups.storage');
+
+    // Managed services — session-scoped like every other product surface.
+    Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');
+    Route::livewire('/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('realtime.show');
+
+    Route::middleware('feature:surface.queue')->group(function (): void {
+        Route::livewire('/queues', QueuesIndex::class)->name('queues.index');
+        Route::livewire('/queues/{queueNamespace}', QueuesShow::class)->name('queues.show');
+    });
 
     Route::middleware('feature:surface.scripts')->group(function (): void {
         Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
@@ -1109,6 +1141,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
         return redirect()->route('organizations.credentials', $params);
     })->name('credentials.index');
+    Route::get('credentials/oauth/dropbox', [BackupStorageOAuthController::class, 'redirectDropbox'])
+        ->name('credentials.oauth.dropbox.redirect');
+    Route::get('credentials/oauth/dropbox/callback', [BackupStorageOAuthController::class, 'callbackDropbox'])
+        ->name('credentials.oauth.dropbox.callback');
+    Route::get('credentials/oauth/google-drive', [BackupStorageOAuthController::class, 'redirectGoogleDrive'])
+        ->name('credentials.oauth.google-drive.redirect');
+    Route::get('credentials/oauth/google-drive/callback', [BackupStorageOAuthController::class, 'callbackGoogleDrive'])
+        ->name('credentials.oauth.google-drive.callback');
     Route::get('credentials/oauth/digitalocean', [ProviderOAuthController::class, 'redirectDigitalOcean'])
         ->name('credentials.oauth.digitalocean.redirect');
     Route::get('credentials/oauth/digitalocean/callback', [ProviderOAuthController::class, 'callbackDigitalOcean'])

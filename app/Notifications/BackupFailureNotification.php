@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -19,7 +19,7 @@ class BackupFailureNotification extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public ServerBackupSchedule $schedule,
+        public BackupSchedule $schedule,
         public string $errorMessage = '',
         public string $serverName = '',
         public bool $isTest = false,

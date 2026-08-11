@@ -8,8 +8,8 @@ use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\QueueCredentialResolver;
 use App\Modules\Queue\Services\SigV4Verifier;
-use App\Modules\Queue\Support\QueueEntitlements;
 use App\Modules\Queue\Support\QueueRequestContext;
+use App\Modules\Queue\Support\QueueTier;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,7 +32,6 @@ class AuthenticateQueueCredential
     public function __construct(
         private readonly QueueCredentialResolver $resolver,
         private readonly SigV4Verifier $verifier,
-        private readonly QueueEntitlements $entitlements,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -59,17 +58,14 @@ class AuthenticateQueueCredential
 
         $credential = $resolved['credential'];
 
-        $organization = $resolved['namespace']->organization;
-
         $request->attributes->set('queue_context', new QueueRequestContext(
             namespace: $resolved['namespace'],
             credential: $credential,
-            // The rate limit is an entitlement, not a constant — a plan that
-            // pays for more throughput gets it. An orphaned namespace with no
-            // org falls back to the config default rather than the ceiling.
-            requestsPerMinute: $organization !== null
-                ? $this->entitlements->for($organization)->requestsPerMinute
-                : (int) config('queue_service.entitlements.defaults.requests_per_minute', 600),
+            // Throughput is bought per namespace by tier, not granted by the
+            // org's plan — a namespace that pays for more gets more. An unknown
+            // tier slug resolves to the configured default rather than
+            // throttling a live queue to nothing over a config typo.
+            requestsPerMinute: QueueTier::resolve($resolved['namespace']->tier)->requestsPerMinute,
         ));
 
         return $next($request);

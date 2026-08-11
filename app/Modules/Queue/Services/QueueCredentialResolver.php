@@ -61,7 +61,7 @@ final class QueueCredentialResolver
 
         $namespace = $credential->queueNamespace;
 
-        if (! $namespace instanceof QueueNamespace || ! $namespace->isActive()) {
+        if (! $namespace instanceof QueueNamespace || ! $namespace->isReachable()) {
             Cache::put($this->negativeKey($accessKeyId), true, self::NEGATIVE_TTL_SECONDS);
 
             return null;
@@ -110,7 +110,7 @@ final class QueueCredentialResolver
 
         $namespace = $credential->queueNamespace;
 
-        if (! $namespace instanceof QueueNamespace || ! $namespace->isActive()) {
+        if (! $namespace instanceof QueueNamespace || ! $namespace->isReachable()) {
             Cache::put($this->negativeHashKey($hash), true, self::NEGATIVE_TTL_SECONDS);
 
             return null;

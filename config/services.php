@@ -87,6 +87,27 @@ return [
     | Redirect URI must match DIGITALOCEAN_OAUTH_REDIRECT_URI, or if unset,
     | route('credentials.oauth.digitalocean.callback') using APP_URL (use your Expose URL locally).
     */
+    /*
+     | Dropbox app used for the one-click "Connect Dropbox" backup destination.
+     | Optional: without it the button hides and operators add an app key +
+     | refresh token by hand instead.
+     */
+    /*
+     | Google Cloud OAuth client used for the one-click "Connect Google Drive"
+     | backup destination. Optional, same as Dropbox.
+     */
+    'google_drive' => [
+        'client_id' => env('GOOGLE_DRIVE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_DRIVE_REDIRECT_URI'),
+    ],
+
+    'dropbox' => [
+        'client_id' => env('DROPBOX_APP_KEY'),
+        'client_secret' => env('DROPBOX_APP_SECRET'),
+        'redirect' => env('DROPBOX_REDIRECT_URI'),
+    ],
+
     'digitalocean_oauth' => [
         'client_id' => env('DIGITALOCEAN_OAUTH_CLIENT_ID'),
         'client_secret' => env('DIGITALOCEAN_OAUTH_CLIENT_SECRET'),

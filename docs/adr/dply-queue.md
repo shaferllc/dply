@@ -37,6 +37,12 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
    `RealtimeApp` — ULID doubling as the data-plane id, `provisioning/active/
    failed/paused`, tier limits enforced at the data plane. Not scoped to a Site;
    any Laravel app can hold one.
+
+   **Amended 2026-08-10 (see `managed-services-tier.md`):** a namespace may
+   still be site-less, but `site_id` is now **load-bearing for pricing**.
+   `ServerlessQueueProvisioner` populates it, and billability is derived live
+   from the attached Site's backend — free when it serves `dply_serverless`,
+   billed otherwise. A site-less namespace is billable.
 3. **Credentials** = a separate `QueueCredential` type, **not `ApiToken`**.
    Its bcrypt hash is salted, so a cache key cannot be derived from the stored
    row and revocation could only wait out a TTL; it also writes `last_used_at`
@@ -82,9 +88,25 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
    dply's own polling design and invert the incentive to optimise it. Counted
    with Redis `INCRBY` at push and flushed hourly — the Logs pattern of metering
    from the store after the fact cannot apply, because acked rows are deleted.
+
+    **Amended 2026-08-10 (see `managed-services-tier.md`): demoted to
+    observational.** v1 prices a namespace by capacity tier, Realtime-shaped,
+    so nothing is invoiced from these counters. They still exist and still
+    flush hourly, but they feed the UI's throughput sparkline only — a few
+    percent of drift under failure is acceptable, and the exactly-once
+    obligations that come from a number landing on an invoice do not apply.
+    `requests_per_minute` is what caps COGS.
 10. **Gating** = `surface.queue` in `config/features.php`; pricing dials,
     entitlements, and the kill switch in a new `config/queue_service.php`, per
     the layering rules at `config/features.php:11-26`.
+
+    **Amended 2026-08-10 (see `managed-services-tier.md`):**
+    `queue_service.tiers` is added (capacity → monthly/yearly price, mirroring
+    `config('realtime.tiers')`). The metered entitlement keys —
+    `monthly_included_jobs`, `overage_per_million_jobs_cents`, `hard_cap_jobs`,
+    and `billing.per_million_jobs_cents` — are **deleted**, not zeroed. The
+    per-plan overlay shrinks to `available` and `max_namespaces`; depth and
+    rate belong to the tier.
 
 11. **Client wiring** = a dedicated `dply` queue *connection* using the `sqs`
     driver, registered at runtime by the injected handler. Not the app's

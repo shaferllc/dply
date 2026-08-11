@@ -54,9 +54,22 @@ class CloudflareRealtimeBackend implements RealtimeBackend
 
     public function fetchStats(RealtimeApp $app): ?array
     {
-        $response = Http::withHeaders($app->statsAuthHeaders())
-            ->acceptJson()
-            ->get($app->statsEndpoint());
+        try {
+            // Bounded: this runs inside a Livewire round-trip on the app page,
+            // so an unreachable relay must fail fast rather than hold the
+            // request open until PHP's own limit.
+            $response = Http::withHeaders($app->statsAuthHeaders())
+                ->acceptJson()
+                ->timeout(6)
+                ->get($app->statsEndpoint());
+        } catch (\Throwable $e) {
+            Log::warning('realtime_stats_fetch_failed', [
+                'realtime_app_id' => $app->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
 
         if (! $response->successful()) {
             Log::warning('realtime_stats_fetch_failed', [
