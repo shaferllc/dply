@@ -41,7 +41,9 @@ use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
+use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
+use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
 use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
@@ -332,6 +334,21 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // The backup engine. Every schedule in the app is derived-due from its own
+        // cron expression here — there is no crontab entry on any customer box, by
+        // design: a provider image has to be capturable when that box is down.
+        // See docs/adr/backups-as-a-product.md, decision 14.
+        $schedule->command(DispatchDueBackupSchedulesCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('dispatch-due-backups');
+        // Retention. Nothing enforced the configured window until this was
+        // scheduled, so the first runs delete a long backlog — verify with
+        // `dply:prune-backups --dry-run` before trusting it unattended.
+        $schedule->command(PruneBackupsCommand::class)
+            ->dailyAt('03:40')
+            ->withoutOverlapping()
+            ->name('prune-backups');
         // 4h-TTL download stagings need finer-than-daily pruning (S3 lifecycle min
         // is 1 day), so sweep every 15 minutes. onOneServer is auto-applied below.
         $schedule->command(PruneBackupDownloadStagingsCommand::class)
@@ -409,7 +426,7 @@ final class DplySchedule
 
         // Secret-vault (app-native, W1 off-box break-glass): daily age-encrypted
         // escrow of the platform .env (→ APP_KEY), an independent DB dump, and the
-        // fast-recovery critical-keys bundle. dply's own ServerBackupSchedule is
+        // fast-recovery critical-keys bundle. dply's own BackupSchedule is
         // the PRIMARY DB backup; this dump is the provider-independent copy.
         $schedule->command(SecretsEscrowCommand::class, ['--source' => 'platform-env'])
             ->dailyAt('04:20')

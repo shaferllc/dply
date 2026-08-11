@@ -24,7 +24,7 @@
     $surface = $surface === 'production' ? 'production' : 'local';
 
     $items = [
-        ['route' => 'backups.databases', 'match' => 'backups.*', 'label' => __('Backups'), 'icon' => 'archive-box', 'feature' => 'workspace.backups'],
+        ['route' => 'backups.overview', 'match' => 'backups.*', 'label' => __('Backups'), 'icon' => 'archive-box', 'feature' => 'workspace.backups'],
         ['route' => 'realtime.index', 'match' => 'realtime.*', 'label' => __('Realtime'), 'icon' => 'signal'],
         ['route' => 'queues.index', 'match' => 'queues.*', 'label' => __('Queues'), 'icon' => 'queue-list', 'feature' => 'surface.queue'],
     ];

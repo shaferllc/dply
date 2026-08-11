@@ -51,7 +51,7 @@
 
     $quickActions = [
         [
-            'title' => __('Provider credentials'),
+            'title' => __('Credentials'),
             'description' => __('Connect DigitalOcean, Hetzner, and other providers before provisioning infrastructure.'),
             'href' => route('credentials.index'),
             'icon' => 'key',
@@ -111,7 +111,7 @@
                     class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
                 >
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Provider credentials') }}
+                    {{ __('Credentials') }}
                 </a>
                 <button
                     type="button"

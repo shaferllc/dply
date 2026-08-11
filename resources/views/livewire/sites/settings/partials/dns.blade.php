@@ -82,7 +82,7 @@
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Missing') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('No DNS-capable credentials yet') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Connect DigitalOcean and/or Cloudflare under Server providers to use a custom DNS zone.') }}</p>
+                        <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Connect DigitalOcean and/or Cloudflare under Credentials to use a custom DNS zone.') }}</p>
                     </div>
                 </div>
                 <a href="{{ route('credentials.index', ['tab' => 'dns']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100">

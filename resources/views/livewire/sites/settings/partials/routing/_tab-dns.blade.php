@@ -150,7 +150,7 @@
                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
                     <div class="min-w-0">
                         <h3 class="text-sm font-semibold text-amber-950">{{ __('No DNS-capable credentials yet') }}</h3>
-                        <p class="mt-0.5 text-xs leading-relaxed text-amber-900">{{ __('Connect DigitalOcean and/or Cloudflare under Server providers to use a custom DNS zone and let dply apply records for you.') }}</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-amber-900">{{ __('Connect DigitalOcean and/or Cloudflare under Credentials to use a custom DNS zone and let dply apply records for you.') }}</p>
                     </div>
                 </div>
                 <a href="{{ route('credentials.index', ['tab' => 'dns']) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100">

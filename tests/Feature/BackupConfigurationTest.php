@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\BackupConfigurationTest;
 
-use App\Livewire\Settings\BackupConfigurations;
+use App\Livewire\Backups\Storage as BackupConfigurations;
 use App\Models\BackupConfiguration;
 use App\Models\Organization;
 use App\Models\User;
@@ -32,8 +32,14 @@ test('guest cannot view backup configurations', function () {
 test('authenticated user can view backup destinations page', function () {
     [$user] = userInNewOrg();
 
+    // The page moved into the product it configures; the old profile URL keeps
+    // its route name and redirects (docs/adr/backups-as-a-product.md, decision 13).
     $this->actingAs($user)
         ->get(route('profile.backup-configurations'))
+        ->assertRedirect(route('backups.storage'));
+
+    $this->actingAs($user)
+        ->get(route('backups.storage'))
         ->assertOk()
         ->assertSee('Backup destinations', false);
 });

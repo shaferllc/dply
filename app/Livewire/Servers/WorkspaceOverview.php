@@ -17,7 +17,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\InsightFinding;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
@@ -294,11 +294,11 @@ class WorkspaceOverview extends Component
                 ->whereIn('program_type', SupervisorQueueProgramTypes::TYPES)
                 ->where('is_active', true)
                 ->count(),
-            'active_schedules' => ServerBackupSchedule::query()
+            'active_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', true)
                 ->count(),
-            'paused_schedules' => ServerBackupSchedule::query()
+            'paused_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', false)
                 ->count(),

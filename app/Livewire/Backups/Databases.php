@@ -1,37 +1,42 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Backups;
 
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Backups\Concerns\RunsBackupSchedules;
+use App\Livewire\Backups\Concerns\SummarisesBackupRuns;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\QueuesQuickDownloads;
-use App\Models\ServerBackupSchedule;
-use App\Models\ServerCronJob;
+use App\Models\BackupSchedule;
+use App\Models\Organization;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
-use App\Models\Site;
-use App\Modules\Backups\Models\SiteFileBackup;
-use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * The Databases tab: every database dply can dump, the schedules protecting
+ * them, their run history, and a one-click dump to the browser.
+ *
+ * Owns its type end-to-end — the Overview deliberately does not repeat the
+ * schedules table (docs/adr/backups-as-a-product.md, decision 1).
+ */
 #[Layout('layouts.app')]
 class Databases extends Component
 {
     use DispatchesToastNotifications;
     use QueuesQuickDownloads;
+    use RunsBackupSchedules;
+    use SummarisesBackupRuns;
 
     public function render(): View
     {
         $org = auth()->user()->currentOrganization();
-        if (! $org) {
+        if (! $org instanceof Organization) {
             abort(403, 'Select an organization first.');
         }
 
@@ -39,95 +44,8 @@ class Databases extends Component
             return view('livewire.backups.databases', ['featureActive' => false]);
         }
 
-        $servers = $org->servers()->orderBy('name')->get();
-        $serverIds = $servers->pluck('id');
-        $sevenDaysAgo = now()->subDays(7);
-
-        $backupsBase = ServerDatabaseBackup::whereHas(
-            'serverDatabase',
-            fn ($q) => $q->whereIn('server_id', $serverIds),
-        );
-
-        // This page is the Backups overview, so every headline number spans both
-        // engines — database dumps and site file archives. The per-site detail
-        // still lives on the Files tab.
-        $sites = Site::query()->whereIn('server_id', $serverIds)->get(['id', 'name', 'server_id']);
-        $filesBase = SiteFileBackup::whereIn('site_id', $sites->pluck('id'));
-
-        $completed7d = (clone $backupsBase)
-            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
-            ->where('created_at', '>=', $sevenDaysAgo)
-            ->count()
-            + (clone $filesBase)
-                ->where('status', SiteFileBackup::STATUS_COMPLETED)
-                ->where('created_at', '>=', $sevenDaysAgo)
-                ->count();
-
-        $failed7d = (clone $backupsBase)
-            ->where('status', ServerDatabaseBackup::STATUS_FAILED)
-            ->where('created_at', '>=', $sevenDaysAgo)
-            ->count()
-            + (clone $filesBase)
-                ->where('status', SiteFileBackup::STATUS_FAILED)
-                ->where('created_at', '>=', $sevenDaysAgo)
-                ->count();
-
-        $storageBytes = (clone $backupsBase)
-            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
-            ->sum('bytes')
-            + (clone $filesBase)
-                ->where('status', SiteFileBackup::STATUS_COMPLETED)
-                ->sum('bytes');
-
-        $activeSchedules = ServerBackupSchedule::whereIn('server_id', $serverIds)
-            ->where('is_active', true)
-            ->count();
-
-        $serversWithSchedule = ServerBackupSchedule::whereIn('server_id', $serverIds)
-            ->where('is_active', true)
-            ->distinct()
-            ->pluck('server_id');
-
-        // The landing hero leads with protection coverage, so we keep the actual
-        // unprotected servers around (not just the count) to offer a one-click
-        // path into each one's backups workspace.
-        $unprotectedServers = $servers->whereNotIn('id', $serversWithSchedule)->values();
-
-        $lastSuccessAt = collect([
-            (clone $backupsBase)->where('status', ServerDatabaseBackup::STATUS_COMPLETED)->max('created_at'),
-            (clone $filesBase)->where('status', SiteFileBackup::STATUS_COMPLETED)->max('created_at'),
-        ])->filter()->map(fn ($at) => Carbon::parse($at))->max();
-
-        $schedules = ServerBackupSchedule::with(['server', 'backupConfiguration'])
-            ->whereIn('server_id', $serverIds)
-            ->orderByDesc('is_active')
-            ->orderByDesc('last_run_at')
-            ->get();
-
-        $recentRuns = $this->recentRuns(clone $backupsBase, clone $filesBase);
-
-        $destinations = $org->backupConfigurations()->orderBy('name')->get();
-
-        $activity = $this->dailyActivity([clone $backupsBase, clone $filesBase]);
-
-        $archives = (clone $filesBase)
-            ->where('status', SiteFileBackup::STATUS_COMPLETED)
-            ->with('site.server')
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get();
-
-        // One row per site, newest archive first — the summary the overview shows
-        // in place of the full per-site table on the Files tab.
-        $archivedSites = $archives
-            ->unique('site_id')
-            ->take(4)
-            ->map(fn (SiteFileBackup $backup) => [
-                'site' => $backup->site,
-                'at' => $backup->created_at,
-                'bytes' => $backup->bytes,
-            ])
-            ->values();
+        $serverIds = $org->servers()->pluck('id');
+        $ownedDatabases = fn ($q) => $q->whereIn('server_id', $serverIds);
 
         $databases = ServerDatabase::query()
             ->whereIn('server_id', $serverIds)
@@ -135,209 +53,69 @@ class Databases extends Component
             ->orderBy('name')
             ->get();
 
-        $serverCount = $servers->count();
-        $protectedCount = $serverCount - $unprotectedServers->count();
+        $schedules = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_DATABASE)
+            ->whereIn('server_id', $serverIds)
+            ->with(['server', 'backupConfiguration'])
+            ->orderByDesc('is_active')
+            ->orderByDesc('last_run_at')
+            ->get();
+
+        // Which databases already have a schedule — drives the per-row
+        // "Protected / Not scheduled" state and the tab's coverage line.
+        $scheduledTargetIds = $schedules->where('is_active', true)->pluck('target_id')->all();
+
+        $runs = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $serverIds))
+            ->with(['serverDatabase.server', 'backupConfiguration'])
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
+        $storageBytes = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $serverIds))
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->sum('bytes');
+
+        // The view renders one row per database with its schedule folded in, so
+        // the schedules that no longer point at a live database have to be
+        // surfaced separately or they would silently vanish from the tab.
+        $schedulesByTarget = $schedules->groupBy('target_id');
+        $databaseIds = $databases->pluck('id')->all();
+        $orphanSchedules = $schedules
+            ->reject(fn (BackupSchedule $schedule) => in_array($schedule->target_id, $databaseIds, true))
+            ->values();
 
         return view('livewire.backups.databases', [
             'featureActive' => true,
             'organization' => $org,
             'databases' => $databases,
-            'metrics' => [
-                'completed7d' => $completed7d,
-                'failed7d' => $failed7d,
-                'storage' => Number::fileSize((int) $storageBytes),
-                'activeSchedules' => $activeSchedules,
-                'unprotectedServers' => $unprotectedServers->count(),
-                'servers' => $serverCount,
-                'protectedServers' => $protectedCount,
-                'coverage' => $serverCount > 0 ? (int) round($protectedCount / $serverCount * 100) : 0,
-                'lastSuccessAt' => $lastSuccessAt ? Carbon::parse($lastSuccessAt) : null,
-            ],
-            'files' => [
-                'sites' => $sites->count(),
-                'archivedSites' => $archives->unique('site_id')->count(),
-                'recent' => $archivedSites,
-            ],
-            'unprotectedServers' => $unprotectedServers,
-            'activity' => $activity,
             'schedules' => $schedules,
-            'recentRuns' => $recentRuns,
-            'destinations' => $destinations,
+            'schedulesByTarget' => $schedulesByTarget,
+            'orphanSchedules' => $orphanSchedules,
+            'scheduledTargetIds' => $scheduledTargetIds,
+            'nextRuns' => $this->nextRuns($schedules),
+            'trends' => $this->recentSizes(
+                ServerDatabaseBackup::query()->whereHas('serverDatabase', $ownedDatabases),
+                'server_database_id',
+            ),
+            'activity' => $this->dailyActivity(
+                ServerDatabaseBackup::query()->whereHas('serverDatabase', $ownedDatabases),
+            ),
+            'engineMix' => $databases
+                ->groupBy(fn (ServerDatabase $database) => $database->engine)
+                ->map->count()
+                ->sortDesc(),
+            'runs' => $runs,
+            'metrics' => [
+                'databases' => $databases->count(),
+                'protected' => count(array_unique($scheduledTargetIds)),
+                'storage' => Number::fileSize((int) $storageBytes),
+                'coverage' => $databases->count() > 0
+                    ? (int) round(count(array_unique($scheduledTargetIds)) / $databases->count() * 100)
+                    : 0,
+            ],
         ]);
     }
 
-    /**
-     * The newest runs from both engines, flattened into one shape the overview
-     * feed can render without caring which model a row came from.
-     *
-     * @param  Builder<ServerDatabaseBackup>  $backups
-     * @param  Builder<SiteFileBackup>  $files
-     * @return list<array{key: string, kind: string, status: string, name: string, context: string, bytes: ?int, destination: string, at: Carbon}>
-     */
-    private function recentRuns(Builder $backups, Builder $files): array
-    {
-        $limit = 25;
-
-        $rows = $backups
-            ->with(['serverDatabase.server', 'backupConfiguration'])
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->get()
-            ->map(fn (ServerDatabaseBackup $run) => [
-                'key' => 'db-'.$run->id,
-                'kind' => 'database',
-                'status' => $run->status,
-                'name' => $run->serverDatabase->name,
-                'context' => $run->serverDatabase->server->name,
-                'bytes' => (int) $run->bytes,
-                'destination' => (string) ($run->backupConfiguration->name ?? __('Server default')),
-                'at' => $run->created_at,
-            ]);
-
-        $archives = $files
-            ->with('site.server')
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->get()
-            ->map(fn (SiteFileBackup $run) => [
-                'key' => 'files-'.$run->id,
-                'kind' => 'files',
-                'status' => $run->status,
-                'name' => $run->site->name,
-                'context' => $run->site->server->name,
-                'bytes' => $run->bytes !== null ? (int) $run->bytes : null,
-                'destination' => (string) ($run->storage_kind === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER
-                    ? __('On the server')
-                    : __('Control plane')),
-                'at' => $run->created_at,
-            ]);
-
-        return $rows
-            ->concat($archives)
-            ->sortByDesc('at')
-            ->take($limit)
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Completed/failed run counts per day for the last two weeks, zero-filled so
-     * the hero strip always renders 14 cells regardless of how sparse the data is.
-     *
-     * @param  list<Builder<ServerDatabaseBackup>|Builder<SiteFileBackup>>  $sources
-     * @return list<array{date: Carbon, completed: int, failed: int}>
-     */
-    private function dailyActivity(array $sources): array
-    {
-        $days = 14;
-
-        $counts = [];
-        foreach ($sources as $source) {
-            // toBase(): these rows are aggregates, not models — hydrating them
-            // into ServerDatabaseBackup/SiteFileBackup would be a lie.
-            $rows = $source
-                ->where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
-                ->selectRaw('date(created_at) as day, status, count(*) as total')
-                ->groupBy('day', 'status')
-                ->toBase()
-                ->get();
-
-            foreach ($rows as $row) {
-                $day = (string) $row->day;
-                $status = (string) $row->status;
-                $counts[$day][$status] = ($counts[$day][$status] ?? 0) + (int) $row->total;
-            }
-        }
-
-        $activity = [];
-        for ($ago = $days - 1; $ago >= 0; $ago--) {
-            $date = now()->subDays($ago)->startOfDay();
-            $key = $date->toDateString();
-
-            $activity[] = [
-                'date' => $date,
-                'completed' => $counts[$key][ServerDatabaseBackup::STATUS_COMPLETED] ?? 0,
-                'failed' => $counts[$key][ServerDatabaseBackup::STATUS_FAILED] ?? 0,
-            ];
-        }
-
-        return $activity;
-    }
-
-    public function toggleSchedule(string $scheduleId): void
-    {
-        $schedule = ServerBackupSchedule::with('server')->findOrFail($scheduleId);
-        Gate::authorize('update', $schedule->server);
-
-        $newActive = ! $schedule->is_active;
-        $schedule->update(['is_active' => $newActive]);
-
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::whereKey($schedule->server_cron_job_id)->update(['enabled' => $newActive]);
-        }
-
-        $this->toastSuccess($newActive ? __('Schedule resumed.') : __('Schedule paused.'));
-    }
-
-    public function runScheduleNow(string $scheduleId): void
-    {
-        $schedule = ServerBackupSchedule::with('server')->findOrFail($scheduleId);
-        Gate::authorize('update', $schedule->server);
-
-        match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => $this->dispatchDatabase($schedule),
-            ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchSiteFiles($schedule),
-            default => $this->toastError(__('Unknown backup target type.')),
-        };
-    }
-
-    private function dispatchDatabase(ServerBackupSchedule $schedule): void
-    {
-        $database = ServerDatabase::whereKey($schedule->target_id)
-            ->where('server_id', $schedule->server_id)
-            ->first();
-
-        if (! $database) {
-            $this->toastError(__('Schedule target database is missing.'));
-
-            return;
-        }
-
-        $backup = ServerDatabaseBackup::create([
-            'server_database_id' => $database->id,
-            'user_id' => auth()->id(),
-            'status' => ServerDatabaseBackup::STATUS_PENDING,
-        ]);
-
-        app(DatabaseBackupExporter::class)->prepareBackupRow(
-            $backup,
-            $schedule->server,
-            $schedule->backup_configuration_id,
-        );
-
-        ExportServerDatabaseBackupJob::dispatch($backup->id);
-        $this->toastSuccess(__('Backup queued for :name.', ['name' => $database->name]));
-    }
-
-    private function dispatchSiteFiles(ServerBackupSchedule $schedule): void
-    {
-        $site = Site::whereKey($schedule->target_id)
-            ->where('server_id', $schedule->server_id)
-            ->first();
-
-        if (! $site) {
-            $this->toastError(__('Schedule target site is missing.'));
-
-            return;
-        }
-
-        $backup = SiteFileBackup::create([
-            'site_id' => $site->id,
-            'user_id' => auth()->id(),
-            'status' => SiteFileBackup::STATUS_PENDING,
-        ]);
-
-        ExportSiteFileBackupJob::dispatch($backup->id);
-        $this->toastSuccess(__('Backup queued for :name.', ['name' => $site->name]));
-    }
 }

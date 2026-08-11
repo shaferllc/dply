@@ -9,6 +9,7 @@
         ['id' => 'server', 'label' => __('Compute'), 'icon' => 'heroicon-o-cpu-chip'],
         ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-globe-alt'],
         ['id' => 'cdn', 'label' => __('CDN'), 'icon' => 'heroicon-o-bolt'],
+        ['id' => 'storage', 'label' => __('Storage'), 'icon' => 'heroicon-o-cloud-arrow-up'],
     ];
 
     // Capability dots for the provider cards — the existing panel.blade.php
@@ -34,13 +35,13 @@
         <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Provider credentials'), 'icon' => 'server'],
+            ['label' => __('Credentials'), 'icon' => 'key'],
         ]" />
     @else
         <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
-            ['label' => __('Provider credentials'), 'icon' => 'server'],
+            ['label' => __('Credentials'), 'icon' => 'key'],
         ]" />
     @endif
 @endif
@@ -56,10 +57,10 @@
                         <x-heroicon-o-key class="h-6 w-6" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Providers') }}</h2>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
+                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Credentials') }}</h2>
                         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.') }}
+                            {{ __('Every secret this organization hands to a third party: API tokens for the clouds, registrars and CDNs you use, and the buckets and remotes your backups ship to. All encrypted at rest, and validated against the provider when we can.') }}
                         </p>
                     </div>
                 </div>
@@ -142,6 +143,9 @@
          out by category. Each card shows capability dots, a count badge,
          and a clear connect / manage state — clicking sets the active
          provider and the panel below jumps in to take over. --}}
+    {{-- The storage tab empties this list entirely; without the guard the
+         section still paints its padding and bottom rule as a blank band. --}}
+    @if (! empty($providerNav))
     <section aria-label="{{ __('Pick a provider') }}" @class([
         'space-y-6' => empty($useOrgShell),
         'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
@@ -276,6 +280,132 @@
             </div>
         @endforeach
     </section>
+    @endif
+
+    {{-- Backup storage. Same card language as the provider grid, but a
+         different model underneath: a destination is a NAMED bucket or remote
+         and an org can hold several per provider, so the card counts rows
+         rather than showing a single connected/not-connected state. --}}
+    @if (! empty($storageNav))
+        <section aria-label="{{ __('Backup storage') }}" @class([
+            'space-y-6' => empty($useOrgShell),
+            'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+        ])>
+            @foreach ($storageNav as $group)
+                @php
+                    $storageItems = $group['items'];
+                    $storageAvailable = collect($storageItems)->reject(fn ($i) => ! empty($i['comingSoon']))->count();
+                    $storageConnected = collect($storageItems)
+                        ->filter(fn ($i) => $this->storageDestinationsFor($i['id'])->isNotEmpty())
+                        ->count();
+                @endphp
+                <div>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">
+                            <x-heroicon-o-cloud-arrow-up class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ $group['label'] }}
+                        </h3>
+                        <span class="text-2xs font-semibold tabular-nums text-brand-mist">
+                            @if ($storageCount > 0)
+                                <span class="text-brand-forest">{{ $storageCount }}</span><span class="text-brand-mist"> {{ trans_choice('destination|destinations', $storageCount) }} · {{ $storageConnected }} / {{ $storageAvailable }} {{ __('providers') }}</span>
+                            @else
+                                {{ $storageAvailable }} {{ __('available') }}
+                            @endif
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                        {{ __('Where scheduled database dumps ship. Without one, a dump stays on the server that made it.') }}
+                        <a href="{{ route('backups.storage') }}" wire:navigate class="font-semibold text-brand-sage hover:text-brand-ink">{{ __('See what uses each destination') }}</a>
+                    </p>
+                    <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        @foreach ($storageItems as $item)
+                            @php
+                                $destinations = $this->storageDestinationsFor($item['id']);
+                                $storageTotal = $destinations->count();
+                                $isComing = ! empty($item['comingSoon']);
+                                $newest = $destinations->sortByDesc('created_at')->first();
+                            @endphp
+                            <li>
+                                <button
+                                    type="button"
+                                    @if (! $isComing)
+                                        wire:click="openStorageModal('{{ $item['id'] }}')"
+                                    @endif
+                                    @disabled($isComing)
+                                    @class([
+                                        'group relative flex h-full w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
+                                        'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $storageTotal === 0,
+                                        'border-brand-sage/35 hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $storageTotal > 0,
+                                        'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
+                                    ])
+                                >
+                                    <div class="flex w-full items-start justify-between gap-2">
+                                        <span @class([
+                                            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-brand-ink/10',
+                                            'bg-brand-sage/12 text-brand-forest' => $storageTotal > 0 && ! $isComing,
+                                            'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $storageTotal === 0 || $isComing,
+                                        ])>
+                                            <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        @if ($isComing)
+                                            <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                        @elseif ($storageTotal > 0)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                                <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
+                                                {{ $storageTotal }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="min-w-0 w-full">
+                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">
+                                            @if ($isComing)
+                                                {{ __('Coming soon') }}
+                                            @elseif ($storageTotal === 0)
+                                                {{ __('Not configured') }}
+                                            @else
+                                                {{ trans_choice(':n destination|:n destinations', $storageTotal, ['n' => $storageTotal]) }}
+                                                @if ($newest?->created_at)
+                                                    <span class="text-brand-mist"> · </span>
+                                                    <span title="{{ $newest->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $newest->created_at->diffForHumans()]) }}</span>
+                                                @endif
+                                            @endif
+                                        </p>
+                                    </div>
+                                    @if ($storageTotal > 0)
+                                        <div class="flex w-full flex-wrap items-center gap-1.5">
+                                            @foreach ($destinations->take(3) as $destination)
+                                                <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                    <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                                    <span class="truncate">{{ $destination->name }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if ($storageTotal > 3)
+                                                <span class="text-2xs text-brand-mist">{{ __('+:count more', ['count' => $storageTotal - 3]) }}</span>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    {{-- Trailing action hint. Visually a button-shaped
+                                         chip, semantically a span — the whole card IS the
+                                         trigger so we don't nest <button>s. --}}
+                                    @unless ($isComing)
+                                        <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
+                                            <span class="inline-flex items-center gap-1.5">
+                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ $storageTotal > 0 ? __('Add another') : __('Add new') }}
+                                            </span>
+                                            <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                        </span>
+                                    @endunless
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endforeach
+        </section>
+    @endif
 
     {{-- Provider management lives in a modal now (opened per-card). Keeps
          the index focused on connection state at a glance. --}}

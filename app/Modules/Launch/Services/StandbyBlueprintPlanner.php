@@ -304,7 +304,7 @@ final class StandbyBlueprintPlanner
 
             return match ($index) {
                 0 => $fleetDomains,
-                1 => [route('settings.servers'), __('Server providers')],
+                1 => [route('settings.servers'), __('Credentials')],
                 default => [null, null],
             };
         }

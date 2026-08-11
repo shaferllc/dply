@@ -262,14 +262,14 @@
                                                  component. See docs/adr/managed-services-tier.md. --}}
                                             <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Services') }}</p>
                                             @feature('workspace.backups')
-                                                <x-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                <x-dropdown-link :href="route('backups.overview')" :description="__('Scheduled database snapshots')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-archive-box class="{{ $hi }}" />
                                                     </x-slot>
                                                     {{ __('Backups') }}
                                                 </x-dropdown-link>
                                             @else
-                                                <x-coming-soon-dropdown-link :href="route('backups.databases')" :description="__('Scheduled database snapshots')">
+                                                <x-coming-soon-dropdown-link :href="route('backups.overview')" :description="__('Scheduled database snapshots')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-archive-box class="{{ $hi }}" />
                                                     </x-slot>
@@ -616,14 +616,14 @@
                      <x-services-index-nav>; keep all three in step. --}}
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Services') }}</p>
                 @feature('workspace.backups')
-                    <x-responsive-nav-link :href="route('backups.databases')" :active="request()->routeIs('backups.*')">
+                    <x-responsive-nav-link :href="route('backups.overview')" :active="request()->routeIs('backups.*')">
                         <x-slot name="icon">
                             <x-heroicon-o-archive-box class="{{ $hi }}" />
                         </x-slot>
                         {{ __('Backups') }}
                     </x-responsive-nav-link>
                 @else
-                    <x-coming-soon-responsive-nav-link :href="route('backups.databases')">
+                    <x-coming-soon-responsive-nav-link :href="route('backups.overview')">
                         <x-slot name="icon">
                             <x-heroicon-o-archive-box class="{{ $hi }}" />
                         </x-slot>

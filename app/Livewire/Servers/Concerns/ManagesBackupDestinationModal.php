@@ -5,6 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Models\BackupConfiguration;
 use App\Models\ObjectStorageCredential;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Modules\Cloud\Services\DigitalOceanService;
@@ -15,23 +16,22 @@ use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 /**
- * Reusable "Add backup destination" modal for any server workspace component.
- * Holds the modal state plus both create modes — "connect existing" (paste
- * credentials for an existing bucket) and "provision" (create a brand-new
- * bucket on a provider) — so every surface that needs a {@see BackupConfiguration}
- * (Backups, Snapshots → Cache, …) opens the identical dialog rather than
- * bouncing the operator to the Backups page.
+ * Reusable "Add backup destination" modal. Holds the modal state plus both
+ * create modes — "connect existing" (paste credentials for an existing bucket)
+ * and "provision" (create a brand-new bucket on a provider) — so every surface
+ * that needs a {@see BackupConfiguration} opens the identical dialog rather
+ * than bouncing the operator somewhere else.
  *
  * Pairs with `livewire.servers.partials.backups._add-destination-modal`.
  *
- * Hosts must extend {@see Component}, expose `$this->server`
- * (via {@see InteractsWithServerWorkspace}), and provide `toastSuccess`/
- * `toastError`. Override {@see onBackupDestinationCreated()} to react to a
- * freshly-created destination (e.g. auto-select it on a form).
+ * Hosts must extend {@see Component} and provide `toastSuccess`/`toastError`.
+ * A server workspace gets its organization from `$this->server` automatically;
+ * org-level surfaces (Backups → Storage, the org Credentials page) fall back to
+ * the current organization. Override {@see backupDestinationOrganization()} to
+ * change that, and {@see onBackupDestinationCreated()} to react to a freshly
+ * created destination (e.g. auto-select it on a form).
  *
  * @phpstan-require-extends Component
- *
- * @property Server $server
  */
 trait ManagesBackupDestinationModal
 {
@@ -65,6 +65,22 @@ trait ManagesBackupDestinationModal
 
     /** Save the entered keys as a reusable ObjectStorageCredential (manual-key providers). */
     public bool $provision_save_credential = true;
+
+    /**
+     * The organization the new destination belongs to. A server workspace host
+     * carries its own server (which may not be the session's current org), so
+     * that wins; org-level surfaces fall back to the current organization.
+     */
+    protected function backupDestinationOrganization(): ?Organization
+    {
+        $server = $this->server ?? null;
+
+        if ($server instanceof Server) {
+            return $server->organization;
+        }
+
+        return Auth::user()?->currentOrganization();
+    }
 
     public function openDestinationModal(): void
     {
@@ -114,12 +130,13 @@ trait ManagesBackupDestinationModal
     {
         $meta = (array) config('object_storage.providers.'.$provider, []);
         $apiProvider = (string) ($meta['api_provider'] ?? '');
-        if (! (bool) ($meta['api_managed'] ?? false) || $apiProvider === '' || $this->server->organization_id === null) {
+        $org = $this->backupDestinationOrganization();
+        if (! (bool) ($meta['api_managed'] ?? false) || $apiProvider === '' || $org === null) {
             return null;
         }
 
         return ProviderCredential::query()
-            ->where('organization_id', $this->server->organization_id)
+            ->where('organization_id', $org->id)
             ->where('provider', $apiProvider)
             ->orderBy('created_at')
             ->first();
@@ -156,12 +173,13 @@ trait ManagesBackupDestinationModal
      */
     public function savedObjectStorageCredentials(): Collection
     {
-        if ($this->server->organization_id === null) {
+        $org = $this->backupDestinationOrganization();
+        if ($org === null) {
             return collect();
         }
 
         return ObjectStorageCredential::query()
-            ->where('organization_id', $this->server->organization_id)
+            ->where('organization_id', $org->id)
             ->where('provider', $this->provisionForm['provider'] ?? '')
             ->orderBy('name')
             ->get();
@@ -202,9 +220,9 @@ trait ManagesBackupDestinationModal
     {
         $this->authorize('create', BackupConfiguration::class);
 
-        $org = $this->server->organization;
+        $org = $this->backupDestinationOrganization();
         if ($org === null) {
-            $this->toastError(__('This server has no organization — refresh the page.'));
+            $this->toastError(__('No active organization — refresh the page.'));
 
             return;
         }
@@ -327,9 +345,9 @@ trait ManagesBackupDestinationModal
     {
         $this->authorize('create', BackupConfiguration::class);
 
-        $org = $this->server->organization;
+        $org = $this->backupDestinationOrganization();
         if ($org === null) {
-            $this->toastError(__('This server has no organization — refresh the page.'));
+            $this->toastError(__('No active organization — refresh the page.'));
 
             return;
         }

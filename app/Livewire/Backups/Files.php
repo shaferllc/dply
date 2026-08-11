@@ -1,26 +1,44 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Backups;
 
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Backups\Concerns\RunsBackupSchedules;
+use App\Livewire\Backups\Concerns\SummarisesBackupRuns;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Models\BackupConfiguration;
+use App\Models\BackupSchedule;
+use App\Models\Organization;
 use App\Models\Site;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Modules\Backups\Models\SiteFileBackup;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Number;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * The Files tab: every site dply can archive, the schedules protecting them,
+ * their run history, and a one-click archive to the browser.
+ *
+ * Owns its type end-to-end alongside Databases and Snapshots
+ * (docs/adr/backups-as-a-product.md, decision 1) — which is why the schedules
+ * live on this page rather than only in each server's workspace.
+ */
 #[Layout('layouts.app')]
 class Files extends Component
 {
     use DispatchesToastNotifications;
     use QueuesQuickDownloads;
+    use RunsBackupSchedules;
     use StagesBackupDownloads;
+    use SummarisesBackupRuns;
 
     public function queueFullBackup(string $siteId): void
     {
@@ -89,14 +107,17 @@ class Files extends Component
     public function render(): View
     {
         $org = auth()->user()->currentOrganization();
-        if (! $org) {
+        if (! $org instanceof Organization) {
             abort(403, 'Select an organization first.');
+        }
+
+        if (! Feature::for($org)->active('workspace.backups')) {
+            return view('livewire.backups.files', ['featureActive' => false]);
         }
 
         $this->authorize('viewAny', Site::class);
 
         $serverIds = $org->servers()->pluck('id');
-        $user = auth()->user();
 
         /** @var Collection<int, Site> $sites */
         $sites = Site::query()
@@ -107,24 +128,90 @@ class Files extends Component
 
         $siteIds = $sites->pluck('id');
 
+        $schedules = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_SITE_FILES)
+            ->whereIn('server_id', $serverIds)
+            ->with(['server', 'backupConfiguration'])
+            ->orderByDesc('is_active')
+            ->orderByDesc('last_run_at')
+            ->get();
+
+        // The view renders one row per site with its schedule folded in, so
+        // schedules that no longer point at a live site have to be surfaced
+        // separately or they would silently vanish from the tab.
+        $schedulesByTarget = $schedules->groupBy('target_id');
+        $orphanSchedules = $schedules
+            ->reject(fn (BackupSchedule $schedule) => $siteIds->contains($schedule->target_id))
+            ->values();
+        $scheduledSiteIds = $schedules->where('is_active', true)->pluck('target_id')->unique();
+
         /** @var \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, SiteFileBackup>> $recentBackups */
         $recentBackups = SiteFileBackup::query()
             ->whereIn('site_id', $siteIds)
             ->orderByDesc('created_at')
             ->limit(200)
             ->get()
-            ->groupBy(fn (SiteFileBackup $b) => (string) $b->site_id)
+            ->groupBy(fn (SiteFileBackup $backup) => (string) $backup->site_id)
             ->map(fn ($group) => $group->take(5));
 
-        $storageDestinations = $org
-            ? $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider'])
-            : collect();
+        $runs = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->with('site.server')
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
+        $storageBytes = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->sum('bytes');
+
+        // Coverage is measured against sites that CAN be archived. An Edge or
+        // serverless site has no filesystem to tar, so counting it as
+        // unprotected would manufacture a gap nobody can close — the same
+        // capability-aware rule the Overview's gaps band follows.
+        $archivable = $sites->filter->supportsSshFileArchive();
+        $protected = $archivable->filter(fn (Site $site) => $scheduledSiteIds->contains($site->id));
+
+        $archivedSiteIds = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->distinct()
+            ->pluck('site_id');
 
         return view('livewire.backups.files', [
+            'featureActive' => true,
             'organization' => $org,
-            'sites' => $sites,
+            // Archivable sites first: the rows with nothing actionable on them
+            // should not sit between the ones an operator came here to act on.
+            // sortBy is stable, so alphabetical order survives within each group.
+            'sites' => $sites->sortByDesc(fn (Site $site) => $site->supportsSshFileArchive())->values(),
+            'schedules' => $schedules,
+            'schedulesByTarget' => $schedulesByTarget,
+            'orphanSchedules' => $orphanSchedules,
+            'scheduledSiteIds' => $scheduledSiteIds,
+            'nextRuns' => $this->nextRuns($schedules),
+            'trends' => $this->recentSizes(
+                SiteFileBackup::query()->whereIn('site_id', $siteIds),
+                'site_id',
+            ),
+            'activity' => $this->dailyActivity(
+                SiteFileBackup::query()->whereIn('site_id', $siteIds),
+            ),
             'recentBackups' => $recentBackups,
-            'storageDestinations' => $storageDestinations,
+            'runs' => $runs,
+            'metrics' => [
+                'sites' => $sites->count(),
+                'archivable' => $archivable->count(),
+                'unarchivable' => $sites->count() - $archivable->count(),
+                'protected' => $protected->count(),
+                'archivedSites' => $archivedSiteIds->count(),
+                'storage' => Number::fileSize((int) $storageBytes),
+                'coverage' => $archivable->count() > 0
+                    ? (int) round($protected->count() / $archivable->count() * 100)
+                    : 0,
+            ],
+            'storageDestinations' => $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider']),
             'providerLabels' => collect(BackupConfiguration::providers())
                 ->mapWithKeys(fn (string $provider) => [$provider => BackupConfiguration::labelForProvider($provider)]),
         ]);

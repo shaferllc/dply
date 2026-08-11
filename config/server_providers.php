@@ -22,6 +22,7 @@ return [
         'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/ — DNS + CDN (no compute)
         'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', false), // https://www.gandi.net/
         'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', false), // https://www.namecheap.com/
+        'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', false), // https://vercel.com/docs/projects/domains — DNS only
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
         'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', false), // GitHub Container Registry — image pull creds for Cloud apps
         'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/

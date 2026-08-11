@@ -152,8 +152,8 @@
                         wire:navigate
                         @class([$navBase, $link('providers')])
                     >
-                        <x-heroicon-o-server class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Server providers') }}
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Credentials') }}
                     </a>
                 @endcan
                 @can('view', $org)

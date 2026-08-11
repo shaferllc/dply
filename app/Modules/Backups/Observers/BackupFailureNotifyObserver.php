@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Backups\Observers;
 
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabaseBackup;
 use App\Modules\Backups\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Notification;
 
 /**
  * Sends an email to org admins when a backup transitions to 'failed' AND there's
- * an opted-in {@see ServerBackupSchedule} for the same target. Operates only on
+ * an opted-in {@see BackupSchedule} for the same target. Operates only on
  * the status flip — older 'failed' rows are not re-notified.
  *
  * Pairs with {@see BackupAutoResumeObserver}: failures notify, successes resume.
@@ -26,10 +26,10 @@ class BackupFailureNotifyObserver
         }
 
         [$targetType, $targetId] = $backup instanceof ServerDatabaseBackup
-            ? [ServerBackupSchedule::TARGET_DATABASE, $backup->server_database_id]
-            : [ServerBackupSchedule::TARGET_SITE_FILES, $backup->site_id];
+            ? [BackupSchedule::TARGET_DATABASE, $backup->server_database_id]
+            : [BackupSchedule::TARGET_SITE_FILES, $backup->site_id];
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('target_type', $targetType)
             ->where('target_id', $targetId)
             ->where('notify_on_failure', true)

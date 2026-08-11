@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Models\ServerBackupSchedule;
-use App\Models\ServerCronJob;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 
@@ -35,12 +34,12 @@ trait ManagesServerBackupSchedules
         $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
 
         $exists = match ($this->new_target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => ServerDatabase::query()
+            BackupSchedule::TARGET_DATABASE => ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->when($siteScope !== null, fn ($q) => $q->where('site_id', $siteScope))
                 ->whereKey($this->new_target_id)
                 ->exists(),
-            ServerBackupSchedule::TARGET_SITE_FILES => Site::query()
+            BackupSchedule::TARGET_SITE_FILES => Site::query()
                 ->where('server_id', $this->server->id)
                 ->when($siteScope !== null, fn ($q) => $q->whereKey($siteScope))
                 ->whereKey($this->new_target_id)
@@ -55,7 +54,7 @@ trait ManagesServerBackupSchedules
             return;
         }
 
-        $schedule = ServerBackupSchedule::create([
+        $schedule = BackupSchedule::create([
             'server_id' => $this->server->id,
             'target_type' => $this->new_target_type,
             'target_id' => $this->new_target_id,
@@ -64,20 +63,12 @@ trait ManagesServerBackupSchedules
             'is_active' => true,
         ]);
 
-        // The cron entry runs the dply control-plane artisan command (this dply install),
-        // not anything on the remote server — so user defaults to root and host is irrelevant
-        // for execution. We just need a stable record so the schedule can be edited/disabled.
-        $cronJob = ServerCronJob::create([
-            'server_id' => $this->server->id,
-            'cron_expression' => $this->new_cron_expression,
-            'command' => 'php '.base_path('artisan').' dply:run-backup-schedule '.$schedule->id,
-            'user' => 'root',
-            'enabled' => true,
-            'description' => 'Backup schedule '.$schedule->id,
-            'system_managed' => true,
-        ]);
-
-        $schedule->update(['server_cron_job_id' => $cronJob->id]);
+        // No cron row. This used to mint a `system_managed` ServerCronJob whose
+        // command pointed at the control plane's artisan binary — but
+        // ServerCronSynchronizer excludes system_managed rows from the server's
+        // crontab, so that line executed nowhere. The schedule row is the only
+        // source of truth now; DispatchDueBackupSchedulesCommand ticks it from
+        // the control plane. See docs/adr/backups-as-a-product.md, decision 14.
 
         if ($org = $this->server->organization) {
             audit_log($org, auth()->user(), 'backup.schedule.created', $schedule, null, [
@@ -102,16 +93,12 @@ trait ManagesServerBackupSchedules
     {
         $this->authorize('update', $this->server);
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
         if ($schedule === null) {
             return;
-        }
-
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->delete();
         }
 
         if ($org = $this->server->organization) {
@@ -132,7 +119,7 @@ trait ManagesServerBackupSchedules
 
     public function startEditSchedule(string $scheduleId): void
     {
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -158,7 +145,7 @@ trait ManagesServerBackupSchedules
             return;
         }
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -168,11 +155,6 @@ trait ManagesServerBackupSchedules
 
         $oldCron = $schedule->cron_expression;
         $schedule->update(['cron_expression' => $newCron]);
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::query()
-                ->whereKey($schedule->server_cron_job_id)
-                ->update(['cron_expression' => $newCron]);
-        }
 
         if ($org = $this->server->organization) {
             audit_log(
@@ -197,14 +179,15 @@ trait ManagesServerBackupSchedules
     }
 
     /**
-     * Pause/resume a schedule by flipping is_active on both the schedule row and the
-     * backing cron entry. The cron line stays in place so resume is one click.
+     * Pause/resume a schedule. `is_active` is the whole mechanism — the
+     * control-plane dispatcher only considers active rows — so resume is one
+     * click and the cadence is preserved either way.
      */
     public function toggleSchedule(string $scheduleId): void
     {
         $this->authorize('update', $this->server);
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -214,9 +197,6 @@ trait ManagesServerBackupSchedules
 
         $newActive = ! $schedule->is_active;
         $schedule->update(['is_active' => $newActive]);
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->update(['enabled' => $newActive]);
-        }
 
         if ($org = $this->server->organization) {
             audit_log(

@@ -4,7 +4,7 @@ namespace App\Modules\Insights\Services\Runners;
 
 use App\Models\InsightFinding;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Modules\Backups\Models\SiteFileBackup;
@@ -33,7 +33,7 @@ class StaleBackupsInsightRunner implements InsightRunnerInterface
             return [];
         }
 
-        $schedules = ServerBackupSchedule::query()
+        $schedules = BackupSchedule::query()
             ->where('server_id', $server->id)
             ->where('is_active', true)
             ->get();
@@ -125,15 +125,15 @@ class StaleBackupsInsightRunner implements InsightRunnerInterface
      * Most-recent completed backup timestamp for a schedule's target, or null
      * if the target has never produced a successful backup.
      */
-    private function latestSuccessAt(ServerBackupSchedule $schedule): ?CarbonInterface
+    private function latestSuccessAt(BackupSchedule $schedule): ?CarbonInterface
     {
         return match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()
+            BackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()
                 ->where('server_database_id', $schedule->target_id)
                 ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
                 ->orderByDesc('updated_at')
                 ->value('updated_at'),
-            ServerBackupSchedule::TARGET_SITE_FILES => SiteFileBackup::query()
+            BackupSchedule::TARGET_SITE_FILES => SiteFileBackup::query()
                 ->where('site_id', $schedule->target_id)
                 ->where('status', SiteFileBackup::STATUS_COMPLETED)
                 ->orderByDesc('updated_at')
