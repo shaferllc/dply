@@ -85,6 +85,30 @@ return [
         'default_seconds' => (int) env('DPLY_QUEUE_LONG_POLL_DEFAULT', 2),
         'max_seconds' => (int) env('DPLY_QUEUE_LONG_POLL_MAX', 5),
         'interval_ms' => (int) env('DPLY_QUEUE_LONG_POLL_INTERVAL_MS', 250),
+        // The poll interval doubles on each empty pass up to this ceiling. A
+        // queue empty at 250ms is usually still empty at 500ms, so the tail of
+        // a long wait should not cost the same query budget as its start.
+        'max_interval_ms' => (int) env('DPLY_QUEUE_LONG_POLL_MAX_INTERVAL_MS', 1000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rate accounting
+    |--------------------------------------------------------------------------
+    |
+    | Polling reads draw on their own bucket, sized at `poll_multiplier` times
+    | the tier's rate. An empty ReceiveMessage changes nothing and costs one
+    | indexed query, so charging it against the same allowance as a push or a
+    | delete lets an idle fleet spend the throughput the customer bought — the
+    | budget is gone before the burst it was waiting for arrives.
+    |
+    | The tier's `requests_per_minute` still bounds everything that mutates the
+    | queue, which is what actually drives COGS.
+    |
+    */
+
+    'rate' => [
+        'poll_multiplier' => (int) env('DPLY_QUEUE_POLL_MULTIPLIER', 4),
     ],
 
     /*

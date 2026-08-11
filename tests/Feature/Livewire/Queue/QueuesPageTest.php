@@ -54,9 +54,19 @@ test('the route renders the full page, nav included', function () {
     // Exercises the org shell — the nav entry runs its own query to keep a
     // live queue reachable after the flag moves, and a broken one would take
     // down every organization page, not just this one.
+    //
+    // The org-scoped URL is a permanent redirect by design: the organization is
+    // no longer a route parameter, so the legacy path switches the session and
+    // hands off to /queues. Following it is the point — the assertion is about
+    // the page that lands, not the hop.
     makeNamespace($this->organization);
 
     $this->actingAs($this->user)
+        ->get(route('organizations.queues', $this->organization))
+        ->assertRedirect(route('queues.index'));
+
+    $this->actingAs($this->user)
+        ->followingRedirects()
         ->get(route('organizations.queues', $this->organization))
         ->assertOk()
         ->assertSee('Queues');
@@ -66,6 +76,7 @@ test('the detail route renders', function () {
     $namespace = makeNamespace($this->organization);
 
     $this->actingAs($this->user)
+        ->followingRedirects()
         ->get(route('organizations.queues.show', [$this->organization, $namespace]))
         ->assertOk()
         ->assertSee($namespace->id);

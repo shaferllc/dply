@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Support\ClaimedJob;
+use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueEntitlements;
 use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
@@ -77,6 +78,7 @@ class SqsCompatibilityController extends Controller
             'SendMessageBatch' => $this->sendMessageBatch($request, $context),
             'ReceiveMessage' => $this->receiveMessage($request, $context),
             'DeleteMessage' => $this->deleteMessage($request, $context),
+            'DeleteMessageBatch' => $this->deleteMessageBatch($request, $context),
             'ChangeMessageVisibility' => $this->changeMessageVisibility($request, $context),
             'GetQueueAttributes' => $this->getQueueAttributes($request, $context),
             'GetQueueUrl' => $this->getQueueUrl($request, $context),
@@ -228,6 +230,81 @@ class SqsCompatibilityController extends Controller
         return $this->ok([]);
     }
 
+    /**
+     * Delete up to ten completed messages in one request.
+     *
+     * This is the throughput lever. Acking one job per request means a drain
+     * costs two round trips per job and burns two of the namespace's
+     * per-minute allowance; batching the deletes collapses the second half of
+     * that to a tenth. Matches SQS's own entry/result shape so a client that
+     * already knows `DeleteMessageBatch` needs no special case.
+     */
+    private function deleteMessageBatch(Request $request, QueueRequestContext $context): JsonResponse
+    {
+        if (! $context->allows(QueueCredential::SCOPE_POP)) {
+            return $this->error('AccessDenied', 'This credential cannot delete.', 403);
+        }
+
+        $entries = $this->field('Entries', []);
+
+        if (! is_array($entries) || $entries === []) {
+            return $this->error('EmptyBatchRequest', 'Entries is required.', 400);
+        }
+
+        if (count($entries) > self::MAX_RECEIVE) {
+            return $this->error('TooManyEntriesInBatchRequest', 'A batch holds at most '.self::MAX_RECEIVE.' entries.', 400);
+        }
+
+        $pairs = [];
+        $entryIdByJob = [];
+        $failed = [];
+
+        foreach ($entries as $index => $entry) {
+            $entryId = is_array($entry) ? (string) ($entry['Id'] ?? $index) : (string) $index;
+            $handle = is_array($entry) ? (string) ($entry['ReceiptHandle'] ?? '') : '';
+
+            $parsed = $this->parseReceipt($handle);
+
+            if ($parsed === null) {
+                $failed[] = [
+                    'Id' => $entryId,
+                    'Code' => 'ReceiptHandleIsInvalid',
+                    'Message' => 'ReceiptHandle is malformed.',
+                    'SenderFault' => true,
+                ];
+
+                continue;
+            }
+
+            $pairs[] = $parsed;
+            // Last entry wins on a duplicated job id, which is also what the
+            // delete itself does — the result must not claim two outcomes.
+            $entryIdByJob[$parsed[0]] = $entryId;
+        }
+
+        $results = $pairs === [] ? [] : $this->store->ackBulk($context->namespace, $pairs);
+
+        $successful = [];
+        foreach ($results as $jobId => $ok) {
+            $entryId = $entryIdByJob[$jobId] ?? $jobId;
+
+            if ($ok) {
+                $successful[] = ['Id' => $entryId];
+
+                continue;
+            }
+
+            $failed[] = [
+                'Id' => $entryId,
+                'Code' => 'ReceiptHandleIsInvalid',
+                'Message' => 'That reservation has expired and the message is held by another consumer.',
+                'SenderFault' => true,
+            ];
+        }
+
+        return $this->ok(['Successful' => $successful, 'Failed' => $failed]);
+    }
+
     private function changeMessageVisibility(Request $request, QueueRequestContext $context): JsonResponse
     {
         if (! $context->allows(QueueCredential::SCOPE_POP)) {
@@ -299,8 +376,10 @@ class SqsCompatibilityController extends Controller
         $maxWait = (int) config('queue_service.long_poll.max_seconds', 5);
         $wait = max(0, min($maxWait, $requestedWait));
         $intervalMs = max(50, (int) config('queue_service.long_poll.interval_ms', 250));
+        $ceilingMs = max($intervalMs, (int) config('queue_service.long_poll.max_interval_ms', 1000));
 
         $deadline = microtime(true) + $wait;
+        $sleepMs = $intervalMs;
 
         do {
             $claimed = $this->store->claim($context->namespace, $queue, $max, $visibility);
@@ -309,11 +388,22 @@ class SqsCompatibilityController extends Controller
                 return $claimed;
             }
 
-            if (microtime(true) >= $deadline) {
+            $remaining = $deadline - microtime(true);
+
+            if ($remaining <= 0) {
                 return [];
             }
 
-            usleep($intervalMs * 1000);
+            // Back off as the wait wears on. A queue that was empty 250ms ago
+            // is usually still empty, and a flat interval spends the same query
+            // budget on second five as on the first — the tail of a long poll
+            // is where a fixed loop wastes the most for the least.
+            //
+            // Never sleep past the deadline: overshooting would hold the
+            // request (and its FPM worker) beyond what the client asked for.
+            usleep((int) (min($sleepMs / 1000, $remaining) * 1_000_000));
+
+            $sleepMs = min($ceilingMs, $sleepMs * 2);
         } while (true);
     }
 
@@ -412,15 +502,32 @@ class SqsCompatibilityController extends Controller
      */
     private function receipt(Request $request): ?array
     {
-        $handle = (string) $this->field('ReceiptHandle', '');
+        return $this->parseReceipt((string) $this->field('ReceiptHandle', ''));
+    }
 
+    /**
+     * Split a receipt handle into its job id and fencing token.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function parseReceipt(string $handle): ?array
+    {
         if (! str_contains($handle, ':')) {
             return null;
         }
 
         [$jobId, $reservationId] = explode(':', $handle, 2);
+        $jobId = trim($jobId);
+        $reservationId = trim($reservationId);
 
-        if (trim($jobId) === '' || trim($reservationId) === '') {
+        if ($jobId === '' || $reservationId === '') {
+            return null;
+        }
+
+        // The reservation id is a uuid and is cast as one in the batch delete;
+        // rejecting a malformed handle here keeps a bad string from reaching
+        // Postgres as a cast error that would fail the whole batch.
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $reservationId) !== 1) {
             return null;
         }
 
@@ -465,14 +572,7 @@ class SqsCompatibilityController extends Controller
 
     private function action(Request $request): string
     {
-        $target = (string) $request->header('X-Amz-Target', '');
-
-        if ($target !== '' && str_contains($target, '.')) {
-            return substr($target, strrpos($target, '.') + 1);
-        }
-
-        // Query-protocol clients (and curl) send Action instead.
-        return (string) $this->field('Action', '');
+        return QueueAction::of($request);
     }
 
     /**

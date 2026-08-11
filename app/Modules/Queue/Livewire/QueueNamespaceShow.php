@@ -6,6 +6,7 @@ namespace App\Modules\Queue\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
+use App\Modules\Queue\Actions\RevokeQueueCredential;
 use App\Modules\Queue\Actions\RotateQueueCredential;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueCredential;
@@ -41,8 +42,20 @@ class QueueNamespaceShow extends Component
 
     public bool $confirmingDelete = false;
 
-    /** Plaintext secret, shown once immediately after a rotation. */
-    public ?string $freshSecret = null;
+    /**
+     * Plaintext secret, shown once immediately after minting.
+     *
+     * Held in a component property and never persisted: once it leaves this
+     * render it is gone, which is the property the whole hashing scheme exists
+     * to preserve.
+     */
+    public ?string $revealedSecret = null;
+
+    /** Name for the credential being minted. */
+    public string $credentialName = '';
+
+    /** The credential open in the revoke-confirmation modal, if any. */
+    public ?string $revokingId = null;
 
     #[Url]
     public string $tab = 'overview';
@@ -65,6 +78,14 @@ class QueueNamespaceShow extends Component
         $this->organization = $organization;
         $this->namespace = $queueNamespace;
         $this->selectedTier = $queueNamespace->tierConfig()->slug;
+
+        // Creating a queue mints its first credential and redirects here, with
+        // the plaintext flashed rather than put in the URL. Picking it up on
+        // mount is what makes "shown once" true across that redirect.
+        $flashed = session('queue.revealed_secret');
+        if (is_string($flashed) && $flashed !== '') {
+            $this->revealedSecret = $flashed;
+        }
     }
 
     public function startTierChange(): void
@@ -126,22 +147,106 @@ class QueueNamespaceShow extends Component
         $this->cancelTierChange();
     }
 
-    public function rotateCredential(RotateQueueCredential $action): void
+    /**
+     * Mint an additional credential without touching the existing one.
+     *
+     * Rotation cannot be atomic: a queue credential lives in a `.env` that only
+     * reaches the running app on its next deploy, so revoking at the moment of
+     * minting guarantees an outage for the length of that deploy. Mint, deploy,
+     * then revoke — {@see revokeCredential()} is the other half, and the cap of
+     * two live credentials is what stops an abandoned rotation leaving a secret
+     * alive forever.
+     */
+    public function mintCredential(RotateQueueCredential $action): void
     {
         $this->authorize('manageCredentials', $this->namespace);
 
         try {
-            $rotated = $action->handle($this->namespace, __('Rotated credential'), auth()->id());
+            $minted = $action->handle(
+                $this->namespace,
+                trim($this->credentialName) !== '' ? trim($this->credentialName) : null,
+                auth()->id(),
+            );
         } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
         }
 
-        $this->freshSecret = $rotated['plaintext'];
+        $this->revealedSecret = $minted['plaintext'];
+        $this->credentialName = '';
         $this->namespace->refresh();
 
         $this->toastSuccess(__('New credential minted. Copy the secret now — it is shown once.'));
+    }
+
+    /**
+     * Drop the revealed secret from the component.
+     *
+     * Not cosmetic: until this runs the plaintext is in the Livewire snapshot
+     * on every subsequent request. Dismissing is how an operator says they have
+     * stored it, and it is the only way the value leaves memory short of a page
+     * load.
+     */
+    public function dismissSecret(): void
+    {
+        $this->revealedSecret = null;
+    }
+
+    /**
+     * Arm the revoke confirmation for one credential.
+     *
+     * Scoped at the lookup, so a guessed id from another namespace — or another
+     * org — 404s rather than reaching the confirmation with someone else's
+     * credential in hand.
+     */
+    public function confirmRevoke(string $credentialId): void
+    {
+        $this->authorize('manageCredentials', $this->namespace);
+
+        $this->revokingId = $this->namespace->credentials()->findOrFail($credentialId)->id;
+        $this->dispatch('open-modal', 'queue-revoke-modal');
+    }
+
+    public function cancelRevoke(): void
+    {
+        $this->revokingId = null;
+        $this->dispatch('close-modal', 'queue-revoke-modal');
+    }
+
+    /**
+     * Revoke the armed credential, effective immediately.
+     *
+     * Without this half of the pair the old credential stays valid forever and
+     * the rotation is theatre.
+     */
+    public function revokeCredential(RevokeQueueCredential $action): void
+    {
+        $this->authorize('manageCredentials', $this->namespace);
+
+        $credential = $this->revokingId !== null
+            ? $this->namespace->credentials()->whereKey($this->revokingId)->first()
+            : null;
+
+        if (! $credential instanceof QueueCredential) {
+            $this->toastError(__('That credential no longer exists.'));
+            $this->cancelRevoke();
+
+            return;
+        }
+
+        if ($credential->isRevoked()) {
+            $this->toastWarning(__('That credential was already revoked.'));
+            $this->cancelRevoke();
+
+            return;
+        }
+
+        $action->handle($credential);
+        $this->namespace->refresh();
+        $this->cancelRevoke();
+
+        $this->toastSuccess(__('Credential revoked. Requests signed with it are rejected from now on.'));
     }
 
     public function confirmDelete(): void

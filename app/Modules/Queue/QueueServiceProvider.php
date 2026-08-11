@@ -6,6 +6,7 @@ namespace App\Modules\Queue;
 
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Queue\Console\MeterQueueUsageCommand;
+use App\Modules\Queue\Console\QueueDoctorCommand;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Livewire\QueueNamespaceShow;
 use App\Modules\Queue\Livewire\Queues;
@@ -46,6 +47,9 @@ class QueueServiceProvider extends ServiceProvider
                 // Retained and still running, but no longer a billing input; see
                 // the note on QueueUsageMeter.
                 MeterQueueUsageCommand::class,
+                // Readiness readout — kill switch, endpoint, store isolation,
+                // schema and table health in one green/red pass.
+                QueueDoctorCommand::class,
             ]);
         }
     }

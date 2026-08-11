@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Backups;
 
+use App\Livewire\Backups\Concerns\EditsBackupSchedules;
 use App\Livewire\Backups\Concerns\RunsBackupSchedules;
 use App\Livewire\Backups\Concerns\SummarisesBackupRuns;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -15,13 +16,16 @@ use App\Models\Organization;
 use App\Models\Site;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Modules\Backups\Models\SiteFileBackup;
+use App\Modules\Backups\Services\SiteFileBackupExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Number;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The Files tab: every site dply can archive, the schedules protecting them,
@@ -35,10 +39,86 @@ use Livewire\Component;
 class Files extends Component
 {
     use DispatchesToastNotifications;
+    use EditsBackupSchedules;
     use QueuesQuickDownloads;
     use RunsBackupSchedules;
     use StagesBackupDownloads;
     use SummarisesBackupRuns;
+    use WithPagination;
+
+    /** Free-text over site, server and error text. */
+    #[Url(as: 'q', except: '')]
+    public string $runSearch = '';
+
+    /** '' = every status. */
+    #[Url(as: 'status', except: '')]
+    public string $runStatus = '';
+
+    public function updatedRunSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedRunStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearRunFilters(): void
+    {
+        $this->runSearch = '';
+        $this->runStatus = '';
+        $this->resetPage();
+    }
+
+    public function hasRunFilters(): bool
+    {
+        return $this->runSearch !== '' || $this->runStatus !== '';
+    }
+
+    /**
+     * Remove one archive and its stored file.
+     *
+     * There is no restore counterpart: unpacking a tar over a live document root
+     * is a different and far riskier operation than importing a SQL dump, and
+     * inventing one here would be a promise the engine cannot keep.
+     */
+    public function deleteArchive(string $backupId, SiteFileBackupExporter $exporter): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if (! $org instanceof Organization) {
+            return;
+        }
+
+        $serverIds = $org->servers()->pluck('id');
+        $backup = SiteFileBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('site', fn ($q) => $q->whereIn('server_id', $serverIds))
+            ->with('site')
+            ->first();
+
+        if (! $backup instanceof SiteFileBackup) {
+            $this->toastError(__('That archive is no longer available.'));
+
+            return;
+        }
+
+        $this->authorize('update', $backup->site);
+
+        try {
+            $exporter->deleteArtifact($backup);
+        } catch (\Throwable $e) {
+            // The row still goes — a stuck artifact must not leave an
+            // undeletable entry in the history forever.
+            $backup->delete();
+            $this->toastError(__('Removed the record, but the stored file could not be deleted: :error', ['error' => $e->getMessage()]));
+
+            return;
+        }
+
+        $backup->delete();
+        $this->toastSuccess(__('Archive deleted.'));
+    }
 
     public function queueFullBackup(string $siteId): void
     {
@@ -157,9 +237,28 @@ class Files extends Component
         $runs = SiteFileBackup::query()
             ->whereIn('site_id', $siteIds)
             ->with('site.server')
+            ->when($this->runStatus !== '', fn ($q) => $q->where('status', $this->runStatus))
+            ->when($this->runSearch !== '', function ($q) {
+                $term = '%'.str_replace('%', '\\%', trim($this->runSearch)).'%';
+
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('site', fn ($s) => $s->where('name', 'like', $term))
+                        ->orWhereHas('site.server', fn ($sv) => $sv->where('name', 'like', $term))
+                        ->orWhere('error_message', 'like', $term);
+                });
+            })
             ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+            ->paginate(20, ['*'], 'runs');
+
+        // Newest run per site, so a row can show that its last attempt failed —
+        // inferred from history rather than probed, per the no-SSH-in-render rule.
+        $lastRuns = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->orderByDesc('created_at')
+            ->limit(300)
+            ->get(['site_id', 'status', 'error_message', 'created_at'])
+            ->unique('site_id')
+            ->keyBy('site_id');
 
         $storageBytes = SiteFileBackup::query()
             ->whereIn('site_id', $siteIds)
@@ -200,6 +299,7 @@ class Files extends Component
             ),
             'recentBackups' => $recentBackups,
             'runs' => $runs,
+            'lastRuns' => $lastRuns,
             'metrics' => [
                 'sites' => $sites->count(),
                 'archivable' => $archivable->count(),

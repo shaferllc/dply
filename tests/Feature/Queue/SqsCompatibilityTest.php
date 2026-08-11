@@ -278,7 +278,13 @@ test('an unimplemented action reports itself clearly', function () {
 });
 
 test('the depth limit rejects a push instead of accepting it', function () {
-    $ctx = sqsNamespace(['max_queue_depth' => 1]);
+    $ctx = sqsNamespace();
+
+    // Depth is stamped on the namespace row from its tier, not read from the
+    // org's plan: capacity is bought per namespace, and the row holds what was
+    // bought so a later re-pricing cannot shrink a running queue underneath the
+    // customer. Setting it here is what "this queue holds one job" means.
+    $ctx['namespace']->forceFill(['max_queue_depth' => 1])->save();
 
     sqsCall($ctx, 'SendMessage', ['MessageBody' => 'one'])->assertOk();
 

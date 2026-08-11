@@ -80,6 +80,7 @@ use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
 use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
+use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
@@ -139,9 +140,9 @@ use App\Support\Debug\SshCallsCollector;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
 use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
-use App\Support\Sites\SiteSyncPeersResolver;
 use App\Support\Servers\ServerRegistry;
 use App\Support\Sites\SiteRegistry;
+use App\Support\Sites\SiteSyncPeersResolver;
 use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -714,11 +715,20 @@ class AppServiceProvider extends ServiceProvider
         //
         // Emphatically NOT `throttle:api` (60/min): one polling worker would
         // exhaust that in seconds.
+        //
+        // Two buckets, not one. A ReceiveMessage that comes back empty changed
+        // nothing and cost one indexed query, but under a single bucket an idle
+        // fleet's polling spends the very allowance a burst needs to drain —
+        // eight workers polling every 3s is 160 req/min of a 600 budget gone
+        // finding nothing. Polls therefore draw on their own, larger allowance;
+        // the tier rate still bounds the work that actually mutates the queue.
         RateLimiter::for('dply-queue', function (Request $request) {
             $context = $request->attributes->get('queue_context');
 
             if ($context instanceof QueueRequestContext) {
-                return Limit::perMinute($context->requestsPerMinute)->by('dq:'.$context->namespaceId());
+                return QueueAction::isPoll($request)
+                    ? Limit::perMinute($context->pollsPerMinute())->by('dqp:'.$context->namespaceId())
+                    : Limit::perMinute($context->requestsPerMinute)->by('dq:'.$context->namespaceId());
             }
 
             // Unauthenticated: a tight IP limit, so credential stuffing cannot

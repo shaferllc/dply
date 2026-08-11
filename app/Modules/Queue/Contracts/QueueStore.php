@@ -68,6 +68,19 @@ interface QueueStore
     public function ack(QueueNamespace $namespace, string $jobId, string $reservationId): bool;
 
     /**
+     * Delete several completed jobs in one statement.
+     *
+     * The point is throughput: acking per job costs one HTTP round trip and one
+     * DELETE each, and at a worker's pace that is the drain ceiling long before
+     * Postgres is troubled. Same semantics as {@see ack()} applied per pair.
+     *
+     * @param  list<array{0: string, 1: string}>  $pairs  [jobId, reservationId]
+     * @return array<string, bool> keyed by job id — false means the job is held
+     *                             under a different reservation
+     */
+    public function ackBulk(QueueNamespace $namespace, array $pairs): array;
+
+    /**
      * Return a job to the queue, optionally after a delay.
      *
      * Returns false when the reservation no longer matches — unlike ack, this

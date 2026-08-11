@@ -481,7 +481,7 @@ BASH;
     /**
      * Import SQL into MySQL database using application credentials (pipes base64-decoded SQL).
      */
-    public function mysqlImportFromString(Server $server, string $database, string $username, string $password, string $sql, int $timeout = 600, ?int $maxBytes = null): string
+    public function mysqlImportFromString(Server $server, string $database, string $username, string $password, string $sql, int $timeout = 600, ?int $maxBytes = null, ?string $host = null): string
     {
         $max = $maxBytes ?? (int) config('server_database.import_max_bytes', 10485760);
         if (strlen($sql) > $max) {
@@ -490,12 +490,12 @@ BASH;
 
         $b64 = base64_encode($sql);
         $inner = 'echo '.escapeshellarg($b64).' | base64 -d | env MYSQL_PWD='.escapeshellarg($password)
-            .' mysql -u '.escapeshellarg($username).' '.escapeshellarg($database).' 2>&1';
+            .' mysql -u '.escapeshellarg($username).$this->mysqlHostFlag($host).' '.escapeshellarg($database).' 2>&1';
 
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
-    public function postgresImportFromString(Server $server, string $database, string $username, string $password, string $sql, int $timeout = 600, ?int $maxBytes = null): string
+    public function postgresImportFromString(Server $server, string $database, string $username, string $password, string $sql, int $timeout = 600, ?int $maxBytes = null, ?string $host = null): string
     {
         $max = $maxBytes ?? (int) config('server_database.import_max_bytes', 10485760);
         if (strlen($sql) > $max) {
@@ -504,7 +504,7 @@ BASH;
 
         $b64 = base64_encode($sql);
         $inner = 'echo '.escapeshellarg($b64).' | base64 -d | env PGPASSWORD='.escapeshellarg($password)
-            .' psql -h 127.0.0.1 -U '.escapeshellarg($username).' -d '.escapeshellarg($database).' 2>&1';
+            .' psql'.$this->postgresHostFlag($host).' -U '.escapeshellarg($username).' -d '.escapeshellarg($database).' 2>&1';
 
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
@@ -614,11 +614,12 @@ BASH;
         return $bytes;
     }
 
-    public function mysqldumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600): int
+    public function mysqldumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600, ?string $host = null): int
     {
         $dir = dirname($destPath);
         $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
             'env MYSQL_PWD='.escapeshellarg($password).' mysqldump -u '.escapeshellarg($username).
+            $this->mysqlHostFlag($host).
             ' --single-transaction --quick --routines=false '.escapeshellarg($database).
             ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
 
@@ -631,11 +632,11 @@ BASH;
         return max(0, (int) trim($out));
     }
 
-    public function pgDumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600): int
+    public function pgDumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600, ?string $host = null): int
     {
         $dir = dirname($destPath);
         $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
-            'env PGPASSWORD='.escapeshellarg($password).' pg_dump -h 127.0.0.1 -U '.escapeshellarg($username).
+            'env PGPASSWORD='.escapeshellarg($password).' pg_dump'.$this->postgresHostFlag($host).' -U '.escapeshellarg($username).
             ' '.escapeshellarg($database).
             ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
 
@@ -839,6 +840,57 @@ BASH;
         return app(ServerSshConnectionRunner::class)->run(
             $server,
             fn ($ssh): array => [$ssh->exec($command, $timeout), $ssh->lastExecExitCode()],
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+    }
+
+    /**
+     * Write file contents to a path on the server over the SSH channel.
+     *
+     * Used for the credential files a non-S3 backup destination needs (curl
+     * `--config`, an SFTP private key, an rclone config). They go over SFTP
+     * rather than through a shell command precisely so the secret never appears
+     * in argv, the box's shell history, or a dply console transcript.
+     */
+    /**
+     * `-h` for the MySQL client, or nothing.
+     *
+     * MySQL treats `-h localhost` as "use the unix socket" and `-h 127.0.0.1`
+     * as TCP, so omitting the flag entirely is the correct local behaviour —
+     * adding `-h localhost` would change nothing, and adding `-h 127.0.0.1`
+     * would break setups that only listen on the socket. Only a genuinely
+     * remote host gets a flag.
+     */
+    protected function mysqlHostFlag(?string $host): string
+    {
+        $host = trim((string) $host);
+
+        return ($host === '' || $host === 'localhost')
+            ? ''
+            : ' -h '.escapeshellarg($host);
+    }
+
+    /**
+     * `-h` for the Postgres client. Postgres has no socket/TCP ambiguity here,
+     * so it always gets an explicit host and 127.0.0.1 stays the default.
+     */
+    protected function postgresHostFlag(?string $host): string
+    {
+        $host = trim((string) $host);
+
+        return ' -h '.escapeshellarg($host === '' || $host === 'localhost' ? '127.0.0.1' : $host);
+    }
+
+    public function putFile(Server $server, string $remotePath, string $contents, int $timeout = 60): void
+    {
+        app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($remotePath, $contents, $timeout): bool {
+                $ssh->putFile($remotePath, $contents, $timeout);
+
+                return true;
+            },
             $this->useRootSsh(),
             $this->fallbackToDeployUserSsh()
         );

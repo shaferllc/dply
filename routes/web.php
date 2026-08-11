@@ -5,6 +5,7 @@ use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\CliInstallController;
 use App\Http\Controllers\CloudDeployWebhookController;
+use App\Http\Controllers\Credentials\BackupStorageOAuthController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\EnvoyAdminProxyController;
@@ -1140,6 +1141,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
         return redirect()->route('organizations.credentials', $params);
     })->name('credentials.index');
+    Route::get('credentials/oauth/dropbox', [BackupStorageOAuthController::class, 'redirectDropbox'])
+        ->name('credentials.oauth.dropbox.redirect');
+    Route::get('credentials/oauth/dropbox/callback', [BackupStorageOAuthController::class, 'callbackDropbox'])
+        ->name('credentials.oauth.dropbox.callback');
+    Route::get('credentials/oauth/google-drive', [BackupStorageOAuthController::class, 'redirectGoogleDrive'])
+        ->name('credentials.oauth.google-drive.redirect');
+    Route::get('credentials/oauth/google-drive/callback', [BackupStorageOAuthController::class, 'callbackGoogleDrive'])
+        ->name('credentials.oauth.google-drive.callback');
     Route::get('credentials/oauth/digitalocean', [ProviderOAuthController::class, 'redirectDigitalOcean'])
         ->name('credentials.oauth.digitalocean.redirect');
     Route::get('credentials/oauth/digitalocean/callback', [ProviderOAuthController::class, 'callbackDigitalOcean'])

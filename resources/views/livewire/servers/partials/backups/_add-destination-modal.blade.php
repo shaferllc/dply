@@ -19,15 +19,24 @@
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Storage') }}</p>
-                        <h2 id="add-destination-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add backup destination') }}</h2>
-                        <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Shared with every server in your organization. Credentials are encrypted at rest.') }}</p>
+                        <h2 id="add-destination-title" class="mt-1 text-lg font-semibold text-brand-ink">
+                            {{ $destination_editing_id ? __('Edit backup destination') : __('Add backup destination') }}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            {{ $destination_editing_id
+                                ? __('Existing credentials are shown so you can change a name or rotate a key without re-entering everything.')
+                                : __('Shared with every server in your organization. Credentials are encrypted at rest.') }}
+                        </p>
                     </div>
                     <button type="button" wire:click="closeDestinationModal" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink" aria-label="{{ __('Close') }}">
                         <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
                 <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
-                    {{-- Mode toggle: connect existing storage vs create a new bucket. --}}
+                    {{-- Mode toggle: connect existing storage vs create a new bucket.
+                         Hidden while editing — "provision a new bucket" would be a
+                         create, not an edit of the row already on screen. --}}
+                    @unless ($destination_editing_id)
                     <div class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-1 text-sm">
                         <button type="button" wire:click="$set('destination_create_mode', 'connect')"
                             @class([
@@ -42,6 +51,7 @@
                                 'text-brand-moss hover:text-brand-ink' => $destination_create_mode !== 'provision',
                             ])>{{ __('Create new bucket') }}</button>
                     </div>
+                    @endunless
 
                     @if ($destination_create_mode === 'connect')
                         <p class="text-sm text-brand-moss">{{ __('Point dply at a bucket you already have. Works with any S3-compatible provider.') }}</p>
@@ -64,6 +74,23 @@
                         </div>
 
                         @include('livewire.settings.partials.backup-provider-fields', ['formKey' => 'destinationForm', 'form' => $destinationForm])
+
+                        {{-- Destination-wide, not provider-specific: SQL gzips
+                             roughly 5-10x, so this is a bandwidth and storage-cost
+                             choice that applies wherever the dump is going. --}}
+                        <label class="flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-3">
+                            <input
+                                type="checkbox"
+                                wire:model="destinationForm.compress"
+                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
+                            />
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Compress dumps with gzip') }}</span>
+                                <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">
+                                    {{ __('Stores a .sql.gz instead of a .sql — typically 5-10x smaller, so uploads finish sooner and cost less to keep. Downloads come back compressed.') }}
+                                </span>
+                            </span>
+                        </label>
                     @else
                         @php
                             $provisionProviders = $this->provisionableObjectStorageProviders();
@@ -204,7 +231,7 @@
                         >
                             <span wire:loading.remove wire:target="saveDestination" class="inline-flex items-center gap-2">
                                 <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Save destination') }}
+                                {{ $destination_editing_id ? __('Save changes') : __('Save destination') }}
                             </span>
                             <span wire:loading wire:target="saveDestination" class="inline-flex items-center gap-2 whitespace-nowrap">
                                 <x-spinner variant="cream" size="sm" />

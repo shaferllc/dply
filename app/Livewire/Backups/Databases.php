@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Backups;
 
+use App\Livewire\Backups\Concerns\EditsBackupSchedules;
+use App\Livewire\Backups\Concerns\ManagesBackupRunActions;
 use App\Livewire\Backups\Concerns\RunsBackupSchedules;
 use App\Livewire\Backups\Concerns\SummarisesBackupRuns;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -16,7 +18,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Number;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The Databases tab: every database dply can dump, the schedules protecting
@@ -29,9 +33,54 @@ use Livewire\Component;
 class Databases extends Component
 {
     use DispatchesToastNotifications;
+    use EditsBackupSchedules;
+    use ManagesBackupRunActions;
     use QueuesQuickDownloads;
     use RunsBackupSchedules;
     use SummarisesBackupRuns;
+    use WithPagination;
+
+    /** Free-text over database, server and destination names, plus error text. */
+    #[Url(as: 'q', except: '')]
+    public string $runSearch = '';
+
+    /** '' = every status. */
+    #[Url(as: 'status', except: '')]
+    public string $runStatus = '';
+
+    /** Narrow to one destination, or '' for all (including on-server dumps). */
+    #[Url(as: 'dest', except: '')]
+    public string $runDestination = '';
+
+    public function updatedRunSearch(): void
+    {
+        // Any filter change invalidates the current page — otherwise a search
+        // that returns three rows can land you on page 4 looking at nothing.
+        $this->resetPage();
+    }
+
+    public function updatedRunStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedRunDestination(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearRunFilters(): void
+    {
+        $this->runSearch = '';
+        $this->runStatus = '';
+        $this->runDestination = '';
+        $this->resetPage();
+    }
+
+    public function hasRunFilters(): bool
+    {
+        return $this->runSearch !== '' || $this->runStatus !== '' || $this->runDestination !== '';
+    }
 
     public function render(): View
     {
@@ -65,12 +114,40 @@ class Databases extends Component
         // "Protected / Not scheduled" state and the tab's coverage line.
         $scheduledTargetIds = $schedules->where('is_active', true)->pluck('target_id')->all();
 
-        $runs = ServerDatabaseBackup::query()
-            ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $serverIds))
+        $runsQuery = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', $ownedDatabases)
             ->with(['serverDatabase.server', 'backupConfiguration'])
+            ->when($this->runStatus !== '', fn ($q) => $q->where('status', $this->runStatus))
+            ->when($this->runDestination === 'none', fn ($q) => $q->whereNull('backup_configuration_id'))
+            ->when($this->runDestination !== '' && $this->runDestination !== 'none',
+                fn ($q) => $q->where('backup_configuration_id', $this->runDestination))
+            ->when($this->runSearch !== '', function ($q) {
+                $term = '%'.str_replace('%', '\\%', trim($this->runSearch)).'%';
+
+                // Search what an operator actually remembers: which database,
+                // which box, which bucket, or the error they saw.
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('serverDatabase', fn ($d) => $d->where('name', 'like', $term))
+                        ->orWhereHas('serverDatabase.server', fn ($sv) => $sv->where('name', 'like', $term))
+                        ->orWhereHas('backupConfiguration', fn ($c) => $c->where('name', 'like', $term))
+                        ->orWhere('error_message', 'like', $term);
+                });
+            })
+            ->orderByDesc('created_at');
+
+        $runs = $runsQuery->paginate(20, ['*'], 'runs');
+
+        // The newest run per database, so a row can show that its last attempt
+        // failed. CLAUDE.md forbids SSH in the render path, so health has to be
+        // inferred from what already happened rather than probed live — which
+        // is also more honest: it reports what the backup engine actually saw.
+        $lastRuns = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', $ownedDatabases)
             ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+            ->limit(300)
+            ->get(['server_database_id', 'status', 'error_message', 'created_at'])
+            ->unique('server_database_id')
+            ->keyBy('server_database_id');
 
         $storageBytes = ServerDatabaseBackup::query()
             ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $serverIds))
@@ -107,6 +184,8 @@ class Databases extends Component
                 ->map->count()
                 ->sortDesc(),
             'runs' => $runs,
+            'lastRuns' => $lastRuns,
+            'runDestinations' => $org->backupConfigurations()->orderBy('name')->get(['id', 'name']),
             'metrics' => [
                 'databases' => $databases->count(),
                 'protected' => count(array_unique($scheduledTargetIds)),

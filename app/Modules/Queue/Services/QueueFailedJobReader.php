@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Services;
 
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Models\QueueNamespaceUsageDaily;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * Dashboard-side reads over the dply Queue data plane: failed jobs and the
  * observational throughput series.
  *
- * The HTTP surface ({@see \App\Modules\Queue\Http\Controllers\QueueFailedJobController})
+ * The HTTP surface ({@see QueueFailedJobController})
  * serves the customer's *application*, signed per-request with a namespace
  * credential. This serves the customer's *browser*, already authorized by
  * policy. Same tables, different callers — going through HTTP from Livewire
@@ -117,6 +119,21 @@ final class QueueFailedJobReader
     }
 
     /**
+     * How many failures are still outstanding for a namespace.
+     *
+     * Counts only jobs that have not been retried: a retried failure is
+     * resolved history, and folding it in would leave the index permanently
+     * reporting a problem the operator has already dealt with.
+     */
+    public function outstandingCount(QueueNamespace $namespace): int
+    {
+        return $this->table()
+            ->where('namespace_id', $namespace->id)
+            ->whereNull('retried_at')
+            ->count();
+    }
+
+    /**
      * Jobs pushed per day for the trailing window, oldest first, with empty
      * days filled in so a sparkline has an even x-axis.
      *
@@ -146,7 +163,7 @@ final class QueueFailedJobReader
         return $series;
     }
 
-    private function table(): \Illuminate\Database\Query\Builder
+    private function table(): Builder
     {
         return DB::connection('dply_queue')->table(self::TABLE);
     }

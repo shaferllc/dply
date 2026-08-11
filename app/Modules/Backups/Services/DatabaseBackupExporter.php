@@ -33,6 +33,9 @@ final class DatabaseBackupExporter
         private readonly ServerDatabaseRemoteExec $remoteExec,
         private readonly ServerDatabaseProvisioner $provisioner,
         private readonly DatabaseBackupS3ClientFactory $s3Factory,
+        private readonly FileTransportCommandFactory $transport,
+        private readonly CloudApiCommandFactory $cloudApi,
+        private readonly CloudApiTokenResolver $cloudTokens,
     ) {}
 
     /**
@@ -83,10 +86,47 @@ final class DatabaseBackupExporter
         $backup->loadMissing('serverDatabase.server');
 
         match ($backup->storage_kind) {
-            DatabaseBackupSettings::KIND_DESTINATION => $this->deleteS3Object($backup),
+            DatabaseBackupSettings::KIND_DESTINATION => filled($backup->destination_path)
+                ? $this->deleteRemoteDestinationObject($backup)
+                : $this->deleteS3Object($backup),
             DatabaseBackupSettings::KIND_CONTROL_PLANE => $this->deleteControlPlaneFile($backup),
             default => $this->deleteRemoteFile($backup),
         };
+    }
+
+    /**
+     * Retention delete on a non-S3 destination. Best-effort by design: prune
+     * removes the row either way, and an orphaned dump the operator can still
+     * see in their bucket beats a prune run that halts on one unreachable host.
+     */
+    private function deleteRemoteDestinationObject(ServerDatabaseBackup $backup): void
+    {
+        $backup->loadMissing('serverDatabase.server', 'backupConfiguration');
+
+        if (CloudApiCommandFactory::supports((string) $backup->backupConfiguration?->provider)) {
+            $this->deleteCloudObject($backup);
+
+            return;
+        }
+
+
+        $configuration = $backup->backupConfiguration;
+        $server = $backup->serverDatabase?->server;
+        if ($configuration === null || $server === null) {
+            return;
+        }
+
+        $delete = $this->transport->deleteCommand($configuration, (string) $backup->destination_path, (string) $backup->id);
+        $files = $this->transport->withKeyFile($configuration, $delete['files'], (string) $backup->id);
+
+        try {
+            $this->placeTransportFiles($server, $files);
+            $this->remoteExec->shellRunWithExit($server, $delete['command'], 300);
+        } catch (\Throwable) {
+            // Swallowed deliberately — see the note above.
+        } finally {
+            $this->clearTransportFiles($server, $files);
+        }
     }
 
     public function isDownloadable(ServerDatabaseBackup $backup): bool
@@ -96,7 +136,8 @@ final class DatabaseBackupExporter
         }
 
         return match ($backup->storage_kind) {
-            DatabaseBackupSettings::KIND_DESTINATION => filled($backup->s3_bucket) && filled($backup->s3_key),
+            DatabaseBackupSettings::KIND_DESTINATION => (filled($backup->s3_bucket) && filled($backup->s3_key))
+                || filled($backup->destination_path),
             DatabaseBackupSettings::KIND_CONTROL_PLANE => filled($backup->disk_path),
             default => filled($backup->remote_path),
         };
@@ -112,6 +153,13 @@ final class DatabaseBackupExporter
         }
 
         if ($backup->storage_kind === DatabaseBackupSettings::KIND_DESTINATION) {
+            // No presigning on SFTP/FTP/Rclone, so the download is a two-hop
+            // trip: pull the object back to the server, then reuse the existing
+            // remote-file streamer rather than routing bytes a third way.
+            if (filled($backup->destination_path)) {
+                return ['mode' => 'remote', 'remote_path' => $this->stageRemoteDestinationObject($backup)];
+            }
+
             // Cold-storage (Glacier/Deep Archive) objects can't be downloaded
             // until thawed; this requests a restore + throws a status message
             // when the object isn't immediately retrievable.
@@ -179,6 +227,226 @@ final class DatabaseBackupExporter
         ]);
     }
 
+    /**
+     * Dump, then push to a non-S3 destination with a client binary running on
+     * the server. The secret files are written mode 600 and removed in a
+     * `finally` so a failed transfer never leaves credentials on the box.
+     */
+    private function exportViaFileTransport(
+        ServerDatabaseBackup $backup,
+        ServerDatabase $db,
+        Server $server,
+        string $extension,
+        ConsoleEmitter $emit,
+        BackupConfiguration $configuration,
+    ): void {
+        $tempPath = '/tmp/dply-db-export-'.$backup->id.'.'.$extension;
+        $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
+        $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension, $emit);
+
+        if ($bytes <= 0) {
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
+
+            throw new \RuntimeException('Backup produced an empty file.');
+        }
+
+        [$tempPath, $extension, $bytes] = $this->maybeCompressDump($configuration, $server, $tempPath, $extension, $bytes, $emit);
+
+        $label = BackupConfiguration::labelForProvider($configuration->provider);
+        $emit->step('db', __('Dumped :size — uploading to :label …', [
+            'size' => Number::fileSize($bytes),
+            'label' => $label,
+        ]));
+
+        $key = $this->buildObjectKey('', $server, $db, $backup, $extension);
+        $objectPath = $this->transport->objectPath($configuration, $key);
+
+        $upload = $this->transport->uploadCommand($configuration, $tempPath, $objectPath, (string) $backup->id);
+        $files = $this->transport->withKeyFile($configuration, $upload['files'], (string) $backup->id);
+
+        try {
+            $this->placeTransportFiles($server, $files);
+
+            [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $upload['command'], 3600);
+
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException($label.' upload failed: '.Str::limit(trim($out), 800));
+            }
+        } finally {
+            $this->clearTransportFiles($server, $files);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
+        }
+
+        $emit->step('db', __('Uploaded to :label — finalizing …', ['label' => $label]));
+
+        $backup->update([
+            'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+            'storage_kind' => DatabaseBackupSettings::KIND_DESTINATION,
+            'remote_path' => null,
+            'disk_path' => null,
+            's3_bucket' => null,
+            's3_key' => null,
+            'destination_path' => $objectPath,
+            'bytes' => $bytes,
+        ]);
+    }
+
+    /**
+     * Dump, then push to an OAuth cloud drive. The bearer token is minted in the
+     * control plane and travels inside the mode-600 script, so Google's client
+     * secret never reaches the server and the token dies within the hour.
+     */
+    private function exportViaCloudApi(
+        ServerDatabaseBackup $backup,
+        ServerDatabase $db,
+        Server $server,
+        string $extension,
+        ConsoleEmitter $emit,
+        BackupConfiguration $configuration,
+    ): void {
+        $tempPath = '/tmp/dply-db-export-'.$backup->id.'.'.$extension;
+        $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
+        $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension, $emit);
+
+        if ($bytes <= 0) {
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
+
+            throw new \RuntimeException('Backup produced an empty file.');
+        }
+
+        [$tempPath, $extension, $bytes] = $this->maybeCompressDump($configuration, $server, $tempPath, $extension, $bytes, $emit);
+
+        $label = BackupConfiguration::labelForProvider($configuration->provider);
+        $emit->step('db', __('Dumped :size — uploading to :label …', [
+            'size' => Number::fileSize($bytes),
+            'label' => $label,
+        ]));
+
+        // Resolve the token AFTER the dump: a slow dump shouldn't burn the
+        // token's lifetime before the upload starts.
+        $token = $this->cloudTokens->forConfiguration($configuration);
+
+        $key = $this->buildObjectKey('', $server, $db, $backup, $extension);
+        $objectPath = $this->cloudApi->objectPath($configuration, $key);
+
+        $upload = $this->cloudApi->uploadCommand($configuration, $token, $tempPath, $objectPath, (string) $backup->id);
+
+        try {
+            $this->placeTransportFiles($server, $upload['files']);
+
+            [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $upload['command'], 3600);
+
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException($this->cloudFailureMessage($configuration, $label, $out));
+            }
+
+            // Drive answers with the file id — the only handle a later download
+            // or prune can use. Dropbox echoes the path back unchanged.
+            $handle = $this->cloudApi->handleFromUploadOutput($configuration, $out, $objectPath);
+        } finally {
+            $this->clearCloudFiles($server, $upload['files']);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
+        }
+
+        $emit->step('db', __('Uploaded to :label — finalizing …', ['label' => $label]));
+
+        $backup->update([
+            'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+            'storage_kind' => DatabaseBackupSettings::KIND_DESTINATION,
+            'remote_path' => null,
+            'disk_path' => null,
+            's3_bucket' => null,
+            's3_key' => null,
+            'destination_path' => $handle,
+            'bytes' => $bytes,
+        ]);
+    }
+
+    /**
+     * Turn a curl failure into something an operator can act on.
+     *
+     * `curl: (22) The requested URL returned error: 401` is technically true and
+     * practically useless — it doesn't say the credential is the problem or what
+     * to do about it. The auth codes are worth naming explicitly because an
+     * expired token is by far the most common cause, especially for a Dropbox
+     * destination created from a short-lived access token.
+     */
+    private function cloudFailureMessage(BackupConfiguration $configuration, string $label, string $output): string
+    {
+        $raw = trim($output);
+        $isDropbox = $configuration->provider === BackupConfiguration::PROVIDER_DROPBOX;
+
+        // An unenabled API is a project-level setup gap, not a credential or
+        // scope problem — and it also answers 403, so it has to be matched
+        // before the scope branch or the operator is sent to fix the wrong thing.
+        if (preg_match('/has not been used in project|accessNotConfigured|SERVICE_DISABLED|is disabled/i', $raw) === 1) {
+            return __(':label failed: the provider API is not enabled on that cloud project. Enable it in the provider console, then retry — no change is needed here.', ['label' => $label]);
+        }
+
+        // Order matters: Dropbox answers a MISSING SCOPE with 401, not 403, so
+        // this must be tested before the generic auth branch — otherwise the
+        // operator is told to re-authorize, which cannot help. The scope has to
+        // be enabled on the app first, and only then does reconnecting pick it up.
+        // Two wordings in the wild: the prose "required scope 'x'" and the
+        // machine "required_scope":"x". Match either, and fall back to a
+        // scope-less message rather than inventing a name.
+        if (preg_match('/required[ _]scope"?[:\s]+"?\'?([a-z][a-z_.]+)|missing_scope|insufficient_scope/i', $raw, $scopeMatch) === 1) {
+            $scope = trim($scopeMatch[1] ?? '', "'\" ");
+
+            return $scope !== ''
+                ? __(':label failed: the connected app lacks the :scope permission. Enable it on the provider\'s Permissions tab, then reconnect this destination so the new scope takes effect.', ['label' => $label, 'scope' => $scope])
+                : __(':label failed: the connected app lacks a required permission. Enable it on the provider\'s Permissions tab, then reconnect this destination.', ['label' => $label]);
+        }
+
+        if (preg_match('/\b(401|invalid_access_token|expired_access_token)\b/i', $raw) === 1) {
+            return $isDropbox && ! $configuration->hasDurableCredentials()
+                ? __(':label failed: Dropbox rejected the credentials (401). This destination uses a short-lived access token, which has expired — reconnect it with Dropbox to store a refresh token instead.', ['label' => $label])
+                : __(':label failed: the provider rejected the credentials (401). Re-authorize this destination.', ['label' => $label]);
+        }
+
+        if (preg_match('/\b(403|insufficient_scope|missing_scope)\b/i', $raw) === 1) {
+            return __(':label failed: the provider refused the request (403). The credential is valid but lacks write permission — check the app\'s scopes.', ['label' => $label]);
+        }
+
+        if (preg_match('/\b(507|insufficient_space|over_quota|quota_exceeded)\b/i', $raw) === 1) {
+            return __(':label failed: the destination is out of space.', ['label' => $label]);
+        }
+
+        return $label.' failed: '.Str::limit($raw, 800);
+    }
+
+    /** @param  array<string, string>  $files */
+    private function clearCloudFiles(Server $server, array $files): void
+    {
+        $cleanup = $this->cloudApi->cleanupCommand($files);
+        if ($cleanup !== '') {
+            $this->remoteExec->shellRunWithExit($server, $cleanup, 60);
+        }
+    }
+
+    /**
+     * Write each credential file to the server with mode 600 before the shell
+     * out. `putFile` goes over the SSH channel, so nothing lands in argv.
+     *
+     * @param  array<string, string>  $files
+     */
+    private function placeTransportFiles(Server $server, array $files): void
+    {
+        foreach ($files as $path => $contents) {
+            $this->remoteExec->putFile($server, $path, $contents);
+            $this->remoteExec->shellRunWithExit($server, 'chmod 600 '.escapeshellarg($path), 30);
+        }
+    }
+
+    /** @param  array<string, string>  $files */
+    private function clearTransportFiles(Server $server, array $files): void
+    {
+        $cleanup = $this->transport->cleanupCommand($files);
+        if ($cleanup !== '') {
+            $this->remoteExec->shellRunWithExit($server, $cleanup, 60);
+        }
+    }
+
     private function exportToDestination(
         ServerDatabaseBackup $backup,
         ServerDatabase $db,
@@ -187,6 +455,22 @@ final class DatabaseBackupExporter
         ConsoleEmitter $emit,
     ): void {
         $configuration = $this->resolveDestinationConfiguration($backup, $server);
+
+        // SFTP/FTP/Rclone can't be presigned, so they take a different route:
+        // the credentials travel to the server in a mode-600 file and a client
+        // binary pushes the bytes. Everything before the upload is identical.
+        if (FileTransportCommandFactory::supports($configuration->provider)) {
+            $this->exportViaFileTransport($backup, $db, $server, $extension, $emit, $configuration);
+
+            return;
+        }
+
+        if (CloudApiCommandFactory::supports($configuration->provider)) {
+            $this->exportViaCloudApi($backup, $db, $server, $extension, $emit, $configuration);
+
+            return;
+        }
+
         $s3 = $this->s3Factory->forConfiguration($configuration);
 
         $tempPath = '/tmp/dply-db-export-'.$backup->id.'.'.$extension;
@@ -199,13 +483,19 @@ final class DatabaseBackupExporter
             throw new \RuntimeException('Backup produced an empty file.');
         }
 
+        [$tempPath, $extension, $bytes] = $this->maybeCompressDump($configuration, $server, $tempPath, $extension, $bytes, $emit);
+
         $emit->step('db', __('Dumped :size — uploading to :bucket …', [
             'size' => Number::fileSize($bytes),
             'bucket' => $s3['bucket'],
         ]));
 
         $key = $this->buildObjectKey($s3['key_prefix'], $server, $db, $backup, $extension);
-        $contentType = $extension === 'db' ? 'application/x-sqlite3' : 'application/sql';
+        $contentType = match (true) {
+            str_ends_with($extension, '.gz') => 'application/gzip',
+            $extension === 'db' => 'application/x-sqlite3',
+            default => 'application/sql',
+        };
 
         // AWS-only per-object storage class (cold tiers). DO Spaces cold is a
         // bucket-level tier (no per-object class), so only AWS sets this.
@@ -291,6 +581,52 @@ final class DatabaseBackupExporter
         ]);
     }
 
+    /**
+     * Optionally gzip the dump in place, once it exists and has been validated.
+     *
+     * Compressing here rather than piping the dump through gzip keeps engine
+     * handling untouched and means {@see assertRemoteDumpLooksValid()} still
+     * inspects real SQL — a corrupt dump should be caught before it becomes an
+     * opaque archive. SQL compresses roughly 5-10x, so this is mostly a
+     * bandwidth and storage-cost decision.
+     *
+     * @return array{0: string, 1: string, 2: int} path, extension, bytes
+     */
+    private function maybeCompressDump(
+        BackupConfiguration $configuration,
+        Server $server,
+        string $path,
+        string $extension,
+        int $bytes,
+        ConsoleEmitter $emit,
+    ): array {
+        if (! (bool) (($configuration->config ?? [])['compress'] ?? false)) {
+            return [$path, $extension, $bytes];
+        }
+
+        $emit->step('db', __('Compressing :size dump …', ['size' => Number::fileSize($bytes)]));
+
+        // -f so a leftover .gz from a retried run doesn't stall on a prompt.
+        [$out, $exit] = $this->remoteExec->shellRunWithExit(
+            $server,
+            'gzip -f '.escapeshellarg($path).' && stat -c %s '.escapeshellarg($path.'.gz'),
+            1800,
+        );
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException('Compression failed: '.Str::limit(trim($out), 400));
+        }
+
+        $compressed = (int) trim($out);
+        if ($compressed <= 0) {
+            throw new \RuntimeException('Compression produced an empty file.');
+        }
+
+        $emit->step('db', __('Compressed to :size', ['size' => Number::fileSize($compressed)]));
+
+        return [$path.'.gz', $extension.'.gz', $compressed];
+    }
+
     private function writeDumpToRemotePath(ServerDatabase $db, Server $server, string $remotePath, string $extension, ConsoleEmitter $emit): int
     {
         if ($db->engine === 'sqlite') {
@@ -304,7 +640,7 @@ final class DatabaseBackupExporter
             // Postgres admin fallback is always usable (sudo -u postgres when no
             // stored superuser credential), so adminAvailable is true.
             $bytes = $this->dumpToPathWithAdminFallback($db, $server, $remotePath, $emit, 'postgres', true,
-                fn (): int => $this->remoteExec->pgDumpToPath($server, $db->name, $db->username, $db->password, $remotePath),
+                fn (): int => $this->remoteExec->pgDumpToPath($server, $db->name, $db->username, $db->password, $remotePath, 600, $db->host),
                 fn (): int => $this->remoteExec->pgDumpAdminToPath($server, $db->name, $remotePath),
             );
             $this->assertRemoteDumpLooksValid($server, $remotePath, 'postgres');
@@ -321,7 +657,11 @@ final class DatabaseBackupExporter
         }
 
         $bytes = $this->dumpToPathWithAdminFallback($db, $server, $remotePath, $emit, 'mysql', $this->hasMysqlRootCredential($server),
-            fn (): int => $this->remoteExec->mysqldumpToPath($server, $db->name, $db->username, $db->password, $remotePath),
+            // Honour the record's host: the client runs on this server, but the
+            // engine may be on another box entirely. Ignoring it would connect
+            // to localhost and, if a same-named database happened to live there,
+            // silently dump the wrong data.
+            fn (): int => $this->remoteExec->mysqldumpToPath($server, $db->name, $db->username, $db->password, $remotePath, 600, $db->host),
             fn (): int => $this->remoteExec->mysqldumpAdminToPath($server, $db->name, $remotePath),
         );
         $this->assertRemoteDumpLooksValid($server, $remotePath, 'mysql');
@@ -485,17 +825,53 @@ final class DatabaseBackupExporter
         return $root.'/'.$server->id.'/'.$db->id.'/'.$backup->id.'.'.$extension;
     }
 
+    /**
+     * Where a dump lands inside the destination.
+     *
+     * This used to be four ULIDs deep — org/server/database/backup.ulid — which
+     * is unambiguous and unreadable: nobody browsing their own bucket could tell
+     * which file was which, and a downloaded dump was called `01kzrr0s5j…sql`.
+     *
+     * Names are slugged (never trusted raw: a database called `../../etc` would
+     * otherwise climb out of the prefix), and the timestamp sorts
+     * chronologically as a string. The short id suffix keeps two dumps of the
+     * same database in the same second from colliding.
+     *
+     * Existing backups keep working — each row stores the full key it was
+     * written with, so only new dumps use this shape.
+     */
     private function buildObjectKey(string $prefix, Server $server, ServerDatabase $db, ServerDatabaseBackup $backup, string $extension): string
     {
+        $serverSlug = $this->pathSlug($server->name, (string) $server->id);
+        $dbSlug = $this->pathSlug($db->name, (string) $db->id);
+
+        $takenAt = ($backup->created_at ?? now())->utc();
+        $shortId = substr((string) $backup->id, -6);
+
+        $filename = sprintf(
+            '%s-%s-%s.%s',
+            $dbSlug,
+            $takenAt->format('Ymd-His'),
+            $shortId,
+            $extension,
+        );
+
         $segments = array_filter([
             trim($prefix, '/'),
-            (string) ($server->organization_id ?? 'no-org'),
-            (string) $server->id,
-            (string) $db->id,
-            $backup->id.'.'.$extension,
-        ], fn ($s) => $s !== '');
+            $serverSlug,
+            $dbSlug,
+            $filename,
+        ], static fn (string $s): bool => $s !== '');
 
         return implode('/', $segments);
+    }
+
+    /** A filesystem- and URL-safe segment, falling back to the id when a name slugs to nothing. */
+    private function pathSlug(?string $name, string $fallback): string
+    {
+        $slug = Str::slug((string) $name);
+
+        return $slug !== '' ? Str::limit($slug, 60, '') : $fallback;
     }
 
     private function resolveDestinationConfiguration(ServerDatabaseBackup $backup, Server $server): BackupConfiguration
@@ -515,6 +891,123 @@ final class DatabaseBackupExporter
         }
 
         return $configuration;
+    }
+
+    /**
+     * Fetch a dump back from a non-S3 destination onto the server it came from,
+     * and return the local path for the SSH streamer.
+     *
+     * The path is deterministic per backup, so a repeated download overwrites
+     * rather than accumulating copies; whatever survives is swept by the box's
+     * own /tmp cleanup.
+     */
+    private function stageRemoteDestinationObject(ServerDatabaseBackup $backup): string
+    {
+        $backup->loadMissing('serverDatabase.server', 'backupConfiguration');
+
+        if (CloudApiCommandFactory::supports((string) $backup->backupConfiguration?->provider)) {
+            return $this->stageCloudObjectOnServer($backup);
+        }
+
+
+        $configuration = $backup->backupConfiguration;
+        $server = $backup->serverDatabase?->server;
+        if ($configuration === null || $server === null) {
+            throw new \RuntimeException(__('Backup destination record is missing.'));
+        }
+
+        $objectPath = (string) $backup->destination_path;
+        $localPath = '/tmp/dply-db-fetch-'.$backup->id;
+
+        $download = $this->transport->downloadCommand($configuration, $objectPath, $localPath, (string) $backup->id);
+        $files = $this->transport->withKeyFile($configuration, $download['files'], (string) $backup->id);
+
+        try {
+            $this->placeTransportFiles($server, $files);
+
+            [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $download['command'], 3600);
+
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(
+                    BackupConfiguration::labelForProvider($configuration->provider)
+                    .' download failed: '.Str::limit(trim($out), 800)
+                );
+            }
+        } finally {
+            $this->clearTransportFiles($server, $files);
+        }
+
+        return $localPath;
+    }
+
+    /**
+     * Pull a dump back from a cloud drive onto the server, for the SSH streamer.
+     * Same two-hop shape as the file transports — there is no URL to hand the
+     * operator, because the bearer token must not leave the control plane.
+     */
+    private function stageCloudObjectOnServer(ServerDatabaseBackup $backup): string
+    {
+        $configuration = $backup->backupConfiguration;
+        $server = $backup->serverDatabase?->server;
+        if ($configuration === null || $server === null) {
+            throw new \RuntimeException(__('Backup destination record is missing.'));
+        }
+
+        $token = $this->cloudTokens->forConfiguration($configuration);
+        $localPath = '/tmp/dply-db-fetch-'.$backup->id;
+
+        $download = $this->cloudApi->downloadCommand(
+            $configuration,
+            $token,
+            (string) $backup->destination_path,
+            $localPath,
+            (string) $backup->id,
+        );
+
+        try {
+            $this->placeTransportFiles($server, $download['files']);
+
+            [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $download['command'], 3600);
+
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException($this->cloudFailureMessage(
+                    $configuration,
+                    BackupConfiguration::labelForProvider($configuration->provider).' download',
+                    $out,
+                ));
+            }
+        } finally {
+            $this->clearCloudFiles($server, $download['files']);
+        }
+
+        return $localPath;
+    }
+
+    /**
+     * Retention delete on a cloud drive. Best-effort, matching the file
+     * transports: prune drops the row either way.
+     */
+    private function deleteCloudObject(ServerDatabaseBackup $backup): void
+    {
+        $configuration = $backup->backupConfiguration;
+        $server = $backup->serverDatabase?->server;
+        if ($configuration === null || $server === null) {
+            return;
+        }
+
+        try {
+            $token = $this->cloudTokens->forConfiguration($configuration);
+            $delete = $this->cloudApi->deleteCommand($configuration, $token, (string) $backup->destination_path, (string) $backup->id);
+
+            try {
+                $this->placeTransportFiles($server, $delete['files']);
+                $this->remoteExec->shellRunWithExit($server, $delete['command'], 300);
+            } finally {
+                $this->clearCloudFiles($server, $delete['files']);
+            }
+        } catch (\Throwable) {
+            // Swallowed deliberately — an orphaned file beats a halted prune run.
+        }
     }
 
     private function presignedGetUrl(ServerDatabaseBackup $backup): string

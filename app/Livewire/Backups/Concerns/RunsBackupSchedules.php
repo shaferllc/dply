@@ -54,9 +54,12 @@ trait RunsBackupSchedules
 
     private function dispatchDatabase(BackupSchedule $schedule): void
     {
-        $database = ServerDatabase::whereKey($schedule->target_id)
-            ->where('server_id', $schedule->server_id)
-            ->first();
+        // Resolve by target alone, exactly as RunBackupScheduleCommand and
+        // ExportServerDatabaseBackupJob do. Scoping this to $schedule->server_id
+        // made "Run now" fail on a schedule the scheduler runs happily: the dump
+        // executes on the DATABASE's server, so a schedule whose server_id has
+        // drifted still works — it just could not be triggered by hand.
+        $database = ServerDatabase::with('server')->find($schedule->target_id);
 
         if (! $database) {
             $this->toastError(__('Schedule target database is missing.'));
@@ -70,9 +73,12 @@ trait RunsBackupSchedules
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
 
+        // The database's own server, not the schedule's — settings resolution
+        // (including the default destination) must come from the box the dump
+        // actually runs on.
         app(DatabaseBackupExporter::class)->prepareBackupRow(
             $backup,
-            $schedule->server,
+            $database->server ?? $schedule->server,
             $schedule->backup_configuration_id,
         );
 
@@ -82,9 +88,9 @@ trait RunsBackupSchedules
 
     private function dispatchSiteFiles(BackupSchedule $schedule): void
     {
-        $site = Site::whereKey($schedule->target_id)
-            ->where('server_id', $schedule->server_id)
-            ->first();
+        // Same reasoning as dispatchDatabase(): the archive runs on the site's
+        // own server, so the target is the source of truth, not schedule.server_id.
+        $site = Site::with('server')->find($schedule->target_id);
 
         if (! $site) {
             $this->toastError(__('Schedule target site is missing.'));

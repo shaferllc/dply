@@ -6,6 +6,7 @@ namespace App\Modules\Queue\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * One namespace's jobs-pushed count for one day.
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property string $namespace_id
- * @property \Illuminate\Support\Carbon $usage_date
+ * @property Carbon $usage_date
  * @property int $jobs_pushed
  */
 class QueueNamespaceUsageDaily extends Model

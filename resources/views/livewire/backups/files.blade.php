@@ -281,6 +281,8 @@
                                     $trendMax = $trend === [] ? 0 : max($trend);
                                     $effectiveRoot = $site->effectiveRepositoryPath();
                                     $runbookCount = $site->workspace?->runbooks?->count() ?? 0;
+                                    $lastRun = $lastRuns[$site->id] ?? null;
+                                    $lastRunFailed = $lastRun?->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED;
                                 @endphp
 
                                 {{-- Sites are ordered archivable-first, so this is
@@ -299,9 +301,10 @@
                                     @class([
                                         'group grid gap-x-4 gap-y-3 border-l-[3px] px-3 py-3 transition-colors hover:bg-brand-sand/15 sm:px-4',
                                         'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto_auto] lg:items-center',
-                                        'border-brand-sage' => $schedule?->is_active,
-                                        'border-brand-gold' => $schedule && ! $schedule->is_active,
-                                        'border-transparent' => ! $schedule,
+                                        'border-brand-rust' => $lastRunFailed,
+                                        'border-brand-sage' => ! $lastRunFailed && $schedule?->is_active,
+                                        'border-brand-gold' => ! $lastRunFailed && $schedule && ! $schedule->is_active,
+                                        'border-transparent' => ! $lastRunFailed && ! $schedule,
                                     ])
                                 >
                                     {{-- Identity --}}
@@ -323,12 +326,35 @@
                                                 {{ $site->server?->name ?? '—' }}
                                                 <span class="font-mono text-brand-mist" title="{{ __('Archive root') }}">· {{ $effectiveRoot }}</span>
                                             </p>
+                                            @if ($lastRunFailed)
+                                                {{-- A site can look scheduled and healthy while every
+                                                     archive fails. Say the cause, not the raw tar/ssh text. --}}
+                                                @php
+                                                    $why = app(\App\Modules\Backups\Services\BackupFailureExplainer::class)
+                                                        ->explain($lastRun->error_message, null, $site->server?->name);
+                                                @endphp
+                                                <p class="mt-1 flex items-start gap-1 text-2xs leading-relaxed text-brand-rust" title="{{ $why['raw'] }}">
+                                                    <x-heroicon-m-exclamation-triangle class="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                                                    <span>
+                                                        <span class="font-semibold">{{ $why['summary'] }}</span>
+                                                        @if ($why['action'])
+                                                            <span class="text-brand-moss">{{ $why['action'] }}</span>
+                                                        @endif
+                                                    </span>
+                                                </p>
+                                            @endif
                                         </div>
                                     </div>
 
                                     {{-- Protection: the schedule, inline --}}
                                     <div class="min-w-0">
                                         @if ($schedule)
+                                            <button
+                                                type="button"
+                                                wire:click="editSchedule('{{ $schedule->id }}')"
+                                                class="group/sched w-full text-left"
+                                                title="{{ __('Edit this schedule') }}"
+                                            >
                                             <div class="flex flex-wrap items-center gap-1.5">
                                                 @if ($schedule->is_active)
                                                     <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/20 px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-brand-forest">
@@ -348,23 +374,29 @@
                                                     <span class="shrink-0 text-2xs text-brand-mist">{{ __('+:count more', ['count' => $ownSchedules->count() - 1]) }}</span>
                                                 @endif
                                             </div>
-                                            <p class="mt-1 truncate font-mono text-2xs text-brand-mist">
+                                            <p class="mt-1 flex items-center gap-1 truncate font-mono text-2xs text-brand-mist">
                                                 {{ $schedule->cron_expression }}
                                                 @if ($next)
                                                     <span class="font-sans text-brand-moss">· {{ __('next in :when', [
                                                         'when' => $next->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true),
                                                     ]) }}</span>
                                                 @endif
+                                                <x-heroicon-o-pencil-square class="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/sched:opacity-100" aria-hidden="true" />
                                             </p>
+                                            </button>
                                         @elseif ($archivable)
-                                            <a
-                                                href="{{ $site->server ? route('servers.backups', $site->server) : route('servers.index') }}"
-                                                wire:navigate
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-brand-ink/20 px-2.5 py-1 text-xs font-semibold text-brand-moss transition-colors hover:border-brand-forest/40 hover:bg-white hover:text-brand-forest"
-                                            >
-                                                <x-heroicon-m-plus class="h-3.5 w-3.5" aria-hidden="true" />
-                                                {{ __('Not scheduled') }}
-                                            </a>
+                                            @if ($site->server)
+                                                <button
+                                                    type="button"
+                                                    wire:click="openScheduleModal('{{ \App\Models\BackupSchedule::TARGET_SITE_FILES }}', '{{ $site->id }}', '{{ $site->server->id }}')"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-brand-ink/20 px-2.5 py-1 text-xs font-semibold text-brand-moss transition-colors hover:border-brand-forest/40 hover:bg-white hover:text-brand-forest"
+                                                >
+                                                    <x-heroicon-m-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ __('Not scheduled') }}
+                                                </button>
+                                            @else
+                                                <span class="text-xs text-brand-mist">{{ __('Not scheduled') }}</span>
+                                            @endif
                                         @else
                                             <span class="inline-flex items-center gap-1.5 rounded-lg bg-brand-sand/40 px-2.5 py-1 text-xs font-medium text-brand-mist">
                                                 <x-heroicon-m-no-symbol class="h-3.5 w-3.5" aria-hidden="true" />
@@ -387,15 +419,19 @@
                                             </p>
                                             <p class="mt-0.5 truncate text-brand-mist">
                                                 {{ \Illuminate\Support\Str::of($latest->status)->replace('_', ' ')->title() }}
-                                                @if ($runbookCount > 0)
-                                                    · {{ trans_choice(':count runbook|:count runbooks', $runbookCount, ['count' => $runbookCount]) }}
-                                                @endif
+                                                {{-- Restore readiness belongs next to the artifact: an
+                                                     archive with no runbook is half a recovery plan. --}}
+                                                · {{ $runbookCount > 0
+                                                    ? trans_choice(':count runbook|:count runbooks', $runbookCount, ['count' => $runbookCount])
+                                                    : __('no runbook') }}
                                             </p>
                                         @elseif ($archivable)
                                             <p class="text-brand-mist">{{ __('Never archived') }}</p>
-                                            @if ($runbookCount === 0)
-                                                <p class="mt-0.5 truncate text-brand-mist">{{ __('No restore runbook') }}</p>
-                                            @endif
+                                            <p class="mt-0.5 truncate text-brand-mist">
+                                                {{ $runbookCount > 0
+                                                    ? trans_choice(':count runbook|:count runbooks', $runbookCount, ['count' => $runbookCount])
+                                                    : __('No restore runbook') }}
+                                            </p>
                                         @else
                                             <p class="text-brand-mist">—</p>
                                         @endif
@@ -537,117 +573,191 @@
                     </section>
                 @endif
 
-                {{-- Run history, grouped by day. Download lives here too: it is
-                     where you look when you need a specific older archive rather
-                     than the newest one. --}}
+                {{-- Archive history. Same shape as the Databases tab: each row
+                     says which site, which server, where it landed and why it
+                     failed, with the actions that apply to it. --}}
                 <section class="border-b border-brand-ink/10">
                     <x-workspace-panel-head
                         dense
                         class="border-b border-brand-ink/10"
                         icon="heroicon-o-clipboard-document-list"
-                        :title="__('Run history')"
-                        :note="__('Last 25 site archives across all servers.')"
+                        :title="__('Archive history')"
+                        :count="$runs->total()"
+                        :note="__('Every site archive across all servers.')"
                     />
 
+                    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5 sm:flex-row sm:items-center sm:px-4">
+                        <div class="relative min-w-0 flex-1">
+                            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-brand-mist">
+                                <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
+                            </span>
+                            <input
+                                type="search"
+                                wire:model.live.debounce.300ms="runSearch"
+                                placeholder="{{ __('Search site, server or error…') }}"
+                                class="w-full rounded-lg border-brand-ink/15 bg-white py-1.5 ps-8 pe-3 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
+                                aria-label="{{ __('Search archive history') }}"
+                            />
+                        </div>
+
+                        <select
+                            wire:model.live="runStatus"
+                            class="rounded-lg border-brand-ink/15 bg-white py-1.5 pe-8 ps-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            aria-label="{{ __('Filter by status') }}"
+                        >
+                            <option value="">{{ __('Any status') }}</option>
+                            <option value="completed">{{ __('Completed') }}</option>
+                            <option value="failed">{{ __('Failed') }}</option>
+                            <option value="pending">{{ __('Pending') }}</option>
+                        </select>
+
+                        @if ($this->hasRunFilters())
+                            <button
+                                type="button"
+                                wire:click="clearRunFilters"
+                                class="shrink-0 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-moss shadow-sm transition-colors hover:text-brand-ink"
+                            >
+                                {{ __('Clear') }}
+                            </button>
+                        @endif
+                    </div>
+
                     @if ($runs->isEmpty())
-                        <div class="px-3 py-8 text-center sm:px-4">
+                        <div class="px-3 py-10 text-center sm:px-4">
                             <x-heroicon-o-clipboard-document-list class="mx-auto h-7 w-7 text-brand-mist" aria-hidden="true" />
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('No archives yet.') }}</p>
+                            <p class="mt-2 text-sm text-brand-moss">
+                                {{ $this->hasRunFilters() ? __('No archives match these filters.') : __('No archives yet.') }}
+                            </p>
+                            @if ($this->hasRunFilters())
+                                <button type="button" wire:click="clearRunFilters" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                    {{ __('Clear filters') }}
+                                </button>
+                            @endif
                         </div>
                     @else
-                        @foreach ($runs->groupBy(fn ($run) => $run->created_at->toDateString()) as $day => $dayRuns)
-                            @php
-                                $dayDate = $dayRuns->first()->created_at;
-                                $dayBytes = $dayRuns->sum(fn ($run) => (int) $run->bytes);
-                                $dayFailed = $dayRuns->where('status', \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED)->count();
-                            @endphp
-                            <div wire:key="day-{{ $day }}">
-                                <div class="flex items-center gap-3 bg-brand-sand/20 px-3 py-1.5 sm:px-4">
-                                    <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
-                                        @if ($dayDate->isToday())
-                                            {{ __('Today') }}
-                                        @elseif ($dayDate->isYesterday())
-                                            {{ __('Yesterday') }}
-                                        @else
-                                            {{ $dayDate->format('D, M j') }}
-                                        @endif
+                        <ul class="divide-y divide-brand-ink/8">
+                            @foreach ($runs as $run)
+                                @php
+                                    $tone = match ($run->status) {
+                                        \App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED => ['bg-brand-sage text-brand-cream', 'heroicon-m-check', __('Completed')],
+                                        \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED => ['bg-brand-rust text-brand-cream', 'heroicon-m-x-mark', __('Failed')],
+                                        default => ['bg-brand-gold text-brand-ink', 'heroicon-m-ellipsis-horizontal', __('Pending')],
+                                    };
+                                    $onServer = $run->effectiveStorageKind() === \App\Modules\Backups\Models\SiteFileBackup::STORAGE_KIND_REMOTE_SERVER;
+                                @endphp
+                                <li wire:key="run-{{ $run->id }}" @class([
+                                    'flex flex-col gap-2 border-l-[3px] px-3 py-3 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-start sm:gap-4 sm:px-4',
+                                    'border-brand-sage' => $run->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED,
+                                    'border-brand-rust' => $run->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED,
+                                    'border-brand-gold' => ! in_array($run->status, [\App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED, \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED], true),
+                                ])>
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full {{ $tone[0] }}">
+                                        <x-dynamic-component :component="$tone[1]" class="h-4 w-4" aria-hidden="true" />
                                     </span>
-                                    <span class="h-px flex-1 bg-brand-ink/10"></span>
-                                    @if ($dayFailed > 0)
-                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-rust">{{ __(':count failed', ['count' => $dayFailed]) }}</span>
-                                    @endif
-                                    <span class="font-mono text-2xs tabular-nums text-brand-mist">
-                                        {{ $dayRuns->count() }} · {{ \Illuminate\Support\Number::fileSize($dayBytes) }}
-                                    </span>
-                                </div>
 
-                                {{-- No row rules inside a day: the tight column of
-                                     status nodes carries the rhythm. --}}
-                                <ul class="py-1">
-                                    @foreach ($dayRuns as $run)
-                                        @php
-                                            $tone = match ($run->status) {
-                                                \App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED => ['bg-brand-sage text-brand-cream', 'heroicon-m-check', __('Done')],
-                                                \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED => ['bg-brand-rust text-brand-cream', 'heroicon-m-x-mark', __('Failed')],
-                                                default => ['bg-brand-gold text-brand-ink', 'heroicon-m-ellipsis-horizontal', __('Pending')],
-                                            };
-                                        @endphp
-                                        <li wire:key="run-{{ $run->id }}" class="relative flex items-center gap-3 px-3 py-1.5 transition-colors hover:bg-brand-sand/20 sm:px-4">
-                                            <span class="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-[3px] ring-brand-cream {{ $tone[0] }}">
-                                                <x-dynamic-component :component="$tone[1]" class="h-4 w-4" aria-hidden="true" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span class="text-sm font-semibold text-brand-ink">{{ $run->site?->name ?? __('(site removed)') }}</span>
+                                            <span @class([
+                                                'inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide',
+                                                'bg-brand-sage/20 text-brand-forest' => $run->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED,
+                                                'bg-brand-rust/15 text-brand-rust' => $run->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED,
+                                                'bg-brand-gold/25 text-amber-800' => ! in_array($run->status, [\App\Modules\Backups\Models\SiteFileBackup::STATUS_COMPLETED, \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED], true),
+                                            ])>{{ $tone[2] }}</span>
+                                        </p>
+
+                                        <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-server class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                {{ $run->site?->server?->name ?? '—' }}
                                             </span>
-                                            <div class="min-w-0 flex-1">
-                                                <p class="truncate text-sm font-medium text-brand-ink">
-                                                    <span class="font-semibold">{{ $run->site?->name ?? '—' }}</span>
-                                                    <span class="text-brand-mist">{{ __('on') }}</span>
-                                                    {{ $run->site?->server?->name ?? '—' }}
-                                                </p>
-                                                <p class="mt-0.5 truncate text-xs text-brand-mist">
-                                                    <span @class([
-                                                        'font-medium',
-                                                        'text-brand-rust' => $run->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED,
-                                                        'text-brand-moss' => $run->status !== \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED,
-                                                    ])>{{ $tone[2] }}</span>
-                                                    · <span class="font-mono tabular-nums">{{ $run->bytes ? \Illuminate\Support\Number::fileSize((int) $run->bytes) : __('no artifact') }}</span>
-                                                    · {{ $run->effectiveStorageKind() === \App\Modules\Backups\Models\SiteFileBackup::STORAGE_KIND_REMOTE_SERVER
-                                                        ? __('On the server')
-                                                        : __('Control plane') }}
-                                                    @if ($run->error_message)
-                                                        · <span class="text-brand-rust">{{ \Illuminate\Support\Str::limit($run->error_message, 80) }}</span>
-                                                    @endif
-                                                </p>
-                                                @if (isset($stagingErrors[$run->id]))
-                                                    <p class="mt-0.5 text-xs text-brand-rust">{{ $stagingErrors[$run->id] }}</p>
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-cloud-arrow-up class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                {{ $onServer ? __('On the server') : __('Control plane') }}
+                                            </span>
+                                            <span class="inline-flex items-center gap-1 font-mono tabular-nums">
+                                                <x-heroicon-o-circle-stack class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                {{ $run->bytes ? \Illuminate\Support\Number::fileSize((int) $run->bytes) : __('no artifact') }}
+                                            </span>
+                                        </p>
+
+                                        @if ($run->error_message)
+                                            @php
+                                                $runWhy = app(\App\Modules\Backups\Services\BackupFailureExplainer::class)
+                                                    ->explain($run->error_message, null, $run->site?->server?->name);
+                                            @endphp
+                                            <div class="mt-1.5 rounded-lg bg-brand-rust/8 px-2 py-1.5 text-xs leading-relaxed">
+                                                <p class="font-semibold text-brand-rust">{{ $runWhy['summary'] }}</p>
+                                                @if ($runWhy['action'])
+                                                    <p class="mt-0.5 text-brand-moss">{{ $runWhy['action'] }}</p>
+                                                @endif
+                                                @if ($runWhy['raw'] !== $runWhy['summary'])
+                                                    <details class="mt-1">
+                                                        <summary class="cursor-pointer text-2xs text-brand-mist hover:text-brand-moss">{{ __('Show original error') }}</summary>
+                                                        <p class="mt-1 break-words font-mono text-2xs text-brand-mist">{{ $runWhy['raw'] }}</p>
+                                                    </details>
                                                 @endif
                                             </div>
+                                        @endif
+
+                                        @if (isset($stagingErrors[$run->id]))
+                                            <p class="mt-1 text-xs text-brand-rust">{{ $stagingErrors[$run->id] }}</p>
+                                        @endif
+                                    </div>
+
+                                    <div class="flex shrink-0 items-start gap-3">
+                                        <time
+                                            class="text-right font-mono text-xs tabular-nums text-brand-moss"
+                                            datetime="{{ $run->created_at->toIso8601String() }}"
+                                            title="{{ $run->created_at->format('Y-m-d H:i:s') }}"
+                                        >
+                                            {{ $run->created_at->diffForHumans(short: true) }}
+                                            <span class="mt-0.5 block text-2xs text-brand-mist">{{ $run->created_at->format('M j, H:i') }}</span>
+                                        </time>
+
+                                        <div class="flex items-center gap-1">
                                             @if ($run->isDownloadable())
                                                 @if ($stagingBackupId === $run->id)
-                                                    <span class="shrink-0 text-xs font-semibold text-brand-mist">{{ __('Preparing…') }}</span>
+                                                    <span class="inline-flex h-7 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-2xs font-semibold text-brand-mist shadow-sm">
+                                                        {{ __('Preparing…') }}
+                                                    </span>
                                                 @else
                                                     <button
                                                         type="button"
                                                         wire:click="requestDownload('site_files', '{{ $run->id }}')"
                                                         wire:loading.attr="disabled"
                                                         wire:target="requestDownload"
-                                                        class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-brand-ink/15 bg-white text-brand-moss shadow-sm transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
+                                                        title="{{ __('Download this archive') }}"
                                                     >
                                                         <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
-                                                        {{ __('Download') }}
                                                     </button>
                                                 @endif
                                             @endif
-                                            <time
-                                                class="shrink-0 font-mono text-xs tabular-nums text-brand-moss"
-                                                datetime="{{ $run->created_at->toIso8601String() }}"
-                                                title="{{ $run->created_at->format('Y-m-d H:i:s') }}"
+
+                                            {{-- No restore button: unpacking a tar over a live
+                                                 document root is a different operation from importing
+                                                 a dump, and the engine does not do it. --}}
+                                            <button
+                                                type="button"
+                                                wire:click="deleteArchive('{{ $run->id }}')"
+                                                wire:confirm="{{ __('Delete this archive and its stored file? This cannot be undone.') }}"
+                                                class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-brand-ink/10 bg-white text-brand-mist shadow-sm transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                                                title="{{ __('Delete this archive') }}"
                                             >
-                                                {{ $run->created_at->diffForHumans(short: true) }}
-                                            </time>
-                                        </li>
-                                    @endforeach
-                                </ul>
+                                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        @if ($runs->hasPages())
+                            <div class="border-t border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                                {{ $runs->onEachSide(1)->links() }}
                             </div>
-                        @endforeach
+                        @endif
                     @endif
                 </section>
 
@@ -680,6 +790,8 @@
                     @endif
                 </div>
             </x-profile-shell>
+
+            @include('livewire.backups.partials._schedule-modal')
         @endif
     </div>
 </div>

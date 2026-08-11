@@ -7,6 +7,7 @@ namespace App\Modules\Queue\Observers;
 use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
 
 /**
  * Dispatch a billing sync when a queue namespace enters or leaves billable
@@ -15,7 +16,7 @@ use App\Modules\Queue\Models\QueueNamespace;
  * Stripe subscription would only reconcile on the nightly sweep, so a new
  * namespace or a tier upgrade wouldn't bill until the next day.
  *
- * Mirrors {@see \App\Modules\Realtime\Observers\RealtimeAppBillingObserver},
+ * Mirrors {@see RealtimeAppBillingObserver},
  * with one addition it does not need: `site_id`. Because billability is derived
  * from the attached site rather than stamped on the row
  * ({@see QueueNamespace::isBillable()}), detaching or re-pointing a namespace

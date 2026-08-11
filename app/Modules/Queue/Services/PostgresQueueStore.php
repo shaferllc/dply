@@ -115,6 +115,16 @@ class PostgresQueueStore implements QueueStore
         $limit = max(1, $limit);
         $claimed = [];
 
+        // The common case during a long poll is "nothing claimable", and the
+        // loop below would spend one UPDATE per queue name to discover it —
+        // three statements every poll interval for a worker on
+        // `high,default,low`. One indexed EXISTS across all of them answers the
+        // same question far more cheaply, and is a pure short-circuit: if it
+        // says there is work, the claim still decides who gets it.
+        if (! $this->hasClaimable($namespace, $queues)) {
+            return [];
+        }
+
         // Drain in priority order. One statement per queue rather than a
         // clever single ORDER BY across all of them — an expression like
         // array_position() cannot use the claim index, and an in-datacentre
@@ -132,6 +142,26 @@ class PostgresQueueStore implements QueueStore
         }
 
         return $claimed;
+    }
+
+    /**
+     * Is anything claimable across these queues right now?
+     *
+     * Advisory only — it takes no lock, so a row it saw may be gone by the time
+     * the claim runs, and a row it missed may appear a moment later. Both are
+     * fine: the claim is still the authority, and the poll loop is going to ask
+     * again. Being wrong here costs one wasted claim or one extra poll
+     * interval, never a lost or double-delivered job.
+     *
+     * @param  list<string>  $queues
+     */
+    private function hasClaimable(QueueNamespace $namespace, array $queues): bool
+    {
+        return $this->connection()->table(self::JOBS)
+            ->where('namespace_id', $namespace->id)
+            ->whereIn('queue', $queues)
+            ->where('visible_at', '<=', DB::raw('now()'))
+            ->exists();
     }
 
     /**
@@ -222,6 +252,74 @@ class PostgresQueueStore implements QueueStore
         // a different reservation. Only the second is a problem — the first is
         // a lost ack response and a client retry, which is correct behaviour.
         return ! $this->existsUnderOtherReservation($namespace, $jobId, $reservationId);
+    }
+
+    public function ackBulk(QueueNamespace $namespace, array $pairs): array
+    {
+        if ($pairs === []) {
+            return [];
+        }
+
+        // One DELETE matching every (id, reservation_id) pair at once. The pair
+        // must be matched as a unit — deleting `WHERE id IN (...) AND
+        // reservation_id IN (...)` would let a stale handle for job A delete
+        // job B under B's current reservation, which is exactly the fencing the
+        // single-row path exists to enforce.
+        $tuples = [];
+        $bindings = [$namespace->id];
+        foreach ($pairs as [$jobId, $reservationId]) {
+            $tuples[] = '(?, ?::uuid)';
+            $bindings[] = $jobId;
+            $bindings[] = $reservationId;
+        }
+
+        $deleted = $this->connection()->select(
+            'DELETE FROM '.self::JOBS.'
+              WHERE namespace_id = ?
+                AND (id, reservation_id) IN ('.implode(', ', $tuples).')
+          RETURNING id',
+            $bindings,
+        );
+
+        $gone = [];
+        foreach ($deleted as $row) {
+            $gone[(string) $row->id] = true;
+        }
+
+        // Anything not deleted is either already gone (a lost ack response and
+        // a client retry — correct behaviour, report success) or held under a
+        // newer reservation (report failure so the caller drops its copy).
+        $survivors = $this->survivingIds($namespace, array_map(
+            static fn (array $pair): string => $pair[0],
+            array_filter($pairs, static fn (array $pair): bool => ! isset($gone[$pair[0]])),
+        ));
+
+        $result = [];
+        foreach ($pairs as [$jobId]) {
+            $result[$jobId] = isset($gone[$jobId]) || ! in_array($jobId, $survivors, true);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Which of these job ids still exist in the namespace.
+     *
+     * @param  list<string>  $jobIds
+     * @return list<string>
+     */
+    private function survivingIds(QueueNamespace $namespace, array $jobIds): array
+    {
+        if ($jobIds === []) {
+            return [];
+        }
+
+        return $this->connection()->table(self::JOBS)
+            ->where('namespace_id', $namespace->id)
+            ->whereIn('id', $jobIds)
+            ->pluck('id')
+            ->map(static fn ($id): string => (string) $id)
+            ->all();
     }
 
     public function release(QueueNamespace $namespace, string $jobId, string $reservationId, int $delaySeconds = 0): bool

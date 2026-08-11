@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\BackupConfiguration;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Form helpers for create/edit of a {@see BackupConfiguration} ("backup
@@ -31,6 +32,9 @@ trait AuthorsBackupDestinations
         return [
             'name' => '',
             'provider' => BackupConfiguration::PROVIDER_CUSTOM_S3,
+            // Applies to every provider, so it lives beside name rather than in
+            // a per-provider sub-array.
+            'compress' => false,
             's3' => [
                 'access_key' => '',
                 'secret' => '',
@@ -41,12 +45,17 @@ trait AuthorsBackupDestinations
                 'storage_class' => '', // AWS-only object storage class (cold tiers).
             ],
             'dropbox' => [
+                'app_key' => '',
+                'app_secret' => '',
+                'refresh_token' => '',
                 'access_token' => '',
+                'path' => '',
             ],
             'google' => [
                 'client_id' => '',
                 'client_secret' => '',
                 'refresh_token' => '',
+                'folder_id' => '',
             ],
             'sftp' => [
                 'host' => '',
@@ -80,6 +89,22 @@ trait AuthorsBackupDestinations
     protected function validateDestinationFormExtras(string $formProperty, array $form): void
     {
         $provider = $form['provider'] ?? '';
+
+        if ($provider === BackupConfiguration::PROVIDER_DROPBOX) {
+            $dropbox = $form['dropbox'] ?? [];
+            $hasRefresh = trim((string) ($dropbox['app_key'] ?? '')) !== ''
+                && trim((string) ($dropbox['app_secret'] ?? '')) !== ''
+                && trim((string) ($dropbox['refresh_token'] ?? '')) !== '';
+
+            if (! $hasRefresh && trim((string) ($dropbox['access_token'] ?? '')) === '') {
+                throw ValidationException::withMessages([
+                    $formProperty.'.dropbox.refresh_token' => __('Add an app key, app secret and refresh token — or paste a short-lived access token for a one-off test.'),
+                ]);
+            }
+
+            return;
+        }
+
         if ($provider !== BackupConfiguration::PROVIDER_SFTP) {
             return;
         }
@@ -89,7 +114,12 @@ trait AuthorsBackupDestinations
         $privateKey = trim((string) ($sftp['private_key'] ?? ''));
 
         if ($password === '' && $privateKey === '') {
-            $this->addError($formProperty.'.sftp.password', __('Provide a password or paste a private key.'));
+            // Must THROW, not just addError: callers run this after validate()
+            // and then create the row, so merely staining the error bag would
+            // still persist a destination that can never authenticate.
+            throw ValidationException::withMessages([
+                $formProperty.'.sftp.password' => __('Provide a password or paste a private key.'),
+            ]);
         }
     }
 
@@ -101,6 +131,19 @@ trait AuthorsBackupDestinations
      * @return array<string, mixed>
      */
     protected function extractDestinationConfig(array $form): array
+    {
+        // `+` not array_merge: provider keys win, and no provider defines
+        // `compress`, so this only ever adds.
+        return $this->providerDestinationConfig($form) + [
+            'compress' => (bool) ($form['compress'] ?? false),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
+    private function providerDestinationConfig(array $form): array
     {
         return match ($form['provider']) {
             BackupConfiguration::PROVIDER_CUSTOM_S3,
@@ -115,12 +158,17 @@ trait AuthorsBackupDestinations
                 'storage_class' => trim((string) ($form['s3']['storage_class'] ?? '')),
             ],
             BackupConfiguration::PROVIDER_DROPBOX => [
-                'access_token' => $form['dropbox']['access_token'],
+                'app_key' => trim((string) ($form['dropbox']['app_key'] ?? '')),
+                'app_secret' => trim((string) ($form['dropbox']['app_secret'] ?? '')),
+                'refresh_token' => trim((string) ($form['dropbox']['refresh_token'] ?? '')),
+                'access_token' => trim((string) ($form['dropbox']['access_token'] ?? '')),
+                'path' => $form['dropbox']['path'] ?? '',
             ],
             BackupConfiguration::PROVIDER_GOOGLE_DRIVE => [
                 'client_id' => $form['google']['client_id'] ?? '',
                 'client_secret' => $form['google']['client_secret'] ?? '',
                 'refresh_token' => $form['google']['refresh_token'],
+                'folder_id' => trim((string) ($form['google']['folder_id'] ?? '')),
             ],
             BackupConfiguration::PROVIDER_SFTP => [
                 'host' => $form['sftp']['host'],
@@ -154,6 +202,8 @@ trait AuthorsBackupDestinations
      */
     protected function hydrateDestinationFormFromConfig(array &$form, string $provider, array $config): void
     {
+        $form['compress'] = (bool) ($config['compress'] ?? false);
+
         match ($provider) {
             BackupConfiguration::PROVIDER_CUSTOM_S3,
             BackupConfiguration::PROVIDER_AWS_S3,
@@ -167,12 +217,17 @@ trait AuthorsBackupDestinations
                 'storage_class' => $config['storage_class'] ?? '',
             ]),
             BackupConfiguration::PROVIDER_DROPBOX => $form['dropbox'] = array_merge($form['dropbox'], [
+                'app_key' => $config['app_key'] ?? '',
+                'app_secret' => $config['app_secret'] ?? '',
+                'refresh_token' => $config['refresh_token'] ?? '',
                 'access_token' => $config['access_token'] ?? '',
+                'path' => $config['path'] ?? '',
             ]),
             BackupConfiguration::PROVIDER_GOOGLE_DRIVE => $form['google'] = array_merge($form['google'], [
                 'client_id' => $config['client_id'] ?? '',
                 'client_secret' => $config['client_secret'] ?? '',
                 'refresh_token' => $config['refresh_token'] ?? '',
+                'folder_id' => $config['folder_id'] ?? '',
             ]),
             BackupConfiguration::PROVIDER_SFTP => $form['sftp'] = array_merge($form['sftp'], [
                 'host' => $config['host'] ?? '',
@@ -213,6 +268,7 @@ trait AuthorsBackupDestinations
             // Only S3-compatible providers are live; the rest are "coming soon"
             // in the picker and rejected here so a tampered request can't slip through.
             $providerKey => ['required', 'string', Rule::in(BackupConfiguration::availableProviders())],
+            $formProperty.'.compress' => ['boolean'],
         ];
 
         return array_merge($base, match ($provider) {
@@ -233,12 +289,19 @@ trait AuthorsBackupDestinations
                     : ['nullable', 'string', 'max:40'],
             ],
             BackupConfiguration::PROVIDER_DROPBOX => [
-                $formProperty.'.dropbox.access_token' => ['required', 'string', 'max:4000'],
+                // Neither shape is required on its own — the cross-field check in
+                // validateDestinationFormExtras() enforces "one or the other".
+                $formProperty.'.dropbox.app_key' => ['nullable', 'string', 'max:500'],
+                $formProperty.'.dropbox.app_secret' => ['nullable', 'string', 'max:500'],
+                $formProperty.'.dropbox.refresh_token' => ['nullable', 'string', 'max:4000'],
+                $formProperty.'.dropbox.access_token' => ['nullable', 'string', 'max:4000'],
+                $formProperty.'.dropbox.path' => ['nullable', 'string', 'max:500'],
             ],
             BackupConfiguration::PROVIDER_GOOGLE_DRIVE => [
                 $formProperty.'.google.client_id' => ['nullable', 'string', 'max:500'],
                 $formProperty.'.google.client_secret' => ['nullable', 'string', 'max:500'],
                 $formProperty.'.google.refresh_token' => ['required', 'string', 'max:4000'],
+                $formProperty.'.google.folder_id' => ['nullable', 'string', 'max:255'],
             ],
             BackupConfiguration::PROVIDER_SFTP => [
                 $formProperty.'.sftp.host' => ['required', 'string', 'max:255'],

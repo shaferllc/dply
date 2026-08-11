@@ -209,9 +209,13 @@ test('file backups page shows storage destinations and runbook readiness', funct
         ->get(route('backups.files'))
         ->assertOk()
         ->assertSee('Archive Bucket', false)
-        ->assertSee('Document root: /var/www/docs/current/public', false)
-        ->assertSee('1 project runbook is already attached to this site workspace.', false)
-        ->assertSee('Queue full backup', false);
+        // The Files tab now folds each site's schedule, last archive and actions
+        // into one row, so it shows the archive root rather than a labelled
+        // "Document root:" line, and the action reads "Archive".
+        ->assertSee('Docs', false)
+        ->assertSee('/var/www/docs', false)
+        ->assertSee('1 runbook', false)
+        ->assertSee('Archive', false);
 });
 
 test('queue full file backup dispatches export job', function () {

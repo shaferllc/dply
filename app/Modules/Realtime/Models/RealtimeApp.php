@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Models;
 
 use App\Models\Organization;
-
 use App\Modules\Realtime\Services\RealtimeBackend;
 use Database\Factories\RealtimeAppFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -39,8 +38,8 @@ use Illuminate\Support\Str;
  * @property string $status
  * @property string $tier
  * @property-read ?Organization $organization
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class RealtimeApp extends Model
 {

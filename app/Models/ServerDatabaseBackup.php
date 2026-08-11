@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $remote_path
  * @property string $s3_bucket
  * @property string $s3_key
+ * @property ?string $destination_path
  * @property ?string $server_database_id
  * @property string $status
  * @property string $storage_kind
@@ -48,6 +49,7 @@ class ServerDatabaseBackup extends Model
         'remote_path',
         's3_bucket',
         's3_key',
+        'destination_path',
         'bytes',
         'error_message',
     ];

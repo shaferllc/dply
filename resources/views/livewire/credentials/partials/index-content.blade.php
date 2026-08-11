@@ -98,6 +98,20 @@
     </section>
 @endif
 
+    {{-- OAuth round trips land back here, so this is the only place their
+         outcome can be reported. Without it a successful "Connect Dropbox"
+         returned silently and looked like nothing happened. --}}
+    @if (session('success') || session('error'))
+        <div @class([
+            'px-5 py-4 sm:px-6' => empty($useOrgShell),
+            'border-b border-brand-ink/10 px-5 py-4 sm:px-6' => ! empty($useOrgShell),
+        ])>
+            <x-alert :tone="session('error') ? 'danger' : 'success'">
+                {{ session('error') ?: session('success') }}
+            </x-alert>
+        </div>
+    @endif
+
     {{-- Capability filter. --}}
     <section aria-label="{{ __('Capability filter') }}" @class([
         'border-b border-brand-ink/10 px-3 py-2 sm:px-4' => ! empty($useOrgShell),
@@ -326,6 +340,68 @@
                                 $newest = $destinations->sortByDesc('created_at')->first();
                             @endphp
                             <li>
+                                {{-- A configured provider becomes a real card with one
+                                     editable row per destination. It can't stay a single
+                                     <button> — the rows are buttons themselves, and
+                                     nesting them would be invalid. --}}
+                                @if (! $isComing && $storageTotal > 0)
+                                    <div class="flex h-full w-full flex-col gap-3 rounded-2xl border border-brand-sage/35 bg-white p-4 shadow-sm">
+                                        <div class="flex w-full items-start justify-between gap-2">
+                                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/12 text-brand-forest ring-1 ring-brand-ink/10">
+                                                <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
+                                            </span>
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                                <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
+                                                {{ $storageTotal }}
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 w-full">
+                                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-moss">
+                                                {{ trans_choice(':n destination|:n destinations', $storageTotal, ['n' => $storageTotal]) }}
+                                            </p>
+                                        </div>
+
+                                        <ul class="w-full space-y-1.5">
+                                            @foreach ($destinations as $destination)
+                                                <li wire:key="dest-{{ $destination->id }}">
+                                                    <button
+                                                        type="button"
+                                                        wire:click="editDestination('{{ $destination->id }}')"
+                                                        class="group/row flex w-full items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/50 px-2 py-1.5 text-left transition hover:border-brand-sage/40 hover:bg-white"
+                                                    >
+                                                        <span class="min-w-0 flex-1">
+                                                            <span class="flex items-center gap-1.5">
+                                                                <span class="truncate text-xs font-semibold text-brand-ink">{{ $destination->name }}</span>
+                                                                @unless ($destination->hasDurableCredentials())
+                                                                    {{-- A short-lived Dropbox token stops scheduled dumps
+                                                                         without reporting a configuration error. --}}
+                                                                    <span class="shrink-0 rounded bg-brand-gold/25 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800" title="{{ __('This uses a short-lived access token — add a refresh token to keep schedules working.') }}">
+                                                                        {{ __('expires') }}
+                                                                    </span>
+                                                                @endunless
+                                                            </span>
+                                                            <span class="mt-0.5 block truncate font-mono text-[10px] text-brand-mist">{{ $destination->locationSummary() }}</span>
+                                                        </span>
+                                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-colors group-hover/row:text-brand-forest" aria-hidden="true" />
+                                                    </button>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+
+                                        <button
+                                            type="button"
+                                            wire:click="openStorageModal('{{ $item['id'] }}')"
+                                            class="group mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition hover:border-brand-sage/35 hover:bg-brand-sage/8 hover:text-brand-forest"
+                                        >
+                                            <span class="inline-flex items-center gap-1.5">
+                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Add another') }}
+                                            </span>
+                                            <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                        </button>
+                                    </div>
+                                @else
                                 <button
                                     type="button"
                                     @if (! $isComing)
@@ -334,71 +410,35 @@
                                     @disabled($isComing)
                                     @class([
                                         'group relative flex h-full w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
-                                        'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $storageTotal === 0,
-                                        'border-brand-sage/35 hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $storageTotal > 0,
+                                        'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing,
                                         'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
                                     ])
                                 >
                                     <div class="flex w-full items-start justify-between gap-2">
-                                        <span @class([
-                                            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-brand-ink/10',
-                                            'bg-brand-sage/12 text-brand-forest' => $storageTotal > 0 && ! $isComing,
-                                            'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $storageTotal === 0 || $isComing,
-                                        ])>
+                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10 group-hover:bg-brand-sand/70">
                                             <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
                                         </span>
                                         @if ($isComing)
                                             <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
-                                        @elseif ($storageTotal > 0)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
-                                                <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                                {{ $storageTotal }}
-                                            </span>
                                         @endif
                                     </div>
                                     <div class="min-w-0 w-full">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
                                         <p class="mt-0.5 text-xs text-brand-moss">
-                                            @if ($isComing)
-                                                {{ __('Coming soon') }}
-                                            @elseif ($storageTotal === 0)
-                                                {{ __('Not configured') }}
-                                            @else
-                                                {{ trans_choice(':n destination|:n destinations', $storageTotal, ['n' => $storageTotal]) }}
-                                                @if ($newest?->created_at)
-                                                    <span class="text-brand-mist"> · </span>
-                                                    <span title="{{ $newest->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $newest->created_at->diffForHumans()]) }}</span>
-                                                @endif
-                                            @endif
+                                            {{ $isComing ? __('Coming soon') : __('Not configured') }}
                                         </p>
                                     </div>
-                                    @if ($storageTotal > 0)
-                                        <div class="flex w-full flex-wrap items-center gap-1.5">
-                                            @foreach ($destinations->take(3) as $destination)
-                                                <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
-                                                    <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
-                                                    <span class="truncate">{{ $destination->name }}</span>
-                                                </span>
-                                            @endforeach
-                                            @if ($storageTotal > 3)
-                                                <span class="text-2xs text-brand-mist">{{ __('+:count more', ['count' => $storageTotal - 3]) }}</span>
-                                            @endif
-                                        </div>
-                                    @endif
-
-                                    {{-- Trailing action hint. Visually a button-shaped
-                                         chip, semantically a span — the whole card IS the
-                                         trigger so we don't nest <button>s. --}}
                                     @unless ($isComing)
                                         <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
                                             <span class="inline-flex items-center gap-1.5">
                                                 <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ $storageTotal > 0 ? __('Add another') : __('Add new') }}
+                                                {{ __('Add new') }}
                                             </span>
                                             <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
                                         </span>
                                     @endunless
                                 </button>
+                                @endif
                             </li>
                         @endforeach
                     </ul>

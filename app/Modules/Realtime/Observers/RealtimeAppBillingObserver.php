@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Observers;
 
 use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
+use App\Modules\Realtime\Models\RealtimeApp;
 
 /**
  * Dispatch a billing sync when a managed realtime app enters or leaves billable
