@@ -4,21 +4,18 @@ namespace Tests\Feature\ServerTest;
 
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Enums\SiteType;
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSetupScriptJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
-use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
 use App\Livewire\Servers\SettingsCard;
 use App\Livewire\Servers\WorkspaceLogs;
-use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Models\Organization;
@@ -37,6 +34,8 @@ use App\Models\SiteDomain;
 use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Models\UserSshKey;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
@@ -2123,7 +2122,6 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Viewer'))
         ->assertSee(__('Overview'))
         ->assertSee(__('Sources'))
-        ->assertSee(__('Related'))
         ->assertSee('Log source')
         ->assertSee('Dply activity')
         ->assertSee(__('Options'))
@@ -2146,10 +2144,7 @@ test('server show logs tab renders', function () {
         ->call('setLogsWorkspaceTab', 'overview')
         ->assertSee(__('Log viewer'))
         ->call('setLogsWorkspaceTab', 'sources')
-        ->assertSee(__('Available sources'))
-        ->call('setLogsWorkspaceTab', 'related')
-        ->assertSee(__('Security digest'))
-        ->assertSee(__('Deploy windows'));
+        ->assertSee(__('Available sources'));
 });
 
 test('server logs select log source updates active key', function () {

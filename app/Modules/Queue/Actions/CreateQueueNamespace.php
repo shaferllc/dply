@@ -32,6 +32,15 @@ final class CreateQueueNamespace
         ?Site $site = null,
         ?string $userId = null,
     ): array {
+        // The platform kill switch, checked here rather than at the call sites
+        // so it actually holds. `ServerlessQueueProvisioner` honoured it and the
+        // control plane did not, which meant flipping DPLY_QUEUE_ENABLED off
+        // stopped deploys wiring queues but still let the dashboard mint them —
+        // exactly the namespaces there would be no data plane to serve.
+        if (! (bool) config('queue_service.enabled', false)) {
+            throw new RuntimeException('dply Queue is currently unavailable.');
+        }
+
         $entitlement = $this->entitlements->for($organization);
 
         if (! $entitlement->available) {
@@ -42,19 +51,25 @@ final class CreateQueueNamespace
             ->where('organization_id', $organization->id)
             ->count();
 
-        if ($entitlement->maxNamespaces > 0 && $existing >= $entitlement->maxNamespaces) {
+        if ($entitlement->hasNamespaceLimit() && $existing >= $entitlement->maxNamespaces) {
             throw new RuntimeException(
                 'This plan allows '.$entitlement->maxNamespaces.' queue namespace(s). Delete one or upgrade to add another.'
             );
         }
+
+        // Depth is stamped onto the row from the tier rather than read live at
+        // push time, so a tier's capacity is fixed at the moment the customer
+        // bought it: re-pricing a tier later must not silently shrink a running
+        // queue underneath someone.
+        $tier = $entitlement->defaultTier();
 
         $namespace = QueueNamespace::query()->create([
             'organization_id' => $organization->id,
             'site_id' => $site?->id,
             'name' => trim($name) !== '' ? trim($name) : 'default',
             'status' => QueueNamespace::STATUS_ACTIVE,
-            'tier' => $entitlement->tier,
-            'max_queue_depth' => $entitlement->maxQueueDepth > 0 ? $entitlement->maxQueueDepth : null,
+            'tier' => $tier->slug,
+            'max_queue_depth' => $tier->hasQueueDepthLimit() ? $tier->maxQueueDepth : null,
         ]);
 
         $minted = QueueCredential::mint($namespace, __('Default credential'), userId: $userId);

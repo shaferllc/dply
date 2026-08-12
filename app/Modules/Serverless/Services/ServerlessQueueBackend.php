@@ -6,7 +6,9 @@ namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\ServerlessQueueProvisioner;
+use App\Modules\Queue\Support\QueueDepth;
 use App\Services\Sites\DotEnvFileParser;
 
 /**
@@ -65,7 +67,14 @@ final class ServerlessQueueBackend
     /**
      * Classify the site's queue backend.
      *
-     * @return array{connection: ?string, database: ?string, state: string, reason: ?string, fixable_with_redis: bool}
+     * The two `fixable_with_*` flags are what the UI offers as a repair, in
+     * that order of preference: a dply Queue namespace is a row and works on
+     * the next deploy, where Redis is a paid cluster the operator has to
+     * already own. Both are false on a `shareable` backend — there is nothing
+     * to repair, and offering to repoint a working queue would be the more
+     * destructive answer.
+     *
+     * @return array{connection: ?string, database: ?string, state: string, reason: ?string, fixable_with_redis: bool, fixable_with_dply: bool}
      */
     public function classify(Site $site): array
     {
@@ -73,6 +82,7 @@ final class ServerlessQueueBackend
         $connection = $this->value($env, 'QUEUE_CONNECTION');
         $database = $this->value($env, 'DB_CONNECTION');
         $redisReady = $this->redisAvailable($site);
+        $dplyReady = $this->provisioner->available($site);
 
         if ($connection === null || $connection === 'sync') {
             return [
@@ -83,6 +93,7 @@ final class ServerlessQueueBackend
                     ? 'QUEUE_CONNECTION is not set, so the function defaults to `sync`: jobs run inline at dispatch and nothing is ever queued.'
                     : 'QUEUE_CONNECTION is `sync`: jobs run inline at dispatch and nothing is ever queued.',
                 'fixable_with_redis' => $redisReady,
+                'fixable_with_dply' => $dplyReady,
             ];
         }
 
@@ -93,6 +104,7 @@ final class ServerlessQueueBackend
                 'state' => self::STATE_SHAREABLE,
                 'reason' => null,
                 'fixable_with_redis' => false,
+                'fixable_with_dply' => false,
             ];
         }
 
@@ -104,6 +116,7 @@ final class ServerlessQueueBackend
                     'state' => self::STATE_SHAREABLE,
                     'reason' => null,
                     'fixable_with_redis' => false,
+                    'fixable_with_dply' => false,
                 ];
             }
 
@@ -114,6 +127,7 @@ final class ServerlessQueueBackend
                     'state' => self::STATE_UNSHARED,
                     'reason' => 'The database queue is backed by SQLite. A function\'s filesystem is read-only except /tmp, and /tmp is per-container, so concurrent drains each see a different database and enqueued jobs are lost.',
                     'fixable_with_redis' => $redisReady,
+                    'fixable_with_dply' => $dplyReady,
                 ];
             }
         }
@@ -124,6 +138,7 @@ final class ServerlessQueueBackend
             'state' => self::STATE_UNKNOWN,
             'reason' => 'dply cannot tell whether the `'.$connection.'` queue driver is reachable from every concurrent invocation. If its store is local to the container, jobs will be lost.',
             'fixable_with_redis' => $redisReady,
+            'fixable_with_dply' => $dplyReady,
         ];
     }
 
@@ -176,6 +191,33 @@ final class ServerlessQueueBackend
         $this->environment->mergeKeys($site, ['QUEUE_CONNECTION' => 'redis']);
 
         return true;
+    }
+
+    /**
+     * Give the site a dply Queue namespace and point its queue at it.
+     *
+     * Unlike {@see wireRedis()} this creates the thing it points at, so it is
+     * offered whenever the org may have dply Queue at all rather than only
+     * when infrastructure happens to already be online. Idempotent: a site
+     * that already has a namespace reuses it and its live credential.
+     */
+    public function wireDplyQueue(Site $site): bool
+    {
+        return $this->provisioner->wire($site);
+    }
+
+    /**
+     * The site's managed queue for display — namespace, endpoint, and depth.
+     *
+     * Null when there is no namespace. See
+     * {@see ServerlessQueueProvisioner::describe()} for why depth may be null
+     * even when a namespace exists.
+     *
+     * @return array{namespace: QueueNamespace, endpoint: string, depth: ?QueueDepth}|null
+     */
+    public function managedQueue(Site $site): ?array
+    {
+        return $this->provisioner->describe($site);
     }
 
     /** Whether this backend is one dply knows cannot work here. */

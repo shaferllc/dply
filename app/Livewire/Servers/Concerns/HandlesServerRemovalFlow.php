@@ -7,7 +7,11 @@ use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Carbon\Carbon;
+use Livewire\Attributes\Computed;
 
+/**
+ * @property-read array{sites: int, databases: int, cron_jobs: int, supervisor_programs: int, firewall_rules: int, authorized_keys: int, recipes: int, running_deployments: int, provider_label: string, provider_value: string, will_destroy_cloud: bool, organization_name: ?string} $serverRemovalSummary
+ */
 trait HandlesServerRemovalFlow
 {
     use ManagesServerRemovalForm;
@@ -20,6 +24,20 @@ trait HandlesServerRemovalFlow
     public string $removeMode = 'now';
 
     public string $scheduledRemovalDate = '';
+
+    /**
+     * Blast radius for the Danger tab: what removal would take with it, and
+     * whether it reaches the provider. The tab shows this *before* the operator
+     * opens the modal — the counts are the explanation, so hiding them behind
+     * the confirm dialog is what made the tab read as a bare button.
+     *
+     * @return array{sites: int, databases: int, cron_jobs: int, supervisor_programs: int, firewall_rules: int, authorized_keys: int, recipes: int, running_deployments: int, provider_label: string, provider_value: string, will_destroy_cloud: bool, organization_name: ?string}
+     */
+    #[Computed]
+    public function serverRemovalSummary(): array
+    {
+        return ServerRemovalAdvisor::summary($this->server);
+    }
 
     public function openRemoveServerModal(): void
     {

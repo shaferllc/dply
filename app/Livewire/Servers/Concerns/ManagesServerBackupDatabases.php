@@ -6,7 +6,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
@@ -188,7 +188,7 @@ trait ManagesServerBackupDatabases
         $this->liveDbDumpTargets = $targets;
     }
 
-    private function dispatchScheduleDatabase(ServerBackupSchedule $schedule): void
+    private function dispatchScheduleDatabase(BackupSchedule $schedule): void
     {
         $database = ServerDatabase::query()
             ->where('server_id', $this->server->id)
@@ -229,7 +229,7 @@ trait ManagesServerBackupDatabases
         $this->dispatch('dply-console-action-focus');
     }
 
-    private function dispatchScheduleSiteFiles(ServerBackupSchedule $schedule): void
+    private function dispatchScheduleSiteFiles(BackupSchedule $schedule): void
     {
         $site = Site::query()
             ->where('server_id', $this->server->id)

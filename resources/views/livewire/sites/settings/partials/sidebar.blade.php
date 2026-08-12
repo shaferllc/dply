@@ -6,7 +6,12 @@
     $sidebarPrimaryHostname = optional($site->primaryDomain())->hostname
         ?? ($runtimePublication['hostname'] ?? null)
         ?? $site->name;
-    $sidebarVisitUrl = $sidebarEdgeLiveUrl ?: $site->visitUrl();
+    // A function has no domain row and no testing hostname, so visitUrl() is
+    // always null for one — resolve its live hostname / proxy path instead so
+    // the URL row links somewhere real rather than echoing the site name.
+    $sidebarVisitUrl = $sidebarEdgeLiveUrl
+        ?: ($site->usesFunctionsRuntime() ? $site->serverlessPublicUrl() : null)
+        ?: $site->visitUrl();
     $sidebarUrlSeed = (string) ($sidebarPrimaryHostname ?: $site->name ?: $site->id);
     $sidebarCanRedeployEdge = is_string($sidebarEdgeLiveUrl)
         && $sidebarEdgeLiveUrl !== ''
@@ -105,7 +110,17 @@
                             : $sidebarPrimaryHostname;
                         $sidebarCopyUrl = $sidebarVisitUrl ?: $sidebarDisplayUrl;
                     @endphp
-                    <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink" title="{{ $sidebarDisplayUrl }}">{{ $sidebarDisplayUrl }}</span>
+                    @if ($sidebarVisitUrl)
+                        <a
+                            href="{{ $sidebarVisitUrl }}"
+                            target="_blank"
+                            rel="noreferrer"
+                            class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink underline-offset-2 hover:text-brand-sage hover:underline"
+                            title="{{ $sidebarVisitUrl }}"
+                        >{{ $sidebarDisplayUrl }}</a>
+                    @else
+                        <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink" title="{{ $sidebarDisplayUrl }}">{{ $sidebarDisplayUrl }}</span>
+                    @endif
                     <button
                         type="button"
                         class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink"

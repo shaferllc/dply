@@ -57,7 +57,7 @@
 @endphp
 
 {{-- Component root MUST be first element for Livewire v3 to inject wire:id/wire:snapshot --}}
-<div x-data @if ($shouldPoll) wire:poll.5s @endif>
+<div x-data @if ($shouldPoll) wire:poll.5s="pollProvisionJourney" @endif>
 
 @once
     @push('styles')

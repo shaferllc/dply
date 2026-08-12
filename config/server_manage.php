@@ -2119,6 +2119,10 @@ BASH
             'action_key' => 'install_mise',
             'preinstalled' => true,
             'card' => 'hero',
+            // Service-only boxes host a cache/DB/LB engine, not an app:
+            // there is no project to pin a runtime for, nothing to composer
+            // install, and no repo to clone. Surfacing these was pure noise.
+            'hide_for_server_roles' => ['redis', 'valkey', 'database', 'load_balancer'],
         ],
         'composer' => [
             'slug' => 'composer',
@@ -2132,6 +2136,10 @@ BASH
             'requires_php' => true,
             'preinstalled' => true,
             'card' => 'generic',
+            // Service-only boxes host a cache/DB/LB engine, not an app:
+            // there is no project to pin a runtime for, nothing to composer
+            // install, and no repo to clone. Surfacing these was pure noise.
+            'hide_for_server_roles' => ['redis', 'valkey', 'database', 'load_balancer'],
         ],
         'git' => [
             'slug' => 'git',
@@ -2146,6 +2154,10 @@ BASH
             'show_source_control_link' => true,
             'preinstalled' => true,
             'card' => 'generic',
+            // Service-only boxes host a cache/DB/LB engine, not an app:
+            // there is no project to pin a runtime for, nothing to composer
+            // install, and no repo to clone. Surfacing these was pure noise.
+            'hide_for_server_roles' => ['redis', 'valkey', 'database', 'load_balancer'],
         ],
         'docker' => [
             'slug' => 'docker',

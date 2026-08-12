@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionMatrix;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -21,6 +22,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The server's central "Notifications" workspace — one place to route notification
@@ -51,6 +53,7 @@ class WorkspaceNotifications extends Component
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesServerWebhook;
+    use WithPagination;
 
     /** @var list<string> */
     public const NOTIF_TABS = ['subscriptions', 'webhooks'];
@@ -228,10 +231,12 @@ class WorkspaceNotifications extends Component
             'assignableNotificationChannels' => $this->assignableChannels(),
             'eventCategories' => $this->eventCategories(),
             'organizationWebhookDestinations' => $this->organizationWebhookDestinations(),
-            // Only query the deliveries log when its tab is showing.
+            // Only query the deliveries log when its tab is showing. The empty
+            // stand-in is a paginator too, so the view can call ->links() and
+            // ->total() without branching on which one it got.
             'webhookDeliveries' => $this->notifTab === 'webhooks'
                 ? $this->recentWebhookDeliveries()
-                : new Collection,
+                : new LengthAwarePaginator([], 0, self::DELIVERIES_PER_PAGE),
         ]);
     }
 }

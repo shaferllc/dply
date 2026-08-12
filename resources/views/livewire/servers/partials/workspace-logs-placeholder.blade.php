@@ -21,7 +21,7 @@
         />
 
         <div class="flex flex-wrap gap-1 border-b border-brand-ink/10 px-4 py-2" aria-hidden="true">
-            @foreach ([__('Viewer'), __('Overview'), __('Sources'), __('dply Logs'), __('Alerts'), __('Activity'), __('Related')] as $i => $label)
+            @foreach ([__('Viewer'), __('Overview'), __('Sources'), __('dply Logs'), __('Alerts'), __('Activity')] as $i => $label)
                 <span @class([
                     'inline-flex h-6 items-center rounded-lg px-2.5 text-xs font-semibold',
                     'bg-brand-ink text-white' => $i === 0,

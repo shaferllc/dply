@@ -7,6 +7,8 @@ namespace App\Modules\Serverless\Livewire;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
+use App\Support\Servers\ServerRegistry;
+use App\Support\Sites\SiteRegistry;
 use App\Modules\Serverless\Services\FunctionInvoker;
 use App\Modules\Serverless\Services\FunctionScheduleService;
 use App\Modules\Serverless\Services\OpenWhiskClient;
@@ -35,9 +37,16 @@ class PlatformPanel extends Component
 
     public string $siteId = '';
 
-    /** inspector | triggers | console */
+    /** inspector | triggers | console | credentials */
     #[Url(as: 'platform')]
     public string $tab = 'inspector';
+
+    /**
+     * Result of the last credential check: {ok, error, actions}.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $credentialCheck = null;
 
     // Schedule (custom-cron) form
     public bool $scheduleFormOpen = false;
@@ -80,11 +89,45 @@ class PlatformPanel extends Component
 
     public function setTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['inspector', 'triggers', 'console'], true) ? $tab : 'inspector';
+        $this->tab = in_array($tab, ['inspector', 'triggers', 'console', 'credentials'], true) ? $tab : 'inspector';
     }
 
     /** Re-renders, which re-queries the OpenWhisk API. */
     public function refresh(): void {}
+
+    // ── Credentials ──────────────────────────────────────────────────────
+
+    /**
+     * Check that the namespace access key dply holds still works.
+     *
+     * DigitalOcean exposes no REST API for minting or revoking namespace
+     * keys — that is control-panel and `doctl` territory — so dply cannot
+     * rotate one on the operator's behalf. What it can do is tell them
+     * whether the key it has is still good, which is the question that
+     * actually gets asked after someone rotates a key elsewhere.
+     */
+    public function verifyCredentials(): void
+    {
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        $result = $this->client($site)->actions();
+
+        $this->credentialCheck = [
+            'ok' => (bool) $result['ok'],
+            'error' => $result['ok'] ? null : (string) ($result['error'] ?? __('The namespace rejected the key.')),
+            'actions' => $result['ok'] && is_array($result['data']) ? count($result['data']) : 0,
+            'at' => now()->toIso8601String(),
+        ];
+
+        if ($this->credentialCheck['ok']) {
+            $this->toastSuccess(__('The namespace credentials work.'));
+
+            return;
+        }
+
+        $this->toastError((string) $this->credentialCheck['error']);
+    }
 
     // ── Inspector ────────────────────────────────────────────────────────
 
@@ -271,6 +314,18 @@ class PlatformPanel extends Component
             $data['triggers'] = $client->triggers();
             $data['rules'] = $client->rules();
             $data['actions'] = $client->actions();
+        } elseif ($this->tab === 'credentials') {
+            $functionsMeta = $site->server?->meta['digitalocean_functions'] ?? null;
+            $functionsMeta = is_array($functionsMeta) ? $functionsMeta : [];
+            $accessKey = (string) ($functionsMeta['access_key'] ?? '');
+
+            $data['namespace'] = (string) ($functionsMeta['namespace'] ?? '');
+            $data['apiHost'] = (string) ($functionsMeta['api_host'] ?? '');
+            // Only the key id is ever shown — the secret half is what makes
+            // the pair a credential, and it is already stored.
+            $data['accessKeyId'] = str_contains($accessKey, ':')
+                ? explode(':', $accessKey, 2)[0]
+                : '';
         }
 
         return view('livewire.serverless.platform-panel', $data);
@@ -280,7 +335,13 @@ class PlatformPanel extends Component
 
     private function site(): Site
     {
-        return Site::with('server')->findOrFail($this->siteId);
+        // Registry on both sides: the sibling panels resolve this same site,
+        // and sync peers / the command palette resolve this same server. Each
+        // used to be its own SELECT.
+        $site = app(SiteRegistry::class)->findOrFail($this->siteId);
+        app(ServerRegistry::class)->attachTo($site);
+
+        return $site;
     }
 
     private function client(Site $site): OpenWhiskClient

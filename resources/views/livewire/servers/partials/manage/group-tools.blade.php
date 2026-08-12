@@ -71,36 +71,47 @@
     @if ($report)
         @include('livewire.servers.partials.manage.tools.header')
 
-        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Tools sections')" bare class="!mb-0">
-                <x-server-workspace-tab
-                    id="manage-tools-tab-catalog"
-                    :active="$toolsPanel === 'tools'"
-                    wire:click="setToolsPanel('tools')"
-                    icon="heroicon-o-wrench-screwdriver"
-                >
-                    {{ __('Tools') }}
-                </x-server-workspace-tab>
-                <x-server-workspace-tab
-                    id="manage-tools-tab-runtimes"
-                    :active="$toolsPanel === 'runtimes'"
-                    wire:click="setToolsPanel('runtimes')"
-                    icon="heroicon-o-cpu-chip"
-                >
-                    {{ __('Runtimes') }}
-                    @if (($summary['runtime_versions'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs tabular-nums text-brand-moss">
-                            {{ $summary['runtime_versions'] }}
-                        </span>
-                    @endif
-                </x-server-workspace-tab>
-            </x-server-workspace-tablist>
-        </div>
+        {{-- Runtimes is a mise view. On service-only roles mise is filtered out of
+             the catalog entirely (there is no project to pin a runtime for), so
+             the report returns no hero tool and the tab would open on an empty
+             panel. With nothing to switch between, the whole tablist goes too —
+             a single tab is just a label. --}}
+        @php $showRuntimesTab = $heroTool !== null; @endphp
 
-        @if ($toolsPanel === 'tools')
-            @include('livewire.servers.partials.manage.tools.tools-list')
-        @elseif ($toolsPanel === 'runtimes')
+        @if ($showRuntimesTab)
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                <x-server-workspace-tablist :aria-label="__('Tools sections')" bare class="!mb-0">
+                    <x-server-workspace-tab
+                        id="manage-tools-tab-catalog"
+                        :active="$toolsPanel === 'tools'"
+                        wire:click="setToolsPanel('tools')"
+                        icon="heroicon-o-wrench-screwdriver"
+                    >
+                        {{ __('Tools') }}
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab
+                        id="manage-tools-tab-runtimes"
+                        :active="$toolsPanel === 'runtimes'"
+                        wire:click="setToolsPanel('runtimes')"
+                        icon="heroicon-o-cpu-chip"
+                    >
+                        {{ __('Runtimes') }}
+                        @if (($summary['runtime_versions'] ?? 0) > 0)
+                            <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-2xs tabular-nums text-brand-moss">
+                                {{ $summary['runtime_versions'] }}
+                            </span>
+                        @endif
+                    </x-server-workspace-tab>
+                </x-server-workspace-tablist>
+            </div>
+        @endif
+
+        {{-- A stale ?panel=runtimes URL must not strand a DB host on a panel its
+             tab no longer offers. --}}
+        @if ($toolsPanel === 'runtimes' && $showRuntimesTab)
             @include('livewire.servers.partials.manage.tools.runtimes')
+        @else
+            @include('livewire.servers.partials.manage.tools.tools-list')
         @endif
     @else
         <p class="px-5 py-6 text-sm text-brand-moss sm:px-6">{{ __('Tool inventory appears after the first successful probe.') }}</p>

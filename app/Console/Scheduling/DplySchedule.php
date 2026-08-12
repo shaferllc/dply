@@ -41,7 +41,9 @@ use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
+use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
+use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
 use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
@@ -67,6 +69,8 @@ use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
 use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Queue\Console\FlushQueueUsageCommand;
+use App\Modules\Queue\Console\MeterQueueUsageCommand;
 use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
@@ -217,6 +221,15 @@ final class DplySchedule
             ->name('realtime-usage-today')
             ->withoutOverlapping();
 
+        // dply Queue throughput rollup. Observational — a namespace is priced by
+        // its capacity tier, so a missed run costs a gap in a sparkline and
+        // nothing else. The flush upserts the day's running total, so the next
+        // pass heals a skipped one (docs/adr/managed-services-tier.md, dec. 6).
+        $schedule->command(FlushQueueUsageCommand::class)
+            ->hourly()
+            ->name('queue-usage-flush')
+            ->withoutOverlapping();
+
         // dply Logs ingest metering (read-only; no billing yet). Hourly keeps the
         // current day's GB/day fresh in the UI; the nightly pass finalizes the prior
         // day after late-arriving lines settle, before the 02:10 billing snapshot.
@@ -228,6 +241,16 @@ final class DplySchedule
         $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday'])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // dply Queue push metering (read-only; no billing yet). One flush covers
+        // every live day at once — the counters hold running totals and the rows
+        // are written absolute, so there is no separate finalize pass to run and
+        // nothing to lose if a flush is missed. Ten past the hour keeps it clear
+        // of the log meter above.
+        $schedule->command(MeterQueueUsageCommand::class)
+            ->hourlyAt(10)
+            ->name('queue-usage-flush')
             ->withoutOverlapping();
 
         // dply Logs alerting (paid tier): evaluate enabled alert rules against the
@@ -311,6 +334,21 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // The backup engine. Every schedule in the app is derived-due from its own
+        // cron expression here — there is no crontab entry on any customer box, by
+        // design: a provider image has to be capturable when that box is down.
+        // See docs/adr/backups-as-a-product.md, decision 14.
+        $schedule->command(DispatchDueBackupSchedulesCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('dispatch-due-backups');
+        // Retention. Nothing enforced the configured window until this was
+        // scheduled, so the first runs delete a long backlog — verify with
+        // `dply:prune-backups --dry-run` before trusting it unattended.
+        $schedule->command(PruneBackupsCommand::class)
+            ->dailyAt('03:40')
+            ->withoutOverlapping()
+            ->name('prune-backups');
         // 4h-TTL download stagings need finer-than-daily pruning (S3 lifecycle min
         // is 1 day), so sweep every 15 minutes. onOneServer is auto-applied below.
         $schedule->command(PruneBackupDownloadStagingsCommand::class)
@@ -388,7 +426,7 @@ final class DplySchedule
 
         // Secret-vault (app-native, W1 off-box break-glass): daily age-encrypted
         // escrow of the platform .env (→ APP_KEY), an independent DB dump, and the
-        // fast-recovery critical-keys bundle. dply's own ServerBackupSchedule is
+        // fast-recovery critical-keys bundle. dply's own BackupSchedule is
         // the PRIMARY DB backup; this dump is the provider-independent copy.
         $schedule->command(SecretsEscrowCommand::class, ['--source' => 'platform-env'])
             ->dailyAt('04:20')

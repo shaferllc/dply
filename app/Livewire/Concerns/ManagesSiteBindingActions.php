@@ -372,6 +372,32 @@ trait ManagesSiteBindingActions
     {
         Gate::authorize('update', $this->site);
 
+        // Placement decides which provisioner runs, and the two dedicated cards
+        // differ only by one word ("Dedicated database server" vs "Dedicated
+        // Docker database server") while routing to completely different
+        // infrastructure. Verify the submitted placement is real and supports
+        // the chosen engine instead of falling through to a different one.
+        if ($this->bindingModalType === 'database' && $this->bindingModalMode === 'provision') {
+            $placement = (string) ($this->bindingForm['placement'] ?? '');
+            $engine = strtolower(trim((string) ($this->bindingForm['engine'] ?? '')));
+            $match = collect($this->databasePlacements())->firstWhere('key', $placement);
+
+            if ($placement !== '' && $match === null) {
+                $this->toastError(__('That database placement is no longer available. Pick one again.'));
+
+                return;
+            }
+
+            if ($match !== null && $engine !== '' && ! in_array($engine, $match['engines'], true)) {
+                $this->toastError(__(':placement does not support :engine. Pick a different placement or engine.', [
+                    'placement' => $match['label'],
+                    'engine' => $engine,
+                ]));
+
+                return;
+            }
+        }
+
         // The dedicated-DB-VM placement provisions a whole new server, which
         // means driving the customer-connected create pipeline (a Livewire Form
         // object) — handled in the component layer, not the binding manager.

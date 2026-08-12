@@ -9,9 +9,13 @@ namespace App\Modules\Billing\Services;
  * applying a per-function included allowance and configurable unit rates
  * (rates embed platform margin). Mirrors {@see EdgeUsageCostCalculator}.
  *
- * v1 meters invocations (DigitalOcean Functions has no usable per-function
- * compute API); `gib_seconds` is summed and billed only when a backing provider
- * reports it (Cloudflare/AWS), and stays 0 — hence free — for DO functions.
+ * Two meters, priced separately because they are separate costs:
+ *
+ *  - `gib_seconds` — provider compute, DigitalOcean's actual billing unit.
+ *    DO has no per-function compute API, so {@see ServerlessUsageCollector}
+ *    derives it from dply's own invocation log (duration x action memory).
+ *  - `invocations` — dply's per-request log-ingest and storage cost, which the
+ *    provider does not charge for and GiB-seconds do not capture.
  */
 class ServerlessUsageCostCalculator
 {

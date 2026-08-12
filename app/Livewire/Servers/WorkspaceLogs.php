@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -24,6 +25,7 @@ use Livewire\Component;
 #[Lazy]
 class WorkspaceLogs extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -34,7 +36,7 @@ class WorkspaceLogs extends Component
     use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity', 'related'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';

@@ -9,8 +9,9 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\OrganizationBillingSnapshot;
 use App\Models\Server;
-use App\Modules\Billing\Models\Subscription;
 use App\Models\Site;
+use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Models\SubscriptionItem;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -539,23 +540,18 @@ final class BillingAnalytics
     }
 
     /**
-     * @return list<array{id: string, name: string, tier: string, monthly_cents: int}>
+     * @return list<array{id: string, name: string, monthly_cents: int}>
      */
     private function billableServersList(Organization $organization): array
     {
         return $this->billableServers($organization)
-            ->map(function (Server $server): array {
-                $tier = $server->billingTier();
-
-                return [
-                    'id' => (string) $server->id,
-                    'name' => (string) $server->name,
-                    'tier' => strtoupper($tier->value),
-                    // Per-server dply fee is $0 under the flat-plan model — the
-                    // plan price (by server count) is billed once, not per size.
-                    'monthly_cents' => 0,
-                ];
-            })
+            ->map(fn (Server $server): array => [
+                'id' => (string) $server->id,
+                'name' => (string) $server->name,
+                // Per-server dply fee is $0 under the flat-plan model — the
+                // plan price (by server count) is billed once, not per server.
+                'monthly_cents' => 0,
+            ])
             ->values()
             ->all();
     }
@@ -635,7 +631,7 @@ final class BillingAnalytics
 
         $items = [];
         foreach ($subscription->items as $item) {
-            /** @var \App\Modules\Billing\Models\SubscriptionItem $item */
+            /** @var SubscriptionItem $item */
             $items[] = [
                 'price_id' => $item->stripe_price,
                 'quantity' => (int) $item->quantity,
@@ -694,7 +690,7 @@ final class BillingAnalytics
     }
 
     /**
-     * @param  array<string, mixed> $estimate
+     * @param  array<string, mixed>  $estimate
      */
     private function formatEdgeUsageDetail(array $estimate): ?string
     {

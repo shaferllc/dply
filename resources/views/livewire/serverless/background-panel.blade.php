@@ -2,10 +2,10 @@
     $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
 @endphp
 
-<div class="dply-card overflow-hidden">
+{{-- Embedded strip inside the Overview card — no card of its own. --}}
+<div class="border-t border-brand-ink/10">
     <x-workspace-panel-head
         dense
-        class="border-b border-brand-ink/10"
         icon="heroicon-o-clock"
         :title="__('Scheduler & queue')"
         :count="$enabled ? __('on') : __('off')"
@@ -33,20 +33,45 @@
                     {{ __('A function drains its queue with several concurrent invocations, so the queue has to live somewhere all of them can reach.') }}
                 </p>
 
+                {{-- dply Queue leads: it is created on the spot, where Redis
+                     needs a cluster the operator has to already be paying
+                     for. Redis stays offered when one is online — an org
+                     without dply Queue still needs the old way out. --}}
                 <div class="mt-2 flex flex-wrap items-center gap-2">
+                    @if ($canUseDply)
+                        <button type="button" wire:click="useDplyQueue" wire:loading.attr="disabled" wire:target="useDplyQueue"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-2.5 py-1 text-2xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:opacity-60">
+                            <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                            <span wire:loading.remove wire:target="useDplyQueue">{{ __('Use dply Queue') }}</span>
+                            <span wire:loading wire:target="useDplyQueue">{{ __('Creating…') }}</span>
+                        </button>
+                    @endif
+
                     @if ($canUseRedis)
                         <button type="button" wire:click="useProvisionedRedis" wire:loading.attr="disabled" wire:target="useProvisionedRedis"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-2.5 py-1 text-2xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:opacity-60">
+                                @class([
+                                    'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-2xs font-semibold shadow-sm disabled:opacity-60',
+                                    'bg-amber-900 text-amber-50 hover:bg-amber-950' => ! $canUseDply,
+                                    'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300 hover:bg-amber-200' => $canUseDply,
+                                ])>
                             <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                             <span wire:loading.remove wire:target="useProvisionedRedis">{{ __('Use the provisioned Redis') }}</span>
                             <span wire:loading wire:target="useProvisionedRedis">{{ __('Wiring…') }}</span>
                         </button>
-                    @else
+                    @endif
+
+                    @unless ($canUseDply || $canUseRedis)
                         <span class="text-2xs">
                             {{ __('Provision a Redis cache for this function on the Resources tab, and dply will point the queue at it automatically.') }}
                         </span>
-                    @endif
+                    @endunless
                 </div>
+
+                @if ($canUseDply)
+                    <p class="mt-1.5 text-2xs">
+                        {{ __('dply Queue is a managed queue dply hosts for this function — nothing to provision, and it works on the next deploy.') }}
+                    </p>
+                @endif
             </div>
         @elseif ($enabled && $queueState === 'unknown')
             {{-- Not blocked: an unrecognised driver backed by a real service
@@ -54,6 +79,47 @@
                  risk. Say so rather than pretending to have checked. --}}
             <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
                 {{ $queueReason }}
+            </div>
+        @endif
+
+        {{-- The managed queue itself. Shown whenever a namespace exists, even
+             if the connection has since been pointed elsewhere by hand — the
+             jobs in it are real either way, and silently hiding them is how
+             an operator loses a backlog. --}}
+        @if ($managedQueue)
+            <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('dply Queue') }}</p>
+                        <span @class([
+                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em]',
+                            'bg-brand-sand/60 text-brand-moss' => $managedQueue['status'] === 'active',
+                            'bg-amber-100 text-amber-900' => $managedQueue['status'] !== 'active',
+                        ])>{{ $managedQueue['status'] }}</span>
+                    </div>
+
+                    @if ($managedQueue['depth'])
+                        <p class="text-2xs text-brand-mist">
+                            {{ __(':pending pending · :delayed delayed · :reserved in flight', [
+                                'pending' => number_format($managedQueue['depth']['pending']),
+                                'delayed' => number_format($managedQueue['depth']['delayed']),
+                                'reserved' => number_format($managedQueue['depth']['reserved']),
+                            ]) }}
+                        </p>
+                    @else
+                        <p class="text-2xs text-brand-mist">{{ __('Depth unavailable right now.') }}</p>
+                    @endif
+                </div>
+
+                <p class="mt-1 truncate font-mono text-2xs text-brand-moss" title="{{ $managedQueue['endpoint'] }}">
+                    {{ $managedQueue['endpoint'] }}
+                </p>
+
+                @unless ($usingManagedQueue)
+                    <p class="mt-1.5 text-2xs text-amber-900">
+                        {{ __('QUEUE_CONNECTION is set to :connection, not `dply`, so this queue is not being used. Anything still in it will not drain.', ['connection' => $queueConnection ?: __('unset')]) }}
+                    </p>
+                @endunless
             </div>
         @endif
 

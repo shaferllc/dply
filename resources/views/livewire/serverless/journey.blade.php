@@ -174,15 +174,10 @@
                             </button>
                         @endif
 
-                        @if ($live && $actionUrl)
-                            <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
-                               class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/50">
-                                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Open app') }}
-                            </a>
-                        @endif
-
-                        @unless ($embedded)
+                        {{-- When live, Open app and the workspace link are the
+                             success panel's job — at full size. Don't repeat
+                             them up here at button-bar scale. --}}
+                        @unless ($embedded || $live)
                             <a href="{{ \App\Support\Serverless\ServerlessWorkspaceUrl::show($site) }}" wire:navigate
                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/50">
                                 {{ __('Open workspace') }}
@@ -226,20 +221,111 @@
                 </div>
             @endif
 
-            {{-- Failure / cancelled / live callout --}}
-            @if ($failed || $cancelled || $live)
+            {{-- Success. A first deploy landing is the payoff for the whole
+                 flow, so it gets a real moment and a clear next move rather
+                 than sharing the one-line callout with the failure states. --}}
+            @if ($live && ! $failed && ! $cancelled)
+                <div class="relative overflow-hidden border-b border-brand-ink/10 bg-emerald-50/60">
+                    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(104,132,121,0.16),_transparent_60%)]" aria-hidden="true"></div>
+
+                    <div class="relative flex flex-col gap-5 px-5 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+                        <div class="flex min-w-0 items-start gap-3.5">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-forest text-brand-cream shadow-sm">
+                                <x-heroicon-o-check class="h-6 w-6" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-lg font-semibold tracking-tight text-brand-ink sm:text-xl">
+                                    {{ __(':name is live', ['name' => $site->name]) }}
+                                </p>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Deployed and answering requests. Set up the rest of the app in its workspace.') }}
+                                </p>
+                                @if ($deployDuration || $repoLabel)
+                                    <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
+                                        @if ($deployDuration)
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                {{ __('Deployed in :time', ['time' => $deployDuration]) }}
+                                            </span>
+                                        @endif
+                                        @if ($deployDuration && $repoLabel)
+                                            <span class="text-brand-mist/70" aria-hidden="true">·</span>
+                                        @endif
+                                        @if ($repoLabel)
+                                            <span class="truncate font-mono">{{ $repoLabel }}</span>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- The one thing to do next, sized like it. --}}
+                        <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                            @unless ($embedded)
+                                <a href="{{ $workspaceUrl }}" wire:navigate
+                                   class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
+                                    <x-heroicon-o-squares-2x2 class="h-5 w-5 shrink-0" aria-hidden="true" />
+                                    {{ __('Go to workspace') }}
+                                    <x-heroicon-m-arrow-right class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
+                                </a>
+                            @endunless
+                            @if ($actionUrl)
+                                <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
+                                   class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/50">
+                                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Open app') }}
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Set-up shortcuts: the sections a just-shipped app still needs. --}}
+                    @if ($nextSteps !== [] && ! $embedded)
+                        <div class="relative border-t border-brand-ink/10 bg-white/50">
+                            <p class="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-6">
+                                {{ __('Finish setting it up') }}
+                            </p>
+                            <ul class="grid sm:grid-cols-2 lg:grid-cols-4">
+                                @foreach ($nextSteps as $i => $step)
+                                    <li @class([
+                                        'min-w-0',
+                                        'border-b border-brand-ink/10 sm:border-b-0' => $i < count($nextSteps) - 1,
+                                        'lg:border-e lg:border-brand-ink/10' => $i < count($nextSteps) - 1,
+                                        'sm:border-b sm:border-brand-ink/10 lg:border-b-0' => $i < 2,
+                                        'sm:border-e sm:border-brand-ink/10' => $i % 2 === 0,
+                                    ])>
+                                        <a href="{{ $step['href'] }}" wire:navigate
+                                           class="group flex h-full items-start gap-2.5 px-5 py-3 transition-colors hover:bg-brand-sand/25 sm:px-6">
+                                            <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest shadow-sm ring-1 ring-brand-ink/10 transition group-hover:ring-brand-sage/40">
+                                                <x-dynamic-component :component="$step['icon']" class="h-4 w-4" aria-hidden="true" />
+                                            </span>
+                                            <span class="min-w-0">
+                                                <span class="flex items-center gap-1 text-sm font-semibold text-brand-ink">
+                                                    {{ $step['label'] }}
+                                                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-hover:translate-x-0.5 group-hover:text-brand-forest" aria-hidden="true" />
+                                                </span>
+                                                <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $step['body'] }}</span>
+                                            </span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- Failure / cancelled callout --}}
+            @if ($failed || $cancelled)
                 <div @class([
                     'border-b border-brand-ink/10 px-5 py-4 sm:px-6',
                     'bg-rose-50/80' => $failed && ! $cancelled,
                     'bg-amber-50/80' => $cancelled,
-                    'bg-emerald-50/50' => $live && ! $failed && ! $cancelled,
                 ])>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-brand-ink">
-                                @if ($live && ! $failed)
-                                    {{ __('Your function is live') }}
-                                @elseif ($cancelled)
+                                @if ($cancelled)
                                     {{ __('Deploy cancelled') }}
                                 @else
                                     {{ __('Deploy failed') }}
@@ -249,9 +335,7 @@
                                 @endif
                             </p>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                @if ($live && ! $failed)
-                                    {{ __('It\'s deployed and answering requests.') }}
-                                @elseif ($cancelled)
+                                @if ($cancelled)
                                     {{ __('Nothing was rolled back — retry when you are ready.') }}
                                 @elseif ($errorSummary !== '')
                                     <span class="font-mono text-[13px] leading-snug text-rose-900">{{ $errorSummary }}</span>

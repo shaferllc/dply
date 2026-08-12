@@ -1,0 +1,343 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Notifications;
+
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Credentials\BackupStorageOAuthController;
+use App\Models\Organization;
+use App\Models\SlackInstallation;
+use App\Models\Team;
+use App\Models\User;
+use App\Modules\Notifications\Services\SlackWorkspaceClient;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+
+/**
+ * "Add to Slack" — connect a workspace once, then pick channels from a dropdown.
+ *
+ * Mirrors {@see BackupStorageOAuthController}'s
+ * shape (nonce in session, short TTL, re-verify the actor at callback), but
+ * produces a {@see SlackInstallation} instead of a credential row, because a
+ * single bot token backs many notification channels.
+ *
+ * Bot token rather than incoming-webhook: an incoming webhook is welded to one
+ * channel forever, so routing alerts to a second channel means a second trip
+ * through Slack's UI. `chat:write` + `chat:write.public` posts anywhere in the
+ * workspace, which is what makes the in-app channel picker possible.
+ *
+ * Requires a Slack app registered by whoever runs this deployment. When it isn't
+ * configured the button hides itself and the manual webhook fields remain — a
+ * self-hoster is never blocked on us.
+ */
+class SlackOAuthController extends Controller
+{
+    /** OAuth state is single-use and short-lived; 15 minutes is plenty to approve a dialog. */
+    private const STATE_TTL_SECONDS = 900;
+
+    /**
+     * chat:write        — post messages.
+     * chat:write.public — post to public channels without being invited first.
+     * channels:read     — list public channels for the picker.
+     * groups:read       — list private channels the bot has been invited to.
+     * team:read         — read the workspace name, so installs are distinguishable.
+     */
+    public const SCOPES = 'chat:write,chat:write.public,channels:read,groups:read,team:read';
+
+    public static function configured(): bool
+    {
+        $id = config('services.slack.client_id');
+        $secret = config('services.slack.client_secret');
+
+        return is_string($id) && $id !== '' && is_string($secret) && $secret !== '';
+    }
+
+    public function redirect(Request $request): RedirectResponse
+    {
+        $returnTo = $this->sanitizeReturnTo($request->query('return_to'));
+
+        if (! self::configured()) {
+            return $this->back($returnTo, __('Slack sign-in is not configured on this deployment. Add an incoming webhook URL manually instead.'));
+        }
+
+        $user = $request->user();
+        if (! $user instanceof User) {
+            return redirect()->route('login');
+        }
+
+        $owner = $this->resolveOwner($request, $user);
+        if (! $owner instanceof Model) {
+            return $this->back($returnTo, __('Could not work out which account the Slack workspace should belong to.'));
+        }
+
+        // Gate before the round trip, and again on the way back — a role can be
+        // revoked while the operator is sitting on Slack's approval screen.
+        if (! Gate::allows('manageNotificationChannels', $owner)) {
+            abort(403);
+        }
+
+        $nonce = Str::random(40);
+        $request->session()->put($this->stateKey($nonce), [
+            'user_id' => (string) $user->id,
+            'owner_type' => $owner::class,
+            'owner_id' => (string) $owner->getKey(),
+            'return_to' => $returnTo,
+            'issued_at' => now()->timestamp,
+        ]);
+
+        $query = http_build_query([
+            'client_id' => config('services.slack.client_id'),
+            // Bot scopes go in `scope`; `user_scope` stays empty because dply acts
+            // as itself, never on behalf of the installing person.
+            'scope' => self::SCOPES,
+            'redirect_uri' => $this->redirectUri(),
+            'state' => $nonce,
+        ]);
+
+        return redirect('https://slack.com/oauth/v2/authorize?'.$query);
+    }
+
+    public function callback(Request $request): RedirectResponse
+    {
+        if ($request->filled('error')) {
+            return $this->back(null, $request->string('error')->toString() === 'access_denied'
+                ? __('Slack authorization was cancelled.')
+                : __('Slack authorization failed: :error', ['error' => $request->string('error')->toString()]));
+        }
+
+        $request->validate([
+            'code' => 'required|string',
+            'state' => 'required|string|size:40',
+        ]);
+
+        $payload = $request->session()->pull($this->stateKey($request->string('state')->toString()));
+        if (! is_array($payload)) {
+            return $this->back(null, __('Invalid or expired sign-in state. Please try again.'));
+        }
+
+        // Re-sanitized on read, not trusted from the session: a link generated by
+        // an already-open tab can carry a path this code would now reject.
+        $returnTo = $this->sanitizeReturnTo($payload['return_to'] ?? null);
+
+        if (now()->timestamp - (int) ($payload['issued_at'] ?? 0) > self::STATE_TTL_SECONDS) {
+            return $this->back($returnTo, __('That sign-in link expired. Please try again.'));
+        }
+
+        $user = $request->user();
+        if (! $user instanceof User || (string) $user->id !== (string) ($payload['user_id'] ?? '')) {
+            return redirect()->route('login')
+                ->with('error', __('Your session changed during sign-in. Please sign in and connect again.'));
+        }
+
+        $owner = $this->ownerFromPayload($payload);
+        if (! $owner instanceof Model || ! Gate::allows('manageNotificationChannels', $owner)) {
+            return $this->back($returnTo, __('You cannot connect a Slack workspace for that account.'));
+        }
+
+        $response = Http::asForm()->acceptJson()->post('https://slack.com/api/oauth.v2.access', [
+            'client_id' => config('services.slack.client_id'),
+            'client_secret' => config('services.slack.client_secret'),
+            'code' => $request->string('code')->toString(),
+            'redirect_uri' => $this->redirectUri(),
+        ]);
+
+        // Slack answers 200 OK with ok:false on failure, so the status code alone
+        // proves nothing — read the body.
+        $body = $response->json();
+        if (! $response->successful() || ! is_array($body) || empty($body['ok'])) {
+            $error = is_array($body) ? (string) ($body['error'] ?? '') : 'http_'.$response->status();
+
+            return $this->back($returnTo, __('Could not complete Slack sign-in: :detail', [
+                'detail' => SlackWorkspaceClient::describeError($error),
+            ]));
+        }
+
+        $botToken = (string) ($body['access_token'] ?? '');
+        $teamId = (string) ($body['team']['id'] ?? '');
+        if ($botToken === '' || $teamId === '') {
+            return $this->back($returnTo, __('Slack returned no bot token. Check that the dply Slack app requests bot scopes, then try again.'));
+        }
+
+        $teamName = (string) ($body['team']['name'] ?? __('Slack workspace'));
+
+        // updateOrCreate on (owner, team): re-running the flow for a workspace
+        // that is already connected is how an operator repairs a revoked token,
+        // and it must not leave two installs racing over the same channels.
+        $installation = SlackInstallation::query()->updateOrCreate(
+            [
+                'owner_type' => $owner::class,
+                'owner_id' => (string) $owner->getKey(),
+                'team_id' => $teamId,
+            ],
+            [
+                'team_name' => $teamName,
+                'bot_user_id' => (string) ($body['bot_user_id'] ?? '') ?: null,
+                'scopes' => (string) ($body['scope'] ?? '') ?: null,
+                'credentials' => ['bot_token' => $botToken],
+                'installed_by_user_id' => $user->id,
+            ],
+        );
+
+        // A reconnect usually means the channel list is stale too (new token, or
+        // channels added while the connection was broken).
+        SlackWorkspaceClient::forgetChannelCache($installation);
+
+        $org = match (true) {
+            $owner instanceof Organization => $owner,
+            $owner instanceof Team => $owner->organization,
+            default => $user->currentOrganization(),
+        };
+        if ($org instanceof Organization) {
+            audit_log($org, $user, 'notification_channel.slack_connected', $installation, null, [
+                'installation_id' => (string) $installation->id,
+                'team_id' => $teamId,
+                'team_name' => $teamName,
+                'owner_type' => $owner::class,
+                'auth' => 'oauth',
+            ]);
+        }
+
+        // The marker reopens the channel modal on arrival with this workspace
+        // preselected, so connecting from a server tab drops the operator back
+        // exactly where they were, one dropdown away from finishing.
+        $destination = $this->withConnectedMarker($returnTo ?? $this->defaultReturnPath($owner), (string) $installation->id);
+
+        return redirect()->to($destination)->with('success', __('Slack workspace ":team" connected — pick a channel to finish setting up the alert.', [
+            'team' => $teamName,
+        ]));
+    }
+
+    /**
+     * Which account the install belongs to. Personal is the default because that
+     * is what the profile-level channels page uses.
+     */
+    private function resolveOwner(Request $request, User $user): ?Model
+    {
+        $type = $request->string('owner')->toString();
+        $id = $request->string('owner_id')->toString();
+
+        if ($type === 'organization' && $id !== '') {
+            $org = Organization::query()->find($id);
+
+            return $org instanceof Organization && $org->hasMember($user) ? $org : null;
+        }
+
+        if ($type === 'team' && $id !== '') {
+            $team = Team::query()->find($id);
+
+            return $team instanceof Team ? $team : null;
+        }
+
+        return $user;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function ownerFromPayload(array $payload): ?Model
+    {
+        $type = is_string($payload['owner_type'] ?? null) ? $payload['owner_type'] : '';
+        $id = (string) ($payload['owner_id'] ?? '');
+
+        // Only ever the three notification-channel owners — the session value is
+        // ours, but resolving an arbitrary class name from it would still be a
+        // gadget waiting to happen.
+        $model = match ($type) {
+            User::class => User::query()->find($id),
+            Organization::class => Organization::query()->find($id),
+            Team::class => Team::query()->find($id),
+            default => null,
+        };
+
+        return $model instanceof Model ? $model : null;
+    }
+
+    private function stateKey(string $nonce): string
+    {
+        return 'slack_oauth_'.$nonce;
+    }
+
+    /** Append `slack_connected=<id>` without clobbering a tab or filter already in the path. */
+    private function withConnectedMarker(string $path, string $installationId): string
+    {
+        [$base, $query] = array_pad(explode('?', $path, 2), 2, '');
+
+        parse_str($query, $params);
+        $params['slack_connected'] = $installationId;
+
+        return $base.'?'.http_build_query($params);
+    }
+
+    /**
+     * Where an operator lands when no usable `return_to` came along — the
+     * notifications page for whichever account they were connecting.
+     */
+    private function defaultReturnPath(Model $owner): string
+    {
+        // route(absolute: false) keeps this a path — same reason as back(): the
+        // callback may arrive on a tunnel host that APP_URL doesn't match.
+        if ($owner instanceof Organization) {
+            return route('organizations.notification-channels', $owner, absolute: false);
+        }
+
+        if ($owner instanceof Team && $owner->organization !== null) {
+            return route('teams.notification-channels', [$owner->organization, $owner], absolute: false);
+        }
+
+        return route('profile.notification-channels', absolute: false);
+    }
+
+    private function redirectUri(): string
+    {
+        $configured = config('services.slack.redirect');
+
+        return is_string($configured) && $configured !== ''
+            ? $configured
+            : route('notifications.oauth.slack.callback', [], true);
+    }
+
+    /** Same-app paths only — never a scheme/host an attacker supplied. */
+    private function sanitizeReturnTo(mixed $raw): ?string
+    {
+        $raw = is_string($raw) ? trim($raw) : '';
+        if ($raw === '' || ! str_starts_with($raw, '/') || str_starts_with($raw, '//') || str_contains($raw, '\\')) {
+            return null;
+        }
+
+        $parts = parse_url($raw);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+
+        // Livewire's update endpoint is POST-only, so returning a browser to it
+        // is a guaranteed 405. It lands here when a connect link was rendered
+        // during a Livewire round trip and something captured the request path.
+        if (str_contains($path, '/livewire/') || str_ends_with($path, '/update') || str_starts_with($path, '/livewire')) {
+            return null;
+        }
+
+        return $path.(isset($parts['query']) ? '?'.$parts['query'] : '');
+    }
+
+    /**
+     * Return to wherever the operator started.
+     *
+     * Deliberately a PATH, not a route() absolute URL — Slack refuses a `.test`
+     * redirect URI, so local setups register an Expose/localhost host, and an
+     * absolute APP_URL redirect would bounce the operator to a different host
+     * where the session (and the flash message they need to read) does not exist.
+     */
+    private function back(?string $returnTo, ?string $error = null): RedirectResponse
+    {
+        $redirect = redirect()->to($returnTo ?? '/profile/notification-channels');
+
+        return $error === null ? $redirect : $redirect->with('error', $error);
+    }
+}

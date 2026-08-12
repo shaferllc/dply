@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\SyncServerProviderSpecsJob;
+use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
+use App\Livewire\Servers\Concerns\ManagesServerNoteComments;
+use App\Livewire\Servers\Concerns\ManagesServerNoteExports;
 use App\Livewire\Servers\Concerns\ManagesServerNotes;
 use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Models\Server;
@@ -45,7 +48,10 @@ class SettingsCard extends Component
 {
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use InteractsWithUnsavedChangesBar;
     use ManagesExtendedServerSettings;
+    use ManagesServerNoteComments;
+    use ManagesServerNoteExports;
     use ManagesServerNotes;
     use ManagesWorkspaceSettingsForm;
 

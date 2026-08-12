@@ -14,8 +14,6 @@ use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
  */
 trait BuildsProvisionRoles
 {
-
-
     /**
      * @return list<string>
      */
@@ -130,6 +128,12 @@ trait BuildsProvisionRoles
         ]);
 
         $lines[] = 'echo '.escapeshellarg(self::VERIFY_PREFIX.'docker :: ok :: Container host packages installed');
+
+        // An engine picked alongside the Docker role runs as a container — the
+        // role exists precisely so the stack is containerised. This argument
+        // used to be accepted and ignored, so the selection vanished and the
+        // host came up with no database.
+        $lines = array_merge($lines, $this->installDatabaseInDockerIfNeeded($database));
 
         return array_merge($lines, $this->writeRenderedConfigs('docker', $web, $php, $layout));
     }

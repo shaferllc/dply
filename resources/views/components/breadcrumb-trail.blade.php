@@ -152,13 +152,13 @@
                             : null;
                     @endphp
                     @if (! $loop->first)
-                        <li class="select-none text-brand-mist" aria-hidden="true">/</li>
+                        <li class="flex h-5 select-none items-center text-brand-mist" aria-hidden="true">/</li>
                     @endif
                     <li class="min-w-0">
                         @if ($hasHref)
                             <a
                                 href="{{ $href }}"
-                                class="group inline-flex max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
+                                class="group inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
                                 wire:navigate
                             >
                                 @if ($crumbAvatar)
@@ -176,7 +176,7 @@
                                 <span class="truncate">{{ $item['label'] }}</span>
                             </a>
                         @elseif ($isLast)
-                            <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
+                            <span class="inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
                                 @if ($crumbAvatar)
                                     <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
@@ -189,7 +189,7 @@
                                 <span class="truncate">{{ $item['label'] }}</span>
                             </span>
                         @else
-                            <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
+                            <span class="inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
                                 @if ($crumbAvatar)
                                     <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)

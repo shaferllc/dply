@@ -15,21 +15,22 @@ use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Models\BackupSchedule;
 use App\Models\InsightFinding;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
@@ -85,12 +86,12 @@ class WorkspaceOverview extends Component
                     && $function->last_deploy_at === null
                 ) {
                     return $this->redirect(
-                        \App\Support\Serverless\ServerlessWorkspaceUrl::journey($function),
+                        ServerlessWorkspaceUrl::journey($function),
                     );
                 }
 
                 return $this->redirect(
-                    \App\Support\Serverless\ServerlessWorkspaceUrl::show($function),
+                    ServerlessWorkspaceUrl::show($function),
                 );
             }
         }
@@ -294,11 +295,11 @@ class WorkspaceOverview extends Component
                 ->whereIn('program_type', SupervisorQueueProgramTypes::TYPES)
                 ->where('is_active', true)
                 ->count(),
-            'active_schedules' => ServerBackupSchedule::query()
+            'active_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', true)
                 ->count(),
-            'paused_schedules' => ServerBackupSchedule::query()
+            'paused_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', false)
                 ->count(),
@@ -578,6 +579,7 @@ class WorkspaceOverview extends Component
         // operator lands, not buried in Settings → Notes. Cap at 3 — the notes
         // tab owns the full list.
         $pinnedNotes = $this->server->notes()
+            ->active()
             ->where('pinned', true)
             ->with('creator:id,name')
             ->orderByDesc('updated_at')

@@ -99,9 +99,15 @@ class ServerlessQueueDoctorCommand extends Command
         $connection = $backend['connection'] ?? '';
 
         if (in_array($backend['state'], [ServerlessQueueBackend::STATE_INERT, ServerlessQueueBackend::STATE_UNSHARED], true)) {
-            $fix = $backend['fixable_with_redis']
-                ? ' A provisioned Redis is online for this function — run the Workers panel\'s "Use the provisioned Redis" action, or set QUEUE_CONNECTION=redis, then redeploy.'
-                : ' Provision a Redis cache on the Resources tab (dply will point the queue at it automatically), use a networked database, or use a networked SQLite such as libSQL/Turso.';
+            // Same order of preference the panel offers, so the doctor never
+            // sends an operator to the harder remedy than the UI would.
+            if ($backend['fixable_with_dply']) {
+                $fix = ' dply Queue is available to this organization — run the Workers panel\'s "Use dply Queue" action to create a managed queue for this function, then redeploy.';
+            } elseif ($backend['fixable_with_redis']) {
+                $fix = ' A provisioned Redis is online for this function — run the Workers panel\'s "Use the provisioned Redis" action, or set QUEUE_CONNECTION=redis, then redeploy.';
+            } else {
+                $fix = ' Provision a Redis cache on the Resources tab (dply will point the queue at it automatically), use a networked database, or use a networked SQLite such as libSQL/Turso.';
+            }
 
             $problems[] = $backend['reason'].$fix.' dply will not drain this function until then.';
         } elseif ($backend['state'] === ServerlessQueueBackend::STATE_UNKNOWN) {

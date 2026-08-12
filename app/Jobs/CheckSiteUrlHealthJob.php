@@ -15,7 +15,9 @@ class CheckSiteUrlHealthJob implements ShouldQueue
 
     public function __construct(
         public string $siteId
-    ) {}
+    ) {
+        $this->onQueue(config('dply.queues.background'));
+    }
 
     public function handle(): void
     {

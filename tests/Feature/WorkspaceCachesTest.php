@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\WorkspaceCachesTest;
 
 use App\Jobs\InstallCacheServiceJob;
+use App\Jobs\RefreshCacheClientsJob;
+use App\Jobs\RefreshCacheMemorySettingsJob;
 use App\Jobs\StatusCacheServiceJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Servers\WorkspaceCaches;
@@ -15,16 +17,15 @@ use App\Models\ServerCacheServiceAuditEvent;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceConfigWriter;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServicePort;
-use App\Jobs\RefreshCacheClientsJob;
-use App\Jobs\RefreshCacheMemorySettingsJob;
 use App\Support\Servers\CacheServiceStats;
-use Illuminate\Support\Facades\Cache;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -200,18 +201,17 @@ test('install refuses second redis family engine on same server', function () {
         'engine' => 'valkey',
     ]);
 });
-test('every cache engine installs — none are gated coming soon', function () {
-    // CacheEngineAvailability::GATED_ENGINES is now empty: every engine
-    // graduated, so the Pennant flag no longer blocks an install. Turning the
-    // flag off must NOT refuse any more — re-adding a key to GATED_ENGINES is
-    // what re-enables the guard (isComingSoon() still honours the const).
+test('a gated cache engine refuses to install while its flag is off', function () {
+    // Every non-Redis engine is parked: listed in GATED_ENGINES with its
+    // `cache.{engine}` flag false, so installs are refused and the engine is
+    // hidden from the tab strip. Flip the flag on to bring one back.
     Queue::fake();
     config(['features.cache.valkey' => false]);
     Feature::flushCache();
     [$user, $server] = actingOwnerWithServer();
 
-    expect(\App\Support\Servers\CacheEngineAvailability::GATED_ENGINES)->toBe([]);
-    expect(\App\Support\Servers\CacheEngineAvailability::isComingSoon('valkey'))->toBeFalse();
+    expect(CacheEngineAvailability::GATED_ENGINES)->toContain('valkey');
+    expect(CacheEngineAvailability::isComingSoon('valkey'))->toBeTrue();
 
     $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
         $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
@@ -223,7 +223,7 @@ test('every cache engine installs — none are gated coming soon', function () {
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->call('installCacheService', 'valkey');
 
-    Queue::assertPushed(InstallCacheServiceJob::class);
+    Queue::assertNotPushed(InstallCacheServiceJob::class);
 });
 test('install blocks when another install is in flight', function () {
     // The new server-wide busy guard blocks even cross-engine installs while apt is

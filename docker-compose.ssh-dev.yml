@@ -7,7 +7,7 @@
 # SSH: ssh -p 2222 -i docker/ssh-dev/local_fake_cloud_ed25519 root@127.0.0.1
 # BYO "existing server": host 127.0.0.1, port 2222, user root, private key = docker/ssh-dev/local_fake_cloud_ed25519
 #
-# Webhook reachability: extra_hosts maps your Valet site (default dplyi.test) to the
+# Webhook reachability: extra_hosts maps your Valet site (default dply.test) to the
 # Docker host gateway, and the Valet CA is mounted + installed at boot so HTTPS verifies.
 # Override DPLY_LOCAL_APP_HOST / DPLY_VALET_CA_PATH if your setup differs.
 services:
@@ -24,7 +24,7 @@ services:
       - /run/lock
       - /tmp
     extra_hosts:
-      - "${DPLY_LOCAL_APP_HOST:-dplyi.test}:host-gateway"
+      - "${DPLY_LOCAL_APP_HOST:-dply.test}:host-gateway"
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ./docker/ssh-dev/local_fake_cloud_ed25519.pub:/etc/ssh/authorized_keys.pub:ro

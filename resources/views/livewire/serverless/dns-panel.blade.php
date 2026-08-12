@@ -48,9 +48,17 @@
                 <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-950">
                     <p class="font-semibold">{{ __('Covered by wildcard') }}</p>
                     <p class="mt-0.5">
-                        {{ __('The zone has a `*` wildcard :type record resolving to', ['type' => $recordType]) }}
-                        <span class="font-mono">{{ $recordData }}</span>.
-                        {{ __('No per-site record needed.') }}
+                        @if ($wildcardMode)
+                            {{ __('Every function on') }}
+                            <span class="font-mono">{{ $zone }}</span>
+                            {{ __('resolves through the zone’s') }}
+                            <span class="font-mono">*.{{ $zone }}</span>
+                            {{ __('record, so dply creates no per-function DNS record and needs no DNS credential.') }}
+                        @else
+                            {{ __('The zone has a `*` wildcard :type record resolving to', ['type' => $recordType]) }}
+                            <span class="font-mono">{{ $recordData }}</span>.
+                            {{ __('No per-site record needed.') }}
+                        @endif
                     </p>
                 </div>
             @else
@@ -128,7 +136,7 @@
                             {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN, then retry.') }}
                             @break
                         @case('unconfigured_zone')
-                            {{ __('Hostname zone isn’t in DPLY_TESTING_DOMAINS. Add it, then retry.') }}
+                            {{ __('Hostname zone isn’t in DPLY_SERVERLESS_TESTING_DOMAINS. Add it, then retry.') }}
                             @break
                         @default
                             {{ __('See deploy log for details.') }}

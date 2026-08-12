@@ -31,8 +31,33 @@
 @endphp
 
 @if ($isRedisFamily)
+    {{-- Dense hairline strip, matching the connection-snippet head below it and
+         the rest of the merged workspace chrome — the old markup used a tall
+         h2 + prose stack that read as a page heading inside a panel. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-link"
+        :title="__(':engine — connection details', ['engine' => $engineLabel])"
+        :note="__('Host, port, and AUTH password for a remote client. Anything in the source CIDR can connect with these values.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot name="actions">
+            @if ($isExposed)
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    {{ __('Remote') }}
+                </span>
+            @else
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                    {{ __('Loopback only') }}
+                </span>
+            @endif
+        </x-slot>
+    </x-workspace-panel-head>
+
     <div
-        class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6"
+        class="{{ $card ?? 'border-b border-brand-ink/10' }} px-4 py-3.5 sm:px-5"
         x-data="{
             shown: false,
             copy(value, label) {
@@ -42,32 +67,12 @@
             },
         }"
     >
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine — connection details', ['engine' => $engineLabel]) }}</h2>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Host, port, and AUTH password for a remote client. Anything in the source CIDR can connect with these values.') }}
-                </p>
-            </div>
-            @if ($isExposed)
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    {{ __('Remote') }}
-                </span>
-            @else
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
-                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                    {{ __('Loopback only') }}
-                </span>
-            @endif
-        </div>
-
         @if ($isExposed)
-            <p class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
+            <p class="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
                 {{ __('Exposed to :source on TCP :port. Sources outside that range are blocked at the firewall.', ['source' => $exposedRule?->source ?? '—', 'port' => $row->port]) }}
             </p>
         @else
-            <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+            <div class="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
                 <p>{{ __('Engine is bound to 127.0.0.1 only — remote clients cannot connect yet. Open the Configure tab and add a network exposure rule to allow another server in.') }}</p>
                 <button
                     type="button"

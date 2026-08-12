@@ -8,13 +8,13 @@
 @endphp
 
 <div
-    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6"
+    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-4 py-3.5 sm:px-5"
     wire:init="loadSlowlog"
     wire:poll.10s="loadSlowlog"
 >
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — slowlog', ['engine' => $engineLabel]) }}</h3>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __(':engine — slowlog', ['engine' => $engineLabel]) }}</h3>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Commands that crossed the slowlog-log-slower-than threshold (10ms default). Most recent 32 entries; auto-refreshes every 10 seconds.') }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">

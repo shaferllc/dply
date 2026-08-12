@@ -24,6 +24,9 @@ trait ManagesNotificationChannels
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ResolvesDiscordGuilds;
+    use ResolvesSlackWorkspaces;
+    use ResolvesTelegramChats;
 
     public string $new_type = NotificationChannel::TYPE_SLACK;
 
@@ -102,6 +105,15 @@ trait ManagesNotificationChannels
 
     abstract protected function notificationChannelsViewData(): array;
 
+    /** {@see ResolvesSlackWorkspaces} — Slack installs hang off the same owner as the channels. */
+    protected function channelIntegrationOwner(): User|Organization|Team
+    {
+        /** @var User|Organization|Team $owner */
+        $owner = $this->owner();
+
+        return $owner;
+    }
+
     /**
      * Call from each component's mount() so the default type matches config-enabled types.
      */
@@ -115,6 +127,10 @@ trait ManagesNotificationChannels
         if (! in_array($this->new_type, $allowed, true)) {
             $this->new_type = $allowed[0];
         }
+
+        $this->syncSlackModeDefault();
+        $this->syncDiscordModeDefault();
+        $this->syncTelegramModeDefault();
     }
 
     public function updatedSearch(): void
@@ -179,6 +195,9 @@ trait ManagesNotificationChannels
         Gate::authorize('manageNotificationChannels', $this->owner());
         $this->resetErrorBag();
         $this->resetNewChannelFields();
+        $this->syncSlackModeDefault();
+        $this->syncDiscordModeDefault();
+        $this->syncTelegramModeDefault();
         $this->dispatch('open-modal', 'settings-create-channel-modal');
     }
 
@@ -194,7 +213,9 @@ trait ManagesNotificationChannels
         $this->new_label = '';
         $this->new_slack_webhook_url = '';
         $this->new_slack_channel = '';
+        $this->new_slack_channel_id = '';
         $this->new_discord_webhook_url = '';
+        $this->new_discord_channel_id = '';
         $this->new_email_address = '';
         $this->new_telegram_bot_token = '';
         $this->new_telegram_chat_id = '';
@@ -218,15 +239,35 @@ trait ManagesNotificationChannels
         $cfg = $channel->config;
         $this->clearEditChannelFields();
         if ($channel->type === NotificationChannel::TYPE_SLACK) {
-            $this->edit_slack_webhook_url = (string) ($cfg['webhook_url'] ?? '');
-            $this->edit_slack_channel = (string) ($cfg['channel'] ?? '');
+            if ($channel->usesSlackOauth()) {
+                $this->edit_slack_mode = 'oauth';
+                $this->edit_slack_installation_id = (string) ($cfg['installation_id'] ?? '');
+                $this->edit_slack_channel_id = (string) ($cfg['channel_id'] ?? '');
+            } else {
+                $this->edit_slack_mode = 'webhook';
+                $this->edit_slack_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+                $this->edit_slack_channel = (string) ($cfg['channel'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_DISCORD) {
-            $this->edit_discord_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+            if ($channel->usesDiscordOauth()) {
+                $this->edit_discord_mode = 'oauth';
+                $this->edit_discord_installation_id = (string) ($cfg['installation_id'] ?? '');
+                $this->edit_discord_channel_id = (string) ($cfg['channel_id'] ?? '');
+            } else {
+                $this->edit_discord_mode = 'webhook';
+                $this->edit_discord_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_EMAIL) {
             $this->edit_email_address = (string) ($cfg['email'] ?? '');
         } elseif ($channel->type === NotificationChannel::TYPE_TELEGRAM) {
-            $this->edit_telegram_bot_token = (string) ($cfg['bot_token'] ?? '');
-            $this->edit_telegram_chat_id = (string) ($cfg['chat_id'] ?? '');
+            if ($channel->usesTelegramConnected()) {
+                $this->edit_telegram_mode = 'connected';
+                $this->edit_telegram_installation_id = (string) ($cfg['installation_id'] ?? '');
+            } else {
+                $this->edit_telegram_mode = 'manual';
+                $this->edit_telegram_bot_token = (string) ($cfg['bot_token'] ?? '');
+                $this->edit_telegram_chat_id = (string) ($cfg['chat_id'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_PUSHOVER) {
             $this->edit_pushover_app_token = (string) ($cfg['app_token'] ?? '');
             $this->edit_pushover_user_key = (string) ($cfg['user_key'] ?? '');
@@ -248,7 +289,9 @@ trait ManagesNotificationChannels
     {
         $this->edit_slack_webhook_url = '';
         $this->edit_slack_channel = '';
+        $this->edit_slack_channel_id = '';
         $this->edit_discord_webhook_url = '';
+        $this->edit_discord_channel_id = '';
         $this->edit_email_address = '';
         $this->edit_telegram_bot_token = '';
         $this->edit_telegram_chat_id = '';
@@ -376,10 +419,15 @@ trait ManagesNotificationChannels
             $p.'label' => __('label'),
             $p.'slack_webhook_url' => __('webhook URL'),
             $p.'slack_channel' => __('channel'),
+            $p.'slack_installation_id' => __('Slack workspace'),
+            $p.'slack_channel_id' => __('Slack channel'),
             $p.'discord_webhook_url' => __('webhook URL'),
+            $p.'discord_installation_id' => __('Discord server'),
+            $p.'discord_channel_id' => __('Discord channel'),
             $p.'email_address' => __('email address'),
             $p.'telegram_bot_token' => __('bot token'),
             $p.'telegram_chat_id' => __('chat ID'),
+            $p.'telegram_installation_id' => __('Telegram chat'),
             $p.'pushover_app_token' => __('application token'),
             $p.'pushover_user_key' => __('user key'),
             $p.'teams_webhook_url' => __('webhook URL'),
@@ -403,20 +451,34 @@ trait ManagesNotificationChannels
         ];
 
         return match ($type) {
-            NotificationChannel::TYPE_SLACK => $base + [
-                $prefix.'slack_webhook_url' => ['required', 'string', 'url', 'max:2048'],
-                $prefix.'slack_channel' => ['nullable', 'string', 'max:120'],
-            ],
-            NotificationChannel::TYPE_DISCORD => $base + [
-                $prefix.'discord_webhook_url' => ['required', 'string', 'url', 'max:2048'],
-            ],
+            NotificationChannel::TYPE_SLACK => $base + ($this->slackMode($prefix) === 'oauth'
+                ? [
+                    $prefix.'slack_installation_id' => ['required', 'string', 'max:26'],
+                    $prefix.'slack_channel_id' => ['required', 'string', 'max:64'],
+                ]
+                : [
+                    $prefix.'slack_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                    $prefix.'slack_channel' => ['nullable', 'string', 'max:120'],
+                ]),
+            NotificationChannel::TYPE_DISCORD => $base + ($this->discordMode($prefix) === 'oauth'
+                ? [
+                    $prefix.'discord_installation_id' => ['required', 'string', 'max:26'],
+                    $prefix.'discord_channel_id' => ['required', 'string', 'max:64'],
+                ]
+                : [
+                    $prefix.'discord_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                ]),
             NotificationChannel::TYPE_EMAIL => $base + [
                 $prefix.'email_address' => ['required', 'string', 'email', 'max:254'],
             ],
-            NotificationChannel::TYPE_TELEGRAM => $base + [
-                $prefix.'telegram_bot_token' => ['required', 'string', 'max:512'],
-                $prefix.'telegram_chat_id' => ['required', 'string', 'max:64'],
-            ],
+            NotificationChannel::TYPE_TELEGRAM => $base + ($this->telegramMode($prefix) === 'connected'
+                ? [
+                    $prefix.'telegram_installation_id' => ['required', 'string', 'max:26'],
+                ]
+                : [
+                    $prefix.'telegram_bot_token' => ['required', 'string', 'max:512'],
+                    $prefix.'telegram_chat_id' => ['required', 'string', 'max:64'],
+                ]),
             NotificationChannel::TYPE_PUSHOVER => $base + [
                 $prefix.'pushover_app_token' => ['required', 'string', 'max:64'],
                 $prefix.'pushover_user_key' => ['required', 'string', 'max:64'],
@@ -447,20 +509,26 @@ trait ManagesNotificationChannels
     protected function configFromInput(string $type, string $prefix): array
     {
         return match ($type) {
-            NotificationChannel::TYPE_SLACK => [
-                'webhook_url' => $this->{$prefix.'slack_webhook_url'},
-                'channel' => $this->{$prefix.'slack_channel'} ?: null,
-            ],
-            NotificationChannel::TYPE_DISCORD => [
-                'webhook_url' => $this->{$prefix.'discord_webhook_url'},
-            ],
+            NotificationChannel::TYPE_SLACK => $this->slackMode($prefix) === 'oauth'
+                ? $this->slackOauthConfigFromInput($prefix)
+                : [
+                    'webhook_url' => $this->{$prefix.'slack_webhook_url'},
+                    'channel' => $this->{$prefix.'slack_channel'} ?: null,
+                ],
+            NotificationChannel::TYPE_DISCORD => $this->discordMode($prefix) === 'oauth'
+                ? $this->discordOauthConfigFromInput($prefix)
+                : [
+                    'webhook_url' => $this->{$prefix.'discord_webhook_url'},
+                ],
             NotificationChannel::TYPE_EMAIL => [
                 'email' => $this->{$prefix.'email_address'},
             ],
-            NotificationChannel::TYPE_TELEGRAM => [
-                'bot_token' => $this->{$prefix.'telegram_bot_token'},
-                'chat_id' => $this->{$prefix.'telegram_chat_id'},
-            ],
+            NotificationChannel::TYPE_TELEGRAM => $this->telegramMode($prefix) === 'connected'
+                ? $this->telegramConnectedConfigFromInput($prefix)
+                : [
+                    'bot_token' => $this->{$prefix.'telegram_bot_token'},
+                    'chat_id' => $this->{$prefix.'telegram_chat_id'},
+                ],
             NotificationChannel::TYPE_PUSHOVER => [
                 'app_token' => $this->{$prefix.'pushover_app_token'},
                 'user_key' => $this->{$prefix.'pushover_user_key'},

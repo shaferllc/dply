@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\Server;
+use App\Exceptions\LogAgentInstallCanceledException;
 use App\Models\ServerLogAgent;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAgentInstallScripts;
@@ -91,6 +91,18 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
                     return;
                 }
                 $lastFlush = $now;
+
+                // Cancellation checkpoint, piggybacked on the flush throttle so it
+                // costs one extra column read every ~3s rather than one per chunk.
+                // The DB row is the signal: an operator hitting Cancel writes
+                // `failed` there, and seeing anything other than `installing` here
+                // means this job no longer owns the row. Note `update()` below
+                // touches only install_output, so it can't resurrect the status.
+                $current = ServerLogAgent::query()->whereKey($agent->id)->value('status');
+                if ($current !== ServerLogAgent::STATUS_INSTALLING) {
+                    throw new LogAgentInstallCanceledException('Install canceled by an operator.');
+                }
+
                 $agent->update(['install_output' => mb_substr($buffer, -32_000)]);
             };
 
@@ -119,6 +131,12 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
                 'config_version' => $scripts->configVersion(),
                 'error_message' => null,
             ]);
+        } catch (LogAgentInstallCanceledException) {
+            // Leave the row exactly as the operator set it — overwriting it with a
+            // generic failure would erase the explanation they need. Swallowed
+            // rather than rethrown so the queue does not retry a cancelled install
+            // back into existence a minute later.
+            return;
         } catch (\Throwable $e) {
             $agent->update([
                 'status' => ServerLogAgent::STATUS_FAILED,

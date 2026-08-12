@@ -195,6 +195,19 @@
                         window.location.assign(url);
                     }
                 });
+
+                // Open a third-party link in a new tab WITHOUT navigating away —
+                // used by the Telegram connect flow, which has no redirect back,
+                // so the half-filled channel form has to survive on this page
+                // while the operator picks a chat in the Telegram app.
+                Livewire.on('open-external', (e) => {
+                    const payload = Array.isArray(e) ? e[0] : e;
+                    const url = payload?.url ?? payload?.detail?.url;
+
+                    if (typeof url === 'string' && url.startsWith('https://')) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                    }
+                });
             });
         </script>
     </body>

@@ -4,13 +4,13 @@
             <x-organization-shell
                 :organization="$organization"
                 section="providers"
-                :title="__('Server providers')"
-                :description="__('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.')"
-                icon="heroicon-o-server"
+                :title="__('Credentials')"
+                :description="__('Every secret this organization hands to a third party: API tokens for the clouds, registrars and CDNs you use, and the buckets and remotes your backups ship to. All encrypted at rest, and validated against the provider when we can.')"
+                icon="heroicon-o-key"
                 :breadcrumb="[
                     ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                     ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                    ['label' => __('Server providers'), 'icon' => 'server'],
+                    ['label' => __('Credentials'), 'icon' => 'key'],
                 ]"
             >
                 <x-slot:actions>
@@ -41,6 +41,14 @@
          provider card dispatches `open-add-provider-credential-modal`
          with its provider id; the modal listens window-wide. --}}
     <livewire:credentials.add-provider-credential-modal />
+
+    {{-- Storage destinations are a different shape from provider tokens (named,
+         many per provider, no OAuth), so they get their own modal rather than
+         being forced through the provider-credential one. It is the shared
+         two-mode dialog: "connect existing" records keys for a bucket you
+         already have, "create new bucket" provisions one on the provider using
+         a connected cloud token. Same dialog the server workspace opens. --}}
+    @include('livewire.servers.partials.backups._add-destination-modal')
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')

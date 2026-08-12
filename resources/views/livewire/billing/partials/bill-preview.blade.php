@@ -1,16 +1,11 @@
 @php
-    $tierSpecs = [
-        'xs' => '≤1 vCPU · ≤2 GB',
-        's' => '2 vCPU · ≤4 GB',
-        'm' => '≤4 vCPU · ≤8 GB',
-        'l' => '≤8 vCPU · ≤16 GB',
-        'xl' => 'Above L',
-    ];
+    // Server size is not a billing input — the plan is set by how many servers
+    // you run — so the what-if is a single count, not five size buckets.
     $presets = [
-        ['label' => 'My fleet', 'hint' => 'Reset to current', 'counts' => collect($this->billingState->tierQuantities)->all()],
-        ['label' => 'Solo dev', 'hint' => '1 small', 'counts' => ['xs' => 1, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0]],
-        ['label' => 'Small team', 'hint' => '3 mid', 'counts' => ['xs' => 0, 's' => 0, 'm' => 3, 'l' => 0, 'xl' => 0]],
-        ['label' => 'Growing fleet', 'hint' => '5 mid + 2 big', 'counts' => ['xs' => 0, 's' => 0, 'm' => 5, 'l' => 2, 'xl' => 0]],
+        ['label' => 'My fleet', 'hint' => 'Reset to current', 'count' => $this->billingState->serverCount()],
+        ['label' => 'Solo dev', 'hint' => '1 server', 'count' => 1],
+        ['label' => 'Small team', 'hint' => '3 servers', 'count' => 3],
+        ['label' => 'Growing fleet', 'hint' => '7 servers', 'count' => 7],
     ];
     $annualPct = (int) config('subscription.standard.annual_discount_pct', 20);
 @endphp
@@ -43,14 +38,14 @@
         <span class="text-xs font-semibold uppercase tracking-wider text-brand-ink/60 mr-2">{{ __('Quick picks') }}</span>
         @foreach ($presets as $preset)
             <button type="button"
-                    @click="previewCounts = {{ json_encode($preset['counts']) }}"
+                    @click="previewServerCount = {{ (int) $preset['count'] }}"
                     class="inline-flex flex-col items-start rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors text-left">
                 <span class="text-xs font-semibold text-brand-ink">{{ $preset['label'] }}</span>
                 <span class="text-2xs text-brand-moss/80">{{ $preset['hint'] }}</span>
             </button>
         @endforeach
         <button type="button"
-                @click="previewCounts = { xs: 0, s: 0, m: 0, l: 0, xl: 0 }"
+                @click="previewServerCount = 0"
                 class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs text-brand-moss hover:text-brand-ink transition-colors ml-auto">
             {{ __('Reset') }}
         </button>
@@ -60,33 +55,32 @@
         {{ __('Add servers of any size — your plan is set by total server count, not size. Managed products are billed separately.') }}
     </div>
 
-    <div class="space-y-2 px-5 pb-5 sm:px-6">
-        @foreach ($tierSpecs as $key => $spec)
-            <div class="flex items-center gap-4 rounded-lg hover:bg-brand-cream/30 transition-colors px-3 py-2">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-3">
-                        <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-md bg-brand-sand/30 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-ink">{{ $key }}</span>
-                        <span class="text-sm text-brand-ink">{{ $spec }}</span>
-                    </div>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button type="button"
-                            @click="previewCounts['{{ $key }}'] = Math.max(0, (previewCounts['{{ $key }}'] || 0) - 1)"
-                            class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            :disabled="(previewCounts['{{ $key }}'] || 0) === 0">
-                        <span class="text-lg leading-none">−</span>
-                    </button>
-                    <input type="number" min="0" step="1"
-                           x-model.number="previewCounts['{{ $key }}']"
-                           class="w-14 rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
-                    <button type="button"
-                            @click="previewCounts['{{ $key }}'] = (previewCounts['{{ $key }}'] || 0) + 1"
-                            class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors">
-                        <span class="text-lg leading-none">+</span>
-                    </button>
-                </div>
+    <div class="px-5 pb-5 sm:px-6">
+        <div class="flex items-center gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-brand-cream/30">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-brand-ink">{{ __('Servers') }}</p>
+                <p class="text-xs text-brand-moss/80">{{ __('Any size, any provider') }}</p>
             </div>
-        @endforeach
+            <div class="inline-flex items-center gap-1">
+                <button type="button"
+                        @click="previewServerCount = Math.max(0, previewServerCount - 1)"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        :disabled="previewServerCount === 0"
+                        aria-label="{{ __('Remove a server') }}">
+                    <span class="text-lg leading-none">−</span>
+                </button>
+                <input type="number" min="0" step="1"
+                       x-model.number="previewServerCount"
+                       aria-label="{{ __('Server count') }}"
+                       class="w-14 rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
+                <button type="button"
+                        @click="previewServerCount = previewServerCount + 1"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors"
+                        aria-label="{{ __('Add a server') }}">
+                    <span class="text-lg leading-none">+</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div class="border-t border-brand-ink/10 bg-brand-cream/40 px-5 py-5 text-sm sm:px-6">

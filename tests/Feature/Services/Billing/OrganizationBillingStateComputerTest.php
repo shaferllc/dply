@@ -34,23 +34,17 @@ test('empty org bills nothing on the free plan', function () {
     expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('classifies each ready server into its tier and resolves the plan by count', function () {
+test('counts each ready server and resolves the plan by count', function () {
     $org = Organization::factory()->create();
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 4, memMb: 8192);
-    // M
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 8, memMb: 16384);
-    // L
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
 
-    // XS
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(3);
-    expect($state->tierQuantities['m'])->toBe(1);
-    expect($state->tierQuantities['l'])->toBe(1);
-    expect($state->tierQuantities['xs'])->toBe(1);
 
-    // 3 servers → Starter ($9 flat), size no longer matters.
+    // 3 servers → Starter ($9 flat).
     expect($state->planKey)->toBe('starter');
     expect($state->monthlyTotalCents)->toBe(900);
 });
@@ -63,16 +57,15 @@ test('excludes non ready servers', function () {
     makeServerWithSpecs($org, status: Server::STATUS_PENDING, cpuCount: 4, memMb: 8192);
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 2, memMb: 4096);
 
-    // S, only billable — 1 server → Free plan.
+    // Only the ready one is billable — 1 server → Free plan.
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['s'])->toBe(1);
     expect($state->planKey)->toBe('free');
     expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('servers without metrics classify as xs', function () {
+test('servers without metrics still count toward the plan', function () {
     $org = Organization::factory()->create();
     Server::factory()->create([
         'organization_id' => $org->id,
@@ -82,7 +75,6 @@ test('servers without metrics classify as xs', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['xs'])->toBe(1);
 
     // A single server is the Free plan — $0.
     expect($state->planKey)->toBe('free');
@@ -199,7 +191,6 @@ test('excludes servers younger than min billable age', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['m'])->toBe(1);
 
     // Only the mature server counts → 1 server → Free plan.
     expect($state->planKey)->toBe('free');
@@ -241,7 +232,6 @@ test('serverless host is not counted as a spec tier', function () {
 
     // It would have classified as XS by null-fallback — must not.
     expect($state->serverCount())->toBe(0);
-    expect($state->tierQuantities['xs'])->toBe(0);
     expect($state->monthlyTotalCents)->toBe(0);
 });
 

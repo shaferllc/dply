@@ -4,6 +4,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Queue lanes
+    |--------------------------------------------------------------------------
+    | Everything used to share one queue, which meant a user watching a deploy
+    | progress bar waited behind fleet-wide SSH sweeps — a serverless deploy is
+    | two queued hops (provision the namespace, then deploy), and each hop went
+    | to the back of the same line. Two lanes, one worker each:
+    |
+    |   interactive — someone is staring at a spinner waiting for this.
+    |   background  — health probes, systemd inventory, uptime checks, error
+    |                 sweeps, broadcast fan-out. Slow and nobody is watching.
+    |
+    | `interactive` must stay the connection's default queue (queue.php →
+    | REDIS_QUEUE) so anything not explicitly routed lands in the fast lane.
+    */
+    'queues' => [
+        'interactive' => env('DPLY_INTERACTIVE_QUEUE', 'dply'),
+        'background' => env('DPLY_BACKGROUND_QUEUE', 'dply-background'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Coming-soon gate
     |--------------------------------------------------------------------------
     | Redirect logged-out visitors to the marketing "coming soon" page.
@@ -316,24 +337,37 @@ return [
     | DigitalOcean Functions has no usable per-function usage API, so v1 meters
     | INVOCATIONS rolled up from the operational function_invocations log by
     | `dply:serverless:collect-usage`. The per-function included allowance keeps
-    | low-traffic functions covered by the flat fee. `gib_seconds_*` rates are
-    | wired for future providers (Cloudflare/AWS) that report compute directly.
+    | low-traffic functions covered by the flat fee. Two meters run: GiB-seconds
+    | (provider compute, derived from the invocation log) and invocations
+    | (dply's own log-ingest cost) — see the notes on each rate below.
     |
     | Unit rates are customer-facing and embed margin over provider list
     | pricing; `markup_percent` applies an additional blanket markup.
     */
     'serverless' => [
         'usage_billing' => [
-            'enabled' => filter_var(env('DPLY_SERVERLESS_USAGE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
-            'markup_percent' => (int) env('DPLY_SERVERLESS_USAGE_MARKUP_PERCENT', 0),
-            // $0.40 / million invocations after the included allowance. DO bills
-            // bundled compute; this rate keeps margin while staying well under
-            // hyperscaler per-request pricing.
+            // On by default: the $2 flat fee covers roughly 108,000 GiB-seconds
+            // of DigitalOcean compute (200c / $0.0000185), so an unmetered
+            // managed function goes upside-down the moment it gets real
+            // traffic. Set the env to false to stage the meter per environment.
+            'enabled' => filter_var(env('DPLY_SERVERLESS_USAGE_BILLING_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            // Blanket margin on overage, aligned with edge/cloud_markup_percent.
+            'markup_percent' => (int) env('DPLY_SERVERLESS_USAGE_MARKUP_PERCENT', 40),
+            // Invocation meter — NOT provider compute (DO bills GiB-seconds
+            // only). This prices dply's own per-request cost: every web request
+            // POSTs a log record to the ingest endpoint, which dply handles and
+            // stores. Generous allowance, so only chatty functions pay it.
             'invocations_cents_per_million' => (int) env('DPLY_SERVERLESS_USAGE_INVOCATIONS_CENTS_PER_MILLION', 40),
-            // GiB-second rate for providers that report compute (Cloudflare/AWS).
-            // DO leaves gib_seconds at 0, so this is dormant until those land.
+            // 185c / 100k GiB-s == $0.0000185/GB-s — DigitalOcean Functions list
+            // price at cost, with markup_percent applied on top. Metered from
+            // dply's own invocation log (duration_ms x action memory), since DO
+            // exposes no per-function compute API.
             'gib_seconds_cents_per_100k' => (int) env('DPLY_SERVERLESS_USAGE_GIB_SECONDS_CENTS_PER_100K', 185),
             'included_invocations_per_function' => (int) env('DPLY_SERVERLESS_USAGE_INCLUDED_INVOCATIONS_PER_FUNCTION', 1_000_000),
+            // Mirrors DigitalOcean's own free tier (90,000 GiB-s/month). Note
+            // that free tier is per *account*, so on managed it is consumed
+            // once across all customers — this allowance is dply's gift, not a
+            // pass-through, and is what the flat fee is buying.
             'included_gib_seconds_per_function' => (int) env('DPLY_SERVERLESS_USAGE_INCLUDED_GIB_SECONDS_PER_FUNCTION', 90_000),
         ],
     ],

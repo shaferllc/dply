@@ -3,16 +3,24 @@
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
+use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
  * Ensures a deployed serverless function's friendly hostname
- * ({slug}.{testing-domain}, e.g. laravel-demo.dply.host) has a DNS record
- * pointing at the dply app, which proxies the request through to the raw
- * DigitalOcean Functions invocation URL (DO Functions has no custom domains).
+ * ({slug}.dply-serverless.cloud) has a DNS record pointing at the dply app,
+ * which proxies the request through to the raw DigitalOcean Functions
+ * invocation URL (DO Functions has no custom domains).
+ *
+ * Two DNS backends, chosen per zone by
+ * {@see ServerlessTestingDomains::dnsProviderForZone()}: the serverless apex is
+ * a Cloudflare zone, while hostnames minted on the legacy shared
+ * DPLY_TESTING_DOMAINS pool live on DigitalOcean and keep the DO path so they
+ * stay repairable.
  *
  * Idempotent: every deploy/redeploy calls this, but the record is only
  * created when it is missing. DNS failures never fail the deploy — the
@@ -34,16 +42,182 @@ final class ServerlessFunctionDnsProvisioner
 
         $zone = $this->zoneForHost($host);
         $recordName = $zone !== null ? (string) Str::beforeLast($host, '.'.$zone) : '';
-        $token = trim((string) config('services.digitalocean.token'));
 
-        if ($zone === null || $recordName === '' || $token === '') {
+        if ($zone === null || $recordName === '') {
             $this->store($site, [
                 'status' => 'skipped',
                 'hostname' => $host,
-                'reason' => $token === '' ? 'missing_token' : 'unconfigured_zone',
+                'reason' => 'unconfigured_zone',
             ]);
 
-            return 'DNS: skipped — no app-level DigitalOcean token or testing zone.';
+            return 'DNS: skipped — '.$host.' is not on a configured serverless apex.';
+        }
+
+        // Wildcard mode: a hand-created `*.{apex}` record already answers for
+        // every function, so there is nothing to create and no credential to
+        // need. Record the hostname as live and make no API call.
+        if (ServerlessTestingDomains::usesWildcard($zone)) {
+            $this->store($site, [
+                'status' => 'ready',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'record_type' => 'CNAME',
+                'record_data' => '*.'.$zone,
+                'covered_by_wildcard' => true,
+                'dns_provider' => 'wildcard',
+                'provisioned_at' => now()->toIso8601String(),
+            ]);
+
+            return 'DNS: covered by *.'.$zone.' — no record needed.';
+        }
+
+        // The serverless apex (dply-serverless.cloud) is a Cloudflare zone;
+        // legacy pool hostnames stay on the DigitalOcean path.
+        if (ServerlessTestingDomains::dnsProviderForZone($zone) === 'cloudflare') {
+            return $this->provisionViaCloudflare($site, $host, $zone, $recordName);
+        }
+
+        return $this->provisionViaDigitalOcean($site, $host, $zone, $recordName);
+    }
+
+    /**
+     * Write the hostname record into the Cloudflare zone. Proxied through
+     * Cloudflare (the client sets `proxied: true`), so the apex gets edge TLS
+     * for `*.{apex}` from Universal SSL without dply issuing a wildcard cert.
+     */
+    private function provisionViaCloudflare(Site $site, string $host, string $zone, string $recordName): string
+    {
+        $token = ServerlessTestingDomains::cloudflareApiToken();
+
+        if ($token === '') {
+            $this->store($site, [
+                'status' => 'skipped',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'dns_provider' => 'cloudflare',
+                'reason' => 'missing_token',
+            ]);
+
+            return 'DNS: skipped — no Cloudflare API token for '.$zone.'.';
+        }
+
+        [$type, $value] = $this->recordTarget($zone);
+
+        try {
+            $cloudflare = new CloudflareDnsService($token);
+
+            if (! $cloudflare->zoneExists($zone)) {
+                $this->store($site, [
+                    'status' => 'skipped',
+                    'hostname' => $host,
+                    'zone' => $zone,
+                    'record_name' => $recordName,
+                    'dns_provider' => 'cloudflare',
+                    'reason' => 'unconfigured_zone',
+                ]);
+
+                return 'DNS: skipped — '.$zone.' is not a zone this Cloudflare token can reach.';
+            }
+
+            // A `*.{apex}` record already answers for every function hostname,
+            // which is the recommended production setup — writing a specific
+            // record on top of it is redundant.
+            $wildcard = $this->cloudflareWildcardCovering($cloudflare, $zone);
+            if ($wildcard !== null) {
+                $this->store($site, [
+                    'status' => 'ready',
+                    'hostname' => $host,
+                    'zone' => $zone,
+                    'record_name' => $recordName,
+                    'record_type' => strtoupper((string) ($wildcard['type'] ?? '')),
+                    'record_data' => (string) ($wildcard['content'] ?? ''),
+                    'covered_by_wildcard' => true,
+                    'wildcard_record_id' => $wildcard['id'] ?? null,
+                    'dns_provider' => 'cloudflare',
+                    'provisioned_at' => now()->toIso8601String(),
+                ]);
+
+                return 'DNS: covered by *.'.$zone.' '.($wildcard['type'] ?? '').' '.($wildcard['content'] ?? '');
+            }
+
+            // Cloudflare rejects a CNAME sharing a name with any other record
+            // and vice versa, but its own upsert helpers already find-and-update
+            // the matching row, so there is no DO-style purge dance here.
+            $record = strtoupper($type) === 'A'
+                ? $cloudflare->upsertARecord($zone, $recordName, $value)
+                : $cloudflare->upsertCnameRecord($zone, $recordName, rtrim($value, '.'));
+
+            $this->store($site, [
+                'status' => 'ready',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'record_id' => $record['id'] ?? null,
+                'record_type' => strtoupper($type),
+                'record_data' => rtrim($value, '.'),
+                'dns_provider' => 'cloudflare',
+                'provisioned_at' => now()->toIso8601String(),
+            ]);
+
+            return 'DNS: '.$host.' → '.strtoupper($type).' '.rtrim($value, '.').' (Cloudflare)';
+        } catch (\Throwable $e) {
+            Log::warning('Serverless function DNS provisioning failed (Cloudflare).', [
+                'site_id' => $site->id,
+                'hostname' => $host,
+                'zone' => $zone,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->store($site, [
+                'status' => 'failed',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'dns_provider' => 'cloudflare',
+                'error' => $e->getMessage(),
+                'failed_at' => now()->toIso8601String(),
+            ]);
+
+            return 'DNS: failed — '.$e->getMessage();
+        }
+    }
+
+    /**
+     * The `*.{zone}` A or CNAME record, when one exists.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function cloudflareWildcardCovering(CloudflareDnsService $cloudflare, string $zone): ?array
+    {
+        foreach (['CNAME', 'A', 'AAAA'] as $type) {
+            $records = $cloudflare->listDnsRecords($zone, $type, '*.'.$zone);
+            foreach ($records as $record) {
+                if (trim((string) ($record['content'] ?? '')) !== '') {
+                    return $record;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function provisionViaDigitalOcean(Site $site, string $host, string $zone, string $recordName): string
+    {
+        $token = trim((string) config('services.digitalocean.token'));
+
+        if ($token === '') {
+            $this->store($site, [
+                'status' => 'skipped',
+                'hostname' => $host,
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'dns_provider' => 'digitalocean',
+                'reason' => 'missing_token',
+            ]);
+
+            return 'DNS: skipped — no app-level DigitalOcean token.';
         }
 
         [$type, $value] = $this->recordTarget($zone);
@@ -314,29 +488,27 @@ final class ServerlessFunctionDnsProvisioner
 
     private function zoneForHost(string $host): ?string
     {
-        $domains = (array) config('services.digitalocean.testing_domains', []);
-        foreach ($domains as $domain) {
-            $domain = strtolower(trim((string) $domain));
-            if ($domain !== '' && str_ends_with($host, '.'.$domain)) {
-                return $domain;
-            }
-        }
-
-        return null;
+        return ServerlessTestingDomains::zoneForHost($host);
     }
 
     /**
      * The function hostname points at the dply app, which proxies through to
-     * DigitalOcean Functions. Defaults to a CNAME onto the testing-domain apex
+     * DigitalOcean Functions. Defaults to a CNAME onto the serverless apex
      * (which must already resolve to the app);
-     * DPLY_SERVERLESS_FUNCTION_DNS_TARGET overrides with an explicit IP
+     * DPLY_SERVERLESS_TESTING_DNS_TARGET (or the legacy
+     * DPLY_SERVERLESS_FUNCTION_DNS_TARGET) overrides with an explicit IP
      * (A record) or hostname (CNAME).
      *
      * @return array{0: string, 1: string}
      */
     private function recordTarget(string $zone): array
     {
-        $target = trim((string) config('services.digitalocean.serverless_function_dns_target'));
+        // `config($key, $default)` returns null for a key that exists and IS
+        // null, so the legacy fallback has to be an explicit `??`.
+        $target = trim((string) (
+            config('serverless.testing_dns_target')
+            ?? config('services.digitalocean.serverless_function_dns_target')
+        ));
         if ($target === '') {
             return ['CNAME', rtrim($zone, '.').'.'];
         }

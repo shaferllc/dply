@@ -23,7 +23,7 @@
         <a
             href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
             wire:navigate
-            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
         >
             {{ __('Manage in Settings') }}
             <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -128,7 +128,7 @@
                 </div>
             </div>
             <div class="flex justify-end">
-                <x-primary-button type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
+                <x-primary-button size="xs" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
                     {{ __('Add subscription') }}
                 </x-primary-button>
             </div>

@@ -23,7 +23,15 @@ final class CacheWorkspaceViewData
     {
         $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
-        $engines = ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly'];
+        // Gated engines are hidden outright, not badged "Soon". An engine that
+        // is already installed on THIS server stays listed regardless of its
+        // flag — otherwise parking an engine would strip the only UI for
+        // managing or uninstalling an existing service.
+        $engines = array_values(array_filter(
+            ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly'],
+            fn (string $engine): bool => CacheEngineAvailability::isAvailable($engine)
+                || $cacheServices->contains(fn (ServerCacheService $row): bool => $row->engine === $engine),
+        ));
 
         $engineLabels = [
             'redis' => 'Redis',

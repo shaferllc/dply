@@ -169,6 +169,29 @@
         @apply border-brand-mist/20 bg-zinc-900/95 shadow-black/25;
     }
 
+    /* ── Global tooltip ───────────────────────────────────────────────────
+       Single bubble owned by resources/js/tooltip.js — see that file for how
+       elements opt in. Wraps to a readable measure (the native title tooltip
+       it replaces ran off-screen on long panel notes) and sits above modals
+       (z-[100]) and toasts (z-[110]) so it is never the thing that's clipped. */
+    .dply-tooltip {
+        @apply pointer-events-none fixed left-0 top-0 z-[120] max-w-xs rounded-lg bg-brand-ink/95 px-2.5 py-1.5 text-xs font-medium leading-relaxed text-brand-cream shadow-lg ring-1 ring-brand-ink/40;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 120ms ease-out;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .dply-tooltip[data-show='true'] {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    html.dark .dply-tooltip {
+        @apply bg-zinc-800 text-zinc-100 ring-white/15;
+    }
+
     /** Shared form control surface — prefer over raw `bg-white` for predictable dark mode */
     .dply-input {
         @apply mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:opacity-50;

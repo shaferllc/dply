@@ -41,6 +41,8 @@
 
         @if (filled($note))
             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+            {{-- `title` is upgraded to the styled bubble by resources/js/tooltip.js
+                 whenever the text is actually clipped — no native cut-off tooltip. --}}
             <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ $note }}">{{ $note }}</p>
         @endif
 

@@ -17,7 +17,7 @@
         <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Route a channel (email, Slack, Discord, webhook…) to this site’s error stream.') }}">
             {{ __('Route a channel (email, Slack, Discord, webhook…) to this site’s error stream.') }}
         </p>
-        <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="ml-auto shrink-0 whitespace-nowrap">
+        <x-secondary-button size="xs" href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="ml-auto shrink-0 whitespace-nowrap">
             {{ __('Manage in Settings') }}
             <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         </x-secondary-button>
@@ -121,7 +121,7 @@
                 </div>
             </div>
             <div class="flex justify-end">
-                <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
+                <x-primary-button size="xs" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
                     {{ __('Add subscription') }}
                 </x-primary-button>
             </div>

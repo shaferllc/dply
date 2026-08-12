@@ -42,52 +42,69 @@
                             <x-input-label for="settings-tags" value="{{ __('Tags') }}" />
                             @php
                                 $tagsDisabled = ! $this->canEditServerSettings;
+                                $tagChips = array_values(array_unique(array_filter(array_map('trim', explode(',', (string) $this->settingsTags)))));
                             @endphp
+                            {{-- Hidden wire:model carries the canonical comma string: it is what the
+                                 floating unsaved bar (clientDirty) watches for `input`, and what the
+                                 component validates/saves. Two rules keep the pills honest:
+
+                                 1. `chips` is PLAIN reactive Alpine state — a getter reading the input's
+                                    DOM value gives x-for no dependency to track, so pills never re-render.
+                                 2. x-effect re-derives it from `$wire.settingsTags` (Livewire's reactive
+                                    proxy), so save/discard normalisation flows back in. Do NOT re-read
+                                    `$refs.model.value` on the commit hook — the input renders without a
+                                    value attribute mid-morph, so that reads '' and wipes every pill. --}}
                             <div
                                 x-data="{
-                                    raw: @entangle('settingsTags'),
                                     draft: '',
                                     disabled: @js($tagsDisabled),
-                                    get chips() {
-                                        return this.raw
-                                            .split(',')
-                                            .map((t) => t.trim())
-                                            .filter((t) => t.length > 0);
+                                    chips: @js($tagChips),
+                                    parse(raw) {
+                                        return (raw ?? '').split(',').map((t) => t.trim()).filter(Boolean);
                                     },
-                                    sync(list) {
-                                        this.raw = list.join(', ');
+                                    write(list) {
+                                        this.chips = list;
+                                        const el = this.$refs.model;
+                                        if (! el) return;
+                                        el.value = list.join(', ');
+                                        el.dispatchEvent(new Event('input', { bubbles: true }));
                                     },
                                     add() {
                                         if (this.disabled) return;
-                                        const value = this.draft.trim().replace(/,+$/, '').trim();
+                                        const next = [...this.chips];
+                                        this.parse(this.draft).forEach((value) => {
+                                            if (! next.includes(value)) next.push(value);
+                                        });
                                         this.draft = '';
-                                        if (value === '') return;
-                                        const list = this.chips;
-                                        if (! list.includes(value)) {
-                                            list.push(value);
-                                            this.sync(list);
-                                        }
+                                        if (next.length !== this.chips.length) this.write(next);
                                     },
                                     remove(index) {
                                         if (this.disabled) return;
-                                        const list = this.chips;
-                                        list.splice(index, 1);
-                                        this.sync(list);
+                                        const next = [...this.chips];
+                                        next.splice(index, 1);
+                                        this.write(next);
                                     },
                                     backspace() {
-                                        if (this.disabled || this.draft !== '') return;
-                                        const list = this.chips;
-                                        if (list.length > 0) {
-                                            list.pop();
-                                            this.sync(list);
-                                        }
+                                        if (this.disabled || this.draft !== '' || this.chips.length === 0) return;
+                                        this.write(this.chips.slice(0, -1));
                                     },
                                 }"
+                                x-effect="chips = parse($wire.settingsTags)"
                                 class="mt-1 flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-sm shadow-sm focus-within:border-brand-sage focus-within:ring-2 focus-within:ring-brand-sage/30"
                                 :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-text'"
                                 @click="$refs.tagInput && $refs.tagInput.focus()"
                             >
-                                <template x-for="(chip, index) in chips" :key="index">
+                                {{-- value= is required: Livewire renders hidden inputs without it, so a
+                                     post-save morph would otherwise blank the string the chips derive from. --}}
+                                <input
+                                    type="hidden"
+                                    wire:model="settingsTags"
+                                    id="settings-tags-model"
+                                    x-ref="model"
+                                    value="{{ $this->settingsTags }}"
+                                />
+                                {{-- Key by value (chips are de-duped) so removing one doesn't leave a stale pill. --}}
+                                <template x-for="(chip, index) in chips" :key="chip">
                                     <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
                                         <span x-text="chip"></span>
                                         <button
@@ -279,18 +296,18 @@
 
                 @if ($this->canEditServerSettings)
                     <div class="flex flex-wrap items-center justify-end gap-3 border-t border-brand-ink/10 pt-6">
-                        <button
-                            type="button"
-                            wire:click="testSshConnection"
-                            wire:loading.attr="disabled"
-                            wire:target="testSshConnection"
-                            @disabled($this->operationalSshProbing)
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test connection') }}
-                        </button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save changes') }}</x-primary-button>
+                        {{-- Do not put Blade @if/@disabled on <x-*> tags — Livewire treats @ as Alpine. --}}
+                        @if ($this->operationalSshProbing)
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection" disabled>
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Testing…') }}
+                            </x-secondary-button>
+                        @else
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection">
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Test connection') }}
+                            </x-secondary-button>
+                        @endif
                     </div>
                 @endif
             </form>
@@ -322,9 +339,6 @@
                 @endforeach
             </select>
             <x-input-error :messages="$errors->get('settingsTimezone')" class="mt-2" />
-            @if ($this->canEditServerSettings)
-                <x-primary-button type="submit" class="mt-4" wire:loading.attr="disabled">{{ __('Save timezone') }}</x-primary-button>
-            @endif
         </form>
         </div>
     </div>
@@ -356,9 +370,6 @@
                     ?? config('server_settings.date_formats.absolute_utc.sample');
             @endphp
             <p class="mt-3 text-xs text-brand-mist">{{ __('Preview:') }} <span class="font-mono text-brand-ink">{{ $previewSample }}</span></p>
-            @if ($this->canEditServerSettings)
-                <x-primary-button type="submit" class="mt-4" wire:loading.attr="disabled">{{ __('Save format') }}</x-primary-button>
-            @endif
         </form>
         </div>
     </div>
@@ -419,21 +430,23 @@
                         </dl>
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            wire:click="testSshConnection"
-                            wire:loading.attr="disabled"
-                            wire:target="testSshConnection"
-                            @disabled($this->operationalSshProbing)
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test operational access') }}
-                        </button>
-                        <x-primary-button type="button" wire:click="repairSshAccess" wire:loading.attr="disabled" wire:target="repairSshAccess">
-                            <span wire:loading.remove wire:target="repairSshAccess">{{ __('Repair SSH access') }}</span>
-                            <span wire:loading wire:target="repairSshAccess" class="inline-flex items-center gap-2">
+                    <div class="flex shrink-0 flex-wrap items-center justify-end gap-3">
+                        @if ($this->operationalSshProbing)
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection" disabled>
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Testing…') }}
+                            </x-secondary-button>
+                        @else
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection">
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Test operational access') }}
+                            </x-secondary-button>
+                        @endif
+                        {{-- Rewrites authorized_keys over SSH, so it explains itself in a
+                             confirm dialog first (confirmRepairSshAccess). --}}
+                        <x-primary-button type="button" size="xs" wire:click="confirmRepairSshAccess" wire:loading.attr="disabled" wire:target="confirmRepairSshAccess,repairSshAccess">
+                            <span wire:loading.remove wire:target="confirmRepairSshAccess,repairSshAccess">{{ __('Repair SSH access') }}</span>
+                            <span wire:loading wire:target="confirmRepairSshAccess,repairSshAccess" class="inline-flex items-center gap-2">
                                 <x-spinner variant="forest" size="sm" />
                                 {{ __('Repairing…') }}
                             </span>
@@ -512,17 +525,18 @@
                         </div>
                         {{-- Post-resize re-sync: re-reads size/region/specs from the
                              provider API (queued), then re-probes the box + inventory. --}}
-                        <button
+                        <x-secondary-button
                             type="button"
+                            size="xs"
                             wire:click="syncProviderSpecs"
                             wire:loading.attr="disabled"
                             wire:target="syncProviderSpecs"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="shrink-0"
                             title="{{ __('Re-read the size and specs from the provider — use after resizing the machine.') }}"
                         >
-                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
+                            <x-heroicon-m-arrow-path class="h-4 w-4" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
                             {{ __('Verify with provider') }}
-                        </button>
+                        </x-secondary-button>
                     </div>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">

@@ -114,14 +114,6 @@
                 >
                     {{ __('Activity') }}
                 </x-server-workspace-tab>
-                <x-server-workspace-tab
-                    id="logs-tab-related"
-                    icon="heroicon-o-link"
-                    :active="$logsTab === 'related'"
-                    wire:click="setLogsWorkspaceTab('related')"
-                >
-                    {{ __('Related') }}
-                </x-server-workspace-tab>
             </x-server-workspace-tablist>
         </div>
 
@@ -183,13 +175,12 @@
                 <livewire:servers.workspace-activity :server="$server" :key="'logs-activity-'.$server->id" />
             @endif
 
-            @if ($logsTab === 'related')
-                @include('livewire.servers.partials.logs._tab-related', ['server' => $server])
-            @endif
         </div>
     </section>
 
     <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

@@ -184,6 +184,7 @@
                             $rowHasEditorError = $phpConfigEditorOpen
                                 && $phpConfigEditorVersion === $row['id']
                                 && ! empty($phpConfigEditorErrorLines);
+                            $extensionsExpanded = $expandedExtensionsVersion === $row['id'];
                         @endphp
 
                         <x-workspace-table-row
@@ -238,6 +239,22 @@
                                             <x-heroicon-m-globe-alt class="h-3 w-3" />
                                             {{ trans_choice('Used by :count site|Used by :count sites', $siteCount, ['count' => $siteCount]) }}
                                         </span>
+                                        @if ($isInstalled)
+                                            <span class="text-brand-mist/60">·</span>
+                                            <button
+                                                type="button"
+                                                wire:click="toggleExtensionsPanel('{{ $row['id'] }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="toggleExtensionsPanel('{{ $row['id'] }}')"
+                                                class="inline-flex items-center gap-1 rounded font-semibold text-brand-forest underline-offset-2 transition hover:underline disabled:opacity-50"
+                                                aria-expanded="{{ $extensionsExpanded ? 'true' : 'false' }}"
+                                                aria-controls="php-extensions-{{ $row['id'] }}"
+                                            >
+                                                <x-heroicon-m-puzzle-piece class="h-3 w-3 shrink-0" />
+                                                {{ trans_choice('Extension (:count)|Extensions (:count)', (int) ($row['extension_count'] ?? 0), ['count' => (int) ($row['extension_count'] ?? 0)]) }}
+                                                <x-heroicon-m-chevron-down @class(['h-3 w-3 shrink-0 transition-transform', 'rotate-180' => $extensionsExpanded]) />
+                                            </button>
+                                        @endif
                                         @if ($disableUninstall && $isInstalled)
                                             <span class="text-brand-mist/60">·</span>
                                             <span class="italic">
@@ -422,6 +439,13 @@
                                     </div>
                                 @endcan
                             </div>
+
+                            @if ($extensionsExpanded && $phpExtensionPanel !== null)
+                                @include('livewire.servers.partials.php.extensions-panel', [
+                                    'version' => $row['id'],
+                                    'panel' => $phpExtensionPanel,
+                                ])
+                            @endif
                         </x-workspace-table-row>
                     @endforeach
                 </ul>

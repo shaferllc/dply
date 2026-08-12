@@ -47,6 +47,77 @@ trait ManagesCachePersistenceReplication
     public ?string $persistenceError = null;
 
     /**
+     * Livewire hydration hook.
+     *
+     * {@see $persistenceState} is a public property, so it round-trips through
+     * the component snapshot. CacheServicePersistence::state() returns
+     * CarbonImmutable values inside it, and an object nested in an array
+     * property does not survive that trip: it comes back as
+     * __PHP_Incomplete_Class, which fatals the blade on ->toDateTimeString()
+     * and then fails dehydration outright with "Property type not supported in
+     * Livewire for property".
+     *
+     * Scrubbing on hydrate (not just where the state is built) is what fixes an
+     * ALREADY-POISONED snapshot sitting in someone's open tab — otherwise the
+     * page keeps 500ing until they hard-refresh.
+     */
+    public function hydrate(): void
+    {
+        if ($this->persistenceState !== null) {
+            $this->persistenceState = $this->scrubPersistenceState($this->persistenceState);
+        }
+    }
+
+    /**
+     * Reduce the state array to snapshot-safe scalars: dates become ISO-8601
+     * strings and anything else non-scalar is dropped rather than risking
+     * another unserializable value.
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    protected function scrubPersistenceState(array $state): array
+    {
+        foreach ($state as $key => $value) {
+            if ($value === null || is_scalar($value)) {
+                continue;
+            }
+
+            if ($value instanceof \DateTimeInterface) {
+                $state[$key] = $value->format(\DateTimeInterface::ATOM);
+
+                continue;
+            }
+
+            // A revived __PHP_Incomplete_Class from an older snapshot: recover
+            // the date it was carrying when possible, otherwise drop it.
+            if (is_object($value)) {
+                $date = ((array) $value)['date'] ?? null;
+                $state[$key] = null;
+
+                if (is_string($date) && $date !== '') {
+                    try {
+                        $state[$key] = CarbonImmutable::parse($date)->format(\DateTimeInterface::ATOM);
+                    } catch (\Throwable) {
+                        $state[$key] = null;
+                    }
+                }
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                $state[$key] = array_values(array_filter(
+                    $value,
+                    static fn ($item): bool => $item === null || is_scalar($item),
+                ));
+            }
+        }
+
+        return $state;
+    }
+
+    /**
      * Live replication state for the Stats-subtab card: role (master/replica),
      * connected replicas, master link status if this engine is a replica.
      * Loaded lazily via wire:init on the Stats subtab; refreshed by wire:poll.
@@ -105,7 +176,8 @@ trait ManagesCachePersistenceReplication
         }
 
         $state = $persistence->state($row->server, $row);
-        $this->persistenceState = $state;
+
+        $this->persistenceState = $this->scrubPersistenceState($state);
         $this->persistenceError = null;
         if ($state['raw_save'] !== null && $this->rdb_save_schedule === '') {
             $this->rdb_save_schedule = $state['raw_save'];

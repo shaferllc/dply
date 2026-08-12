@@ -600,7 +600,7 @@
                             <thead class="bg-brand-sand/35 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
                                     <th class="px-5 py-2 text-left sm:px-6">{{ __('Server') }}</th>
-                                    <th class="px-4 py-2 text-left">{{ __('Tier / status') }}</th>
+                                    <th class="px-4 py-2 text-left">{{ __('Status') }}</th>
                                     <th class="px-5 py-2 text-right sm:px-6">{{ __('Monthly') }}</th>
                                 </tr>
                             </thead>
@@ -608,7 +608,7 @@
                                 @foreach ($billableServers as $server)
                                     <tr class="transition-colors hover:bg-brand-sand/15">
                                         <td class="px-5 py-3 font-medium text-brand-ink sm:px-6">{{ $server['name'] }}</td>
-                                        <td class="px-4 py-3 text-brand-moss">{{ $server['tier'] }}</td>
+                                        <td class="px-4 py-3 text-brand-moss">{{ __('Billable') }}</td>
                                         <td class="px-5 py-3 text-right font-mono tabular-nums text-brand-ink sm:px-6">${{ number_format($server['monthly_cents'] / 100, 2) }}</td>
                                     </tr>
                                 @endforeach

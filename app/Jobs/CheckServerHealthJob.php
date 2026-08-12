@@ -17,7 +17,11 @@ class CheckServerHealthJob implements ShouldQueue
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        // SSH probe — slow, and nobody is watching it land. Keep it out of the
+        // lane user-initiated provisioning and deploys run in.
+        $this->onQueue(config('dply.queues.background'));
+    }
 
     public function handle(ServerHealthProbe $probe, ServerHealthNotifier $healthNotifier): void
     {

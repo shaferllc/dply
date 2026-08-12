@@ -4,33 +4,37 @@ declare(strict_types=1);
 
 namespace App\Modules\Backups\Console;
 
+use App\Jobs\ExportRedisSnapshotJob;
 use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
-use App\Models\ServerBackupSchedule;
-use App\Models\ServerCronJob;
+use App\Models\BackupSchedule;
+use App\Models\RedisSnapshot;
 use App\Models\ServerDatabaseBackup;
 use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 
 /**
- * Invoked by the cron entry that materializes a {@see ServerBackupSchedule}.
- * The cron line shape is `php artisan dply:run-backup-schedule {schedule}` so
- * the schedule row is the source of truth — operators can edit the cadence on
- * the schedule and we don't have to rewrite the cron line.
+ * Runs one {@see BackupSchedule}, whatever it targets — database dump, site file
+ * archive, or cache RDB snapshot. Server images join in M2.
+ *
+ * Invoked by {@see DispatchDueBackupSchedulesCommand} when the schedule comes
+ * due, and by an operator directly for a one-off. Absorbed the old
+ * `dply:run-redis-snapshot-schedule`, which was a copy of this file operating on
+ * a copy of the schedule table (docs/adr/backups-as-a-product.md, decision 8).
  */
 class RunBackupScheduleCommand extends Command
 {
     protected $signature = 'dply:run-backup-schedule {schedule}';
 
-    protected $description = 'Create a pending backup row and dispatch the export job for the given ServerBackupSchedule.';
+    protected $description = 'Create a pending backup row and dispatch the export job for the given BackupSchedule.';
 
     /** Auto-disable a schedule after this many consecutive failures (last N backups all failed). */
     private const FAILURE_AUTO_PAUSE_THRESHOLD = 3;
 
     public function handle(): int
     {
-        $schedule = ServerBackupSchedule::query()->find((string) $this->argument('schedule'));
+        $schedule = BackupSchedule::query()->find((string) $this->argument('schedule'));
         if ($schedule === null) {
             $this->error('Schedule not found.');
 
@@ -57,19 +61,15 @@ class RunBackupScheduleCommand extends Command
 
         if ($this->shouldAutoPause($schedule)) {
             $schedule->update(['is_active' => false]);
-            if ($schedule->server_cron_job_id) {
-                ServerCronJob::query()
-                    ->whereKey($schedule->server_cron_job_id)
-                    ->update(['enabled' => false]);
-            }
             $this->warn('Schedule auto-paused after '.self::FAILURE_AUTO_PAUSE_THRESHOLD.' consecutive failures.');
 
             return self::SUCCESS;
         }
 
         match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => $this->dispatchDatabaseBackup($schedule),
-            ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchSiteFilesBackup($schedule),
+            BackupSchedule::TARGET_DATABASE => $this->dispatchDatabaseBackup($schedule),
+            BackupSchedule::TARGET_SITE_FILES => $this->dispatchSiteFilesBackup($schedule),
+            BackupSchedule::TARGET_CACHE => $this->dispatchCacheSnapshot($schedule),
             default => $this->error('Unknown target type: '.$schedule->target_type),
         };
 
@@ -83,18 +83,23 @@ class RunBackupScheduleCommand extends Command
      * Operators get a clean signal that the destination/credentials are broken
      * instead of the queue spamming dead jobs forever.
      */
-    private function shouldAutoPause(ServerBackupSchedule $schedule): bool
+    private function shouldAutoPause(BackupSchedule $schedule): bool
     {
         $threshold = self::FAILURE_AUTO_PAUSE_THRESHOLD;
 
         $recent = match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()
+            BackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()
                 ->where('server_database_id', $schedule->target_id)
                 ->orderByDesc('created_at')
                 ->limit($threshold)
                 ->pluck('status'),
-            ServerBackupSchedule::TARGET_SITE_FILES => SiteFileBackup::query()
+            BackupSchedule::TARGET_SITE_FILES => SiteFileBackup::query()
                 ->where('site_id', $schedule->target_id)
+                ->orderByDesc('created_at')
+                ->limit($threshold)
+                ->pluck('status'),
+            BackupSchedule::TARGET_CACHE => RedisSnapshot::query()
+                ->where('server_cache_service_id', $schedule->target_id)
                 ->orderByDesc('created_at')
                 ->limit($threshold)
                 ->pluck('status'),
@@ -104,7 +109,28 @@ class RunBackupScheduleCommand extends Command
         return $recent->count() >= $threshold && $recent->every(fn ($s) => $s === 'failed');
     }
 
-    private function dispatchDatabaseBackup(ServerBackupSchedule $schedule): void
+    /**
+     * RDB snapshot of a cache service. Ported from the retired
+     * `dply:run-redis-snapshot-schedule`; the storage kind is always the
+     * configured destination because a cache schedule requires one.
+     */
+    private function dispatchCacheSnapshot(BackupSchedule $schedule): void
+    {
+        $schedule->loadMissing('server');
+
+        $snapshot = RedisSnapshot::query()->create([
+            'server_id' => $schedule->server_id,
+            'server_cache_service_id' => $schedule->target_id,
+            'backup_configuration_id' => $schedule->backup_configuration_id,
+            'status' => RedisSnapshot::STATUS_PENDING,
+            'storage_kind' => RedisSnapshot::STORAGE_DESTINATION,
+        ]);
+
+        ExportRedisSnapshotJob::dispatch($snapshot->id);
+        $this->info('Dispatched cache snapshot '.$snapshot->id);
+    }
+
+    private function dispatchDatabaseBackup(BackupSchedule $schedule): void
     {
         $schedule->loadMissing('server');
 
@@ -124,7 +150,7 @@ class RunBackupScheduleCommand extends Command
         $this->info('Dispatched database backup '.$backup->id);
     }
 
-    private function dispatchSiteFilesBackup(ServerBackupSchedule $schedule): void
+    private function dispatchSiteFilesBackup(BackupSchedule $schedule): void
     {
         $backup = SiteFileBackup::create([
             'site_id' => $schedule->target_id,

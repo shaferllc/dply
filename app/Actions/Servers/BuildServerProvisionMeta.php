@@ -7,6 +7,7 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 
 /**
  * Normalizes wizard “stack” fields into servers.meta for setup scripts.
@@ -67,7 +68,15 @@ final class BuildServerProvisionMeta
             $meta['cache_server'] = $cacheServerMeta;
         }
 
-        if ($serverRole === 'database' && DedicatedDatabaseServerProvisionConfig::supportsBootstrapCredentials($database)) {
+        // A Docker host with an engine selected runs it as a container, and the
+        // mysql/postgres images refuse to initialise without a superuser
+        // password — so it needs the same bootstrap credentials a dedicated
+        // database node gets. Without this the container step has nothing to
+        // pass to -e POSTGRES_PASSWORD and the provision fails.
+        $wantsBootstrapCredentials = $serverRole === 'database'
+            || ($serverRole === 'docker' && $database !== 'none' && trim($database) !== '');
+
+        if ($wantsBootstrapCredentials && DedicatedDatabaseServerProvisionConfig::supportsBootstrapCredentials($database)) {
             $databaseServerMeta = [
                 'remote_access' => $databaseRemoteAccess,
                 'allowed_from' => trim($databaseAllowedFrom),
@@ -75,9 +84,17 @@ final class BuildServerProvisionMeta
                 'username' => trim($databaseUsername),
             ];
 
-            if (is_string($databasePassword) && $databasePassword !== '') {
-                $databaseServerMeta['password_encrypted'] = Crypt::encryptString($databasePassword);
+            // The wizard only generates a password for the dedicated-database
+            // role (StepWhat::updatedFormDatabase() is gated on it), so the
+            // Docker path arrives with none. Mint one here rather than letting
+            // the container step fail: this is the choke point every caller
+            // (wizard, warm pool, managed server) already passes through, and
+            // meta is where the credential is stored anyway.
+            if (! is_string($databasePassword) || $databasePassword === '') {
+                $databasePassword = Str::password(32, symbols: false);
             }
+
+            $databaseServerMeta['password_encrypted'] = Crypt::encryptString($databasePassword);
 
             $meta['database_server'] = $databaseServerMeta;
         }

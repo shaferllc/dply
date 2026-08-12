@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Jobs\SendNotificationChannelTestEmailJob;
 use App\Mail\NotificationChannelMail;
+use App\Modules\Notifications\Services\DiscordGuildClient;
+use App\Modules\Notifications\Services\SlackWorkspaceClient;
+use App\Modules\Notifications\Services\TelegramBotClient;
 use Database\Factories\NotificationChannelFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -35,11 +38,33 @@ class NotificationChannel extends Model
 
     public const TYPE_SLACK = 'slack';
 
+    /**
+     * Slack channels come in two shapes. `oauth` rides a {@see SlackInstallation}
+     * bot token and posts by channel id; anything else is the original pasted
+     * incoming-webhook URL. Stored in `config['auth']` — absent means webhook, so
+     * rows written before "Add to Slack" existed need no backfill.
+     */
+    public const SLACK_AUTH_OAUTH = 'oauth';
+
     public const TYPE_DISCORD = 'discord';
+
+    /**
+     * Discord's twin of {@see SLACK_AUTH_OAUTH}: `oauth` posts through the dply
+     * bot in a connected guild, anything else is a pasted webhook URL. Absent
+     * means webhook, so pre-existing rows need no backfill.
+     */
+    public const DISCORD_AUTH_OAUTH = 'oauth';
 
     public const TYPE_EMAIL = 'email';
 
     public const TYPE_TELEGRAM = 'telegram';
+
+    /**
+     * Telegram's twin of {@see SLACK_AUTH_OAUTH}: `connected` posts through the
+     * deployment bot into a chat discovered via the /start claim check; anything
+     * else is a hand-pasted bot token + chat ID. Absent means manual.
+     */
+    public const TELEGRAM_AUTH_CONNECTED = 'connected';
 
     public const TYPE_PUSHOVER = 'pushover';
 
@@ -173,18 +198,22 @@ class NotificationChannel extends Model
      */
     protected function sendSlackTest(string $actorLabel): array
     {
+        $text = __(':app test notification (:label) from :actor', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        if ($this->usesSlackOauth()) {
+            return $this->postSlackViaBotToken($text);
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return ['ok' => false, 'message' => __('Slack webhook URL is missing.')];
         }
 
-        $payload = [
-            'text' => __(':app test notification (:label) from :actor', [
-                'app' => config('app.name'),
-                'label' => $this->label,
-                'actor' => $actorLabel,
-            ]),
-        ];
+        $payload = ['text' => $text];
 
         $channel = $this->config['channel'] ?? null;
         if (is_string($channel) && $channel !== '') {
@@ -204,23 +233,74 @@ class NotificationChannel extends Model
         return ['ok' => true, 'message' => __('Test message sent.')];
     }
 
+    /** Whether this Slack channel posts through a connected workspace's bot token. */
+    public function usesSlackOauth(): bool
+    {
+        return $this->type === self::TYPE_SLACK
+            && ($this->config['auth'] ?? null) === self::SLACK_AUTH_OAUTH;
+    }
+
+    /** The connected workspace behind an OAuth Slack channel, if it still exists. */
+    public function slackInstallation(): ?SlackInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return SlackInstallation::query()->find($id);
+    }
+
+    /**
+     * Post through the workspace bot token.
+     *
+     * The disconnected-workspace case gets its own message on purpose: it is the
+     * one failure an operator can fix themselves, and "Slack returned an error"
+     * would send them hunting through Slack's admin UI instead of clicking
+     * reconnect.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    protected function postSlackViaBotToken(string $text): array
+    {
+        $installation = $this->slackInstallation();
+        if (! $installation instanceof SlackInstallation) {
+            return ['ok' => false, 'message' => __('The Slack workspace for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $channelId = $this->config['channel_id'] ?? null;
+        if (! is_string($channelId) || $channelId === '') {
+            return ['ok' => false, 'message' => __('No Slack channel is selected.')];
+        }
+
+        $result = SlackWorkspaceClient::for($installation)->postMessage($channelId, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => SlackWorkspaceClient::describeError($result['error'])];
+    }
+
     /**
      * @return array{ok: bool, message: string}
      */
     protected function sendDiscordTest(string $actorLabel): array
     {
+        $text = __('[:app] Test notification (:label) from :actor', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        if ($this->usesDiscordOauth()) {
+            return $this->postDiscordViaBot($text);
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return ['ok' => false, 'message' => __('Discord webhook URL is missing.')];
         }
 
-        $body = [
-            'content' => __('[:app] Test notification (:label) from :actor', [
-                'app' => config('app.name'),
-                'label' => $this->label,
-                'actor' => $actorLabel,
-            ]),
-        ];
+        $body = ['content' => $text];
 
         try {
             $response = Http::timeout(10)->asJson()->post($url, $body);
@@ -233,6 +313,45 @@ class NotificationChannel extends Model
         }
 
         return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /** Whether this Discord channel posts through the dply bot in a connected guild. */
+    public function usesDiscordOauth(): bool
+    {
+        return $this->type === self::TYPE_DISCORD
+            && ($this->config['auth'] ?? null) === self::DISCORD_AUTH_OAUTH;
+    }
+
+    /** The connected guild behind an OAuth Discord channel, if it still exists. */
+    public function discordInstallation(): ?DiscordInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return DiscordInstallation::query()->find($id);
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function postDiscordViaBot(string $text): array
+    {
+        if (! $this->discordInstallation() instanceof DiscordInstallation) {
+            return ['ok' => false, 'message' => __('The Discord server for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $channelId = $this->config['channel_id'] ?? null;
+        if (! is_string($channelId) || $channelId === '') {
+            return ['ok' => false, 'message' => __('No Discord channel is selected.')];
+        }
+
+        $result = DiscordGuildClient::make()->postMessage($channelId, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => DiscordGuildClient::describeError($result['error'])];
     }
 
     /**
@@ -263,17 +382,21 @@ class NotificationChannel extends Model
      */
     protected function sendTelegramTest(string $actorLabel): array
     {
-        $token = $this->config['bot_token'] ?? null;
-        $chatId = $this->config['chat_id'] ?? null;
-        if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
-            return ['ok' => false, 'message' => __('Telegram bot token and chat ID are required.')];
-        }
-
         $text = __('[:app] Test notification (:label) from :actor', [
             'app' => config('app.name'),
             'label' => $this->label,
             'actor' => $actorLabel,
         ]);
+
+        if ($this->usesTelegramConnected()) {
+            return $this->postTelegramViaBot($text);
+        }
+
+        $token = $this->config['bot_token'] ?? null;
+        $chatId = $this->config['chat_id'] ?? null;
+        if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
+            return ['ok' => false, 'message' => __('Telegram bot token and chat ID are required.')];
+        }
 
         $url = 'https://api.telegram.org/bot'.rawurlencode($token).'/sendMessage';
 
@@ -296,6 +419,41 @@ class NotificationChannel extends Model
         }
 
         return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /** Whether this Telegram channel posts through the deployment bot. */
+    public function usesTelegramConnected(): bool
+    {
+        return $this->type === self::TYPE_TELEGRAM
+            && ($this->config['auth'] ?? null) === self::TELEGRAM_AUTH_CONNECTED;
+    }
+
+    /** The connected chat behind a bot-backed Telegram channel, if it still exists. */
+    public function telegramInstallation(): ?TelegramInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return TelegramInstallation::query()->find($id);
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function postTelegramViaBot(string $text): array
+    {
+        $installation = $this->telegramInstallation();
+        if (! $installation instanceof TelegramInstallation) {
+            return ['ok' => false, 'message' => __('The Telegram chat for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $result = TelegramBotClient::make()->sendMessage($installation->chat_id, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => TelegramBotClient::describeError($result['error'])];
     }
 
     /**
@@ -496,6 +654,18 @@ class NotificationChannel extends Model
 
     protected function deliverSlackPlain(string $text): void
     {
+        if ($this->usesSlackOauth()) {
+            $result = $this->postSlackViaBotToken($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.slack_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return;
@@ -512,6 +682,18 @@ class NotificationChannel extends Model
 
     protected function deliverDiscordPlain(string $text): void
     {
+        if ($this->usesDiscordOauth()) {
+            $result = $this->postDiscordViaBot($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.discord_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return;
@@ -545,6 +727,18 @@ class NotificationChannel extends Model
 
     protected function deliverTelegramPlain(string $text): void
     {
+        if ($this->usesTelegramConnected()) {
+            $result = $this->postTelegramViaBot($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.telegram_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $token = $this->config['bot_token'] ?? null;
         $chatId = $this->config['chat_id'] ?? null;
         if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {

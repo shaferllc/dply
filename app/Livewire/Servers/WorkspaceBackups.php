@@ -23,7 +23,7 @@ use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\BackupConfiguration;
 use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
@@ -52,11 +52,13 @@ use Livewire\Component;
 /**
  * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
  * (site-scoped). Surfaces {@see ServerDatabaseBackup} and {@see SiteFileBackup}
- * runs plus recurring schedule CRUD via {@see ServerBackupSchedule}.
+ * runs plus recurring schedule CRUD via {@see BackupSchedule}.
  *
- * Schedules materialize as {@see ServerCronJob} entries that invoke
- * `dply:run-backup-schedule {schedule}` so the cron line stays stable across
- * cadence edits.
+ * Schedules are rows, not cron lines: {@see \App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand}
+ * ticks every minute on the control plane and runs whichever have come due, so
+ * a cadence edit takes effect immediately and a capture still happens when the
+ * server itself is down. Legacy `system_managed` {@see ServerCronJob} rows from
+ * before that engine existed are inert and are swept in M1.
  */
 #[Layout('layouts.app')]
 #[Lazy]
@@ -105,7 +107,7 @@ class WorkspaceBackups extends Component
     public string $run_site_id = '';
 
     /** New schedule form. */
-    public string $new_target_type = ServerBackupSchedule::TARGET_DATABASE;
+    public string $new_target_type = BackupSchedule::TARGET_DATABASE;
 
     public string $new_target_id = '';
 
@@ -214,7 +216,7 @@ class WorkspaceBackups extends Component
 
             $this->siteDedicatedContext = true;
             $this->context_site_id = $site->id;
-            $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+            $this->new_target_type = BackupSchedule::TARGET_SITE_FILES;
             $this->new_target_id = $site->id;
         }
 
@@ -246,7 +248,7 @@ class WorkspaceBackups extends Component
                 ->exists();
             if ($exists) {
                 $this->context_site_id = $siteId;
-                $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+                $this->new_target_type = BackupSchedule::TARGET_SITE_FILES;
                 $this->new_target_id = $siteId;
             }
         }

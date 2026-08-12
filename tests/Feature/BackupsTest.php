@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\BackupsTest;
 
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Backups\Databases;
 use App\Livewire\Backups\Files;
 use App\Models\BackupConfiguration;
@@ -11,9 +10,10 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Models\SiteFileBackup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -33,23 +33,46 @@ function userWithOrganization(): User
 }
 
 test('guest cannot view backups', function () {
+    $this->get('/backups')->assertRedirect();
     $this->get('/backups/databases')->assertRedirect();
+    $this->get('/backups/snapshots')->assertRedirect();
+    $this->get('/backups/storage')->assertRedirect();
     $this->get('/backups/files')->assertRedirect();
 });
 
-test('legacy databases path redirects to backups hub', function () {
+test('every backups tab renders', function () {
     $user = userWithOrganization();
 
-    $this->actingAs($user)
-        ->get('/backups/databases')
-        ->assertRedirect('/backups');
+    // The five-tab product surface (docs/adr/backups-as-a-product.md, decision 1).
+    // A tab that 500s is invisible until someone clicks it, so each one is a route
+    // assertion rather than a manual check.
+    foreach ([
+        'backups.overview' => 'Backups',
+        'backups.databases' => 'Databases',
+        'backups.files' => 'File backups',
+        'backups.snapshots' => 'Snapshots',
+        'backups.storage' => 'Backup destinations',
+    ] as $route => $heading) {
+        $this->actingAs($user)
+            ->get(route($route))
+            ->assertOk()
+            ->assertSee($heading, false);
+    }
 });
 
-test('authenticated user can view database backups page', function () {
+test('the old destinations URL redirects into the Storage tab', function () {
     $user = userWithOrganization();
 
     $this->actingAs($user)
-        ->get(route('backups.databases'))
+        ->get('/profile/backup-configurations')
+        ->assertRedirect('/backups/storage');
+});
+
+test('authenticated user can view the backups overview', function () {
+    $user = userWithOrganization();
+
+    $this->actingAs($user)
+        ->get(route('backups.overview'))
         ->assertOk()
         ->assertSee('Backups', false)
         ->assertSee(route('launches.create'), false);
@@ -77,7 +100,7 @@ test('backups livewire components render', function () {
         ->assertOk();
 });
 
-test('database backups page shows storage destinations and latest exports', function () {
+test('the databases tab shows its dumps and the storage tab its destinations', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
@@ -122,13 +145,19 @@ test('database backups page shows storage destinations and latest exports', func
         'bytes' => 12345,
     ]);
 
+    // Each tab owns its own type end-to-end: the run history and the target live
+    // on Databases, the destinations they ship to live on Storage. The Overview
+    // deliberately repeats neither table.
     $this->actingAs($user)
         ->get(route('backups.databases'))
         ->assertOk()
-        ->assertSee('Primary S3', false)
         ->assertSee('Done', false)
-        ->assertSee('app_db', false)
-        ->assertSee('Storage destinations', false);
+        ->assertSee('app_db', false);
+
+    $this->actingAs($user)
+        ->get(route('backups.storage'))
+        ->assertOk()
+        ->assertSee('Primary S3', false);
 });
 
 test('file backups page shows storage destinations and runbook readiness', function () {
@@ -180,9 +209,13 @@ test('file backups page shows storage destinations and runbook readiness', funct
         ->get(route('backups.files'))
         ->assertOk()
         ->assertSee('Archive Bucket', false)
-        ->assertSee('Document root: /var/www/docs/current/public', false)
-        ->assertSee('1 project runbook is already attached to this site workspace.', false)
-        ->assertSee('Queue full backup', false);
+        // The Files tab now folds each site's schedule, last archive and actions
+        // into one row, so it shows the archive root rather than a labelled
+        // "Document root:" line, and the action reads "Archive".
+        ->assertSee('Docs', false)
+        ->assertSee('/var/www/docs', false)
+        ->assertSee('1 runbook', false)
+        ->assertSee('Archive', false);
 });
 
 test('queue full file backup dispatches export job', function () {

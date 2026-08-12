@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
+
 return [
     'provisioner' => env('SERVERLESS_PROVISIONER', 'local'),
 
@@ -80,5 +82,77 @@ return [
         'default_action_kind' => env('DIGITALOCEAN_FUNCTIONS_ACTION_KIND', 'nodejs:18'),
         'default_action_main' => env('DIGITALOCEAN_FUNCTIONS_ACTION_MAIN', 'index.js'),
         'default_package' => trim((string) env('DIGITALOCEAN_FUNCTIONS_PACKAGE', '')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Serverless function hostnames
+    |--------------------------------------------------------------------------
+    |
+    | Every deployed function gets a friendly hostname on a dedicated apex —
+    | {slug}.dply-serverless.cloud — rather than borrowing an entry from the
+    | shared DPLY_TESTING_DOMAINS pool that BYO/VM previews use. Needs
+    | *.dply-serverless.cloud DNS + wildcard TLS pointed at the dply app.
+    |
+    | Override with DPLY_SERVERLESS_TESTING_DOMAINS (comma-separated) for local
+    | or staging apexes.
+    */
+    'testing_domains' => (static function (): array {
+        $configured = trim((string) env('DPLY_SERVERLESS_TESTING_DOMAINS', ''));
+        if ($configured === '') {
+            return [ServerlessTestingDomains::DEFAULT_APEX];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (string $value): string => strtolower(trim($value)),
+            explode(',', $configured),
+        )));
+    })(),
+
+    /*
+    | DNS target for a function's friendly hostname. An IP becomes an A record;
+    | a hostname becomes a CNAME. When unset, the host CNAMEs onto the apex
+    | (which must already resolve to the dply app). Falls back to the legacy
+    | DPLY_SERVERLESS_FUNCTION_DNS_TARGET.
+    */
+    'testing_dns_target' => env(
+        'DPLY_SERVERLESS_TESTING_DNS_TARGET',
+        env('DPLY_SERVERLESS_FUNCTION_DNS_TARGET'),
+    ),
+
+    /*
+    | Who hosts the serverless apex's DNS. dply-serverless.cloud is a Cloudflare
+    | zone, so function hostnames are written through the Cloudflare API — not
+    | the DigitalOcean DNS path the legacy DPLY_TESTING_DOMAINS pool uses.
+    | Hostnames still on a legacy DO zone keep using DigitalOcean regardless of
+    | this setting.
+    |
+    | The token needs Zone → DNS → Edit on the serverless zone. Reuses the Edge
+    | platform token when a serverless-specific one isn't set.
+    */
+    'testing_dns' => [
+        /*
+         | How the apex answers for function hostnames:
+         |
+         |  wildcard  A single `*.{apex}` record (created once, by hand, in the
+         |            Cloudflare dashboard and pointed at the dply app) already
+         |            resolves every function. dply makes NO DNS API calls and
+         |            needs NO DNS credential — it just records the hostname as
+         |            live. Universal SSL covers one wildcard level, so TLS
+         |            needs nothing either. This is the default.
+         |
+         |  auto      dply writes one record per function through the DNS API.
+         |            Needs a token with Zone:DNS:Edit on the apex
+         |            (DPLY_SERVERLESS_CF_API_TOKEN).
+         |
+         | Applies only to the serverless apex; legacy DPLY_TESTING_DOMAINS
+         | hostnames always use the DigitalOcean API path.
+         */
+        'mode' => strtolower(trim((string) env('DPLY_SERVERLESS_TESTING_DNS_MODE', 'wildcard'))),
+        'provider' => strtolower(trim((string) env('DPLY_SERVERLESS_TESTING_DNS_PROVIDER', 'cloudflare'))),
+        'cloudflare_api_token' => env(
+            'DPLY_SERVERLESS_CF_API_TOKEN',
+            env('DPLY_EDGE_CF_API_TOKEN', env('CLOUDFLARE_API_TOKEN')),
+        ),
     ],
 ];

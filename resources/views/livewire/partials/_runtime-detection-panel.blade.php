@@ -133,4 +133,19 @@
             </div>
         @endif
     </div>
+@else
+    {{--
+        Nothing detected yet. Several call sites wrap this include in a card, so a
+        silent render leaves an empty box on the page — give it an empty state
+        instead. Borderless so it reads as the *contents* of that wrapper card
+        rather than a second nested box.
+    --}}
+    <x-empty-state
+        borderless
+        compact
+        tone="sage"
+        icon="heroicon-o-sparkles"
+        :title="__('No runtime detected yet')"
+        :description="__('Pick a repository and branch, then run detection — dply inspects the repo and previews the runtime, build command, and output directory before you deploy.')"
+    />
 @endif

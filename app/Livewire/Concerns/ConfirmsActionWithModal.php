@@ -31,6 +31,14 @@ trait ConfirmsActionWithModal
     public ?array $confirmActionModalDetails = null;
 
     /**
+     * Optional consequence the user should read before confirming (e.g. "this
+     * file is overwritten, not appended"). Renders as a callout under the
+     * details — prose belongs there, not stuffed into a <dl> value cell where
+     * it fights the label column for width.
+     */
+    public ?string $confirmActionModalWarning = null;
+
+    /**
      * Optional extra opt-in on the confirm dialog (e.g. "also delete the
      * underlying resource"). When a label is set the modal renders a checkbox;
      * its boolean value is appended to the confirmed method's arguments, so the
@@ -56,6 +64,10 @@ trait ConfirmsActionWithModal
         ?string $toggleLabel = null,
         string $toggleHint = '',
         bool $toggleDefault = false,
+        // Appended, not slotted in next to $details: callers pass this list
+        // positionally (see ManagesSiteBindingActions::confirmDetachBinding),
+        // so inserting a parameter mid-signature silently shifts their toggle.
+        ?string $warning = null,
     ): void {
         if (in_array($method, [
             'openConfirmActionModal',
@@ -78,6 +90,7 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalConfirmLabel = $confirmLabel;
         $this->confirmActionModalDestructive = $destructive;
         $this->confirmActionModalDetails = $details;
+        $this->confirmActionModalWarning = $warning;
         $this->confirmActionModalToggleLabel = $toggleLabel;
         $this->confirmActionModalToggleHint = $toggleHint;
         $this->confirmActionModalToggle = $toggleDefault;
@@ -94,6 +107,7 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalArguments = [];
         $this->confirmActionModalDestructive = false;
         $this->confirmActionModalDetails = null;
+        $this->confirmActionModalWarning = null;
         $this->confirmActionModalToggleLabel = null;
         $this->confirmActionModalToggleHint = '';
         $this->confirmActionModalToggle = false;

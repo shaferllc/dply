@@ -33,22 +33,15 @@
                         <thead class="bg-brand-cream/60 text-brand-ink/70">
                             <tr>
                                 <th class="px-4 py-2.5 text-left font-semibold">{{ __('Server') }}</th>
-                                <th class="px-4 py-2.5 text-left font-semibold">{{ __('Size') }}</th>
                                 <th class="px-4 py-2.5 text-right font-semibold">{{ __('Plan fee') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/5">
                             @foreach ($billable as $server)
-                                @php
-                                    $tier = $server->billingTier();
-                                @endphp
                                 <tr class="bg-white/40">
                                     <td class="px-4 py-3">
                                         <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->name }}</a>
                                         <p class="text-xs text-brand-moss/80 mt-0.5">{{ $server->provider?->label() ?? __('Custom') }}</p>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-2 py-0.5 text-xs font-semibold uppercase text-brand-ink">{{ $tier->label() }}</span>
                                     </td>
                                     <td class="px-4 py-3 text-right text-xs text-brand-moss">{{ __('Included in plan') }}</td>
                                 </tr>
@@ -59,7 +52,8 @@
                                         <a href="{{ route('servers.show', $row['server']) }}" wire:navigate class="font-medium hover:text-brand-ink">{{ $row['server']->name }}</a>
                                         <p class="text-xs mt-0.5">{{ $row['server']->provider?->label() ?? __('Custom') }}</p>
                                     </td>
-                                    <td class="px-4 py-3" colspan="2">
+                                    {{-- Two columns now the Size column is gone; no colspan needed. --}}
+                                    <td class="px-4 py-3">
                                         <span class="inline-flex items-center gap-1 text-xs">
                                             <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
                                             {{ __('Not billed') }} — {{ $row['reason'] }}

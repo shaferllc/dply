@@ -2,7 +2,7 @@
     :server="$server"
     active="settings"
     :title="__('Settings')"
-    :description="__('Navigate through the tabs to manage different settings categories. Changes in each section are automatically saved.')"
+    :description="__('Navigate through the tabs to manage different settings categories. Unsaved edits surface a save bar at the bottom of the page.')"
     hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')

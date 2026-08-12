@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Services\Billing\DesiredBillingStateTest;
 
-use App\Enums\ServerTier;
 use App\Modules\Billing\Services\DesiredBillingState;
 
 const FREE = ['key' => 'free', 'label' => 'Free', 'price_cents' => 0, 'max_servers' => 1];
@@ -24,11 +23,11 @@ test('free plan with no managed products bills nothing', function () {
 });
 
 test('a paid plan price is the whole server fee regardless of size', function () {
-    // One XL server on the Starter plan still costs the flat Starter price —
-    // size no longer affects the dply fee.
+    // One server on the Starter plan costs the flat Starter price — server
+    // size is not a billing input at all.
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: STARTER,
-        tierQuantities: ['xl' => 1],
+        billableServerCount: 1,
     );
 
     expect($state->planPriceCents)->toBe(900);
@@ -38,14 +37,13 @@ test('a paid plan price is the whole server fee regardless of size', function ()
     expect($state->isFree())->toBeFalse();
 });
 
-test('mixed fleet keeps a display breakdown but bills the flat plan', function () {
+test('a mixed fleet bills the flat plan for its server count', function () {
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: PRO,
-        tierQuantities: ['m' => 2, 'l' => 1, 'xs' => 1],
+        billableServerCount: 4,
     );
 
     expect($state->serverCount())->toBe(4);
-    expect($state->tierQuantities)->toBe(['xs' => 1, 's' => 0, 'm' => 2, 'l' => 1, 'xl' => 0]);
     expect($state->planPriceCents)->toBe(1900);
     expect($state->monthlyTotalCents)->toBe(1900);
 });
@@ -53,7 +51,7 @@ test('mixed fleet keeps a display breakdown but bills the flat plan', function (
 test('business plan covers an unlimited fleet at a flat price', function () {
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: BUSINESS,
-        tierQuantities: ['xl' => 25],
+        billableServerCount: 25,
     );
 
     expect($state->serverCount())->toBe(25);
@@ -61,34 +59,13 @@ test('business plan covers an unlimited fleet at a flat price', function () {
     expect($state->monthlyTotalCents)->toBe(3900);
 });
 
-test('unknown tier keys are ignored in the breakdown', function () {
-    $state = DesiredBillingState::fromPlanAndUsage(
-        plan: STARTER,
-        tierQuantities: ['xs' => 1, 'mythical_tier' => 99],
-    );
-
-    expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities)->toBe(['xs' => 1, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0]);
-});
-
-test('negative quantities are clamped to zero', function () {
+test('a negative server count is clamped to zero', function () {
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: FREE,
-        tierQuantities: ['xs' => -5],
+        billableServerCount: -5,
     );
 
     expect($state->serverCount())->toBe(0);
-});
-
-test('quantity for returns zero for unbought tiers', function () {
-    $state = DesiredBillingState::fromPlanAndUsage(
-        plan: PRO,
-        tierQuantities: ['m' => 3],
-    );
-
-    expect($state->quantityFor(ServerTier::M))->toBe(3);
-    expect($state->quantityFor(ServerTier::XS))->toBe(0);
-    expect($state->quantityFor(ServerTier::XL))->toBe(0);
 });
 
 test('serverless functions add a flat per function subtotal on top of the plan', function () {
@@ -109,7 +86,7 @@ test('plan and managed products combine in the total', function () {
     // Starter ($9) + 4 functions ($8) = $17
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: STARTER,
-        tierQuantities: ['m' => 2],
+        billableServerCount: 2,
         serverlessCount: 4,
         serverlessUnitCents: 200,
     );
@@ -206,7 +183,7 @@ test('edge delivery usage adds on top and is not plan eligible', function () {
     // Pro ($19) + 1 edge ($2) + $5 usage = $26
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: PRO,
-        tierQuantities: ['m' => 1],
+        billableServerCount: 1,
         edgeCount: 1,
         edgeUnitCents: 200,
         edgeUsageSubtotalCents: 500,
@@ -220,7 +197,7 @@ test('managed products and a plan all combine in the total', function () {
     // Pro ($19) + 2 cloud ($10) + 1 edge ($2) = $31
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: PRO,
-        tierQuantities: ['m' => 1],
+        billableServerCount: 1,
         cloudCount: 2,
         cloudUnitCents: 500,
         edgeCount: 1,
@@ -252,7 +229,7 @@ test('negative cloud and edge counts are clamped', function () {
 test('to array round trips for queue payloads', function () {
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: STARTER,
-        tierQuantities: ['s' => 2, 'l' => 1],
+        billableServerCount: 3,
     );
 
     $array = $state->toArray();
@@ -260,7 +237,7 @@ test('to array round trips for queue payloads', function () {
     expect($array['plan_key'])->toBe('starter');
     expect($array['plan_price_cents'])->toBe(900);
     expect($array['server_count'])->toBe(3);
-    expect($array['tier_quantities'])->toBe(['xs' => 0, 's' => 2, 'm' => 0, 'l' => 1, 'xl' => 0]);
+    expect($array)->not->toHaveKey('tier_quantities');
     expect($array['monthly_total_cents'])->toBe(900);
     expect($array['cloud_resource_subtotal_cents'])->toBe(0);
     // Back-compat keys still present for not-yet-migrated consumers.

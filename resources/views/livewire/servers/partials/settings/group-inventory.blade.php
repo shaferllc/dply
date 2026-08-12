@@ -59,32 +59,33 @@
                 </p>
             </div>
             @if ($this->canEditServerSettings)
-                <div class="flex shrink-0 flex-wrap gap-2">
-                    <button
+                <div class="flex shrink-0 flex-wrap gap-3">
+                    <x-secondary-button
                         type="button"
+                        size="xs"
                         wire:click="refreshServerInventoryDetails"
                         wire:loading.attr="disabled"
-                        class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                        wire:target="refreshServerInventoryDetails"
                     >
                         <span wire:loading.remove wire:target="refreshServerInventoryDetails">{{ __('Refresh inventory') }}</span>
                         <span wire:loading wire:target="refreshServerInventoryDetails" class="inline-flex items-center gap-2">
                             <x-spinner variant="forest" size="sm" />
                             {{ __('Running…') }}
                         </span>
-                    </button>
-                    <button
+                    </x-secondary-button>
+                    <x-secondary-button
                         type="button"
+                        size="xs"
                         wire:click="checkHealth"
                         wire:loading.attr="disabled"
                         wire:target="checkHealth"
-                        class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="checkHealth">{{ __('Test connection') }}</span>
                         <span wire:loading wire:target="checkHealth" class="inline-flex items-center gap-2">
                             <x-spinner variant="forest" size="sm" />
                             {{ __('Probing…') }}
                         </span>
-                    </button>
+                    </x-secondary-button>
                 </div>
             @endif
         </div>
@@ -133,24 +134,19 @@
             <p class="mt-0.5 text-xs text-brand-moss">
                 {{ __('Basic: OS detection and apt preview. Extended: adds disk usage, memory, uptime, and fail2ban status (slightly longer SSH run).') }}
             </p>
-            <form wire:submit="saveInventoryDepthPreference" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div class="min-w-[min(100%,20rem)] flex-1">
-                    <x-input-label for="settings-inventory-depth" value="{{ __('Depth') }}" />
-                    <select
-                        id="settings-inventory-depth"
-                        wire:model="settingsInventoryDepth"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    >
-                        @foreach ($inventoryDepths as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <x-input-error :messages="$errors->get('settingsInventoryDepth')" class="mt-2" />
-                </div>
-                @if ($this->canEditServerSettings)
-                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save depth') }}</x-primary-button>
-                @endif
+            <form wire:submit="saveInventoryDepthPreference" class="mt-4 max-w-md">
+                <x-input-label for="settings-inventory-depth" value="{{ __('Depth') }}" />
+                <select
+                    id="settings-inventory-depth"
+                    wire:model="settingsInventoryDepth"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    @disabled(! $this->canEditServerSettings)
+                >
+                    @foreach ($inventoryDepths as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('settingsInventoryDepth')" class="mt-2" />
             </form>
         </div>
 
@@ -240,11 +236,12 @@
                                 <span class="text-brand-moss"> — {{ $osVersions[$meta['inventory_os_detected_key']] ?? $meta['inventory_os_detected_key'] }}</span>
                             @endif
                             @if ($this->canEditServerSettings && isset($meta['inventory_os_detected_key']) && ($meta['os_version'] ?? '') !== ($meta['inventory_os_detected_key'] ?? ''))
-                                <button
+                                <x-secondary-button
                                     type="button"
+                                    size="xs"
                                     wire:click="applyDetectedOsFromInventory"
-                                    class="ml-2 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                                >{{ __('Use detected label') }}</button>
+                                    class="ml-2"
+                                >{{ __('Use detected label') }}</x-secondary-button>
                             @endif
                         </dd>
                     </div>

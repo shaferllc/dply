@@ -16,7 +16,7 @@ use App\Models\AuditLog;
 use App\Models\BackupDownloadStaging;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerProvisionArtifact;
@@ -161,7 +161,7 @@ test('backups page run now dispatches database export job', function () {
 
     Bus::assertDispatched(ExportServerDatabaseBackupJob::class);
 });
-test('backups page add schedule creates backup schedule and managed cron', function () {
+test('backups page add schedule creates a schedule row and no cron entry', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $database = $server->serverDatabases()->create([
@@ -179,19 +179,20 @@ test('backups page add schedule creates backup schedule and managed cron', funct
         ->call('addSchedule')
         ->assertHasNoErrors();
 
-    $schedule = ServerBackupSchedule::query()->where('server_id', $server->id)->first();
+    $schedule = BackupSchedule::query()->where('server_id', $server->id)->first();
     expect($schedule)->not->toBeNull();
     expect($schedule->target_type)->toBe('database');
     expect($schedule->target_id)->toBe($database->id);
     expect($schedule->cron_expression)->toBe('15 4 * * *');
-    expect($schedule->server_cron_job_id)->not->toBeNull();
 
-    $cronJob = ServerCronJob::find($schedule->server_cron_job_id);
-    expect($cronJob)->not->toBeNull();
-    $this->assertStringContainsString('dply:run-backup-schedule '.$schedule->id, $cronJob->command);
-    expect($cronJob->system_managed)->toBeTrue();
+    // The schedule row IS the schedule. The `system_managed` cron row this used
+    // to mint was excluded from every crontab by ServerCronSynchronizer, so it
+    // executed nowhere; DispatchDueBackupSchedulesCommand ticks the row instead.
+    // See docs/adr/backups-as-a-product.md, decision 14.
+    expect($schedule->server_cron_job_id)->toBeNull();
+    expect(ServerCronJob::query()->where('server_id', $server->id)->count())->toBe(0);
 });
-test('backups delete schedule removes cron entry', function () {
+test('backups delete schedule removes the schedule', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $site = Site::factory()->create([
@@ -207,16 +208,13 @@ test('backups delete schedule removes cron entry', function () {
         ->set('new_cron_expression', '0 5 * * *')
         ->call('addSchedule');
 
-    $schedule = ServerBackupSchedule::query()->where('server_id', $server->id)->first();
-    $cronId = $schedule->server_cron_job_id;
-    expect($cronId)->not->toBeNull();
+    $schedule = BackupSchedule::query()->where('server_id', $server->id)->first();
 
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('deleteSchedule', $schedule->id);
 
-    expect(ServerBackupSchedule::find($schedule->id))->toBeNull();
-    expect(ServerCronJob::find($cronId))->toBeNull();
+    expect(BackupSchedule::find($schedule->id))->toBeNull();
 });
 test('schedule route renders via http', function () {
     // Stable markers post milestone-2A rewrite: page heading + the
@@ -397,7 +395,7 @@ test('empty state explainer offers inline add destination', function () {
         ->assertSee('Add backup destination', false)
         ->assertSee('openDestinationModal', false);
 });
-test('toggle schedule pauses and resumes managed cron', function () {
+test('toggle schedule pauses and resumes the schedule', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $database = $server->serverDatabases()->create([
@@ -406,36 +404,25 @@ test('toggle schedule pauses and resumes managed cron', function () {
         'username' => '',
         'password' => '',
     ]);
-    $cronJob = ServerCronJob::create([
-        'server_id' => $server->id,
-        'cron_expression' => '0 3 * * *',
-        'command' => 'php artisan dply:run-backup-schedule X',
-        'user' => 'root',
-        'enabled' => true,
-        'system_managed' => true,
-    ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => true,
-        'server_cron_job_id' => $cronJob->id,
     ]);
 
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('toggleSchedule', $schedule->id);
 
-    expect(ServerBackupSchedule::find($schedule->id)->is_active)->toBeFalse();
-    expect(ServerCronJob::find($cronJob->id)->enabled)->toBeFalse();
+    expect(BackupSchedule::find($schedule->id)->is_active)->toBeFalse();
 
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('toggleSchedule', $schedule->id);
 
-    expect(ServerBackupSchedule::find($schedule->id)->is_active)->toBeTrue();
-    expect(ServerCronJob::find($cronJob->id)->enabled)->toBeTrue();
+    expect(BackupSchedule::find($schedule->id)->is_active)->toBeTrue();
 });
 test('delete database backup removes row and disk file', function () {
     Storage::fake('local');
@@ -526,7 +513,7 @@ test('schedule meta includes next run and latest status', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -652,7 +639,7 @@ test('run schedule now dispatches database export job', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -676,7 +663,7 @@ test('run schedule now dispatches site files export job', function () {
         'user_id' => $user->id,
         'organization_id' => $server->organization_id,
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'site_files',
         'target_id' => $site->id,
@@ -708,7 +695,7 @@ test('schedule mutations emit audit log rows', function () {
         ->set('new_cron_expression', '0 3 * * *')
         ->call('addSchedule');
 
-    $schedule = ServerBackupSchedule::query()->where('server_id', $server->id)->first();
+    $schedule = BackupSchedule::query()->where('server_id', $server->id)->first();
     expect($schedule)->not->toBeNull();
 
     // Pause
@@ -754,7 +741,7 @@ test('schedule meta includes recent runs for target', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -876,7 +863,7 @@ test('send test alert sends notification with test marker and audits', function 
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -910,7 +897,7 @@ test('failed backup sends notification when schedule opted in', function () {
         'username' => '',
         'password' => '',
     ]);
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -938,7 +925,7 @@ test('failed backup does not notify when schedule opted out', function () {
         'username' => '',
         'password' => '',
     ]);
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -964,7 +951,7 @@ test('toggle notify on failure flips flag and audits', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -977,7 +964,7 @@ test('toggle notify on failure flips flag and audits', function () {
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('toggleNotifyOnFailure', $schedule->id);
 
-    expect(ServerBackupSchedule::find($schedule->id)->notify_on_failure)->toBeFalse();
+    expect(BackupSchedule::find($schedule->id)->notify_on_failure)->toBeFalse();
 
     $latestAudit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
@@ -994,21 +981,12 @@ test('completed backup auto resumes paused schedule', function () {
         'username' => '',
         'password' => '',
     ]);
-    $cronJob = ServerCronJob::create([
-        'server_id' => $server->id,
-        'cron_expression' => '0 3 * * *',
-        'command' => 'php artisan dply:run-backup-schedule X',
-        'user' => 'root',
-        'enabled' => false,
-        'system_managed' => true,
-    ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => false,
-        'server_cron_job_id' => $cronJob->id,
     ]);
 
     $backup = ServerDatabaseBackup::create([
@@ -1016,11 +994,10 @@ test('completed backup auto resumes paused schedule', function () {
         'status' => ServerDatabaseBackup::STATUS_PENDING,
     ]);
 
-    // Status flip from pending → completed should re-enable both schedule and cron.
+    // Status flip from pending → completed should re-activate the schedule.
     $backup->update(['status' => ServerDatabaseBackup::STATUS_COMPLETED, 'disk_path' => 'x.sql']);
 
-    expect(ServerBackupSchedule::find($schedule->id)->is_active)->toBeTrue();
-    expect(ServerCronJob::find($cronJob->id)->enabled)->toBeTrue();
+    expect(BackupSchedule::find($schedule->id)->is_active)->toBeTrue();
 });
 test('failed backup does not auto resume paused schedule', function () {
     $user = actingOrgUser();
@@ -1031,7 +1008,7 @@ test('failed backup does not auto resume paused schedule', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -1045,7 +1022,7 @@ test('failed backup does not auto resume paused schedule', function () {
     ]);
     $backup->update(['status' => 'failed']);
 
-    expect(ServerBackupSchedule::find($schedule->id)->is_active)->toBeFalse();
+    expect(BackupSchedule::find($schedule->id)->is_active)->toBeFalse();
 });
 test('paused schedule has null next run', function () {
     $user = actingOrgUser();
@@ -1056,7 +1033,7 @@ test('paused schedule has null next run', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -1070,7 +1047,7 @@ test('paused schedule has null next run', function () {
     $meta = $component->viewData('scheduleMeta');
     expect($meta[$schedule->id]['next_run_at'])->toBeNull();
 });
-test('save schedule cadence updates both schedule and cron', function () {
+test('save schedule cadence updates the schedule', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $database = $server->serverDatabases()->create([
@@ -1079,21 +1056,12 @@ test('save schedule cadence updates both schedule and cron', function () {
         'username' => '',
         'password' => '',
     ]);
-    $cronJob = ServerCronJob::create([
-        'server_id' => $server->id,
-        'cron_expression' => '0 3 * * *',
-        'command' => 'php artisan dply:run-backup-schedule X',
-        'user' => 'root',
-        'enabled' => true,
-        'system_managed' => true,
-    ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => true,
-        'server_cron_job_id' => $cronJob->id,
     ]);
 
     Livewire::actingAs($user)
@@ -1102,8 +1070,8 @@ test('save schedule cadence updates both schedule and cron', function () {
         ->set('editing_schedules.'.$schedule->id, '30 4 * * 0')
         ->call('saveScheduleCadence', $schedule->id);
 
-    expect(ServerBackupSchedule::find($schedule->id)->cron_expression)->toBe('30 4 * * 0');
-    expect(ServerCronJob::find($cronJob->id)->cron_expression)->toBe('30 4 * * 0');
+    // The cadence lives in one place now — the dispatcher reads it directly.
+    expect(BackupSchedule::find($schedule->id)->cron_expression)->toBe('30 4 * * 0');
 });
 test('save schedule cadence rejects empty cron', function () {
     $user = actingOrgUser();
@@ -1114,7 +1082,7 @@ test('save schedule cadence rejects empty cron', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
         'target_type' => 'database',
         'target_id' => $database->id,
@@ -1129,7 +1097,7 @@ test('save schedule cadence rejects empty cron', function () {
         ->call('saveScheduleCadence', $schedule->id);
 
     // Original cadence preserved.
-    expect(ServerBackupSchedule::find($schedule->id)->cron_expression)->toBe('0 3 * * *');
+    expect(BackupSchedule::find($schedule->id)->cron_expression)->toBe('0 3 * * *');
 });
 test('solid queue preset fills daemons form', function () {
     $user = actingOrgUser();
@@ -1194,15 +1162,15 @@ test('backups site query param filters schedules and hides db runs', function ()
     ]);
 
     // Schedule for site (should appear); schedule for other site (should NOT); db schedule (should NOT).
-    $siteSchedule = ServerBackupSchedule::create([
+    $siteSchedule = BackupSchedule::create([
         'server_id' => $server->id, 'target_type' => 'site_files', 'target_id' => $site->id,
         'cron_expression' => '0 3 * * *', 'is_active' => true,
     ]);
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id, 'target_type' => 'site_files', 'target_id' => $otherSite->id,
         'cron_expression' => '0 4 * * *', 'is_active' => true,
     ]);
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
         'cron_expression' => '0 5 * * *', 'is_active' => true,
     ]);
@@ -1331,11 +1299,11 @@ test('overview background tile summarizes workers and schedules', function () {
     ]);
 
     // 1 active schedule, 1 paused.
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
         'cron_expression' => '0 3 * * *', 'is_active' => true,
     ]);
-    ServerBackupSchedule::create([
+    BackupSchedule::create([
         'server_id' => $server->id, 'target_type' => 'database', 'target_id' => $database->id,
         'cron_expression' => '0 4 * * *', 'is_active' => false,
     ]);

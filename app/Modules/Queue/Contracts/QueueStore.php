@@ -68,6 +68,19 @@ interface QueueStore
     public function ack(QueueNamespace $namespace, string $jobId, string $reservationId): bool;
 
     /**
+     * Delete several completed jobs in one statement.
+     *
+     * The point is throughput: acking per job costs one HTTP round trip and one
+     * DELETE each, and at a worker's pace that is the drain ceiling long before
+     * Postgres is troubled. Same semantics as {@see ack()} applied per pair.
+     *
+     * @param  list<array{0: string, 1: string}>  $pairs  [jobId, reservationId]
+     * @return array<string, bool> keyed by job id — false means the job is held
+     *                             under a different reservation
+     */
+    public function ackBulk(QueueNamespace $namespace, array $pairs): array;
+
+    /**
      * Return a job to the queue, optionally after a delay.
      *
      * Returns false when the reservation no longer matches — unlike ack, this
@@ -89,4 +102,16 @@ interface QueueStore
 
     /** Drop every job in a queue. Returns how many were removed. */
     public function clear(QueueNamespace $namespace, string $queue): int;
+
+    /**
+     * Drop everything belonging to a namespace — every queue, plus its failed
+     * jobs. For teardown only.
+     *
+     * The job tables live on a separate connection from the namespace row, so
+     * no foreign key can cascade this. Deleting a namespace without it would
+     * leave rows nothing can ever reach or bill for.
+     *
+     * @return array{jobs: int, failed: int}
+     */
+    public function purge(QueueNamespace $namespace): array;
 }

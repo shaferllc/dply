@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Exceptions\LogShippingException;
+use App\Http\Controllers\Api\ServerLogShippingController;
 use App\Jobs\InstallLogAgentJob;
 use App\Jobs\UninstallLogAgentJob;
+use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
+use App\Mcp\Tools\Logs;
 use App\Models\Server;
 use App\Models\ServerLogAgent;
+use App\Models\ServerLogAggregator;
 use App\Models\ServerLogUsageDaily;
 use App\Modules\Logs\Services\ServerLogEntitlements;
 
@@ -17,9 +21,9 @@ use App\Modules\Logs\Services\ServerLogEntitlements;
  * disable, and inspect the per-server edge Vector agent.
  *
  * Every surface drives the add-on through this action so the guard rules live
- * once: the Livewire workspace ({@see \App\Livewire\Servers\Concerns\ManagesServerLogShipping}),
- * the REST API ({@see \App\Http\Controllers\Api\ServerLogShippingController}),
- * and MCP ({@see \App\Mcp\Tools\Logs}). On a refusal it throws
+ * once: the Livewire workspace ({@see ManagesServerLogShipping}),
+ * the REST API ({@see ServerLogShippingController}),
+ * and MCP ({@see Logs}). On a refusal it throws
  * {@see LogShippingException}; callers translate that to a toast / 422 / MCP error.
  *
  * The mutating methods only persist state + dispatch the install/uninstall job —
@@ -95,6 +99,42 @@ class ManageServerLogShipping
     }
 
     /**
+     * Abandon an in-flight install (or removal) so the UI stops being stuck on
+     * "Installing…".
+     *
+     * This is a *state* cancel, not a kill: it flips the row to `failed`, and
+     * {@see InstallLogAgentJob} notices on its next output chunk and unwinds.
+     * A remote step already executing finishes on the server regardless — we
+     * have no way to reach into a running SSH session — so the honest promise is
+     * "stop waiting and let me retry", not "undo what was done". A re-install is
+     * idempotent, which is what makes that safe.
+     *
+     * Deliberately lands on `failed` rather than a new status: it is the state
+     * the UI already renders a "Retry install" button for, and a cancelled
+     * install genuinely is one that did not complete.
+     */
+    public function cancel(Server $server): ServerLogAgent
+    {
+        $agent = $server->logAgent;
+        if ($agent === null) {
+            throw new LogShippingException('No log agent operation to cancel.');
+        }
+
+        if (! $agent->isBusy()) {
+            throw new LogShippingException('Nothing is running for this agent right now.');
+        }
+
+        $agent->update([
+            'status' => ServerLogAgent::STATUS_FAILED,
+            'error_message' => $agent->status === ServerLogAgent::STATUS_UNINSTALLING
+                ? 'Removal canceled. The agent may be partially removed — disable again to finish, or re-sync to restore it.'
+                : 'Install canceled. Any step already running on the server finished; re-installing is safe.',
+        ]);
+
+        return $agent->refresh();
+    }
+
+    /**
      * Tear the agent off the box. Idempotent: a server with no agent is a no-op
      * and returns null. The row is deleted by {@see UninstallLogAgentJob} on
      * success.
@@ -133,8 +173,8 @@ class ManageServerLogShipping
 
         // Prefer the codified aggregator's recorded endpoint; fall back to the
         // manual config env. Mirrors VectorLogAgentInstallScripts::resolveAggregatorTarget().
-        $aggregator = \App\Models\ServerLogAggregator::query()
-            ->where('status', \App\Models\ServerLogAggregator::STATUS_RUNNING)
+        $aggregator = ServerLogAggregator::query()
+            ->where('status', ServerLogAggregator::STATUS_RUNNING)
             ->whereNotNull('endpoint')
             ->orderByDesc('updated_at')
             ->first();
