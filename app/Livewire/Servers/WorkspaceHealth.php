@@ -43,11 +43,43 @@ class WorkspaceHealth extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->healthTab = $this->normalizeHealthTab($this->healthTab);
     }
 
     public function setHealthWorkspaceTab(string $tab): void
     {
-        $this->healthTab = in_array($tab, self::HEALTH_TABS, true) ? $tab : 'overview';
+        $this->healthTab = $this->normalizeHealthTab($tab);
+    }
+
+    /**
+     * Coerce an unavailable tab back to Overview.
+     *
+     * Releases lists per-site atomic deploy folders, so it is hidden on roles
+     * that host no site code. Without this a bookmarked ?tab=releases would
+     * paint the tab strip with nothing under it — the tab it selected no longer
+     * exists to render a panel.
+     */
+    protected function normalizeHealthTab(string $tab): string
+    {
+        if (! in_array($tab, self::HEALTH_TABS, true)) {
+            return 'overview';
+        }
+
+        if ($tab === 'releases' && ! $this->hostsSiteCode()) {
+            return 'overview';
+        }
+
+        return $tab;
+    }
+
+    /** Dedicated service boxes (database / cache / load balancer) never host site code. */
+    public function hostsSiteCode(): bool
+    {
+        return ! in_array(
+            (string) ($this->server->meta['server_role'] ?? ''),
+            ['redis', 'valkey', 'database', 'load_balancer'],
+            true,
+        );
     }
 
     /**

@@ -1,7 +1,21 @@
 {{--
     Lazy-load skeleton for Health. Mirrors the merged page (hide-hero + single
     card with the dense head, tabs, overview alert rows, and the figure strip).
+
+    Keep the note text and tab list in step with workspace-health.blade.php —
+    including the Releases tab, which is hidden on server roles that host no site
+    code. A skeleton that paints a tab the real render drops makes the strip jump.
 --}}
+@php
+    $skeletonHostsSiteCode = ! in_array(
+        (string) ($server->meta['server_role'] ?? ''),
+        ['redis', 'valkey', 'database', 'load_balancer'],
+        true,
+    );
+    $skeletonHealthTabs = $skeletonHostsSiteCode
+        ? [__('Overview'), __('Capacity'), __('Releases'), __('Reliability'), __('Notifications')]
+        : [__('Overview'), __('Capacity'), __('Reliability'), __('Notifications')];
+@endphp
 <x-server-workspace-layout
     :server="$server"
     active="health"
@@ -17,7 +31,9 @@
             dense
             icon="heroicon-o-heart"
             :title="__('Health')"
-            :note="__('Capacity, releases, deploy failures, certificates, and daemon drift — one cockpit for this server.')"
+            :note="$skeletonHostsSiteCode
+                ? __('Capacity, releases, deploy failures, certificates, and daemon drift — one cockpit for this server.')
+                : __('Capacity, certificates, and daemon drift — one cockpit for this server.')"
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
@@ -26,7 +42,7 @@
         </x-workspace-panel-head>
 
         <div class="flex flex-wrap gap-1.5 border-b border-brand-ink/10 px-3 py-2 sm:px-4" aria-hidden="true">
-            @foreach ([__('Overview'), __('Capacity'), __('Releases'), __('Reliability'), __('Notifications')] as $i => $label)
+            @foreach ($skeletonHealthTabs as $i => $label)
                 <span @class([
                     'inline-flex h-6 items-center rounded-lg px-2.5 text-xs font-semibold leading-none',
                     'bg-brand-ink text-brand-cream shadow-sm' => $i === 0,

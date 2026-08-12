@@ -40,6 +40,20 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
+                {{-- The copy above already promised "create channels inline", and the
+                     modal was rendered at the foot of this page — but nothing ever
+                     opened it, so the only route to a new channel was leaving for
+                     Settings. Same trigger as every server notifications tab, which
+                     is what makes the one-click Slack / Discord / Telegram connect
+                     flows reachable from here too. --}}
+                <button
+                    type="button"
+                    wire:click="openCreateChannelModal"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-m-plus-circle class="h-4 w-4 shrink-0" />
+                    {{ __('Create a channel') }}
+                </button>
                 <a
                     href="{{ route('profile.notification-channels') }}"
                     wire:navigate

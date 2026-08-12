@@ -1,6 +1,15 @@
 @php
     $healthTabContext = compact('report', 'server');
 
+    // Atomic releases are per-site deploy folders. A dedicated database / cache /
+    // load-balancer box never hosts site code, so that tab can only ever render
+    // "No atomic deploy sites" — an empty state promising something impossible.
+    $hostsSiteCode = ! in_array(
+        (string) ($server->meta['server_role'] ?? ''),
+        ['redis', 'valkey', 'database', 'load_balancer'],
+        true,
+    );
+
     $overallTone = match ($report['overall'] ?? 'healthy') {
         'critical' => 'bg-rose-50 text-rose-700 ring-rose-200',
         'warning' => 'bg-amber-50 text-amber-900 ring-amber-200',
@@ -37,7 +46,9 @@
             icon="heroicon-o-heart"
             :tone="in_array($report['overall'] ?? 'healthy', ['critical', 'warning'], true) ? 'amber' : null"
             :title="__('Health')"
-            :note="__('Capacity, releases, deploy failures, certificates, and daemon drift — one cockpit for this server.')"
+            :note="$hostsSiteCode
+                ? __('Capacity, releases, deploy failures, certificates, and daemon drift — one cockpit for this server.')
+                : __('Capacity, certificates, and daemon drift — one cockpit for this server.')"
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
@@ -78,6 +89,7 @@
                 >
                     {{ __('Capacity') }}
                 </x-server-workspace-tab>
+                @if ($hostsSiteCode)
                 <x-server-workspace-tab
                     id="health-tab-releases"
                     icon="heroicon-o-rectangle-stack"
@@ -89,6 +101,7 @@
                         <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-amber-900">{{ number_format((int) $report['releases']['sites_over_keep']) }}</span>
                     @endif
                 </x-server-workspace-tab>
+                @endif
                 <x-server-workspace-tab
                     id="health-tab-reliability"
                     icon="heroicon-o-shield-check"
@@ -181,7 +194,7 @@
                 @include('livewire.servers.partials.health._tab-capacity', $healthTabContext)
             @endif
 
-            @if ($healthTab === 'releases')
+            @if ($healthTab === 'releases' && $hostsSiteCode)
                 @include('livewire.servers.partials.health._tab-releases', $healthTabContext)
             @endif
 

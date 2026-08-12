@@ -53,11 +53,17 @@
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
         {{-- Dense head, matching the rest of the workspace. --}}
+        {{-- Service-only boxes (database / cache / load balancer) have no
+             installable CLIs, so promising "install, upgrade, or repair" would be
+             describing a list that isn't there. --}}
+        @php $hasToolCatalog = ($toolsReport['summary']['catalog_count'] ?? 0) > 0; @endphp
         <x-workspace-panel-head
             dense
             icon="heroicon-o-wrench-screwdriver"
             :title="__('Tools')"
-            :note="__('Installed CLIs and version managers from the inventory probe — install, upgrade, or repair from here.')"
+            :note="$hasToolCatalog
+                ? __('Installed CLIs and version managers from the inventory probe — install, upgrade, or repair from here.')
+                : __('Host-level actions for this server. This server type has no installable CLIs.')"
             class="border-b border-brand-ink/10"
         />
 
@@ -77,39 +83,40 @@
         @include('livewire.servers.partials.manage.group-tools', $manageShare)
 
         @if ($opsReady && ! $isDeployer && (count($dangerousActions) > 0 || $manageRemoteTaskId))
-            <div class="border-t border-red-200/60 bg-red-50/30 px-5 py-5 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-800 ring-1 ring-rose-200">
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-800">{{ __('Power') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host power') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Reboot the host or clear a stuck queued task. A reboot drops your SSH session and any in-flight work.') }}</p>
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
-                            @foreach ($dangerousActions as $actionKey => $action)
-                                <button
-                                    type="button"
-                                    wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Are you sure?')), @js($action['label'] ?? __('Run action')), true)"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-900 transition-colors hover:bg-red-100"
-                                >
-                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ $action['label'] ?? $actionKey }}
-                                </button>
-                            @endforeach
+            {{-- Compact: one row, actions inline on the right. The "POWER" eyebrow
+                 restated the "Host power" title directly under it, and the button
+                 sat on its own line below a full-width paragraph — three stacked
+                 blocks for what is really one action. --}}
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-3 border-t border-red-200/60 bg-red-50/30 px-5 py-4 sm:px-6">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-800 ring-1 ring-rose-200">
+                    <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Host power') }}</h3>
+                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Reboot the host or clear a stuck queued task. A reboot drops your SSH session and any in-flight work.') }}</p>
+                </div>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    @foreach ($dangerousActions as $actionKey => $action)
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Are you sure?')), @js($action['label'] ?? __('Run action')), true)"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 transition-colors hover:bg-red-100"
+                        >
+                            <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $action['label'] ?? $actionKey }}
+                        </button>
+                    @endforeach
 
-                            @if ($manageRemoteTaskId)
-                                <button
-                                    type="button"
-                                    wire:click="cancelQueuedManageTasks"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Cancel queued task') }}
-                                </button>
-                            @endif
-                        </div>
-                    </div>
+                    @if ($manageRemoteTaskId)
+                        <button
+                            type="button"
+                            wire:click="cancelQueuedManageTasks"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Cancel queued task') }}
+                        </button>
+                    @endif
                 </div>
             </div>
         @endif

@@ -1,13 +1,23 @@
+@php
+    // Empty catalog = a service-only box. "0 of 0 installed" and a stale-probe
+    // nag both describe a tool list that does not exist here.
+    $hasCatalog = ($summary['catalog_count'] ?? 0) > 0;
+@endphp
+
 @if ($report)
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
         <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-brand-moss">
             <span class="font-semibold text-brand-ink">
-                {{ __(':installed of :total installed', [
-                    'installed' => $summary['installed_count'] ?? 0,
-                    'total' => $summary['catalog_count'] ?? 0,
-                ]) }}
+                @if ($hasCatalog)
+                    {{ __(':installed of :total installed', [
+                        'installed' => $summary['installed_count'] ?? 0,
+                        'total' => $summary['catalog_count'] ?? 0,
+                    ]) }}
+                @else
+                    {{ __('No installable tools for this server type') }}
+                @endif
             </span>
-            @if ($overall === 'stale')
+            @if ($overall === 'stale' && $hasCatalog)
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
                     {{ __('Probe stale — refresh recommended') }}
                 </span>
@@ -57,41 +67,54 @@
         @endif
     </div>
 
-    <nav class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6" aria-label="{{ __('Related workspaces') }}">
-        <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Also') }}</span>
-        <a
-            href="{{ route('servers.caches', $server) }}"
-            wire:navigate
-            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-        >
-            <x-heroicon-o-bolt class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-            {{ __('Caches') }}
-        </a>
-        <a
-            href="{{ route('servers.runtime', $server) }}"
-            wire:navigate
-            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-        >
-            <x-heroicon-o-command-line class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-            {{ __('Runtime') }}
-        </a>
-        <a
-            href="{{ route('servers.run', $server) }}"
-            wire:navigate
-            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-        >
-            <x-heroicon-o-play-circle class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-            {{ __('Run') }}
-        </a>
-        @feature('workspace.docker')
+    {{-- "Also" points at sibling workspaces. Runtime / Run / Docker are app-host
+         surfaces, and Caches only means anything on a cache box — so on a
+         service-only role the whole row is links to places that have nothing for
+         this server, and it disappears rather than shipping dead ends. --}}
+    @php
+        $serviceRole = (string) ($server->meta['server_role'] ?? '');
+        $isServiceRoleHost = in_array($serviceRole, ['redis', 'valkey', 'database', 'load_balancer'], true);
+        $isCacheRoleHost = in_array($serviceRole, ['redis', 'valkey'], true);
+    @endphp
+    @if (! $isServiceRoleHost || $isCacheRoleHost)
+        <nav class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6" aria-label="{{ __('Related workspaces') }}">
+            <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Also') }}</span>
             <a
-                href="{{ route('servers.docker', $server) }}"
+                href="{{ route('servers.caches', $server) }}"
                 wire:navigate
                 class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-square-3-stack-3d class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-                {{ __('Docker') }}
+                <x-heroicon-o-bolt class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                {{ __('Caches') }}
             </a>
-        @endfeature
-    </nav>
+            @unless ($isServiceRoleHost)
+                <a
+                    href="{{ route('servers.runtime', $server) }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-command-line class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                    {{ __('Runtime') }}
+                </a>
+                <a
+                    href="{{ route('servers.run', $server) }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-play-circle class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                    {{ __('Run') }}
+                </a>
+                @feature('workspace.docker')
+                    <a
+                        href="{{ route('servers.docker', $server) }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-square-3-stack-3d class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                        {{ __('Docker') }}
+                    </a>
+                @endfeature
+            @endunless
+        </nav>
+    @endif
 @endif
