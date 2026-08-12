@@ -119,6 +119,142 @@
     </div>
 @endif
 
+{{-- Connected Slack workspaces. Lives above the channel list because it is the
+     prerequisite, not a peer: one connect here turns every later Slack channel
+     into a dropdown pick instead of a webhook hunt. Hidden entirely on
+     deployments with no Slack app registered — those operators paste webhook
+     URLs and this strip would just be a dead end. --}}
+@php
+    $slackWorkspaces = $canManage ? $this->slackInstallations() : collect();
+@endphp
+@if ($canManage && ($this->slackOauthConfigured() || $slackWorkspaces->isNotEmpty()))
+    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Slack workspaces') }}</p>
+                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                    {{ __('Connect once, then route alerts to any channel without copying webhook URLs.') }}
+                </p>
+            </div>
+            @if ($this->slackOauthConfigured())
+                <a
+                    href="{{ $this->slackConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->slackConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ $slackWorkspaces->isEmpty() ? __('Add to Slack') : __('Add workspace') }}
+                </a>
+            @endif
+        </div>
+
+        @if ($slackWorkspaces->isNotEmpty())
+            <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
+                @foreach ($slackWorkspaces as $workspace)
+                    <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-brand-ink">{{ $workspace->team_name }}</p>
+                            <p class="text-2xs text-brand-mist">{{ __('Connected :when', ['when' => $workspace->created_at?->diffForHumans() ?? '—']) }}</p>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="disconnectSlackWorkspace('{{ $workspace->id }}')"
+                            wire:confirm="{{ __('Disconnect :team? Channels pointed at it stop delivering until you reconnect.', ['team' => $workspace->team_name]) }}"
+                            class="shrink-0 text-xs font-semibold text-red-600 transition hover:text-red-700"
+                        >
+                            {{ __('Disconnect') }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@endif
+
+{{-- Connected Discord servers — same shape as the Slack strip above. --}}
+@php
+    $discordGuilds = $canManage ? $this->discordInstallations() : collect();
+@endphp
+@if ($canManage && ($this->discordOauthConfigured() || $discordGuilds->isNotEmpty()))
+    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Discord servers') }}</p>
+                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                    {{ __('Add the dply bot once, then route alerts to any channel without copying webhook URLs.') }}
+                </p>
+            </div>
+            @if ($this->discordOauthConfigured())
+                <a
+                    href="{{ $this->discordConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->discordConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ $discordGuilds->isEmpty() ? __('Add to Discord') : __('Add server') }}
+                </a>
+            @endif
+        </div>
+
+        @if ($discordGuilds->isNotEmpty())
+            <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
+                @foreach ($discordGuilds as $guild)
+                    <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-brand-ink">{{ $guild->guild_name }}</p>
+                            <p class="text-2xs text-brand-mist">{{ __('Connected :when', ['when' => $guild->created_at?->diffForHumans() ?? '—']) }}</p>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="disconnectDiscordGuild('{{ $guild->id }}')"
+                            wire:confirm="{{ __('Disconnect :guild? Channels pointed at it stop delivering. Remove the dply bot in Discord to fully revoke access.', ['guild' => $guild->guild_name]) }}"
+                            class="shrink-0 text-xs font-semibold text-red-600 transition hover:text-red-700"
+                        >
+                            {{ __('Disconnect') }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@endif
+
+{{-- Connected Telegram chats. No "Add" button here: connecting is a wait-and-poll
+     flow that belongs inside the channel form, not on a page that isn't watching
+     for it. --}}
+@php
+    $telegramChatRows = $canManage ? $this->telegramInstallations() : collect();
+@endphp
+@if ($canManage && $telegramChatRows->isNotEmpty())
+    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-brand-ink">{{ __('Telegram chats') }}</p>
+            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                {{ __('Chats the dply bot has been added to. Connect a new one from the Telegram channel form.') }}
+            </p>
+        </div>
+
+        <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
+            @foreach ($telegramChatRows as $chatRow)
+                <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-brand-ink">{{ $chatRow->chat_title }}</p>
+                        <p class="text-2xs text-brand-mist">{{ __('Connected :when', ['when' => $chatRow->created_at?->diffForHumans() ?? '—']) }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="disconnectTelegramChat('{{ $chatRow->id }}')"
+                        wire:confirm="{{ __('Disconnect :chat? Channels pointed at it stop delivering. Remove the dply bot in Telegram to fully revoke access.', ['chat' => $chatRow->chat_title]) }}"
+                        class="shrink-0 text-xs font-semibold text-red-600 transition hover:text-red-700"
+                    >
+                        {{ __('Disconnect') }}
+                    </button>
+                </li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 {{-- Channel list. No second identity strip and no duplicate Add — shell
      header (when list has items) or empty-state CTA (when empty). --}}
 <div class="border-b border-brand-ink/10 last:border-b-0">

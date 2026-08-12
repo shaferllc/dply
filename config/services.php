@@ -36,7 +36,58 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+     | Telegram bot behind the one-click "Connect Telegram" notification channel.
+     | Create with @BotFather (/newbot) to get TELEGRAM_BOT_TOKEN.
+     | TELEGRAM_WEBHOOK_SECRET is invented by you (any random string) — Telegram
+     | echoes it on every delivery and it is the only thing authenticating the
+     | public /hooks/telegram endpoint, so treat it like a password.
+     | Register the webhook with: php artisan telegram:set-webhook
+     | Telegram requires a public HTTPS URL, so use your Expose URL locally.
+     | Optional: without it the button hides and operators paste a bot token +
+     | chat ID by hand instead.
+     */
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+    ],
+
+    /*
+     | Discord application backing the one-click "Add to Discord" notification
+     | channel. Create at https://discord.com/developers/applications:
+     |   OAuth2 → Redirects: add DISCORD_REDIRECT_URI (Discord rejects `.test`
+     |   hosts — use your Expose URL locally); unset falls back to APP_URL +
+     |   route('notifications.oauth.discord.callback').
+     |   Bot → Reset Token gives DISCORD_BOT_TOKEN.
+     | All three are required: unlike Slack, the bot token is application-wide
+     | and does NOT come out of the OAuth exchange, so without it the flow would
+     | connect a server that can never actually receive a message.
+     | Optional overall: without it the button hides and operators paste a
+     | webhook URL by hand instead.
+     */
+    'discord' => [
+        'client_id' => env('DISCORD_CLIENT_ID'),
+        'client_secret' => env('DISCORD_CLIENT_SECRET'),
+        'redirect' => env('DISCORD_REDIRECT_URI'),
+        'bot_token' => env('DISCORD_BOT_TOKEN'),
+    ],
+
+    /*
+     | Slack app backing the one-click "Add to Slack" notification channel.
+     | Register at https://api.slack.com/apps, add the bot scopes listed in
+     | SlackOAuthController::SCOPES, and set the redirect URL to
+     | SLACK_REDIRECT_URI — or, if unset, route('notifications.oauth.slack.callback')
+     | using APP_URL (use your Expose URL locally; Slack rejects `.test` hosts).
+     | Turn on "Manage Distribution" so workspaces other than your own can install.
+     | Optional: without it the button hides and operators paste an incoming
+     | webhook URL by hand instead.
+     */
     'slack' => [
+        'client_id' => env('SLACK_CLIENT_ID'),
+        'client_secret' => env('SLACK_CLIENT_SECRET'),
+        'redirect' => env('SLACK_REDIRECT_URI'),
+
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),

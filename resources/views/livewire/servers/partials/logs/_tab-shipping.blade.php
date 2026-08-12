@@ -231,6 +231,27 @@
                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
                         {{ __('Working on the server…') }}
                     </span>
+
+                    {{-- Without this the panel is fully disabled behind "Installing…"
+                         with nothing to click — a dead queue worker or an unreachable
+                         box would strand it there indefinitely. --}}
+                    <button
+                        type="button"
+                        wire:click="openConfirmActionModal(
+                            'cancelLogShipping',
+                            [],
+                            @js($status === 'uninstalling' ? __('Cancel removal') : __('Cancel install')),
+                            @js($status === 'uninstalling'
+                                ? __('Stop waiting on this removal? Anything already running on the server finishes, and the agent may be left partly removed.')
+                                : __('Stop waiting on this install? Anything already running on the server finishes — re-installing afterwards is safe.')),
+                            @js($status === 'uninstalling' ? __('Cancel removal') : __('Cancel install')),
+                            false
+                        )"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss transition hover:bg-brand-sand/20 hover:text-brand-ink"
+                    >
+                        <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ $status === 'uninstalling' ? __('Cancel removal') : __('Cancel install') }}
+                    </button>
                 @endif
             </div>
 

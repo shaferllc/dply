@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\Concerns;
 
+use App\Modules\Database\Support\DockerDatabase;
+use App\Services\Servers\DockerDatabaseProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -13,8 +16,6 @@ use App\Support\Servers\DatabaseEngineInstallScripts;
  */
 trait BuildsProvisionDatabaseStack
 {
-
-
     /**
      * @return list<string>
      */
@@ -31,6 +32,150 @@ trait BuildsProvisionDatabaseStack
     public function installEngineLines(string $engineId): array
     {
         return $this->installDatabaseIfNeeded($engineId);
+    }
+
+    /**
+     * Container-host variant of {@see installDatabaseIfNeeded()}.
+     *
+     * On a Docker server the engine belongs in a container, not in apt — that
+     * is the whole point of picking the role. Previously `roleDocker()` took a
+     * `$database` argument and ignored it, so choosing "Docker server" plus an
+     * engine silently produced a host with no database at all.
+     *
+     * Engines dply has no image mapping for (sqlite, mongodb, clickhouse) fall
+     * through to the native installer rather than being dropped, with a log
+     * line saying so — silently installing nothing is what caused this.
+     *
+     * @return list<string>
+     */
+    private function installDatabaseInDockerIfNeeded(string $database): array
+    {
+        if ($database === 'none') {
+            return [];
+        }
+
+        $family = DedicatedDatabaseServerProvisionConfig::engineFamily($database);
+
+        // mariadb shares the mysql client/protocol but not the image; without a
+        // dedicated mapping it would silently launch mysql:8.0 under a MariaDB
+        // label, so it takes the native path until an image is configured.
+        $dockerEngine = match ($family) {
+            'postgres' => 'postgres',
+            'mysql' => 'mysql',
+            default => null,
+        };
+
+        if ($dockerEngine === null) {
+            return array_merge(
+                ['echo "[dply] '.$family.' has no Docker image mapping — installing it natively on this Docker host."'],
+                $this->installDatabaseIfNeeded($database),
+            );
+        }
+
+        return $this->withStep(
+            'Starting '.($dockerEngine === 'postgres' ? 'PostgreSQL' : 'MySQL').' container',
+            $this->dockerEngineLines($database, $dockerEngine),
+        );
+    }
+
+    /**
+     * Provision-time container launch. Mirrors the idiom in
+     * {@see DockerDatabaseProvisioner::baseScript()} —
+     * named volume, `--restart unless-stopped`, loopback bind unless remote
+     * access was requested — but reads credentials from the create wizard
+     * instead of a site binding.
+     *
+     * Unlike the native Postgres path this waits for readiness and fails loud:
+     * a container that never becomes ready is a failed provision, not a silent
+     * one.
+     *
+     * @return list<string>
+     */
+    private function dockerEngineLines(string $database, string $dockerEngine): array
+    {
+        $config = DedicatedDatabaseServerProvisionConfig::fromServer($this->server, $database);
+
+        $image = DockerDatabase::imageForEngine($dockerEngine);
+        $internalPort = DockerDatabase::containerPortForEngine($dockerEngine);
+        $hostPort = $config->defaultPort();
+        $bindHost = $config->remoteAccess ? '0.0.0.0' : '127.0.0.1';
+        $container = 'dply-db-'.$dockerEngine;
+        $volume = 'dply-db-'.$dockerEngine.'-data';
+
+        $dbName = $config->databaseName !== '' ? $config->databaseName : 'app';
+        $user = $config->username !== '' ? $config->username : 'dply_app';
+        $password = (string) ($config->password ?? '');
+
+        // No credentials means no usable database: both images refuse to
+        // initialise without a root/superuser password.
+        if ($password === '') {
+            return [
+                'echo "[dply] ERROR: no database password was generated for this server; cannot start the '.$dockerEngine.' container." >&2',
+                'exit 1',
+            ];
+        }
+
+        [$envFlags, $readyCheck] = $dockerEngine === 'postgres'
+            ? [
+                [
+                    '  -e POSTGRES_DB='.escapeshellarg($dbName).' \\',
+                    '  -e POSTGRES_USER='.escapeshellarg($user).' \\',
+                    '  -e POSTGRES_PASSWORD='.escapeshellarg($password).' \\',
+                ],
+                'docker exec "$CONTAINER" pg_isready -U '.escapeshellarg($user).' -d '.escapeshellarg($dbName).' >/dev/null 2>&1',
+            ]
+            : [
+                [
+                    '  -e MYSQL_DATABASE='.escapeshellarg($dbName).' \\',
+                    '  -e MYSQL_USER='.escapeshellarg($user).' \\',
+                    '  -e MYSQL_PASSWORD='.escapeshellarg($password).' \\',
+                    '  -e MYSQL_ROOT_PASSWORD='.escapeshellarg($password).' \\',
+                ],
+                'docker exec "$CONTAINER" mysqladmin ping -h 127.0.0.1 -u root -p'.escapeshellarg($password).' >/dev/null 2>&1',
+            ];
+
+        $mount = $dockerEngine === 'postgres' ? '/var/lib/postgresql/data' : '/var/lib/mysql';
+
+        return array_merge(
+            [
+                'if ! command -v docker >/dev/null 2>&1; then',
+                '  echo "[dply] ERROR: Docker is not available on this host — cannot start the database container." >&2',
+                '  exit 1',
+                'fi',
+                'CONTAINER='.escapeshellarg($container),
+                'docker pull '.escapeshellarg($image),
+                'docker rm -f "$CONTAINER" >/dev/null 2>&1 || true',
+                'docker volume create '.escapeshellarg($volume).' >/dev/null 2>&1 || true',
+                'docker run -d --name "$CONTAINER" \\',
+            ],
+            $envFlags,
+            [
+                '  -p '.escapeshellarg($bindHost.':'.$hostPort.':'.$internalPort).' \\',
+                '  -v '.escapeshellarg($volume.':'.$mount).' \\',
+                '  --restart unless-stopped \\',
+                '  '.escapeshellarg($image),
+                'echo "[dply] waiting for the '.$dockerEngine.' container to accept connections..."',
+                'DPLY_DB_READY=0',
+                'for i in $(seq 1 60); do',
+                '  if '.$readyCheck.'; then',
+                '    echo "[dply] '.$dockerEngine.' container is ready (after $((i * 2))s)."',
+                '    DPLY_DB_READY=1',
+                '    break',
+                '  fi',
+                '  sleep 2',
+                'done',
+                'if [ "$DPLY_DB_READY" != "1" ]; then',
+                '  echo "[dply] ERROR: the '.$dockerEngine.' container did not become ready within 120s." >&2',
+                '  echo "[dply] === docker logs '.$container.' (last 60 lines) ===" >&2',
+                '  docker logs --tail 60 "$CONTAINER" >&2 2>&1 || true',
+                '  exit 1',
+                'fi',
+                'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
+            ],
+            $config->remoteAccess ? $config->ufwAllowLines() : [
+                'ufw deny '.$hostPort.'/tcp || true',
+            ],
+        );
     }
 
     private function installDatabaseIfNeeded(string $database): array
@@ -338,8 +483,48 @@ trait BuildsProvisionDatabaseStack
                 '[dply] postgresql-'.$ver.' already installed; skipping package install.'
             ),
             $this->writeFileWithRollback('/etc/postgresql/'.$ver.'/main/conf.d/99-dply.conf', "listen_addresses = '127.0.0.1'\nshared_buffers = '256MB'\nmax_connections = 200\n"),
-            'systemctl enable --now postgresql',
-            'systemctl restart postgresql || true',
+            // Start the cluster ourselves and fail loud, mirroring the MySQL
+            // branch above. `|| true` used to swallow a failed restart, and
+            // nothing waited for the socket — so the next step's psql hit
+            // "No such file or directory" with no way to tell whether Postgres
+            // had crashed or simply wasn't up yet.
+            'systemctl daemon-reload >/dev/null 2>&1 || true',
+            'systemctl enable postgresql >/dev/null 2>&1 || true',
+            'if ! systemctl restart postgresql; then '
+                .'echo "[dply] PostgreSQL failed to restart on first attempt — clearing systemd failure state and retrying." >&2; '
+                .'systemctl reset-failed postgresql "postgresql@'.$ver.'-main" >/dev/null 2>&1 || true; '
+                .'sleep 3; '
+                .'systemctl restart postgresql || { '
+                    .'echo "[dply] ERROR: PostgreSQL still not running after reset-failed retry." >&2; '
+                    .'echo "[dply] === journalctl -u postgresql@'.$ver.'-main (last 60 lines) ===" >&2; '
+                    .'journalctl -u "postgresql@'.$ver.'-main" --no-pager -n 60 >&2 || true; '
+                    .'echo "[dply] === /var/log/postgresql/postgresql-'.$ver.'-main.log (last 50 lines) ===" >&2; '
+                    .'tail -n 50 "/var/log/postgresql/postgresql-'.$ver.'-main.log" >&2 2>/dev/null || echo "(no cluster log)" >&2; '
+                    .'echo "[dply] === free -h ===" >&2; '
+                    .'free -h >&2 || true; '
+                    .'exit 1; '
+                .'}; '
+            .'fi',
+            // postgresql.service is a SysV-wrapped oneshot: it returns as soon
+            // as the init script forks, well before the cluster opens its
+            // socket. Everything downstream talks to that socket, so wait for
+            // it rather than racing it.
+            'echo "[dply] waiting for the PostgreSQL socket..."',
+            'DPLY_PG_READY=0',
+            'for i in $(seq 1 60); do '
+                .'if pg_isready -q -h /var/run/postgresql >/dev/null 2>&1; then '
+                    .'echo "[dply] PostgreSQL is accepting connections (after ${i}s)."; DPLY_PG_READY=1; break; '
+                .'fi; '
+                .'sleep 1; '
+            .'done',
+            'if [ "$DPLY_PG_READY" != "1" ]; then '
+                .'echo "[dply] ERROR: PostgreSQL did not accept connections within 60s." >&2; '
+                .'echo "[dply] === journalctl -u postgresql@'.$ver.'-main (last 60 lines) ===" >&2; '
+                .'journalctl -u "postgresql@'.$ver.'-main" --no-pager -n 60 >&2 || true; '
+                .'echo "[dply] === /var/log/postgresql/postgresql-'.$ver.'-main.log (last 50 lines) ===" >&2; '
+                .'tail -n 50 "/var/log/postgresql/postgresql-'.$ver.'-main.log" >&2 2>/dev/null || echo "(no cluster log)" >&2; '
+                .'exit 1; '
+            .'fi',
             'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
         ];
 

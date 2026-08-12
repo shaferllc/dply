@@ -1,9 +1,11 @@
 @php
     $card = 'border-b border-brand-ink/10';
-    $settingsDescription = __('Navigate through the tabs to manage different settings categories. Changes in each section are automatically saved.');
+    $settingsDescription = __('Navigate through the tabs to manage different settings categories. Unsaved edits surface a save bar at the bottom of the page.');
+    $canEditSettings = $this->canEditServerSettings;
 @endphp
 
-{{-- Single root: this is a nested component, so the card is the whole render. --}}
+{{-- Single root: this is a nested component, so the card is the whole render.
+     Floating unsaved bars must live inside this root so $wire / wire:click resolve. --}}
 <div class="min-w-0">
     <section class="dply-card min-w-0 overflow-hidden p-0">
         <x-workspace-panel-head
@@ -73,6 +75,11 @@
         </div>
     </section>
 
+    {{-- Shared confirm dialog (ConfirmsActionWithModal, pulled in by
+         ManagesWorkspaceSettingsForm) — currently the "Repair SSH access"
+         explain-then-proceed step. --}}
+    @include('livewire.partials.confirm-action-modal')
+
     {{-- The removal flow's state lives on this component, so its modal renders
          here rather than in the page layout's modals slot. Fixed-position
          overlay, so nesting it inside the card is only a DOM detail. --}}
@@ -82,4 +89,52 @@
         'serverId' => $server->id,
         'deletionSummary' => $deletionSummary,
     ])
+
+    @if ($canEditSettings)
+        @if ($section === 'connection')
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to connection details.')"
+                saveAction="saveServerSettingsInfo"
+                discardAction="discardServerSettingsInfoUnsaved"
+                targets="settingsName,settingsTags,settingsIpAddress,settingsInternalIp,settingsSshPort,settingsSshUser,settingsOsVersion,settingsWorkspaceId"
+                :client-dirty="true"
+                :saveLabel="__('Save connection')"
+            />
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to the display timezone.')"
+                saveAction="saveServerTimezone"
+                discardAction="discardServerTimezoneUnsaved"
+                targets="settingsTimezone"
+                :client-dirty="true"
+                :saveLabel="__('Save timezone')"
+            />
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to the date format.')"
+                saveAction="saveServerDateFormat"
+                discardAction="discardServerDateFormatUnsaved"
+                targets="settingsDateFormat"
+                :client-dirty="true"
+                :saveLabel="__('Save format')"
+            />
+        @elseif ($section === 'inventory')
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to inventory scan depth.')"
+                saveAction="saveInventoryDepthPreference"
+                discardAction="discardInventoryDepthUnsaved"
+                targets="settingsInventoryDepth"
+                :client-dirty="true"
+                :saveLabel="__('Save depth')"
+            />
+        @elseif ($section === 'governance')
+            <x-unsaved-changes-bar
+                :message="__('You have unsaved changes to cost notes.')"
+                saveAction="saveCostLifecycle"
+                discardAction="discardCostLifecycleUnsaved"
+                targets="settingsCostMonthlyNote"
+                form-pending-wire="costNoteAwaitingSave"
+                :client-dirty="true"
+                :saveLabel="__('Save cost notes')"
+            />
+        @endif
+    @endif
 </div>

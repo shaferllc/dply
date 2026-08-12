@@ -69,7 +69,7 @@ return [
         // No soon_badge: the edge proxy workspace is live (see coming_soon_keys /
         // edge_proxy_coming_soon below — both empty), so the nav must not still
         // advertise it as upcoming.
-        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.edge_proxy'],
         // No hardcoded soon_badge: orgs on `workspace.docker_preview` still get the
         // badge via the dynamic preview_only flag, while orgs with the full
         // `workspace.docker` feature see the workspace without a "Soon" label.
@@ -84,7 +84,7 @@ return [
         // access (alphabetical by label)
         ['key' => 'ssh-access', 'route' => 'servers.ssh-access', 'preview_route' => 'servers.ssh-access', 'icon' => 'finger-print', 'label' => 'Access graph', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.ssh_access_graph', 'preview_feature' => 'workspace.ssh_access_graph_preview'],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'load-balancers', 'route' => 'servers.load-balancers', 'icon' => 'arrows-right-left', 'label' => 'Load balancers', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'load-balancers', 'route' => 'servers.load-balancers', 'icon' => 'arrows-right-left', 'label' => 'Load balancers', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.load_balancers'],
         ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
@@ -301,6 +301,25 @@ return [
     // block any more. Empty means every engine in the catalog is switchable;
     // re-add a key here to gate one again.
     'webserver_coming_soon' => [],
+
+    /*
+    | Webserver engines removed from the UI entirely — no engine tab, no entry
+    | in the switch picker. Distinct from `webserver_coming_soon` above, which
+    | only adds a "Soon" badge and leaves the engine visible.
+    |
+    | A server already RUNNING a hidden engine still gets its tab (see
+    | WebserverWorkspaceViewData::webserverCatalogIncluding()), so parking one
+    | never strips the only UI for managing an existing install.
+    */
+    'webserver_hidden' => ['caddy', 'apache', 'openlitespeed'],
+
+    /*
+    | Hides the Webserver → Change tab (the switch-webserver flow) and blocks
+    | the server-side switch action. With every alternative engine parked in
+    | `webserver_hidden` there is nothing to switch to, so the tab would only
+    | offer a dead end.
+    */
+    'webserver_switch_hidden' => true,
 
     /*
     | Edge proxy engines listed here show "Coming soon" in the overview picker

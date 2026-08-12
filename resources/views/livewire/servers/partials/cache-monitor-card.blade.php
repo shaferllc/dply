@@ -112,7 +112,7 @@
                 {{-- Dark-theme empty state: same shape as the REPL "no
                      commands run yet" panel — operator immediately reads
                      this as "still waiting" not "broken". --}}
-                <div class="px-6 py-6 text-center">
+                <div class="px-4 py-3.5 text-center">
                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100/10 text-emerald-200 ring-1 ring-emerald-100/15">
                         <svg class="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <circle cx="12" cy="12" r="3" />

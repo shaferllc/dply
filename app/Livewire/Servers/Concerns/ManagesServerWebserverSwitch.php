@@ -51,6 +51,16 @@ trait ManagesServerWebserverSwitch
     {
         $this->authorize('update', $this->server);
 
+        // Hiding the Change tab removes the entry point; this refuses the
+        // action itself, so a stale page or a crafted Livewire call cannot
+        // start a switch to a parked engine.
+        if (WebserverWorkspaceViewData::switchHidden()
+            || WebserverWorkspaceViewData::isHiddenEngine($target)) {
+            $this->toastError(__('Switching webservers is not available.'));
+
+            return;
+        }
+
         if ($this->hasInflightWebserverSwitch()) {
             $this->toastError(__('A webserver switch is already in flight — wait for it to finish before starting another.'));
 

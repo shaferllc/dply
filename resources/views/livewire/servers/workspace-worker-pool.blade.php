@@ -78,7 +78,6 @@
                 'slate' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/15',
             ][$statusMeta['tone']];
 
-            $totalCents = $perWorkerCents * max(0, $active);
             $regions = $members->pluck('region')->filter()->unique()->values();
             $providers = $members->map(fn ($m) => $m->provider?->value)->filter()->unique()->values();
 
@@ -162,12 +161,8 @@
                     {{ $pool->primaryServer?->name ?? '—' }}
                 </p>
                 <p class="text-brand-moss">
-                    <span class="font-medium text-brand-ink">{{ __('Est. cost') }}:</span>
-                    @if ($perWorkerCents > 0)
-                        ${{ number_format($totalCents / 100, 2) }}/mo ({{ __(':n × $:each', ['n' => $active, 'each' => number_format($perWorkerCents / 100, 2)]) }})
-                    @else
-                        {{ __('unknown') }}
-                    @endif
+                    <span class="font-medium text-brand-ink">{{ __('Billing') }}:</span>
+                    {{ trans_choice(':count worker counts toward your plan|:count workers count toward your plan', $active, ['count' => $active]) }}
                 </p>
                 <p class="text-brand-moss">
                     <span class="font-medium text-brand-ink">{{ __('Regions') }}:</span>
@@ -248,14 +243,12 @@
                 </div>
                 @php
                     $delta = (int) $desired_count - $active;
-                    $costDelta = abs($delta) * $perWorkerCents;
-                    $costLabel = $perWorkerCents > 0 ? ' ≈ $'.number_format($costDelta / 100, 2).'/mo' : '';
                 @endphp
                 @if ($delta !== 0)
                     <p class="pb-1 text-xs text-brand-moss">
                         {{ $delta > 0
-                            ? __('+:n server(s) will be provisioned (billable):cost.', ['n' => $delta, 'cost' => $costLabel])
-                            : __(':n server(s) will be drained and destroyed (saves:cost).', ['n' => abs($delta), 'cost' => $costLabel]) }}
+                            ? __('+:n server(s) will be provisioned and counted toward your plan.', ['n' => $delta])
+                            : __(':n server(s) will be drained and destroyed.', ['n' => abs($delta)]) }}
                     </p>
                 @endif
             </form>

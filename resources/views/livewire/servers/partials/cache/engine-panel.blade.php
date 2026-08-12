@@ -59,7 +59,7 @@
                              installable; this engine shows a teaser instead of the install
                              affordance until platform admin flips the flag on. The Info tab
                              still describes the engine so operators can evaluate it now. --}}
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5">
                             <div class="flex items-start gap-3">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-moss ring-1 ring-brand-ink/10">
                                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
@@ -154,9 +154,9 @@
                     @else
                         {{-- Overview when in-flight: small status note pointing at the
                              top-of-page console banner for live details. --}}
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss">
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5">
+                            <h3 class="text-sm font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
+                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                 {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
                             </p>
                         </div>
@@ -558,15 +558,15 @@
 
                     {{-- Port card (Configure subtab, all engines). Restarts the unit. --}}
                     @if ($activeSubtab === 'configure')
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — listen port', ['engine' => $engineLabels[$engine]]) }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss">
-                                {{ __('Change the TCP port :engine listens on. The systemd unit will restart and connections drop briefly while the new port comes up. If the engine fails to bind, the previous config is restored automatically.', ['engine' => $engineLabels[$engine]]) }}
-                            </p>
-                            <p class="mt-1 text-xs text-brand-mist">
-                                {{ __('Currently on port :port.', ['port' => $row->port]) }}
-                            </p>
-                            <form wire:submit="changeCachePort" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-signal"
+                            :title="__(':engine — listen port', ['engine' => $engineLabels[$engine]])"
+                            :note="__('Change the TCP port :engine listens on — the unit restarts and connections drop briefly. On a failed bind the previous config is restored. Currently on port :port.', ['engine' => $engineLabels[$engine], 'port' => $row->port])"
+                            class="border-b border-brand-ink/10"
+                        />
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5">
+                            <form wire:submit="changeCachePort" class="grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
                                 <div>
                                     <x-input-label for="new_port" :value="__('New port')" />
                                     <x-text-input
@@ -596,15 +596,16 @@
                     {{-- AUTH password card (redis-family only, Configure subtab). --}}
                     @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
                         @if ($activeSubtab === 'configure')
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss">
-                                @if (filled($row->auth_password))
-                                    {{ __('A password is set. Apps connecting to this engine must send AUTH. Rotate by entering a new value below.') }}
-                                @else
-                                    {{ __('No AUTH password is set. Anything that can reach the loopback port can issue commands. Set one below to require authentication.') }}
-                                @endif
-                            </p>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-key"
+                            :title="__(':engine — AUTH password', ['engine' => $engineLabels[$engine]])"
+                            :note="filled($row->auth_password)
+                                ? __('A password is set. Apps connecting to this engine must send AUTH. Rotate by entering a new value below.')
+                                : __('No AUTH password is set. Anything that can reach the loopback port can issue commands. Set one below to require authentication.')"
+                            class="border-b border-brand-ink/10"
+                        />
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5">
 
                             {{-- Current password reveal. The Overview tab carries this too via
                                  the connection details card; mirroring it here lets operators
@@ -701,35 +702,34 @@
                             $exposedRule = $cacheExposure['rule'];
                             $hasAuth = filled($row->auth_password ?? null);
                         @endphp
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="min-w-0">
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — network exposure', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
-                                        @if ($isExposed)
-                                            {{ __('This instance is exposed to :source on TCP :port. Other servers in that range can connect.', ['source' => $exposedRule?->source ?? '—', 'port' => $row->port]) }}
-                                        @else
-                                            {{ __('Currently bound to 127.0.0.1 — only processes on this server can connect. Expose to a private network (a VPC peer, a specific app server) to allow cross-server connections.') }}
-                                        @endif
-                                    </p>
-                                </div>
-                                <div class="flex shrink-0 items-center gap-2">
-                                    @if ($isExposed)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
-                                            <x-heroicon-m-globe-alt class="h-3 w-3" />
-                                            {{ __('Exposed') }}
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
-                                            <x-heroicon-m-lock-closed class="h-3 w-3" />
-                                            {{ __('Loopback only') }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-globe-alt"
+                            :title="__(':engine — network exposure', ['engine' => $engineLabels[$engine]])"
+                            :note="$isExposed
+                                ? __('Exposed to :source on TCP :port. Other servers in that range can connect.', ['source' => $exposedRule?->source ?? '—', 'port' => $row->port])
+                                : __('Bound to 127.0.0.1 — only processes on this server can connect. Expose to a private network to allow cross-server connections.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot name="actions">
+                                @if ($isExposed)
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                        <x-heroicon-m-globe-alt class="h-3 w-3" />
+                                        {{ __('Exposed') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                        <x-heroicon-m-lock-closed class="h-3 w-3" />
+                                        {{ __('Loopback only') }}
+                                    </span>
+                                @endif
+                            </x-slot>
+                        </x-workspace-panel-head>
+
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5">
 
                             @if (! $hasAuth && ! $isExposed)
-                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+                                <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
                                     <p class="flex items-start gap-2">
                                         <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
                                         <span>{{ __('Set an AUTH password above first. Exposing an unauthenticated cache to a network — even a private one — isn\'t allowed from this dialog.') }}</span>
@@ -819,30 +819,32 @@
                              wire:poll attributes were unreliable — Livewire
                              didn't always re-register the timer after the
                              attribute reappeared post-re-render. --}}
-                        <div class="{{ $card }} px-5 py-5 sm:px-6" wire:poll.2s="pollCacheMemorySettings">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                    <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
-                                </div>
-                                <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
-                                        @if ($cacheMemoryLoaded)
-                                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                            <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
-                                        @else
-                                            <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
-                                            <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
-                                        @endif
-                                        <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
-                                    </button>
-                                </div>
-                            </div>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-circle-stack"
+                            :title="__(':engine — memory limits', ['engine' => $engineLabels[$engine]])"
+                            :note="__('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot name="actions">
+                                <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                    @if ($cacheMemoryLoaded)
+                                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
+                                    @else
+                                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
+                                    @endif
+                                    <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
+                                </button>
+                            </x-slot>
+                        </x-workspace-panel-head>
 
+                        <div class="{{ $card }} px-4 py-3.5 sm:px-5" wire:poll.2s="pollCacheMemorySettings">
                             {{-- Active-load banner. Fires while the dispatch + cache
                                  read is in flight; the worker writes the values to
                                  cache and the next render swaps to the form. --}}
-                            <div wire:loading.block wire:target="loadCacheMemorySettings" class="mt-4">
+                            <div wire:loading.block wire:target="loadCacheMemorySettings">
                                 <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
                                     <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                         <circle cx="12" cy="12" r="10" opacity="0.25" />
@@ -977,27 +979,33 @@
                                     return rtrim(rtrim(number_format($val, $val < 10 ? 1 : 0), '0'), '.').' '.$units[$i];
                                 };
                             @endphp
-                            <div class="{{ $card }} px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div class="max-w-2xl">
-                                        <h3 class="text-base font-semibold text-brand-ink">{{ __('System INFO snapshot') }}</h3>
-                                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Last `redis-cli INFO` output captured by the host inventory probe. Refresh the probe from Manage → Overview to update.') }}</p>
-                                    </div>
-                                    @if (! empty($serviceActions['redis_info']) && ! $rowInFlight)
-                                        @php $redisInfoAction = $serviceActions['redis_info']; @endphp
+                            {{-- Dense strip + tighter body, matching the merged
+                                 workspace chrome used across the other subtabs. --}}
+                            <x-workspace-panel-head
+                                dense
+                                icon="heroicon-o-chart-bar"
+                                :title="__('System INFO snapshot')"
+                                :note="__('Last `redis-cli INFO` output captured by the host inventory probe. Refresh the probe from Manage → Overview to update.')"
+                                class="border-b border-brand-ink/10"
+                            >
+                                @if (! empty($serviceActions['redis_info']) && ! $rowInFlight)
+                                    @php $redisInfoAction = $serviceActions['redis_info']; @endphp
+                                    <x-slot name="actions">
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('runAllowlistedManageAction', ['redis_info'], @js($redisInfoAction['label']), @js($redisInfoAction['confirm']), @js($redisInfoAction['label']), false)"
-                                            class="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                            class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                         >
-                                            <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                            <x-heroicon-o-bolt class="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
                                             {{ $redisInfoAction['label'] }}
                                         </button>
-                                    @endif
-                                </div>
+                                    </x-slot>
+                                @endif
+                            </x-workspace-panel-head>
 
+                            <div class="{{ $card }} px-4 py-3.5 sm:px-5">
                                 @if ($manageActionRun)
-                                    <div class="mt-4">
+                                    <div>
                                         @include('livewire.partials.console-action-banner-static', [
                                             'run' => $manageActionRun,
                                             'kindLabels' => (array) config('console_actions.kinds', []),
@@ -1006,21 +1014,21 @@
                                 @endif
 
                                 @if (! empty($manageRedisInfo))
-                                    <dl class="mt-5 grid gap-4 sm:grid-cols-4">
-                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Connected clients') }}</dt>
-                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisInfo['connected_clients'] ?? '—' }}</dd>
+                                    <dl class="grid gap-3 sm:grid-cols-4">
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                                            <dt class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Connected clients') }}</dt>
+                                            <dd class="mt-0.5 text-lg font-semibold text-brand-ink">{{ $manageRedisInfo['connected_clients'] ?? '—' }}</dd>
                                         </div>
-                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Used memory') }}</dt>
-                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisInfo['used_memory_human'] ?? $manageRedisFormatBytes($manageRedisInfo['used_memory'] ?? 0) }}</dd>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                                            <dt class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Used memory') }}</dt>
+                                            <dd class="mt-0.5 text-lg font-semibold text-brand-ink">{{ $manageRedisInfo['used_memory_human'] ?? $manageRedisFormatBytes($manageRedisInfo['used_memory'] ?? 0) }}</dd>
                                         </div>
-                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Hit rate') }}</dt>
-                                            <dd class="mt-1 text-xl font-semibold text-brand-ink">{{ $manageRedisHitRate !== null ? $manageRedisHitRate.'%' : '—' }}</dd>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                                            <dt class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Hit rate') }}</dt>
+                                            <dd class="mt-0.5 text-lg font-semibold text-brand-ink">{{ $manageRedisHitRate !== null ? $manageRedisHitRate.'%' : '—' }}</dd>
                                         </div>
-                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                                            <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Last RDB save') }}</dt>
+                                        <div class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                                            <dt class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Last RDB save') }}</dt>
                                             <dd class="mt-1 text-xs font-medium text-brand-ink">
                                                 @if (isset($manageRedisInfo['rdb_last_save_time']))
                                                     {{ \Illuminate\Support\Carbon::createFromTimestamp((int) $manageRedisInfo['rdb_last_save_time'])->diffForHumans() }}
@@ -1340,29 +1348,30 @@
                          subtab off-screen on long config files. --}}
                     @if ($activeSubtab === 'configure')
                     @php $configModalName = 'cache-config-modal-'.$engine; @endphp
-                    <div class="{{ $card }} px-5 py-5 sm:px-6">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                <p class="mt-2 text-sm text-brand-moss">
-                                    {{ __('Read-only view of the engine\'s main config file. Click Edit inside the viewer to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
-                                </p>
-                            </div>
-                            <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    wire:click="loadCacheConfig"
-                                    wire:loading.attr="disabled"
-                                    wire:target="loadCacheConfig"
-                                    x-on:click="$dispatch('open-modal', @js($configModalName))"
-                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
-                                >
-                                    <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
-                                    <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
-                                    <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
-                                </button>
-                            </div>
-                        </div>
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-document-text"
+                        :title="__(':engine — server config file', ['engine' => $engineLabels[$engine]])"
+                        :note="__('Read-only view of the engine\'s main config file. Click Edit inside the viewer to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot name="actions">
+                            <button
+                                type="button"
+                                wire:click="loadCacheConfig"
+                                wire:loading.attr="disabled"
+                                wire:target="loadCacheConfig"
+                                x-on:click="$dispatch('open-modal', @js($configModalName))"
+                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                            >
+                                <x-heroicon-o-document-text class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
+                                <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
+                            </button>
+                        </x-slot>
+                    </x-workspace-panel-head>
+
+                    <div class="{{ $card }} px-4 py-3.5 sm:px-5">
 
                         {{-- Loading state — fires while loadCacheConfig is in flight.
                              Mirrors the clients/keyspace/persistence pattern: sky-blue

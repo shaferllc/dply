@@ -69,6 +69,7 @@
                 >
                     {{ __('Overview') }}
                 </x-server-workspace-tab>
+@unless ($webserverSwitchHidden)
                 <x-server-workspace-tab
                     id="ws-tab-change"
                     :active="$workspace_tab === 'change'"
@@ -85,6 +86,7 @@
                         @endif
                     </span>
                 </x-server-workspace-tab>
+                @endunless
                 <x-server-workspace-tab
                     id="ws-tab-health"
                     :active="$workspace_tab === 'health'"
@@ -177,7 +179,7 @@
             </x-server-workspace-tab-panel>
         @endif
 
-        @if ($workspace_tab === 'change')
+        @if ($workspace_tab === 'change' && ! $webserverSwitchHidden)
             <x-server-workspace-tab-panel
                 id="ws-panel-change"
                 labelled-by="ws-tab-change"

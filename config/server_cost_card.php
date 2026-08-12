@@ -14,7 +14,13 @@ return [
         'low_util_pct' => (float) env('DPLY_SERVER_COST_LOW_UTIL_PCT', 15),
         'headroom_util_pct' => (float) env('DPLY_SERVER_COST_HEADROOM_UTIL_PCT', 40),
         'hot_util_pct' => (float) env('DPLY_SERVER_COST_HOT_UTIL_PCT', 85),
-        'min_tier_weight_oversized' => max(1, (int) env('DPLY_SERVER_COST_OVERSIZED_MIN_TIER', 3)),
+        /*
+        | A host only counts as "oversized" once it is big enough that
+        | downsizing would save something. These replace the old XS-XL tier
+        | weight gate and are set to the same cut-off it encoded (tier M).
+        */
+        'oversized_min_vcpu' => max(1, (int) env('DPLY_SERVER_COST_OVERSIZED_MIN_VCPU', 3)),
+        'oversized_min_mem_mb' => max(1, (int) env('DPLY_SERVER_COST_OVERSIZED_MIN_MEM_MB', 4096)),
         'min_per_site_pct' => (float) env('DPLY_SERVER_COST_MIN_PER_SITE_PCT', 5),
     ],
 

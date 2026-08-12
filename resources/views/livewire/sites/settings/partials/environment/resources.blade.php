@@ -520,13 +520,24 @@
                         engine: $wire.entangle('bindingForm.engine'),
                         placement: $wire.entangle('bindingForm.placement'),
                         placements: @js(collect($dbPlacements)->mapWithKeys(fn ($p) => [$p['key'] => ['engines' => $p['engines'], 'available' => $p['available']]])),
+                        {{-- Engine compatibility only. `available` is deliberately NOT part
+                             of this test: it depends on dedicatedVmSizes, which loads
+                             asynchronously after the modal opens, while `placements` is a
+                             @js snapshot frozen when Alpine initialises and never refreshed
+                             across Livewire morphs. Filtering on the stale flag silently
+                             bounced operators off a placement they had legitimately picked
+                             (choose "Dedicated Docker database server", get a native VM). --}}
                         validFor(eng) {
-                            return Object.keys(this.placements).filter((k) => this.placements[k].engines.includes(eng) && this.placements[k].available);
+                            return Object.keys(this.placements).filter((k) => this.placements[k].engines.includes(eng));
                         },
                     }"
+                    {{-- Only rewrite the choice when the engine genuinely cannot live
+                         there, and prefer an available target when we do. --}}
                     x-effect="
-                        const valid = validFor(engine);
-                        if (valid.length && !valid.includes(placement)) { placement = valid[0]; }
+                        const compatible = validFor(engine);
+                        if (compatible.length && !compatible.includes(placement)) {
+                            placement = compatible.find((k) => placements[k].available) ?? compatible[0];
+                        }
                     "
                     class="space-y-4"
                 >

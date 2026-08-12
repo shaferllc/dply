@@ -12,6 +12,9 @@ use App\Http\Controllers\EnvoyAdminProxyController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
+use App\Http\Controllers\Notifications\DiscordOAuthController;
+use App\Http\Controllers\Notifications\SlackOAuthController;
+use App\Http\Controllers\Notifications\TelegramWebhookController;
 use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\OrgScopedRedirectController;
 use App\Http\Controllers\QuickDownloadController;
@@ -40,6 +43,9 @@ use App\Livewire\Admin\Users\Index;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
+use App\Livewire\Backups\Overview as BackupsOverview;
+use App\Livewire\Backups\Snapshots as BackupsSnapshots;
+use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
@@ -146,9 +152,6 @@ use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
-use App\Livewire\Backups\Overview as BackupsOverview;
-use App\Livewire\Backups\Snapshots as BackupsSnapshots;
-use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -232,8 +235,8 @@ use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
-use App\Modules\Queue\Livewire\Queues as QueuesIndex;
 use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
+use App\Modules\Queue\Livewire\Queues as QueuesIndex;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
@@ -241,10 +244,10 @@ use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
-use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
 use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Services\ProductionData\ProductionDataMirror;
 use App\Support\Admin\AdminFeatureFlags;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
@@ -286,6 +289,13 @@ Route::match(['post', 'options'], '/hooks/cloud/{site}/github', GithubCloudWebho
 Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.edge.github');
+
+// Telegram bot updates. Under /hooks/* so MachineCallbackPaths exempts it from
+// CSRF and the guest gates in one place. Authenticated by the secret-token
+// header Telegram echoes, checked inside the controller.
+Route::post('/hooks/telegram', TelegramWebhookController::class)
+    ->middleware(['throttle:site-webhook'])
+    ->name('hooks.telegram');
 
 // Per-request log records POSTed by a deployed serverless function's handler
 // — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
@@ -1153,6 +1163,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->name('credentials.oauth.digitalocean.redirect');
     Route::get('credentials/oauth/digitalocean/callback', [ProviderOAuthController::class, 'callbackDigitalOcean'])
         ->name('credentials.oauth.digitalocean.callback');
+
+    // "Add to Slack" — one bot token per workspace, backing many notification channels.
+    Route::get('notifications/oauth/slack', [SlackOAuthController::class, 'redirect'])
+        ->name('notifications.oauth.slack.redirect');
+    Route::get('notifications/oauth/slack/callback', [SlackOAuthController::class, 'callback'])
+        ->name('notifications.oauth.slack.callback');
+
+    // "Add to Discord" — the dply bot joined to a guild, backing many channels.
+    Route::get('notifications/oauth/discord', [DiscordOAuthController::class, 'redirect'])
+        ->name('notifications.oauth.discord.redirect');
+    Route::get('notifications/oauth/discord/callback', [DiscordOAuthController::class, 'callback'])
+        ->name('notifications.oauth.discord.callback');
 });
 
 require __DIR__.'/auth.php';

@@ -92,22 +92,20 @@
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
                             ], true));
                     @endphp
+                    {{-- Icon rides the component's `icon` prop rather than the
+                         slot: x-server-workspace-tab already swaps the icon for a
+                         spinner on its own wire:target. Hand-rolling that pair in
+                         the slot rendered a SECOND spinner beside the component's,
+                         so switching engine tabs showed two side by side — and a
+                         tab that looks permanently busy reads as a stuck install.
+                         The caches tab strip carries the same note. --}}
                     <x-server-workspace-tab
                         :id="'db-tab-'.$engine"
                         :active="$workspace_tab === $engine"
+                        :icon="$engine === 'sqlite' ? 'heroicon-o-archive-box' : 'heroicon-o-circle-stack'"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
                         <span class="inline-flex items-center gap-2">
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
-                                @if ($engine === 'sqlite')
-                                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                @else
-                                    <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                @endif
-                            </span>
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
-                                <x-spinner class="h-4 w-4" />
-                            </span>
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! ($capabilities[$engine] ?? false) && ! $engineRow)
                                 <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>

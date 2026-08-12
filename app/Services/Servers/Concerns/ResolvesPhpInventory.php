@@ -14,8 +14,6 @@ use App\Services\Servers\ServerSshConnectionRunner;
  */
 trait ResolvesPhpInventory
 {
-
-
     /**
      * @return list<array{id: string, label: string}>
      */
@@ -222,10 +220,18 @@ trait ResolvesPhpInventory
             $newSiteDefault = $detectedDefault;
         }
 
+        $existingInventory = is_array($meta['php_inventory'] ?? null) ? $meta['php_inventory'] : [];
+
         $meta['php_inventory'] = [
             'supported' => array_key_exists('supported', $freshInventory) ? (bool) $freshInventory['supported'] : true,
             'installed_versions' => $installedIds,
             'detected_default_version' => $detectedDefault,
+            // Keep the last known extension map when a probe predates the
+            // extensions block (older snapshot, or a partial failure) rather
+            // than blanking the panel out to "nothing installed".
+            'extensions' => is_array($freshInventory['extensions'] ?? null)
+                ? $freshInventory['extensions']
+                : (is_array($existingInventory['extensions'] ?? null) ? $existingInventory['extensions'] : []),
         ];
         $meta['default_php_version'] = $cliDefault;
         $meta['php_new_site_default_version'] = $newSiteDefault;
@@ -411,7 +417,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed> $meta
+     * @param  array<string, mixed>  $meta
      */
     protected function persistRefreshedInventoryMeta(Server $server, array $meta): void
     {
@@ -421,7 +427,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed> $refreshMeta
+     * @param  array<string, mixed>  $refreshMeta
      */
     protected function persistRefreshMeta(Server $server, array $refreshMeta): void
     {
@@ -435,7 +441,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed> $meta
+     * @param  array<string, mixed>  $meta
      * @return list<string>
      */
     /** @return array<string, mixed> */
@@ -489,6 +495,83 @@ trait ResolvesPhpInventory
                     : explode(',', $values['installed_versions'])
             ),
             'detected_default_version' => $this->normalizeVersionId($values['detected_default_version'] ?? null),
+            'extensions' => $this->parseRemoteExtensionValues($values),
+        ];
+    }
+
+    /**
+     * Fold the probe's `extensions_available[8.3]=` / `extensions_enabled[8.3]=`
+     * lines into a per-version map. "available" is what apt/PECL has put in
+     * mods-available; "enabled" is what the cli or fpm conf.d symlinks load.
+     *
+     * @param  array<string, string>  $values
+     * @return array<string, array{available: list<string>, enabled: list<string>}>
+     */
+    protected function parseRemoteExtensionValues(array $values): array
+    {
+        $extensions = [];
+
+        foreach ($values as $key => $value) {
+            if (preg_match('/^extensions_(available|enabled)\[(.+)\]$/', $key, $matches) !== 1) {
+                continue;
+            }
+
+            $version = $this->normalizeVersionId($matches[2]);
+            if ($version === null || $version === 'none') {
+                continue;
+            }
+
+            $extensions[$version] ??= ['available' => [], 'enabled' => []];
+            $extensions[$version][$matches[1]] = $this->normalizeModuleList($value);
+        }
+
+        ksort($extensions);
+
+        return $extensions;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function normalizeModuleList(string $value): array
+    {
+        if (trim($value) === '') {
+            return [];
+        }
+
+        $modules = [];
+
+        foreach (explode(',', $value) as $module) {
+            // Module names are case-inconsistent across sources — `php -m`
+            // prints "Zend OPcache" while the ini file is `opcache.ini`.
+            $module = strtolower(trim($module));
+
+            if ($module !== '' && preg_match('/^[a-z0-9_. -]+$/', $module) === 1) {
+                $modules[$module] = $module;
+            }
+        }
+
+        $normalized = array_keys($modules);
+        sort($normalized);
+
+        return $normalized;
+    }
+
+    /**
+     * Per-version extension state from the cached snapshot.
+     *
+     * @return array{available: list<string>, enabled: list<string>}
+     */
+    public function cachedExtensionsFor(Server $server, string $version): array
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $inventory = is_array($meta['php_inventory'] ?? null) ? $meta['php_inventory'] : [];
+        $extensions = is_array($inventory['extensions'] ?? null) ? $inventory['extensions'] : [];
+        $row = is_array($extensions[$version] ?? null) ? $extensions[$version] : [];
+
+        return [
+            'available' => is_array($row['available'] ?? null) ? array_values(array_filter($row['available'], 'is_string')) : [],
+            'enabled' => is_array($row['enabled'] ?? null) ? array_values(array_filter($row['enabled'], 'is_string')) : [],
         ];
     }
 }

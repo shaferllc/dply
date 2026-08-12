@@ -2,8 +2,6 @@
 
 namespace App\Modules\Billing\Services;
 
-use App\Enums\ServerTier;
-
 /**
  * Snapshot of what an organization *should* be billed this cycle, derived
  * purely from its current fleet. The sync layer reconciles a Stripe
@@ -20,23 +18,20 @@ use App\Enums\ServerTier;
  *   top of the flat per-app platform fee, not plan-eligible.
  * - **Edge delivery usage** — metered pass-through on top, not plan-eligible.
  *
- * `tierQuantities` is retained as a *display-only* size breakdown (the billing
- * dashboard still shows which sizes a fleet runs); it no longer drives price.
- *
- * Always pre-tax; expressed in cents and tier-keyed quantities so it survives
- * JSON round-trips through queue payloads.
+ * Always pre-tax; expressed in cents and plain counts so it survives JSON
+ * round-trips through queue payloads.
  */
 class DesiredBillingState
 {
     /**
-     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown (xs/s/m/l/xl).
-     * @param  array<string, mixed> $edgeUsageEstimate
+     * @param  array<string, mixed>  $edgeUsageEstimate
      */
     private function __construct(
         public readonly string $planKey,
         public readonly string $planLabel,
         public readonly int $planPriceCents,
-        public readonly array $tierQuantities,
+        /** Billable BYO servers. Was an xs/s/m/l/xl breakdown that only ever got summed. */
+        public readonly int $billableServerCount,
         public readonly int $serverlessCount,
         public readonly int $serverlessSubtotalCents,
         public readonly int $serverlessUsageSubtotalCents,
@@ -90,15 +85,14 @@ class DesiredBillingState
      * Build a state from a resolved plan plus managed-product usage.
      *
      * @param  array{key: string, label: string, price_cents: int, max_servers: ?int}  $plan
-     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown.
-     * @param  array<string, mixed> $edgeUsageEstimate
-     * @param  array<string, mixed> $realtimeTierQuantities
-     * @param  array<string, mixed> $queueTierQuantities
-     * @param  list<string> $queueBillableNamespaceIds
+     * @param  array<string, mixed>  $edgeUsageEstimate
+     * @param  array<string, mixed>  $realtimeTierQuantities
+     * @param  array<string, mixed>  $queueTierQuantities
+     * @param  list<string>  $queueBillableNamespaceIds
      */
     public static function fromPlanAndUsage(
         array $plan,
-        array $tierQuantities = [],
+        int $billableServerCount = 0,
         int $serverlessCount = 0,
         int $serverlessUnitCents = 0,
         int $serverlessUsageSubtotalCents = 0,
@@ -124,10 +118,7 @@ class DesiredBillingState
         int $serverLogUsageSubtotalCents = 0,
         array $serverLogUsageEstimate = [],
     ): self {
-        $normalized = [];
-        foreach (ServerTier::ordered() as $tier) {
-            $normalized[$tier->value] = max(0, (int) ($tierQuantities[$tier->value] ?? 0));
-        }
+        $billableServerCount = max(0, $billableServerCount);
 
         $planPriceCents = max(0, (int) ($plan['price_cents'] ?? 0));
 
@@ -226,7 +217,7 @@ class DesiredBillingState
             planKey: $plan['key'],
             planLabel: $plan['label'],
             planPriceCents: $planPriceCents,
-            tierQuantities: $normalized,
+            billableServerCount: $billableServerCount,
             serverlessCount: $serverlessCount,
             serverlessSubtotalCents: $serverlessSubtotal,
             serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
@@ -264,12 +255,7 @@ class DesiredBillingState
      */
     public function serverCount(): int
     {
-        return array_sum($this->tierQuantities);
-    }
-
-    public function quantityFor(ServerTier $tier): int
-    {
-        return $this->tierQuantities[$tier->value] ?? 0;
+        return $this->billableServerCount;
     }
 
     /** Static / hybrid Edge sites (Stripe `edge` line quantity). */
@@ -315,7 +301,6 @@ class DesiredBillingState
             'plan_label' => $this->planLabel,
             'plan_price_cents' => $this->planPriceCents,
             'server_count' => $this->serverCount(),
-            'tier_quantities' => $this->tierQuantities,
             'serverless_count' => $this->serverlessCount,
             'serverless_subtotal_cents' => $this->serverlessSubtotalCents,
             'serverless_usage_subtotal_cents' => $this->serverlessUsageSubtotalCents,

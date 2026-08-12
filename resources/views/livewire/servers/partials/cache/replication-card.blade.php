@@ -14,13 +14,13 @@
 @endphp
 
 <div
-    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6"
+    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-4 py-3.5 sm:px-5"
     wire:init="loadReplicationState"
     wire:poll.15s="loadReplicationState"
 >
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — replication', ['engine' => $engineLabel]) }}</h3>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __(':engine — replication', ['engine' => $engineLabel]) }}</h3>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Live INFO replication parse. Read-only view of the engine\'s current master/replica state and any attached replicas.') }}</p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -80,7 +80,7 @@
     @else
         @if ($isReplica)
             {{-- Replica view: surface upstream master + link health. --}}
-            <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <dl class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Master endpoint') }}</dt>
                     <dd class="mt-1 truncate font-mono text-sm text-brand-ink">{{ $state['master_endpoint'] ?? '—' }}</dd>
@@ -106,10 +106,10 @@
             </dl>
         @else
             {{-- Master view: surface connected replicas. --}}
-            <dl class="mt-5 grid gap-3 sm:grid-cols-3">
+            <dl class="mt-3 grid gap-3 sm:grid-cols-3">
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connected replicas') }}</dt>
-                    <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $state['connected_replicas'] }}</dd>
+                    <dd class="mt-1 font-mono text-lg font-semibold tabular-nums text-brand-ink">{{ $state['connected_replicas'] }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 sm:col-span-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Replication ID') }}</dt>

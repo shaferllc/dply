@@ -15,8 +15,6 @@ use App\Services\Servers\ServerPhpSiteRuntimeMigrator;
  */
 trait BuildsPhpWorkspaceData
 {
-
-
     /**
      * @return array{
      *     summary: array{
@@ -74,6 +72,13 @@ trait BuildsPhpWorkspaceData
             if ((int) ($row['site_count'] ?? 0) > 0 && ($row['is_installed'] ?? false)) {
                 $rows[$id]['migration_target_version'] = $rows[$id]['uninstall_fallback_version'];
             }
+
+            // Counts only — the full catalog is built lazily for whichever
+            // version the operator expands, so a server with eight versions
+            // does not pay for eight catalogs on every render.
+            $rows[$id]['extension_count'] = ($row['is_installed'] ?? false)
+                ? count($this->cachedExtensionsFor($server, (string) $id)['enabled'])
+                : 0;
         }
 
         return [
@@ -87,6 +92,113 @@ trait BuildsPhpWorkspaceData
                 'detected_default_version' => $inventory['detected_default_version'],
             ],
             'version_rows' => array_values($rows),
+        ];
+    }
+
+    /**
+     * Catalog for one version, enriched with live host state and grouped for
+     * the expandable panel under that version's row.
+     *
+     * State comes from the inventory probe: `available` is what sits in
+     * mods-available (i.e. the package is installed), `enabled` is what the
+     * cli/fpm conf.d symlinks actually load. A package can be installed but
+     * disabled, which is exactly how you park Xdebug on a staging box.
+     *
+     * @return array{
+     *     categories: list<array{key: string, label: string, rows: list<array<string, mixed>>}>,
+     *     unlisted: list<string>,
+     *     installed_count: int,
+     *     enabled_count: int
+     * }
+     */
+    /** @return array<string, mixed> */
+    public function extensionPanelData(Server $server, string $version): array
+    {
+        $state = $this->cachedExtensionsFor($server, $version);
+        $available = array_flip($state['available']);
+        $enabled = array_flip($state['enabled']);
+        $catalog = $this->extensionCatalog($version);
+        $categoryLabels = (array) config('server_php_extensions.categories', []);
+
+        $grouped = [];
+        $claimed = [];
+        $installedCount = 0;
+
+        foreach ($catalog as $row) {
+            $modules = $row['modules'];
+            $isInstalled = false;
+            $isEnabled = false;
+
+            foreach ($modules as $module) {
+                $module = strtolower($module);
+                $claimed[$module] = true;
+
+                if (isset($available[$module])) {
+                    $isInstalled = true;
+                }
+
+                if (isset($enabled[$module])) {
+                    $isEnabled = true;
+                }
+            }
+
+            // Bundled extensions live inside php-common, so they may never
+            // appear in mods-available. Treat them as always present.
+            if ($row['bundled']) {
+                $isInstalled = true;
+            }
+
+            // Enabled implies installed — covers builtins compiled straight
+            // into the binary with no mods-available entry at all.
+            if ($isEnabled) {
+                $isInstalled = true;
+            }
+
+            if ($isInstalled) {
+                $installedCount++;
+            }
+
+            $category = $row['category'];
+            $grouped[$category] ??= [];
+            $grouped[$category][] = $row + [
+                'is_installed' => $isInstalled,
+                'is_enabled' => $isEnabled,
+            ];
+        }
+
+        $categories = [];
+
+        foreach ($categoryLabels as $key => $label) {
+            if (($grouped[$key] ?? []) === []) {
+                continue;
+            }
+
+            $categories[] = [
+                'key' => (string) $key,
+                'label' => (string) $label,
+                'rows' => $grouped[$key],
+            ];
+            unset($grouped[$key]);
+        }
+
+        // Anything left carries a category the config does not name.
+        foreach ($grouped as $key => $rows) {
+            $categories[] = ['key' => (string) $key, 'label' => __('Other'), 'rows' => $rows];
+        }
+
+        // Modules on the host that no catalog entry claims. Surfaced read-only
+        // so the panel does not imply the curated list is the whole truth.
+        $unlisted = array_values(array_filter(
+            $state['available'],
+            static fn (string $module): bool => ! isset($claimed[$module]),
+        ));
+        sort($unlisted);
+
+        return [
+            'categories' => $categories,
+            'unlisted' => $unlisted,
+            'installed_count' => $installedCount,
+            'enabled_count' => count($state['enabled']),
         ];
     }
 
@@ -142,9 +254,46 @@ trait BuildsPhpWorkspaceData
             'composer_auth' => [
                 'summary' => __('Open the server PHP workspace to manage shared Composer authentication for this server.'),
             ],
-            'extensions' => [
-                'summary' => __('Open the server PHP workspace to review installed versions and shared extension entry points.'),
-            ],
+            'extensions' => $this->siteExtensionSummary($server, $currentVersion),
+        ];
+    }
+
+    /**
+     * Read-only extension state for the site PHP panel. Management stays on
+     * the server workspace — extensions are per-version and shared by every
+     * site on the box, so editing them from one site would be misleading.
+     *
+     * @return array{summary: string, enabled: list<string>, count: int}
+     */
+    /** @return array<string, mixed> */
+    protected function siteExtensionSummary(Server $server, ?string $version): array
+    {
+        if ($version === null) {
+            return [
+                'summary' => __('Set a PHP version for this site to see its loaded extensions.'),
+                'enabled' => [],
+                'count' => 0,
+            ];
+        }
+
+        $enabled = $this->cachedExtensionsFor($server, $version)['enabled'];
+
+        if ($enabled === []) {
+            return [
+                'summary' => __('No extension inventory yet for PHP :version. Refresh it from the server PHP workspace.', ['version' => $version]),
+                'enabled' => [],
+                'count' => 0,
+            ];
+        }
+
+        return [
+            'summary' => trans_choice(
+                ':count extension loaded for PHP :version. Manage them from the server PHP workspace.|:count extensions loaded for PHP :version. Manage them from the server PHP workspace.',
+                count($enabled),
+                ['count' => count($enabled), 'version' => $version],
+            ),
+            'enabled' => $enabled,
+            'count' => count($enabled),
         ];
     }
 

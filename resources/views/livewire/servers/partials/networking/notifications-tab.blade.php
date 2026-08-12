@@ -18,7 +18,7 @@
         class="border-b border-brand-ink/10"
     >
         <x-slot:actions>
-            <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
+            <x-secondary-button size="xs" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
                 {{ __('Manage in Settings') }}
                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             </x-secondary-button>
@@ -126,7 +126,7 @@
                 </div>
             </div>
             <div class="flex justify-end">
-                <x-primary-button type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
+                <x-primary-button size="xs" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
                     {{ __('Add subscription') }}
                 </x-primary-button>
             </div>

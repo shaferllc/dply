@@ -42,6 +42,17 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DPLY_FAKE_EDGE" value="true"/>
         <env name="DPLY_CHOOSE_APP_ENABLED" value="false"/>
+        <!-- Slack "Add to Slack" off by default: with a client id present the
+             channel form defaults to the OAuth picker, which would change what
+             every pasted-webhook test is asserting against. Tests that exercise
+             the OAuth path set these two keys themselves. -->
+        <env name="SLACK_CLIENT_ID" value=""/>
+        <env name="SLACK_CLIENT_SECRET" value=""/>
+        <env name="DISCORD_CLIENT_ID" value=""/>
+        <env name="DISCORD_CLIENT_SECRET" value=""/>
+        <env name="DISCORD_BOT_TOKEN" value=""/>
+        <env name="TELEGRAM_BOT_TOKEN" value=""/>
+        <env name="TELEGRAM_WEBHOOK_SECRET" value=""/>
         <ini name="max_execution_time" value="0"/>
         <ini name="memory_limit" value="1G"/>
     </php>

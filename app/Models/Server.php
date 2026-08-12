@@ -3,11 +3,10 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
-use App\Enums\ServerTier;
 use App\Enums\SiteType;
-use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
-use App\Modules\Billing\Services\ServerTierClassifier;
+use App\Livewire\Servers\WorkspaceOverview;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
+use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerTags;
@@ -89,8 +88,8 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property-read Collection<int, ServerProvisionRun> $provisionRuns
  * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
  * @property-read ?PrivateNetwork $privateNetwork
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class Server extends Model
 {
@@ -676,28 +675,6 @@ class Server extends Model
         return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
     }
 
-    /**
-     * Billing tier derived from the most recent metric snapshot's cpu_count
-     * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
-     * freshly-connected server isn't accidentally billed at XL during the
-     * gap between provision and first agent report.
-     */
-    public function billingTier(): ServerTier
-    {
-        $snapshot = $this->latestMetricSnapshot;
-        $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
-
-        $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
-            ? (int) $payload['cpu_count']
-            : null;
-
-        $memMb = isset($payload['mem_total_kb']) && is_numeric($payload['mem_total_kb'])
-            ? (int) round((float) $payload['mem_total_kb'] / 1024)
-            : null;
-
-        return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
-    }
-
     /** @return HasMany<ServerSystemdServiceState, $this> */
     public function systemdServiceStates(): HasMany
     {
@@ -736,11 +713,14 @@ class Server extends Model
 
     /**
      * Free-form operator notes (runbooks, customer IDs, context). Pinned first,
-     * then most-recently-touched. Pinned notes surface on the server overview. *
+     * then most-recently-touched. Pinned notes surface on the server overview.
+     *
+     * Includes archived notes — the relation is the whole notebook, so exports
+     * and the manifest keep the history. Callers that render the live list
+     * scope with ->active() / ->archived().
      *
      * @return HasMany<ServerNote, $this>
      */
-    /** @return HasMany<ServerNote, $this> */
     public function notes(): HasMany
     {
         return $this->hasMany(ServerNote::class)
@@ -875,7 +855,7 @@ class Server extends Model
      * host rows dply creates to back Edge sites.
      *
      * These aren't machines — you don't provision, SSH into, or spec-tier them,
-     * and {@see \App\Livewire\Servers\WorkspaceOverview} already bounces them to
+     * and {@see WorkspaceOverview} already bounces them to
      * /edge if you open one. Listing them in the fleet made "8 servers" count
      * two Edge apps that live on the Edge surface, alongside a "Provisioning…"
      * label and an empty metrics row that will never fill in.

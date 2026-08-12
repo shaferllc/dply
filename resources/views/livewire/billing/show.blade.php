@@ -49,12 +49,11 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
          x-data="{
              billingPreviewAnnual: @js($this->subscriptionInterval === 'year'),
-             previewCounts: @js(collect($this->billingState->tierQuantities)->all()),
+             {{-- One number, because the plan is chosen by total server count.
+                  This was five xs/s/m/l/xl counters that only ever got summed. --}}
+             previewServerCount: @js($this->billingState->serverCount()),
              previewPlans: @js($this->planCatalog),
              previewAnnualPct: @js((int) config('subscription.standard.annual_discount_pct', 20)),
-             get previewServerCount() {
-                 return ['xs','s','m','l','xl'].reduce((n, k) => n + (this.previewCounts[k] || 0), 0);
-             },
              get previewPlan() {
                  const count = this.previewServerCount;
                  for (const plan of this.previewPlans) {

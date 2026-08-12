@@ -21,12 +21,14 @@ final class WebserverWorkspaceViewData
      */
     public static function webserverCatalog(): array
     {
-        $catalog = [
-            'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
-            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
-            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
-            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
-        ];
+        $catalog = self::fullWebserverCatalog();
+
+        // Parked engines drop out of the catalog entirely — no tab, no entry in
+        // the switch picker. `webserver_coming_soon` still exists for the
+        // softer "Soon badge" treatment; this list is the hard hide.
+        foreach (self::hiddenEngines() as $key) {
+            unset($catalog[$key]);
+        }
 
         foreach (self::comingSoonEngines() as $key) {
             if (isset($catalog[$key])) {
@@ -35,6 +37,78 @@ final class WebserverWorkspaceViewData
         }
 
         return $catalog;
+    }
+
+    /**
+     * Engines removed from the UI outright. Callers that must still render an
+     * ALREADY-INSTALLED engine should use {@see webserverCatalogIncluding()}
+     * so parking an engine never orphans a server running it.
+     *
+     * @return list<string>
+     */
+    public static function hiddenEngines(): array
+    {
+        $keys = config('server_workspace.webserver_hidden', []);
+
+        return is_array($keys) ? array_values(array_map('strtolower', $keys)) : [];
+    }
+
+    public static function isHiddenEngine(string $key): bool
+    {
+        return in_array(strtolower(trim($key)), self::hiddenEngines(), true);
+    }
+
+    /**
+     * Whether the Webserver → Change (switch engine) flow is hidden. Read by
+     * the blade to drop the tab and by the switch action to refuse the call,
+     * so hiding the UI is not the only thing standing in the way.
+     */
+    public static function switchHidden(): bool
+    {
+        return (bool) config('server_workspace.webserver_switch_hidden', false);
+    }
+
+    /**
+     * The catalog plus any engine in `$keep` (typically the server's currently
+     * installed webserver), so a parked-but-running engine stays manageable.
+     *
+     * @param  list<string>  $keep
+     * @return array<string, array{label: string, icon: string, systemd: string, coming_soon?: bool}>
+     */
+    public static function webserverCatalogIncluding(array $keep): array
+    {
+        $catalog = self::webserverCatalog();
+
+        foreach ($keep as $key) {
+            $key = strtolower(trim($key));
+            if ($key === '' || isset($catalog[$key])) {
+                continue;
+            }
+
+            foreach (self::fullWebserverCatalog() as $candidate => $row) {
+                if ($candidate === $key) {
+                    $catalog[$key] = $row;
+                }
+            }
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * Unfiltered catalog — the source of truth for labels/icons/systemd units,
+     * used to resurrect a hidden-but-installed engine.
+     *
+     * @return array<string, array{label: string, icon: string, systemd: string}>
+     */
+    public static function fullWebserverCatalog(): array
+    {
+        return [
+            'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
+            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
+            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
+            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
+        ];
     }
 
     /**
@@ -109,9 +183,12 @@ final class WebserverWorkspaceViewData
         }
 
         // `coming_soon` engines render a "Soon" badge in the tab strip until
-        // their switch + config flows ship; nginx is GA today.
-        $webserverCatalog = self::webserverCatalog();
+        // their switch + config flows ship; nginx is GA today. Hidden engines
+        // are dropped entirely — except the one this server actually runs,
+        // which stays so an existing install is never left unmanageable.
+        $webserverCatalog = self::webserverCatalogIncluding([$activeWebserver]);
         $engineTabCatalog = $webserverCatalog;
+        $webserverSwitchHidden = self::switchHidden();
 
         $certs = self::parseCertbotCerts($certbot);
 
@@ -281,6 +358,7 @@ final class WebserverWorkspaceViewData
             'unitFor',
             'nginxVersion',
             'webserverCatalog',
+            'webserverSwitchHidden',
             'edgeProxyCatalog',
             'activeEdgeProxy',
             'edgeProxyPreviousWebserver',
@@ -314,7 +392,7 @@ final class WebserverWorkspaceViewData
     }
 
     /**
-     * @param  array<string, mixed> $certbot
+     * @param  array<string, mixed>  $certbot
      * @return list<array{name: string, domains: ?string, expiry: ?string, valid: int|null}>
      */
     private static function parseCertbotCerts(array $certbot): array

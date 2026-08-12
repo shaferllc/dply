@@ -12,11 +12,15 @@ import {
     installFeedbackConsoleBuffer,
     registerFeedbackSidebar,
 } from './feedback.js';
+import { registerDplyTooltips } from './tooltip.js';
+import { registerMarkdownEditor } from './markdown-editor.js';
 
 window.dplyEnsureDocsProseStyles = dplyEnsureDocsProseStyles;
 
 registerDplyLazyAssetListeners();
 registerDplyThemeListeners();
+// Styled hover tooltips for [data-tooltip] and for truncated [title] text.
+registerDplyTooltips();
 
 // Install the console-error ring buffer immediately so the global feedback
 // sidebar can attach the errors that preceded a bug report.
@@ -104,6 +108,9 @@ document.addEventListener('alpine:init', () => {
     registerConsoleDrawer(window.Alpine);
     registerFeedbackSidebar(window.Alpine);
     registerRealtimeConsole(window.Alpine);
+    // Toolbar/shortcuts for Markdown textareas (server notes today). Pure DOM
+    // work — no parser, so it stays in the main bundle rather than a lazy entry.
+    registerMarkdownEditor(window.Alpine);
 });
 
 const plotlyCdnUrl = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.4.0/plotly.min.js';

@@ -99,10 +99,14 @@ return [
     | from /admin/flags — same pattern as the workspace coming-soon previews.
     */
     'cache' => [
-        'valkey' => env('FEATURE_CACHE_VALKEY', true),
-        'memcached' => env('FEATURE_CACHE_MEMCACHED', false),
-        'keydb' => env('FEATURE_CACHE_KEYDB', false),
-        'dragonfly' => env('FEATURE_CACHE_DRAGONFLY', false),
+        // All parked: Redis is the only cache engine offered. Off now means
+        // HIDDEN, not "Soon" — CacheWorkspaceViewData filters the tab strip by
+        // isAvailable() instead of badging. Engines already installed on a
+        // server stay listed so they remain manageable.
+        'valkey' => false,
+        'memcached' => false,
+        'keydb' => false,
+        'dragonfly' => false,
     ],
 
     /*
@@ -116,9 +120,15 @@ return [
     | App\Support\Servers\DatabaseEngineAvailability (`database.{engine}`).
     */
     'database' => [
-        'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
-        'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
-        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', true),
+        // All parked: MySQL / PostgreSQL / SQLite are the only engines offered.
+        // Off now means HIDDEN, not "Soon" — see the cache note above.
+        // NOTE: clickhouse backs the dply Logs add-on. Parking it only removes
+        // it from the Databases tab strip and the create-server picker; an
+        // existing ClickHouse install keeps working and stays manageable. A NEW
+        // logs store can no longer be installed from the UI while this is off.
+        'mariadb' => false,
+        'mongodb' => false,
+        'clickhouse' => false,
     ],
 
     /*
@@ -128,8 +138,14 @@ return [
     'workspace' => [
         'site_promote' => env('FEATURE_WORKSPACE_SITE_PROMOTE', true),
         'health' => env('FEATURE_WORKSPACE_HEALTH', true),
-        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', true),
-        'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
+        // Parked: OFF with no preview teaser, so the nav row is filtered out
+        // entirely rather than showing a "Soon" badge. Both keys must stay
+        // false — server_workspace_nav_for_server() keeps the row whenever
+        // EITHER the feature or its preview resolves active.
+        // Hardcoded, not env(): these are product decisions, not per-deploy
+        // config, so flipping one back is a code change and a code review.
+        'server_blueprint' => false,
+        'server_blueprint_preview' => false,
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
         'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
         'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
@@ -146,13 +162,27 @@ return [
         'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', true),
         'security_digest_preview' => env('FEATURE_WORKSPACE_SECURITY_DIGEST_PREVIEW', false),
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
-        'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
-        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
-        'cli' => env('FEATURE_WORKSPACE_CLI', true),
-        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', false),
+        // Parked — see the server_blueprint note above.
+        'console' => false,
+        'console_preview' => false,
+        // Parked — see the server_blueprint note above.
+        'cli' => false,
+        'cli_preview' => false,
 
-        'files' => env('FEATURE_WORKSPACE_FILES', true),
-        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', false),
+        // Parked — see the server_blueprint note above.
+        'files' => false,
+        'files_preview' => false,
+
+        // Load balancers had no flag at all: its nav row carried no `feature`
+        // key, and server_workspace_nav_for_server() only filters rows that
+        // declare one. Added here and wired into config/server_workspace.php
+        // so it can be parked like the rest.
+        'load_balancers' => false,
+
+        // Edge proxy: same situation as load_balancers — its nav row carried no
+        // `feature` key, so it could not be parked. Flag added + wired into
+        // config/server_workspace.php.
+        'edge_proxy' => false,
         'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', true),
         'insights' => env('FEATURE_WORKSPACE_INSIGHTS', true),
@@ -163,8 +193,9 @@ return [
         'backups' => env('FEATURE_WORKSPACE_BACKUPS', true),
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
-        'run' => env('FEATURE_WORKSPACE_RUN', true),
-        'run_preview' => env('FEATURE_WORKSPACE_RUN_PREVIEW', true),
+        // Parked — see the server_blueprint note above.
+        'run' => false,
+        'run_preview' => false,
         'shared_host' => env('FEATURE_WORKSPACE_SHARED_HOST', true),
         'shared_host_preview' => env('FEATURE_WORKSPACE_SHARED_HOST_PREVIEW', true),
 

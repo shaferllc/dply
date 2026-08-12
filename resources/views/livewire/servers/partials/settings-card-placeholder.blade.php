@@ -16,7 +16,7 @@
     Connection skeleton. See SettingsCard::placeholder().
 --}}
 @php
-    $settingsDescription = __('Navigate through the tabs to manage different settings categories. Changes in each section are automatically saved.');
+    $settingsDescription = __('Navigate through the tabs to manage different settings categories. Unsaved edits surface a save bar at the bottom of the page.');
 @endphp
 
 <div class="min-w-0">

@@ -4,6 +4,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ProbeServerOperationalSshJob;
 use App\Jobs\RefreshServerPrivateIpJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\ServerRemoteAccessEvent;
 use App\Services\Servers\ServerSshAccessRepairer;
 use App\Support\Servers\ServerDateFormatter;
@@ -13,6 +14,10 @@ use Livewire\Attributes\Computed;
 
 trait ManagesWorkspaceSettingsForm
 {
+    // confirmRepairSshAccess() drives the shared confirm dialog, so the state it
+    // needs travels with this trait — the host component only has to render
+    // `livewire.partials.confirm-action-modal`.
+    use ConfirmsActionWithModal;
     use RunsServerInventoryProbe;
 
     public string $settingsName = '';
@@ -303,6 +308,33 @@ trait ManagesWorkspaceSettingsForm
         }
     }
 
+    /**
+     * Explain the repair before running it: it logs in over the hidden root
+     * recovery key and REWRITES the deploy user's authorized_keys with Dply's
+     * operational key, so any other key that user relied on stops working.
+     */
+    public function confirmRepairSshAccess(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = trim((string) $this->server->ssh_user) ?: 'root';
+        $host = trim((string) $this->server->ip_address);
+
+        $this->openConfirmActionModal(
+            method: 'repairSshAccess',
+            title: __('Repair SSH access'),
+            message: __('Dply will connect as root using the hidden recovery key for this server and reinstall its operational public key for the deploy user. Your saved connection details (host, port, user) are not changed.'),
+            confirmLabel: __('Repair access'),
+            details: [
+                ['label' => __('Server'), 'value' => $this->server->name],
+                ['label' => __('Connect as'), 'value' => 'root@'.$host.':'.$this->server->ssh_port, 'mono' => true],
+                ['label' => __('Repairs user'), 'value' => $user, 'mono' => true],
+                ['label' => __('Replaces'), 'value' => '/home/'.$user.'/.ssh/authorized_keys', 'mono' => true],
+            ],
+            warning: __('That file is overwritten, not appended — any other key you added for this user by hand will be removed.'),
+        );
+    }
+
     public function repairSshAccess(ServerSshAccessRepairer $repairer): void
     {
         $this->authorize('update', $this->server);
@@ -399,6 +431,21 @@ trait ManagesWorkspaceSettingsForm
         $this->server->refresh();
         $this->syncSettingsFormFromServer();
         $this->toastSuccess(__('OS label updated to match the last inventory scan.'));
+    }
+
+    public function discardServerSettingsInfoUnsaved(): void
+    {
+        $this->syncSettingsFormFromServer();
+    }
+
+    public function discardServerTimezoneUnsaved(): void
+    {
+        $this->syncSettingsFormFromServer();
+    }
+
+    public function discardServerDateFormatUnsaved(): void
+    {
+        $this->syncSettingsFormFromServer();
     }
 
     protected function deployerCannotEditServerSettings(): bool

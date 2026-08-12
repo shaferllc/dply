@@ -127,7 +127,7 @@
                 </div>
             </div>
             <div class="flex justify-end">
-                <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
+                <x-primary-button size="xs" type="submit" wire:loading.attr="disabled" :disabled="$notifChannels->isEmpty()">
                     {{ __('Add subscription') }}
                 </x-primary-button>
             </div>

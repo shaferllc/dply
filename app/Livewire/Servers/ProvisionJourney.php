@@ -4,18 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
-use App\Enums\ServerProvider;
-use App\Jobs\ProvisionAwsEc2ServerJob;
-use App\Jobs\ProvisionAzureServerJob;
-use App\Jobs\ProvisionDigitalOceanDropletJob;
-use App\Jobs\ProvisionHetznerServerJob;
-use App\Jobs\ProvisionLinodeServerJob;
-use App\Jobs\ProvisionOracleServerJob;
-use App\Jobs\ProvisionOvhServerJob;
-use App\Jobs\ProvisionUpCloudServerJob;
-use App\Jobs\ProvisionVultrServerJob;
-use App\Jobs\RunSetupScriptJob;
-use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\BuildsProvisionDiagnostics;
 use App\Livewire\Servers\Concerns\BuildsProvisionStepView;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -23,24 +11,13 @@ use App\Livewire\Servers\Concerns\InspectsProvisionState;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesProvisionActions;
 use App\Models\Server;
-use App\Models\ServerCreateDraft;
-use App\Models\ServerProvisionArtifact;
-use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
-use App\Modules\TaskRunner\Services\TaskRunnerService;
-use App\Services\Servers\ProvisionStepEtaService;
 use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Support\Servers\ClassifyProvisionFailure;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionPipelineLog;
-use App\Support\Servers\ProvisionStepDurations;
-use App\Support\Servers\ProvisionStepSnapshots;
-use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -65,6 +42,40 @@ class ProvisionJourney extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+    }
+
+    /**
+     * The poll target, and the thing that actually forwards you to the workspace
+     * when provisioning finishes.
+     *
+     * Previously the poll was a bare `wire:poll` ($refresh) and the forward was a
+     * custom `provision-journey-complete` event that a hand-written listener in
+     * the app layout turned into `window.location.assign()`. The server side of
+     * that fires correctly — but it depends on a bespoke JS listener being
+     * registered and reachable, and when that link breaks the journey page simply
+     * sits on "Ready" forever with no way to tell that anything went wrong.
+     *
+     * A redirect returned from an action method is Livewire's own mechanism: no
+     * custom JS, and it composes with wire:navigate. The render() path below is
+     * left in place as a backstop for non-poll requests.
+     */
+    public function pollProvisionJourney(): void
+    {
+        $fresh = Server::query()->find($this->server->getKey());
+
+        if ($fresh === null) {
+            $this->showRemoveServerModal = false;
+            $this->showCancelProvisionModal = false;
+            $this->redirectRoute('servers.index', navigate: true);
+
+            return;
+        }
+
+        $this->server = $fresh;
+
+        if ($this->shouldRedirectToServerOverview()) {
+            $this->redirectRoute('servers.overview', $this->server, navigate: true);
+        }
     }
 
     public function render(): View
@@ -195,7 +206,6 @@ class ProvisionJourney extends Component
         ]);
     }
 
-
     /**
      * Map of label_hash → recorded duration_seconds for every step that
      * has emitted an end marker so far in this task's output. Cached
@@ -204,6 +214,4 @@ class ProvisionJourney extends Component
      * @return array<string, int>
      */
     private array $stepEndDurationsCache = [];
-
-
 }

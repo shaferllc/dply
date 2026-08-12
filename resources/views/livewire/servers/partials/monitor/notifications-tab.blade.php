@@ -124,7 +124,7 @@
                     </div>
                 </div>
                 <div class="flex justify-end">
-                    <x-primary-button
+                    <x-primary-button size="xs"
                         type="submit"
                         wire:loading.attr="disabled"
                         :disabled="$assignableChannels->isEmpty()"

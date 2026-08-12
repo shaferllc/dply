@@ -65,7 +65,26 @@
 
 <section id="settings-group-keys" aria-labelledby="settings-group-keys-title">
     {{-- Outbound: provisioned key for Git/scripts --}}
-    <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24" x-data="{ copied: false, copiedFp: false }">
+    <div
+        id="settings-keys-outbound"
+        class="{{ $card }} scroll-mt-24"
+        x-data="{
+            pubKey: {{ \Illuminate\Support\Js::from($serverPub ?? '') }},
+            fingerprint: {{ \Illuminate\Support\Js::from($serverPubFingerprint ?? '') }},
+            copiedPub: {{ \Illuminate\Support\Js::from(__('Public key copied to clipboard')) }},
+            copiedFingerprint: {{ \Illuminate\Support\Js::from(__('Fingerprint copied to clipboard')) }},
+            copyFailed: {{ \Illuminate\Support\Js::from(__('Could not copy to clipboard.')) }},
+            async copy(value, message) {
+                if (! value) { return; }
+                try {
+                    await navigator.clipboard.writeText(value);
+                    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type: 'success' } }));
+                } catch {
+                    window.dispatchEvent(new CustomEvent('toast', { detail: { message: this.copyFailed, type: 'error' } }));
+                }
+            },
+        }"
+    >
         <x-workspace-panel-head
             dense
             icon="heroicon-o-key"
@@ -93,21 +112,21 @@
             <div class="space-y-4">
                 <div>
                     <x-input-label value="{{ __('Public key (OpenSSH)') }}" />
-                    <div class="mt-1 flex gap-2">
+                    <div class="mt-1 flex items-start gap-2">
                         <textarea
                             readonly
                             rows="3"
                             aria-label="{{ __('Public key') }}"
                             class="min-h-[5rem] flex-1 resize-y rounded-lg border border-brand-ink/15 bg-brand-sand/20 px-3 py-2 font-mono text-xs text-brand-ink"
                         >{{ $serverPub }}</textarea>
-                        <button
+                        <x-secondary-button
                             type="button"
-                            class="h-10 shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
-                            x-on:click="navigator.clipboard.writeText(@js($serverPub)); copied = true; setTimeout(() => copied = false, 2000)"
+                            size="xs"
+                            class="shrink-0"
+                            x-on:click="copy(pubKey, copiedPub)"
                         >
-                            <span x-show="!copied">{{ __('Copy') }}</span>
-                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
-                        </button>
+                            {{ __('Copy') }}
+                        </x-secondary-button>
                     </div>
                 </div>
 
@@ -116,14 +135,14 @@
                         <x-input-label value="{{ __('Fingerprint (SHA-256)') }}" />
                         <div class="mt-1 flex items-center gap-2">
                             <code class="flex-1 truncate rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 font-mono text-xs text-brand-ink">{{ $serverPubFingerprint }}</code>
-                            <button
+                            <x-secondary-button
                                 type="button"
-                                class="h-10 shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                                x-on:click="navigator.clipboard.writeText(@js($serverPubFingerprint)); copiedFp = true; setTimeout(() => copiedFp = false, 2000)"
+                                size="xs"
+                                class="shrink-0"
+                                x-on:click="copy(fingerprint, copiedFingerprint)"
                             >
-                                <span x-show="!copiedFp">{{ __('Copy') }}</span>
-                                <span x-show="copiedFp" x-cloak>{{ __('Copied') }}</span>
-                            </button>
+                                {{ __('Copy') }}
+                            </x-secondary-button>
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Compare with the key shown when you authorize the server on a Git host.') }}</p>
                     </div>

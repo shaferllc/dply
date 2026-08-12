@@ -14,8 +14,6 @@ use App\Support\Servers\ServerPhpMutationLock;
  */
 trait BuildsPhpScripts
 {
-
-
     protected function privilegedShellScript(Server $server, string $quotedVersions): string
     {
         $inner = <<<'BASH'
@@ -68,12 +66,28 @@ fi
 
 default_version=""
 if command -v php >/dev/null 2>&1; then
-  default_version="$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null || true)"
+  default_version="$(php -r "echo PHP_MAJOR_VERSION, chr(46), PHP_MINOR_VERSION;" 2>/dev/null || true)"
 fi
 
 printf "supported=%s\n" "$supported"
 printf "installed_versions=%s\n" "$(IFS=,; echo "${installed_versions[*]}")"
 printf "detected_default_version=%s\n" "$default_version"
+
+for extdir in /etc/php/*/; do
+  extver="$(basename "$extdir")"
+  [ -d "/etc/php/${extver}/mods-available" ] || continue
+  ext_available="$(ls -1 "/etc/php/${extver}/mods-available" 2>/dev/null | sed -n "s/\.ini\$//p" | sort -u | paste -sd, -)"
+  ext_enabled=""
+  for extsapi in cli fpm; do
+    if [ -d "/etc/php/${extver}/${extsapi}/conf.d" ]; then
+      ext_enabled="${ext_enabled}$(ls -1 "/etc/php/${extver}/${extsapi}/conf.d" 2>/dev/null | sed -n "s/^[0-9]*-//;s/\.ini\$//p")
+"
+    fi
+  done
+  ext_enabled="$(printf %s "$ext_enabled" | grep -v "^\$" | sort -u | paste -sd, -)"
+  printf "extensions_available[%s]=%s\n" "$extver" "$ext_available"
+  printf "extensions_enabled[%s]=%s\n" "$extver" "$ext_enabled"
+done
 '
 BASH;
 

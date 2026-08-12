@@ -179,6 +179,19 @@ class WorkspaceWebserver extends WorkspaceManage
     public function setWorkspaceTab(string $tab): void
     {
         $allowed = ['overview', 'change', 'health', 'nginx', 'caddy', 'apache', 'openlitespeed', 'advanced', 'notifications'];
+
+        // Parked engines and the switch flow are not reachable by tab key
+        // either — otherwise a stale wire:click or a hand-crafted request
+        // lands the operator on a panel that renders nothing.
+        $allowed = array_values(array_diff(
+            $allowed,
+            WebserverWorkspaceViewData::switchHidden() ? ['change'] : [],
+            array_diff(
+                WebserverWorkspaceViewData::hiddenEngines(),
+                [strtolower((string) (($this->server->meta['webserver'] ?? 'nginx')))],
+            ),
+        ));
+
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'overview';
         // Reset the sub-tab on every top-level switch so the operator always
         // lands on the actionable view first. Skipping this would leave

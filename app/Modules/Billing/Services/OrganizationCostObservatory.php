@@ -120,6 +120,11 @@ final class OrganizationCostObservatory
                 'provider' => $server->provider->label(),
                 'plan' => (string) ($server->size ?: ''),
                 'monthly_usd_cents' => $this->noteParser->toUsdCents($parsed['amount'], $parsed['currency']),
+                // Kept alongside the USD figure so the UI can show what the
+                // provider actually bills (Hetzner quotes EUR) rather than only
+                // the converted number.
+                'native_amount' => $parsed['amount'],
+                'native_currency' => $parsed['currency'],
                 'source' => 'note',
                 'detail' => $note,
             ];
@@ -136,6 +141,8 @@ final class OrganizationCostObservatory
                     'provider' => (string) ($estimate['provider_label'] ?? $server->provider->label()),
                     'plan' => (string) ($estimate['plan'] ?? $server->size),
                     'monthly_usd_cents' => $this->noteParser->toUsdCents((float) $estimate['monthly'], $currency),
+                    'native_amount' => (float) $estimate['monthly'],
+                    'native_currency' => $currency,
                     'source' => 'catalog',
                     'detail' => (string) ($estimate['source'] ?? __('Provider catalog')),
                 ];

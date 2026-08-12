@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Console;
 
-use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use Illuminate\Console\Command;
 
 /**
  * Nightly safety sweep: dispatches a SyncOrganizationBillingJob for every
  * organization that has a Cashier subscription. The event-driven path (see
  * ServerObserver) covers the bulk of changes in real time; this sweep catches
- * any drift — server resizes that mutate billingTier(), missed events from
- * worker outages, manual SQL fixups, etc.
+ * any drift — servers added or removed outside the observer, missed events
+ * from worker outages, manual SQL fixups, etc.
  *
  * Each dispatched job is unique-by-org-ID, so overlapping schedules collapse.
  *

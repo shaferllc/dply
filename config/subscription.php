@@ -18,21 +18,6 @@ return [
     |   line item to share a billing interval, so each tier has both a monthly
     |   and a yearly price; the yearly variant is 20% off the monthly × 12.
     |
-    |   STRIPE_PRICE_STANDARD_BASE_MONTHLY=price_...
-    |   STRIPE_PRICE_STANDARD_BASE_YEARLY=price_...
-    |
-    |   STRIPE_PRICE_STANDARD_TIER_XS=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_S=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_M=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_L=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_XL=price_...
-    |
-    |   STRIPE_PRICE_STANDARD_TIER_XS_YEARLY=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_S_YEARLY=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_M_YEARLY=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_L_YEARLY=price_...
-    |   STRIPE_PRICE_STANDARD_TIER_XL_YEARLY=price_...
-    |
     |   STRIPE_PRICE_STANDARD_SERVERLESS=price_...         (flat per-function fee, monthly)
     |   STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_...  (flat per-function fee, yearly)
     |   STRIPE_PRICE_STANDARD_CLOUD=price_...              (flat dply Cloud platform fee, monthly)
@@ -220,20 +205,11 @@ return [
         'app_runner_hours_per_month' => (int) env('SUBSCRIPTION_APP_RUNNER_HOURS_PER_MONTH', 730),
         'app_runner_vcpu_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_VCPU_USD_PER_HOUR', 0.064),
         'app_runner_memory_gb_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_MEMORY_GB_USD_PER_HOUR', 0.007),
-        // --- Legacy size-tier keys (being retired in the plan migration) ---
-        // Retained so the not-yet-migrated billing dashboard, analytics, and
-        // cost cards keep functioning until each is moved onto the plan model.
-        // Remove once every consumer reads `plans` instead of `tiers`/base.
-        'base_cents' => 0,
-        'included_credit_cents' => 0,
-        'per_server_cap_cents' => 4000,
-        'tiers' => [
-            'xs' => 200,
-            's' => 500,
-            'm' => 1000,
-            'l' => 2000,
-            'xl' => 4000,
-        ],
+        // The legacy size-tier keys (base_cents, included_credit_cents,
+        // per_server_cap_cents, tiers) lived here. All four are gone: the first
+        // three had zero readers, and `tiers` fed only ServerTier::priceCents(),
+        // which priced servers per size — something the flat-plan model does not
+        // do. Server size is no longer a billing input anywhere.
         /*
         | Cost observatory — comparison baselines for billing analytics.
         | forge_per_server_cents mirrors Laravel Forge Hobby ($12/server/mo).
@@ -241,6 +217,27 @@ return [
         'observatory' => [
             'forge_per_server_cents' => (int) env('SUBSCRIPTION_FORGE_PER_SERVER_CENTS', 1200),
             'eur_to_usd_rate' => (float) env('SUBSCRIPTION_EUR_TO_USD_RATE', 1.08),
+
+            /*
+            | Reference FX rates, expressed as USD per 1 unit of the currency
+            | (so EUR 1.08 means €1 = $1.08 — same direction as the legacy
+            | eur_to_usd_rate above, which stays the source for EUR).
+            |
+            | These are STATIC display rates, refreshed by editing env — dply
+            | does not quote live FX. They exist so a provider price billed in
+            | euros reads in the currency you think in; every amount dply
+            | actually charges is USD.
+            */
+            'currency_rates' => [
+                'USD' => 1.0,
+                'EUR' => (float) env('SUBSCRIPTION_EUR_TO_USD_RATE', 1.08),
+                'GBP' => (float) env('SUBSCRIPTION_GBP_TO_USD_RATE', 1.27),
+                'CAD' => (float) env('SUBSCRIPTION_CAD_TO_USD_RATE', 0.73),
+                'AUD' => (float) env('SUBSCRIPTION_AUD_TO_USD_RATE', 0.66),
+            ],
+
+            /* Which of the above to show under the monthly cost estimate. */
+            'display_currencies' => ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
         ],
         'stripe' => [
             // One recurring price per paid plan, per interval. Free has no price
@@ -316,23 +313,10 @@ return [
                 'standard' => env('STRIPE_PRICE_STANDARD_QUEUE_STANDARD_YEARLY', ''),
                 'pro' => env('STRIPE_PRICE_STANDARD_QUEUE_PRO_YEARLY', ''),
             ],
-            // --- Legacy size-tier Stripe prices (retired with the migration) ---
-            'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
-            'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),
-            'tiers' => [
-                'xs' => env('STRIPE_PRICE_STANDARD_TIER_XS', ''),
-                's' => env('STRIPE_PRICE_STANDARD_TIER_S', ''),
-                'm' => env('STRIPE_PRICE_STANDARD_TIER_M', ''),
-                'l' => env('STRIPE_PRICE_STANDARD_TIER_L', ''),
-                'xl' => env('STRIPE_PRICE_STANDARD_TIER_XL', ''),
-            ],
-            'tiers_yearly' => [
-                'xs' => env('STRIPE_PRICE_STANDARD_TIER_XS_YEARLY', ''),
-                's' => env('STRIPE_PRICE_STANDARD_TIER_S_YEARLY', ''),
-                'm' => env('STRIPE_PRICE_STANDARD_TIER_M_YEARLY', ''),
-                'l' => env('STRIPE_PRICE_STANDARD_TIER_L_YEARLY', ''),
-                'xl' => env('STRIPE_PRICE_STANDARD_TIER_XL_YEARLY', ''),
-            ],
+            // The legacy size-tier Stripe prices (base_monthly/base_yearly,
+            // tiers, tiers_yearly) lived here. Nothing read them — the syncer
+            // drives prices through SubscriptionPlanResolver — and the XS-XL
+            // concept they priced no longer exists.
         ],
     ],
 

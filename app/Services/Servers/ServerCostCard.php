@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
-use App\Enums\ServerTier;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Billing\Services\OrganizationCostObservatory;
+use App\Modules\Billing\Services\ServerResourceCostCalculator;
+use App\Support\Billing\CurrencyConverter;
 
 /**
  * Per-server true cost card — provider estimate, dply tier fee, site count,
@@ -17,6 +18,8 @@ final class ServerCostCard
 {
     public function __construct(
         private OrganizationCostObservatory $costObservatory,
+        private CurrencyConverter $currency,
+        private ServerResourceCostCalculator $managedServerCost,
     ) {}
 
     /**
@@ -27,23 +30,25 @@ final class ServerCostCard
     {
         $server->loadMissing(['providerCredential', 'sites']);
         $provider = $this->costObservatory->providerEstimateForServer($server);
-        $tier = $server->billingTier();
-        // Spec-tiered per-server fee only applies to VMs dply runs on its own
-        // provider account (HOSTING_BACKEND_DPLY). BYO servers — where the
-        // customer brings their own credential/SSH key and pays the provider
-        // directly — don't get tier-priced; same for managed-product hosts
-        // (serverless / dply-cloud / dply-edge), which have their own
-        // per-product pricing models.
-        $chargesTierFee = $server->usesManagedHosting() && ! $server->isManagedProductHost();
-        $dplyCents = $chargesTierFee ? $tier->priceCents() : 0;
+        // A per-server dply charge only exists for VMs dply runs on its own
+        // provider account (HOSTING_BACKEND_DPLY), which bill all-in cost-plus
+        // through ServerResourceCostCalculator — the SAME calculator the real
+        // invoice uses, so this line matches the bill. BYO servers (customer's
+        // own credential, paying the provider directly) are covered by the flat
+        // plan and add nothing per server; managed-product hosts (serverless /
+        // cloud / edge) have their own per-product pricing.
+        $chargesManagedFee = $server->usesManagedHosting() && ! $server->isManagedProductHost();
+        $dplyCents = $chargesManagedFee && ! $server->isComped()
+            ? $this->managedServerCost->monthlyCentsForSize((string) $server->size)
+            : 0;
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
-        $hardware = $this->hardware($server, $tier);
+        $hardware = $this->hardware($server);
         $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
         $stackCents = $providerCents + $dplyCents;
         $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 
-        $nudge = $this->rightSizeNudge($server, $tier, $siteCount, $capacity);
+        $nudge = $this->rightSizeNudge($siteCount, $hardware, $capacity);
         $forgePerServer = (int) config('subscription.standard.observatory.forge_per_server_cents', 1200);
         $deltaVsForge = $stackCents - ($forgePerServer + $providerCents);
         $perSiteCents = $siteCount > 0 ? (int) round($stackCents / $siteCount) : null;
@@ -52,7 +57,7 @@ final class ServerCostCard
             'stack_cents' => $stackCents,
             'provider_cents' => $providerCents,
             'dply_cents' => $dplyCents,
-            'charges_tier_fee' => $chargesTierFee,
+            'charges_managed_fee' => $chargesManagedFee,
             'site_count' => $siteCount,
             'per_site_cents' => $perSiteCents,
             'forge_baseline_cents' => $forgePerServer,
@@ -72,13 +77,10 @@ final class ServerCostCard
             'alerts' => $alerts,
             'summary' => $summary,
             'hardware' => $hardware,
-            'tiers' => $this->tierLadder($tier),
             'breakdown' => $this->costBreakdown($providerCents, $dplyCents, $stackCents),
             'site_rows' => $this->siteRows($server, $perSiteCents),
             'provider' => $provider,
             'dply' => [
-                'tier' => $tier->value,
-                'tier_label' => $tier->label(),
                 'monthly_cents' => $dplyCents,
                 'formatted' => $this->formatUsdCents($dplyCents),
             ],
@@ -100,6 +102,7 @@ final class ServerCostCard
                 'delta_vs_forge_cents' => $deltaVsForge,
             ],
             'nudge' => $nudge,
+            'currency' => $this->currencyView($provider, $stackCents),
             'disclaimer' => __('Provider cost is a catalog estimate or a note you saved — not an invoiced amount. Dply bills its platform fee separately.'),
         ];
     }
@@ -157,14 +160,12 @@ final class ServerCostCard
      *   cpu_count: ?int,
      *   mem_mb: ?int,
      *   mem_formatted: ?string,
-     *   tier: string,
-     *   tier_label: string,
      *   provider: ?string,
      *   plan: ?string,
      *   region: ?string,
      * }
      */
-    private function hardware(Server $server, ServerTier $tier): array
+    private function hardware(Server $server): array
     {
         $snapshot = $server->latestMetricSnapshot;
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
@@ -181,8 +182,6 @@ final class ServerCostCard
             'cpu_count' => $cpuCount,
             'mem_mb' => $memMb,
             'mem_formatted' => $memMb !== null ? $this->formatMemory($memMb) : null,
-            'tier' => $tier->value,
-            'tier_label' => $tier->label(),
             'provider' => $server->provider->label(),
             'plan' => (string) ($server->size ?: '') ?: null,
             'region' => (string) ($server->region ?: '') ?: null,
@@ -190,20 +189,57 @@ final class ServerCostCard
     }
 
     /**
-     * @return list<array{value: string, label: string, price_cents: int, formatted: string, current: bool}>
+     * The same monthly total in the currencies the org is likely to think in,
+     * plus what the provider actually quotes when that is not USD.
+     *
+     * @param  array<string, mixed>  $provider
+     * @return array{
+     *   native: array{currency: string, formatted: string, rate_note: string}|null,
+     *   totals: list<array{code: string, formatted: string, base: bool}>,
+     *   note: string,
+     * }
      */
-    private function tierLadder(ServerTier $current): array
+    private function currencyView(array $provider, int $stackCents): array
     {
-        return array_map(
-            static fn (ServerTier $tier): array => [
-                'value' => $tier->value,
-                'label' => $tier->label(),
-                'price_cents' => $tier->priceCents(),
-                'formatted' => '$'.number_format($tier->priceCents() / 100, 2).'/mo',
-                'current' => $tier === $current,
-            ],
-            ServerTier::ordered(),
-        );
+        $usd = $stackCents / 100;
+        $nativeCurrency = strtoupper((string) ($provider['native_currency'] ?? 'USD'));
+        $nativeAmount = isset($provider['native_amount']) && is_numeric($provider['native_amount'])
+            ? (float) $provider['native_amount']
+            : null;
+
+        $native = null;
+        // Only worth calling out when the provider bills in something other than
+        // the USD the rest of the card is denominated in.
+        if ($nativeAmount !== null && $nativeCurrency !== 'USD' && $this->currency->supports($nativeCurrency)) {
+            $native = [
+                'currency' => $nativeCurrency,
+                'formatted' => $this->currency->formatMonthly($nativeAmount, $nativeCurrency),
+                'rate_note' => __('1 :code = :usd', [
+                    'code' => $nativeCurrency,
+                    'usd' => $this->currency->format((float) $this->currency->rateFor($nativeCurrency), 'USD'),
+                ]),
+            ];
+        }
+
+        $totals = [];
+        foreach ($this->currency->displayCurrencies() as $code) {
+            $converted = $this->currency->fromUsd($usd, $code);
+            if ($converted === null) {
+                continue;
+            }
+
+            $totals[] = [
+                'code' => $code,
+                'formatted' => $this->currency->formatMonthly($converted, $code),
+                'base' => $code === 'USD',
+            ];
+        }
+
+        return [
+            'native' => $native,
+            'totals' => $totals,
+            'note' => __('Reference rates for reading only — Dply bills in USD, and your provider settles at its own rate.'),
+        ];
     }
 
     /**
@@ -244,10 +280,10 @@ final class ServerCostCard
     }
 
     /**
-     * @param  array<string, mixed> $provider
+     * @param  array<string, mixed>  $provider
      * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
      * @param  array{kind: string, severity: string, title: string, message: string}|null  $nudge
-     * @return list<array{severity: string, title: string, message: string, action_label: ?string, action_route: ?string, action_anchor: ?string}>
+     * @return list<array{kind: string, severity: string, title: string, message: string, action_label: ?string, action_route: ?string, action_anchor: ?string}>
      */
     private function buildAlerts(array $provider, array $capacity, ?array $nudge): array
     {
@@ -255,6 +291,7 @@ final class ServerCostCard
 
         if (($provider['source'] ?? '') === 'unknown') {
             $alerts[] = [
+                'kind' => 'provider_unknown',
                 'severity' => 'warning',
                 'title' => __('Provider cost unknown'),
                 'message' => (string) ($provider['detail'] ?? __('Add a monthly cost note on Settings or connect a supported provider credential for catalog lookup.')),
@@ -266,6 +303,7 @@ final class ServerCostCard
 
         if ($capacity['metrics_at'] === null) {
             $alerts[] = [
+                'kind' => 'metrics_pending',
                 'severity' => 'info',
                 'title' => __('Utilization metrics pending'),
                 'message' => __('Guest metrics have not reported yet — right-size nudges and headroom estimates appear after the first monitor snapshot.'),
@@ -275,6 +313,7 @@ final class ServerCostCard
             ];
         } elseif (! $capacity['metrics_fresh']) {
             $alerts[] = [
+                'kind' => 'metrics_stale',
                 'severity' => 'info',
                 'title' => __('Metrics may be stale'),
                 'message' => trans_choice(
@@ -290,6 +329,7 @@ final class ServerCostCard
 
         if ($nudge !== null) {
             $alerts[] = [
+                'kind' => 'nudge',
                 'severity' => (string) ($nudge['severity'] ?? 'info'),
                 'title' => (string) ($nudge['title'] ?? ''),
                 'message' => (string) ($nudge['message'] ?? ''),
@@ -328,7 +368,7 @@ final class ServerCostCard
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function metricFloat(array $payload, string $key): ?float
     {
@@ -365,10 +405,11 @@ final class ServerCostCard
     }
 
     /**
+     * @param  array{cpu_count: ?int, mem_mb: ?int, mem_formatted: ?string, provider: ?string, plan: ?string, region: ?string}  $hardware
      * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
      * @return array{kind: string, severity: string, title: string, message: string}|null
      */
-    private function rightSizeNudge(Server $server, ServerTier $tier, int $siteCount, array $capacity): ?array
+    private function rightSizeNudge(int $siteCount, array $hardware, array $capacity): ?array
     {
         $cpuPct = $capacity['cpu_pct'];
         $memPct = $capacity['mem_pct'];
@@ -380,7 +421,13 @@ final class ServerCostCard
 
         $lowUtil = (float) config('server_cost_card.right_size.low_util_pct', 15);
         $hotUtil = (float) config('server_cost_card.right_size.hot_util_pct', 85);
-        $minTierWeight = (int) config('server_cost_card.right_size.min_tier_weight_oversized', 3);
+
+        // "Big enough to be worth downsizing", read straight off the specs.
+        // This used to be a ServerTier weight check, which meant the same thing
+        // through an extra layer of indirection.
+        $bigEnoughToDownsize = ($hardware['cpu_count'] ?? 0) >= (int) config('server_cost_card.right_size.oversized_min_vcpu', 3)
+            || ($hardware['mem_mb'] ?? 0) > (int) config('server_cost_card.right_size.oversized_min_mem_mb', 4096);
+        $specLabel = $this->specLabel($hardware);
 
         $peak = max($cpuPct ?? 0.0, $memPct ?? 0.0);
         $low = ($cpuPct === null || $cpuPct <= $lowUtil)
@@ -398,16 +445,16 @@ final class ServerCostCard
             ];
         }
 
-        if ($siteCount <= 1 && $low && $tier->weight() >= $minTierWeight) {
+        if ($siteCount <= 1 && $low && $bigEnoughToDownsize) {
             $utilLabel = $cpuPct !== null ? number_format($cpuPct, 0).'% CPU' : number_format((float) $memPct, 0).'% memory';
 
             return [
                 'kind' => 'oversized',
                 'severity' => 'info',
                 'title' => __('Room to downsize'),
-                'message' => __('You have :count site on :tier at about :util — a smaller dply tier or provider plan may fit.', [
+                'message' => __('You have :count site on this :spec host at about :util — a smaller provider plan may fit.', [
                     'count' => $siteCount,
-                    'tier' => $tier->label(),
+                    'spec' => $specLabel,
                     'util' => $utilLabel,
                 ]),
             ];
@@ -426,19 +473,45 @@ final class ServerCostCard
             ];
         }
 
-        if ($siteCount >= 3 && $low && $tier->weight() >= $minTierWeight) {
+        if ($siteCount >= 3 && $low && $bigEnoughToDownsize) {
             return [
                 'kind' => 'consolidation',
                 'severity' => 'info',
-                'title' => __('Underutilized for this tier'),
-                'message' => __(':count sites share this :tier host at low utilization — you may be paying for capacity you are not using.', [
+                'title' => __('Underutilized for this size'),
+                'message' => __(':count sites share this :spec host at low utilization — you may be paying for capacity you are not using.', [
                     'count' => $siteCount,
-                    'tier' => $tier->label(),
+                    'spec' => $specLabel,
                 ]),
             ];
         }
 
         return null;
+    }
+
+    /**
+     * Human spec summary ("4 vCPU · 8 GB") used in the nudge copy where the
+     * XS-XL tier label used to sit. Falls back to the provider's plan slug, and
+     * then to a neutral word, when metrics have not reported specs yet.
+     *
+     * @param  array{cpu_count: ?int, mem_mb: ?int, mem_formatted: ?string, provider: ?string, plan: ?string, region: ?string}  $hardware
+     */
+    private function specLabel(array $hardware): string
+    {
+        $parts = [];
+
+        if (($hardware['cpu_count'] ?? null) !== null) {
+            $parts[] = trans_choice(':count vCPU|:count vCPU', (int) $hardware['cpu_count'], ['count' => (int) $hardware['cpu_count']]);
+        }
+
+        if (($hardware['mem_formatted'] ?? null) !== null) {
+            $parts[] = (string) $hardware['mem_formatted'];
+        }
+
+        if ($parts !== []) {
+            return implode(' · ', $parts);
+        }
+
+        return (string) ($hardware['plan'] ?? '') !== '' ? (string) $hardware['plan'] : __('current');
     }
 
     private function formatMemory(int $memMb): string
