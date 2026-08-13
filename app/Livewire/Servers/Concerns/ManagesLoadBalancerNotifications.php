@@ -24,6 +24,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesLoadBalancerNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same key set the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return ServerLoadBalancerNotificationKeys::eventKeys();
+    }
+
     /** Active in-page sub-tab: 'load_balancers' or 'notifications'. */
     public string $lb_workspace_tab = 'load_balancers';
 
@@ -40,6 +54,8 @@ trait ManagesLoadBalancerNotifications
 
     public function mountManagesLoadBalancerNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = ServerLoadBalancerNotificationKeys::eventKeys();
     }
 

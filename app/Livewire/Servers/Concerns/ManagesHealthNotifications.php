@@ -23,6 +23,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesHealthNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same keys the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return ServerHealthNotificationKeys::eventKeys();
+    }
+
     /** Channel selected in the add-subscription form on the Notifications tab. */
     public string $notif_channel_id = '';
 
@@ -36,6 +50,8 @@ trait ManagesHealthNotifications
 
     public function mountManagesHealthNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = ServerHealthNotificationKeys::eventKeys();
     }
 

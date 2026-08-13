@@ -19,7 +19,7 @@
             dense
             icon="heroicon-o-calendar-days"
             :title="__('Schedule')"
-            :note="__('Framework schedulers running on this server. Tracks tick health for each scheduler; nudges you when one stops firing.')"
+            :note="__('Framework schedulers on this server — tick health per site; nudges when one stops firing.')"
             class="border-b border-brand-ink/10"
         />
 

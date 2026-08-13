@@ -5,6 +5,26 @@
 --}}
 @php
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+
+    // Derived, not copied. The literal that used to sit here was the `default`
+    // arm of the real view's match — and Server::siteType() only ever returns
+    // container|php|static|node, so that arm is unreachable and the skeleton was
+    // showing the wrong note on every single load.
+    $skeletonSiteType = $server->siteType();
+    $skeletonSitesNote = match ($skeletonSiteType) {
+        'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
+        'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
+        'static' => __('Host static sites from Git with zero-config builds.'),
+        'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
+        default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
+    };
+    $skeletonSitesIcon = match ($skeletonSiteType) {
+        'container' => 'heroicon-o-cube-transparent',
+        'php' => 'heroicon-o-code-bracket',
+        'static' => 'heroicon-o-photo',
+        'node' => 'heroicon-o-bolt',
+        default => 'heroicon-o-globe-alt',
+    };
 @endphp
 
 <x-server-workspace-layout
@@ -19,9 +39,9 @@
         {{-- Dense head, matching the merged page. --}}
         <x-workspace-panel-head
             dense
-            :icon="$isContainerHost ? 'heroicon-o-cube-transparent' : 'heroicon-o-globe-alt'"
+            :icon="$skeletonSitesIcon"
             :title="$isContainerHost ? __('Container apps') : __('Sites')"
-            :note="__('Manage sites on this server — deploys, env, and settings per workspace.')"
+            :note="$skeletonSitesNote"
             class="border-b border-brand-ink/10"
         />
 

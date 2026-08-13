@@ -20,7 +20,7 @@
             dense
             icon="heroicon-o-folder"
             :title="__('Files')"
-            :note="__('Read-only filesystem browser over SSH. View text or image previews and download files.')"
+            :note="__('Read-only filesystem browser over SSH. View text or image previews and download files (up to :mb MB).', ['mb' => (int) (config('server_file_browser.download_max_bytes', 26_214_400) / 1024 / 1024)])"
             class="border-b border-brand-ink/10"
         />
 

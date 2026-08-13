@@ -17,7 +17,7 @@
             dense
             icon="heroicon-o-user-group"
             :title="__('System users')"
-            :note="__('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user.')"
+            :note="__('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user; create the account here, then assign it to a site from the site\'s System user section.')"
             class="border-b border-brand-ink/10"
         />
 

@@ -25,6 +25,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesBackupNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same key set the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return ServerBackupNotificationKeys::eventKeys();
+    }
+
     /** Channel selected in the add-subscription form on the Notifications tab. */
     public string $notif_channel_id = '';
 
@@ -38,6 +52,8 @@ trait ManagesBackupNotifications
 
     public function mountManagesBackupNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = ServerBackupNotificationKeys::eventKeys();
     }
 

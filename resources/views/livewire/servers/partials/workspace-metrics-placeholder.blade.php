@@ -20,7 +20,7 @@
                     <div class="min-w-0">
                         <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Metrics') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Live usage, history charts, alert routing, and agent diagnostics for this server.') }}
+                            {{ __('Live usage, history, alert routing, and agent diagnostics.') }}
                         </p>
                     </div>
                 </div>
