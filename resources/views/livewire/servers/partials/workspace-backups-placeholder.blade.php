@@ -19,7 +19,7 @@
             dense
             icon="heroicon-o-archive-box"
             :title="__('Backups')"
-            :note="__('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup configurations.')"
+            :note="__('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup destinations.')"
             class="border-b border-brand-ink/10"
         />
 

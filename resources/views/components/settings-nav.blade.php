@@ -27,6 +27,7 @@
         'profile.api-keys',
         'profile.cli',
         'profile.backup-configurations',
+        'profile.backup-destinations',
         'profile.notification-channels',
     );
 
@@ -87,18 +88,20 @@
                                 </x-slot>
                                 {{ __('API keys') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.backup-configurations')" wire:navigate>
+                            <x-dropdown-link :href="route('profile.backup-destinations')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-archive-box class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
-                                {{ __('Backup configurations') }}
+                                {{ __('Backup destinations') }}
                             </x-dropdown-link>
+                            {{-- CLI hidden for now — bringing it back later.
                             <x-dropdown-link :href="route('profile.cli')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-command-line class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('CLI') }}
                             </x-dropdown-link>
+                            --}}
                             <x-dropdown-link :href="route('profile.notification-channels')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-bell-alert class="h-[1.15rem] w-[1.15rem]" />
@@ -111,12 +114,14 @@
                                 </x-slot>
                                 {{ __('Profile') }}
                             </x-dropdown-link>
+                            {{-- Referrals hidden for now.
                             <x-dropdown-link :href="route('profile.referrals')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-gift class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('Referrals') }}
                             </x-dropdown-link>
+                            --}}
                             <x-dropdown-link :href="route('profile.security')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-shield-check class="h-[1.15rem] w-[1.15rem]" />
@@ -274,13 +279,14 @@
                 {{ __('API keys') }}
             </a>
             <a
-                href="{{ route('profile.backup-configurations') }}"
+                href="{{ route('profile.backup-destinations') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('profile.backup-configurations') ? $navOn : $navOff])
+                @class([$navBase, request()->routeIs('profile.backup-destinations') ? $navOn : $navOff])
             >
                 <x-heroicon-o-archive-box class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Backup configurations') }}
+                {{ __('Backup destinations') }}
             </a>
+            {{-- CLI hidden for now — bringing it back later.
             <a
                 href="{{ route('profile.cli') }}"
                 wire:navigate
@@ -289,6 +295,7 @@
                 <x-heroicon-o-command-line class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('CLI') }}
             </a>
+            --}}
             <a
                 href="{{ route('profile.notification-channels') }}"
                 wire:navigate
@@ -308,6 +315,7 @@
                 <x-heroicon-o-user-circle class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Profile') }}
             </a>
+            {{-- Referrals hidden for now.
             <a
                 href="{{ route('profile.referrals') }}"
                 wire:navigate
@@ -316,6 +324,7 @@
                 <x-heroicon-o-gift class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Referrals') }}
             </a>
+            --}}
             <a
                 href="{{ route('profile.security') }}"
                 wire:navigate

@@ -96,11 +96,11 @@ trait ResolvesCommandPaletteItems
                 ['Two-factor auth', '2fa mfa two factor authentication', 'two-factor.setup', 'shield-check'],
                 ['SSH keys', 'ssh keys access', 'profile.ssh-keys', 'key'],
                 ['API keys', 'api tokens keys', 'profile.api-keys', 'key'],
-                ['CLI tokens', 'cli command line tokens', 'profile.cli', 'command-line'],
+                // ['CLI tokens', 'cli command line tokens', 'profile.cli', 'command-line'], // hidden for now — bringing CLI back later
                 ['Source control', 'github gitlab source control git', 'profile.source-control', 'code-bracket'],
                 ['Notification channels', 'slack email webhook channels', 'profile.notification-channels', 'bell'],
-                ['Backup configurations', 'backup config s3 storage', 'profile.backup-configurations', 'circle-stack'],
-                ['Referrals', 'referral invite friends', 'profile.referrals', 'user'],
+                ['Backup destinations', 'backup config destination bucket s3 storage', 'profile.backup-destinations', 'circle-stack'],
+                // ['Referrals', 'referral invite friends', 'profile.referrals', 'user'], // hidden for now
                 ['Billing', 'billing invoices payment plan', 'billing.show', 'credit-card', ['org' => true]],
                 ['Invoices', 'invoices billing receipts', 'billing.invoices', 'credit-card', ['org' => true]],
                 ['Org members', 'organization members invite', 'organizations.members', 'building-office-2', ['org' => true]],

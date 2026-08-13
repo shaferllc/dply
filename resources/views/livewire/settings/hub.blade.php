@@ -38,52 +38,48 @@
     @endpush
 
     <x-profile-shell
+        dense
         :title="$isProfile ? __('Profile') : __('Servers & Sites')"
         :description="$isProfile
             ? __('Identity, preferences, sessions, and account on this page.')
             : __('Organization and team defaults for servers and sites.')"
         :icon="$isProfile ? 'heroicon-o-user-circle' : 'heroicon-o-server'"
     >
-        <x-slot:actions>
-            <x-outline-link href="{{ route('profile.security') }}" wire:navigate>
-                <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Security') }}
-            </x-outline-link>
-        </x-slot:actions>
+        {{-- No header actions: Security is one click away in the settings nav. --}}
 
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Your settings at a glance') }}">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Theme') }}</dt>
-                    <dd class="mt-1 flex items-center gap-1.5">
+                    <dd class="mt-0.5 flex items-center gap-1.5">
                         @if ($currentTheme === 'light')
-                            <x-heroicon-m-sun class="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                            <x-heroicon-m-sun class="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden="true" />
                         @elseif ($currentTheme === 'dark')
-                            <x-heroicon-m-moon class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                            <x-heroicon-m-moon class="h-3.5 w-3.5 shrink-0 text-brand-forest" aria-hidden="true" />
                         @else
-                            <x-heroicon-m-computer-desktop class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                            <x-heroicon-m-computer-desktop class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
                         @endif
-                        <span class="text-sm font-semibold capitalize text-brand-ink">{{ __(ucfirst((string) $currentTheme)) }}</span>
+                        <span class="truncate text-sm font-semibold capitalize text-brand-ink">{{ __(ucfirst((string) $currentTheme)) }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Appearance') }}</p>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Nav') }}</dt>
-                    <dd class="mt-1 flex items-center gap-1.5">
+                    <dd class="mt-0.5 flex items-center gap-1.5">
                         @if ($currentNavLayout === 'top')
-                            <x-heroicon-m-bars-3 class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                            <span class="text-sm font-semibold text-brand-ink">{{ __('Top') }}</span>
+                            <x-heroicon-m-bars-3 class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            <span class="truncate text-sm font-semibold text-brand-ink">{{ __('Top') }}</span>
                         @else
-                            <x-heroicon-m-squares-2x2 class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                            <span class="text-sm font-semibold text-brand-ink">{{ __('Sidebar') }}</span>
+                            <x-heroicon-m-squares-2x2 class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            <span class="truncate text-sm font-semibold text-brand-ink">{{ __('Sidebar') }}</span>
                         @endif
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Settings layout') }}</p>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Timezone') }}</dt>
-                    <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $u?->timezone ?? config('app.timezone') }}">{{ $u?->timezone ?? config('app.timezone') }}</dd>
-                    <p class="mt-1 truncate text-xs text-brand-mist">{{ now($u?->timezone ?? config('app.timezone'))->format('g:i A') }} · {{ __('local time') }}</p>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="truncate text-sm font-semibold text-brand-ink" title="{{ $u?->timezone ?? config('app.timezone') }}">{{ $u?->timezone ?? config('app.timezone') }}</span>
+                        <span class="shrink-0 font-mono text-xs tabular-nums text-brand-moss">{{ now($u?->timezone ?? config('app.timezone'))->format('g:i A') }}</span>
+                    </dd>
                 </div>
             </dl>
         </x-slot:stats>
@@ -112,310 +108,297 @@
                  Lifted from the old /profile/edit page so settings/profile
                  is the single personal-settings surface. --}}
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Name, login email, country, language, and timezone. Avatar is loaded via Gravatar — change it by updating the email tied to your Gravatar account.') }}</p>
-                    </div>
-                    <p x-show="profileSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Saved') }}
-                    </p>
-                </div>
-                <div class="grid gap-6 px-5 py-5 sm:px-6 lg:grid-cols-3 lg:gap-8">
-                    <div class="lg:col-span-1">
-                        <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 text-center">
-                            <img
-                                src="{{ $this->gravatarUrl }}"
-                                alt=""
-                                width="96"
-                                height="96"
-                                class="mx-auto rounded-full border border-brand-ink/10 shadow-sm"
-                            />
-                            <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Gravatar') }}</p>
-                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Resolved from your email.') }}</p>
-                        </div>
-                    </div>
-                    <div class="space-y-5 lg:col-span-2">
-                        <div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-user-circle"
+                    :title="__('Your details')"
+                    :note="__('Name, login email, country, language, and timezone.')"
+                >
+                    <x-slot:actions>
+                        <p x-show="profileSaved" x-transition x-cloak class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Saved') }}
+                        </p>
+                        {{-- Avatar is read-only chrome, so it rides in the header
+                             rather than stealing a form column or a field row. --}}
+                        <img
+                            src="{{ $this->gravatarUrl }}"
+                            alt=""
+                            width="24"
+                            height="24"
+                            class="h-6 w-6 shrink-0 rounded-full border border-brand-ink/10 shadow-sm"
+                            title="{{ __('Gravatar, resolved from your email address.') }}"
+                        />
+                    </x-slot:actions>
+                </x-workspace-panel-head>
+                <div class="px-3 py-2.5 sm:px-4">
+                    {{-- Six-column base: the two identity fields take half each,
+                         the three locale fields take a third each, so every row
+                         fills the width instead of trailing off mid-panel. --}}
+                    <div class="grid gap-2.5 sm:grid-cols-6">
+                        <div class="sm:col-span-3">
                             <x-input-label for="profile-name" :value="__('Name')" required />
                             <x-text-input id="profile-name" wire:model="profileForm.name" type="text" class="mt-1 block w-full" required autocomplete="name" />
-                            <x-input-error class="mt-2" :messages="$errors->get('profileForm.name')" />
+                            <x-input-error class="mt-1" :messages="$errors->get('profileForm.name')" />
                         </div>
-                        <div>
+                        <div class="sm:col-span-3">
                             <x-input-label for="profile-email" :value="__('Email')" required />
                             <x-text-input id="profile-email" wire:model.live="profileForm.email" type="email" class="mt-1 block w-full" required autocomplete="username" />
-                            <x-input-error class="mt-2" :messages="$errors->get('profileForm.email')" />
+                            <x-input-error class="mt-1" :messages="$errors->get('profileForm.email')" />
                             @if ($u instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $u->hasVerifiedEmail())
-                                <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                <div class="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
                                     <p class="font-semibold">{{ __('Your email address is unverified.') }}</p>
-                                    <button type="button" wire:click="sendVerificationEmail" class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-950 underline underline-offset-2 hover:no-underline">
+                                    <button type="button" wire:click="sendVerificationEmail" class="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-950 underline underline-offset-2 hover:no-underline">
                                         {{ __('Re-send verification email') }} →
                                     </button>
                                     @if ($verificationLinkSent)
-                                        <p class="mt-2 inline-flex items-center gap-1 font-semibold text-emerald-800">
-                                            <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <p class="mt-1 inline-flex items-center gap-1 font-semibold text-emerald-800">
+                                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Verification link sent.') }}
                                         </p>
                                     @endif
                                 </div>
                             @endif
                         </div>
-                        <div class="grid gap-5 sm:grid-cols-2">
-                            <div>
-                                <x-input-label for="profile-country" :value="__('Country')" />
-                                <select id="profile-country" wire:model="profileForm.country_code" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
-                                    <option value="">{{ __('Select a country') }}</option>
-                                    @foreach ($countries as $code => $label)
-                                        <option value="{{ $code }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error class="mt-2" :messages="$errors->get('profileForm.country_code')" />
-                            </div>
-                            <div>
-                                <x-input-label for="profile-locale" :value="__('Language')" required />
-                                <select id="profile-locale" wire:model="profileForm.locale" required class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
-                                    @foreach ($locales as $code => $label)
-                                        <option value="{{ $code }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error class="mt-2" :messages="$errors->get('profileForm.locale')" />
-                            </div>
+                        <div class="sm:col-span-2">
+                            <x-input-label for="profile-country" :value="__('Country')" />
+                            <select id="profile-country" wire:model="profileForm.country_code" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                                <option value="">{{ __('Select a country') }}</option>
+                                @foreach ($countries as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error class="mt-1" :messages="$errors->get('profileForm.country_code')" />
                         </div>
-                        <div>
+                        <div class="sm:col-span-2">
+                            <x-input-label for="profile-locale" :value="__('Language')" required />
+                            <select id="profile-locale" wire:model="profileForm.locale" required class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                                @foreach ($locales as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error class="mt-1" :messages="$errors->get('profileForm.locale')" />
+                        </div>
+                        <div class="sm:col-span-2">
                             <x-input-label for="profile-timezone" :value="__('Timezone')" required />
-                            <select id="profile-timezone" wire:model="profileForm.timezone" required class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                            <select id="profile-timezone" wire:model="profileForm.timezone" required class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                                 @foreach ($this->timezones as $tz)
                                     <option value="{{ $tz }}">{{ $tz }}</option>
                                 @endforeach
                             </select>
-                            <x-input-error class="mt-2" :messages="$errors->get('profileForm.timezone')" />
+                            <x-input-error class="mt-1" :messages="$errors->get('profileForm.timezone')" />
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Only you see these — not shared with your organization or teams.') }}</p>
-                    </div>
-                </div>
-                <form wire:submit="saveProfile" class="px-5 py-5 sm:px-6">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-adjustments-horizontal"
+                    :title="__('Your preferences')"
+                    :note="__('Only you see these — not shared with your organization or teams.')"
+                />
+                <form wire:submit="saveProfile" class="px-3 py-2.5 sm:px-4">
                     <button type="submit" class="sr-only">{{ __('Save settings') }}</button>
 
-                    {{-- Toggle stack. Same row pattern used on Automation
-                         (per-row hover, mt-aligned checkbox). --}}
-                    <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
+                    {{-- One settings list rather than a toggle box followed by
+                         loose stacked pickers: every preference is a row with its
+                         name + explanation on the left and its control on the
+                         right, so the wide column is actually used and the two
+                         kinds of setting line up on a single control edge. --}}
+                    @php
+                        $segmented = fn (bool $on) => $on
+                            ? 'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-semibold transition bg-brand-ink text-brand-cream shadow-sm'
+                            : 'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-semibold transition text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink';
+                        $rowClass = 'flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 bg-white px-2.5 py-2';
+                        $captionClass = 'bg-brand-sand/25 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss';
+                    @endphp
+
+                    <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
+                        <p class="{{ $captionClass }}">{{ __('Appearance & layout') }}</p>
+
+                        <div class="{{ $rowClass }}">
+                            <div class="min-w-0 flex-1 basis-64">
+                                <p class="text-sm font-medium text-brand-ink">{{ __('Theme mode') }}</p>
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Choose an appearance or follow your system setting.') }}</p>
+                                @error('ui.theme') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="inline-flex shrink-0 flex-wrap gap-1 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm">
+                                @foreach ($themeOptions as $opt)
+                                    <button type="button" wire:click="persistTheme('{{ $opt }}')" class="{{ $segmented(($ui['theme'] ?? '') === $opt) }}">
+                                        @if ($opt === 'light')
+                                            <x-heroicon-o-sun class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Light') }}
+                                        @elseif ($opt === 'dark')
+                                            <x-heroicon-o-moon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Dark') }}
+                                        @else
+                                            <x-heroicon-o-computer-desktop class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('System') }}
+                                        @endif
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="{{ $rowClass }}">
+                            <div class="min-w-0 flex-1 basis-64">
+                                <p class="text-sm font-medium text-brand-ink">{{ __('Navigation layout') }}</p>
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Sidebar on large screens, or a horizontal link row under the header.') }}</p>
+                                @error('ui.navigation_layout') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="inline-flex shrink-0 flex-wrap gap-1 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm">
+                                @foreach ($navLayoutOptions as $opt)
+                                    <button type="button" wire:click="persistNavigationLayout('{{ $opt }}')" class="{{ $segmented(($ui['navigation_layout'] ?? '') === $opt) }}">
+                                        @if ($opt === 'sidebar')
+                                            <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Sidebar') }}
+                                        @else
+                                            <x-heroicon-o-bars-3 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Top') }}
+                                        @endif
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="{{ $rowClass }}">
+                            <div class="min-w-0 flex-1 basis-64">
+                                <label for="notification-position" class="text-sm font-medium text-brand-ink">{{ __('Notification position') }}</label>
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Where toast notifications appear on screen.') }}</p>
+                                @error('ui.notification_position') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="flex shrink-0 items-center gap-1.5">
+                                <select
+                                    id="notification-position"
+                                    wire:model="ui.notification_position"
+                                    class="h-7 w-44 rounded-md border-brand-ink/15 bg-white py-0 ps-2.5 pe-8 text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                >
+                                    @foreach (config('user_preferences.notification_positions', []) as $value => $label)
+                                        <option value="{{ $value }}">{{ __($label) }}</option>
+                                    @endforeach
+                                </select>
+                                <button
+                                    type="button"
+                                    data-notification-preview-message="{{ __('This is where notifications will appear.') }}"
+                                    onclick="window.dispatchEvent(new CustomEvent('toast', { detail: { message: this.dataset.notificationPreviewMessage, type: 'success', position: document.getElementById('notification-position').value } }))"
+                                    class="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Test') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="{{ $captionClass }}">{{ __('Email & behavior') }}</p>
+
+                        {{-- Checkbox sits in the same right-hand control column as
+                             the pickers above, so the list reads as one column of
+                             settings and one column of controls. --}}
                         @foreach ([
                             ['key' => 'newsletter', 'title' => __('Receive newsletter'), 'desc' => __('Product updates only — no spam.')],
                             ['key' => 'keyboard_shortcuts', 'title' => __('Enable keyboard shortcuts'), 'desc' => __('Turns keyboard shortcuts on or off in the app.')],
                             ['key' => 'redirect_home_to_app', 'title' => __('Redirect to app when logged in'), 'desc' => __('Visiting the marketing homepage signed in sends you to the dashboard.')],
                             ['key' => 'subscription_invoice_emails', 'title' => __('Subscription invoice emails'), 'desc' => __('When your org moves from trial to Pro, include Stripe invoice PDFs in email.')],
                         ] as $toggle)
-                            <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
-                                <input type="checkbox" wire:model.boolean="ui.{{ $toggle['key'] }}" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
-                                <span class="min-w-0 flex-1">
+                            <label class="{{ $rowClass }} cursor-pointer transition-colors hover:bg-brand-sand/15">
+                                <span class="min-w-0 flex-1 basis-64">
                                     <span class="text-sm font-medium text-brand-ink">{{ $toggle['title'] }}</span>
                                     <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $toggle['desc'] }}</span>
                                 </span>
+                                <input type="checkbox" wire:model.boolean="ui.{{ $toggle['key'] }}" class="h-4 w-4 shrink-0 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                             </label>
                         @endforeach
-                    </div>
-
-                    {{-- Theme picker --}}
-                    <div class="mt-6">
-                        <div class="flex items-baseline justify-between gap-3">
-                            <p class="text-sm font-semibold text-brand-ink">{{ __('Theme mode') }}</p>
-                            <p class="text-xs text-brand-mist">{{ __('Choose appearance or follow your system setting.') }}</p>
-                        </div>
-                        <div class="mt-2 inline-flex flex-wrap gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
-                            @foreach ($themeOptions as $opt)
-                                <button
-                                    type="button"
-                                    wire:click="persistTheme('{{ $opt }}')"
-                                    @class([
-                                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                                        'bg-brand-ink text-brand-cream shadow-sm' => ($ui['theme'] ?? '') === $opt,
-                                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ($ui['theme'] ?? '') !== $opt,
-                                    ])
-                                >
-                                    @if ($opt === 'light')
-                                        <x-heroicon-o-sun class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Light') }}
-                                    @elseif ($opt === 'dark')
-                                        <x-heroicon-o-moon class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Dark') }}
-                                    @else
-                                        <x-heroicon-o-computer-desktop class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('System') }}
-                                    @endif
-                                </button>
-                            @endforeach
-                        </div>
-                        @error('ui.theme') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-                    </div>
-
-                    {{-- Navigation layout --}}
-                    <div class="mt-6">
-                        <div class="flex items-baseline justify-between gap-3">
-                            <p class="text-sm font-semibold text-brand-ink">{{ __('Navigation layout') }}</p>
-                            <p class="text-xs text-brand-mist">{{ __('Sidebar on large screens or a horizontal link row under the header.') }}</p>
-                        </div>
-                        <div class="mt-2 inline-flex flex-wrap gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
-                            @foreach ($navLayoutOptions as $opt)
-                                <button
-                                    type="button"
-                                    wire:click="persistNavigationLayout('{{ $opt }}')"
-                                    @class([
-                                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                                        'bg-brand-ink text-brand-cream shadow-sm' => ($ui['navigation_layout'] ?? '') === $opt,
-                                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ($ui['navigation_layout'] ?? '') !== $opt,
-                                    ])
-                                >
-                                    @if ($opt === 'sidebar')
-                                        <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Sidebar') }}
-                                    @else
-                                        <x-heroicon-o-bars-3 class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Top') }}
-                                    @endif
-                                </button>
-                            @endforeach
-                        </div>
-                        @error('ui.navigation_layout') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-                    </div>
-
-                    {{-- Notification position --}}
-                    <div class="mt-6">
-                        <div class="flex items-baseline justify-between gap-3">
-                            <label for="notification-position" class="text-sm font-semibold text-brand-ink">{{ __('Notification position') }}</label>
-                            <p class="text-xs text-brand-mist">{{ __('Where toast notifications appear on screen.') }}</p>
-                        </div>
-                        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
-                            <select
-                                id="notification-position"
-                                wire:model="ui.notification_position"
-                                class="block w-full min-w-0 max-w-md flex-1 rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                            >
-                                @foreach (config('user_preferences.notification_positions', []) as $value => $label)
-                                    <option value="{{ $value }}">{{ __($label) }}</option>
-                                @endforeach
-                            </select>
-                            <button
-                                type="button"
-                                data-notification-preview-message="{{ __('This is where notifications will appear.') }}"
-                                onclick="window.dispatchEvent(new CustomEvent('toast', { detail: { message: this.dataset.notificationPreviewMessage, type: 'success', position: document.getElementById('notification-position').value } }))"
-                                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Test') }}
-                            </button>
-                        </div>
-                        @error('ui.notification_position') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </form>
             </div>
 
             {{-- Active sessions --}}
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each device currently signed in. Revoking a session logs that device out on its next request.') }}</p>
-                    </div>
-                    @if ($otherSessions > 0)
-                        <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100">
-                            <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Revoke other devices') }}
-                        </button>
-                    @endif
-                </div>
-                <div class="px-5 py-5 sm:px-6">
-                    <p x-show="sessionRevoked" x-transition x-cloak class="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Session revoked.') }}
-                    </p>
-                    <p x-show="sessionsRevoked" x-transition x-cloak class="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('All other sessions revoked.') }}
-                    </p>
-                    @error('session')
-                        <p class="mb-3 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-device-phone-mobile"
+                    :title="__('Active sessions')"
+                    :count="count($sessions) ?: null"
+                    :note="__('Revoking a session logs that device out on its next request.')"
+                >
+                    <x-slot:actions>
+                        <p x-show="sessionRevoked" x-transition x-cloak class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Session revoked.') }}
+                        </p>
+                        <p x-show="sessionsRevoked" x-transition x-cloak class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('All other sessions revoked.') }}
+                        </p>
+                        @if ($otherSessions > 0)
+                            <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100">
+                                <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Revoke other devices') }}
+                            </button>
+                        @endif
+                    </x-slot:actions>
+                </x-workspace-panel-head>
+                @error('session')
+                    <p class="px-3 pt-2 text-xs text-red-600 sm:px-4">{{ $message }}</p>
+                @enderror
 
-                    @if ($sessions === [])
-                        <div class="flex flex-col items-center justify-center px-5 py-10 text-center">
-                            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <p class="mt-3 text-sm text-brand-moss">{{ __('No active sessions.') }}</p>
-                        </div>
-                    @else
-                        <ul class="space-y-2">
-                            @foreach ($sessions as $session)
-                                <li class="flex items-center justify-between gap-4 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-brand-sand/15">
-                                    <div class="min-w-0 flex-1">
-                                        <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                            <span class="truncate text-sm font-semibold text-brand-ink">{{ $session['device_label'] }}</span>
-                                            @if ($session['is_current'])
-                                                <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('This device') }}</span>
-                                            @endif
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-brand-moss">
-                                            <span class="font-mono">{{ $session['ip_address'] ?? __('Unknown IP') }}</span>
-                                            <span class="text-brand-mist"> · </span>
-                                            {{ __('Last active :time', ['time' => \Carbon\Carbon::createFromTimestamp($session['last_activity'])->diffForHumans()]) }}
-                                        </p>
-                                    </div>
-                                    @if (! $session['is_current'])
-                                        <button
-                                            type="button"
-                                            wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Revoke this session? That device will be logged out on its next request.')), @js(__('Revoke')), true)"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
-                                        >
-                                            <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Revoke') }}
-                                        </button>
+                @if ($sessions === [])
+                    <div class="px-3 py-3 text-center sm:px-4">
+                        <p class="text-xs text-brand-mist">{{ __('No active sessions.') }}</p>
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($sessions as $session)
+                            <li class="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
+                                <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                    <span class="truncate text-sm font-semibold text-brand-ink">{{ $session['device_label'] }}</span>
+                                    @if ($session['is_current'])
+                                        <span class="inline-flex items-center rounded border border-brand-sage/30 bg-brand-sage/15 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('This device') }}</span>
                                     @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
+                                    <span class="truncate text-xs text-brand-moss">
+                                        <span class="font-mono">{{ $session['ip_address'] ?? __('Unknown IP') }}</span>
+                                        <span class="text-brand-mist"> · </span>
+                                        {{ __('Last active :time', ['time' => \Carbon\Carbon::createFromTimestamp($session['last_activity'])->diffForHumans()]) }}
+                                    </span>
+                                </div>
+                                @if (! $session['is_current'])
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Revoke this session? That device will be logged out on its next request.')), @js(__('Revoke')), true)"
+                                        class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                    >
+                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Revoke') }}
+                                    </button>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
 
             {{-- Danger zone --}}
             <div>
-                <div class="flex items-start gap-3 bg-rose-50/60 px-5 py-4 sm:px-6">
-                    <x-icon-badge tone="danger">
-                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('You\'ll be signed out and lose access to organizations and data tied to this login. This cannot be undone.') }}</p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center justify-end gap-3 px-5 py-4 sm:px-6">
-                    <a
-                        href="{{ route('profile.delete-account') }}"
-                        wire:navigate
-                        class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100"
-                    >
-                        <x-heroicon-o-arrow-right-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Go to delete account page') }}
-                    </a>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    tone="danger"
+                    icon="heroicon-o-trash"
+                    :title="__('Delete account')"
+                    :note="__('Signs you out and drops access to organizations and data tied to this login. Cannot be undone.')"
+                >
+                    <x-slot:actions>
+                        <a
+                            href="{{ route('profile.delete-account') }}"
+                            wire:navigate
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100"
+                        >
+                            <x-heroicon-o-arrow-right-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Delete account') }}
+                        </a>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
             </div>
 
             <x-unsaved-changes-bar
@@ -438,29 +421,26 @@
         @if ($section === 'servers')
             {{-- Your timezone --}}
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Used for schedules, Insights quiet hours, and when applying timezone on new servers below.') }}</p>
-                    </div>
-                </div>
-                <form wire:submit="saveProfileTimezone" class="px-5 py-5 sm:px-6">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-clock"
+                    :title="__('Your timezone')"
+                    :note="__('Used for schedules, Insights quiet hours, and applying a timezone to new servers.')"
+                />
+                <form wire:submit="saveProfileTimezone" class="px-3 py-2.5 sm:px-4">
                     <button type="submit" class="sr-only">{{ __('Save timezone') }}</button>
                     <x-input-label for="hub-profile-timezone" :value="__('Timezone')" required />
                     <select
                         id="hub-profile-timezone"
                         wire:model="profileTimezone"
                         required
-                        class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                        class="mt-1 block w-full max-w-md rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                     >
                         @foreach ($this->timezones as $tz)
                             <option value="{{ $tz }}">{{ $tz }}</option>
                         @endforeach
                     </select>
-                    @error('profileTimezone') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                    @error('profileTimezone') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </form>
             </div>
 
@@ -474,38 +454,38 @@
 
             {{-- Organization defaults --}}
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Email and new-server policy for the current organization.') }}</p>
-                    </div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-building-office-2"
+                    :title="__('Organization defaults')"
+                    :note="__('Email and new-server policy for the current organization.')"
+                >
                     @if ($currentOrg)
-                        <span class="shrink-0 rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss" title="{{ $currentOrg->name }}">{{ $currentOrg->name }}</span>
+                        <x-slot:actions>
+                            <span class="inline-flex items-center rounded border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wide text-brand-moss" title="{{ $currentOrg->name }}">{{ $currentOrg->name }}</span>
+                        </x-slot:actions>
                     @endif
-                </div>
-                <form wire:submit="saveOrganizationServersSites" class="px-5 py-5 sm:px-6">
+                </x-workspace-panel-head>
+                <form wire:submit="saveOrganizationServersSites" class="px-3 py-2.5 sm:px-4">
                     <button type="submit" class="sr-only">{{ __('Save organization settings') }}</button>
                     @if (! $currentOrg)
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
                             {{ __('Create or join an organization to configure these options.') }}
                         </div>
                     @elseif (! $canEditOrgPrefs)
-                        <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm text-brand-moss">
+                        <div class="rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs text-brand-moss">
                             {{ __('Only organization admins can change organization defaults.') }}
                         </div>
                     @else
-                        <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
-                            <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                        <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
+                            <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                 <input type="checkbox" wire:model.boolean="organizationServerSite.email_server_passwords" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                 <span class="min-w-0 flex-1">
                                     <span class="text-sm font-medium text-brand-ink">{{ __('Receive server passwords via email') }}</span>
                                     <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('When off, retrieve credentials from each server\'s settings in the app.') }}</span>
                                 </span>
                             </label>
-                            <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                            <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                 <input type="checkbox" wire:model.boolean="organizationServerSite.set_timezone_on_new_servers" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                 <span class="min-w-0 flex-1">
                                     <span class="text-sm font-medium text-brand-ink">{{ __('Set timezone on new servers') }}</span>
@@ -519,43 +499,40 @@
 
             {{-- Insights preferences --}}
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Org defaults for alert batching and quiet hours. Critical findings still notify immediately when channels are subscribed.') }}</p>
-                    </div>
-                </div>
-                <form wire:submit="saveOrganizationInsights" class="px-5 py-5 sm:px-6">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-light-bulb"
+                    :title="__('Insights preferences')"
+                    :note="__('Alert batching and quiet hours. Critical findings still notify immediately.')"
+                />
+                <form wire:submit="saveOrganizationInsights" class="px-3 py-2.5 sm:px-4">
                     <button type="submit" class="sr-only">{{ __('Save Insights preferences') }}</button>
                     @if (! $currentOrg)
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
                             {{ __('Create or join an organization to configure these options.') }}
                         </div>
                     @elseif (! $canEditOrgPrefs)
-                        <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm text-brand-moss">
+                        <div class="rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs text-brand-moss">
                             {{ __('Only organization admins can change Insights preferences.') }}
                         </div>
                     @else
-                        <div class="space-y-5">
-                            <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
-                                <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                        <div class="space-y-2.5">
+                            <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
+                                <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                     <input type="checkbox" wire:model.boolean="organizationInsights.digest_non_critical" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                     <span class="min-w-0 flex-1">
                                         <span class="text-sm font-medium text-brand-ink">{{ __('Digest non-critical findings') }}</span>
                                         <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Batch warning and info findings into email. Critical stays immediate.') }}</span>
                                     </span>
                                 </label>
-                                <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                                <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                     <input type="checkbox" wire:model.boolean="organizationInsights.quiet_hours_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                     <span class="min-w-0 flex-1">
                                         <span class="text-sm font-medium text-brand-ink">{{ __('Quiet hours for non-critical') }}</span>
                                         <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Suppress immediate non-critical insight alerts within the window below. Uses the app timezone (:tz).', ['tz' => config('app.timezone')]) }}</span>
                                     </span>
                                 </label>
-                                <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                                <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                     <input type="checkbox" wire:model.boolean="organizationInsights.allow_config_mutation" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                     <span class="min-w-0 flex-1">
                                         <span class="text-sm font-medium text-brand-ink">{{ __('Allow Insights to mutate server configs') }}</span>
@@ -564,13 +541,13 @@
                                 </label>
                             </div>
 
-                            <div class="grid gap-4 sm:grid-cols-3">
+                            <div class="grid gap-2.5 sm:grid-cols-3">
                                 <div>
                                     <label for="org-insights-digest-frequency" class="block text-xs font-semibold text-brand-ink">{{ __('Digest frequency') }}</label>
                                     <select
                                         id="org-insights-digest-frequency"
                                         wire:model="organizationInsights.digest_frequency"
-                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                        class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                     >
                                         <option value="daily">{{ __('Daily (08:00)') }}</option>
                                         <option value="weekly">{{ __('Weekly (Mon 08:15)') }}</option>
@@ -585,7 +562,7 @@
                                         min="0"
                                         max="23"
                                         wire:model="organizationInsights.quiet_hours_start"
-                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                        class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                     />
                                     @error('organizationInsights.quiet_hours_start') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                                 </div>
@@ -597,7 +574,7 @@
                                         min="0"
                                         max="23"
                                         wire:model="organizationInsights.quiet_hours_end"
-                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                        class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                     />
                                     @error('organizationInsights.quiet_hours_end') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                                 </div>
@@ -609,33 +586,30 @@
 
             {{-- Team defaults --}}
             <div>
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('List and creation defaults for servers and sites in the selected team.') }}</p>
-                    </div>
-                </div>
-                <form wire:submit="saveTeamServersSites" class="px-5 py-5 sm:px-6">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-rectangle-group"
+                    :title="__('Team defaults')"
+                    :note="__('List and creation defaults for servers and sites in the selected team.')"
+                />
+                <form wire:submit="saveTeamServersSites" class="px-3 py-2.5 sm:px-4">
                     <button type="submit" class="sr-only">{{ __('Save team settings') }}</button>
                     @if (! $currentOrg)
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
                             {{ __('Create or join an organization first.') }}
                         </div>
                     @elseif ($teams->isEmpty())
-                        <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm text-brand-moss">
+                        <div class="rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs text-brand-moss">
                             {{ __('Add a team to this organization to configure team defaults.') }}
                         </div>
                     @else
-                        <div class="space-y-5">
+                        <div class="space-y-2.5">
                             <div>
                                 <label for="settings-team" class="block text-xs font-semibold text-brand-ink">{{ __('Team') }}</label>
                                 <select
                                     id="settings-team"
                                     wire:model.live="selectedTeamId"
-                                    class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                    class="mt-1 block w-full max-w-md rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                 >
                                     @foreach ($teams as $team)
                                         <option value="{{ $team->id }}">{{ $team->name }}</option>
@@ -645,19 +619,19 @@
                             </div>
 
                             @if (! $canEditTeamPrefs)
-                                <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm text-brand-moss">
+                                <div class="rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs text-brand-moss">
                                     {{ __('Only team admins (or organization admins) can change team defaults.') }}
                                 </div>
                             @else
-                                <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
-                                    <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                                <div class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
+                                    <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                         <input type="checkbox" wire:model.boolean="teamServerSite.show_server_updates_in_list" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                         <span class="min-w-0 flex-1">
                                             <span class="text-sm font-medium text-brand-ink">{{ __('Show server updates in list') }}</span>
                                             <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Surface pending updates in the server list when available.') }}</span>
                                         </span>
                                     </label>
-                                    <label class="flex cursor-pointer items-start gap-3 bg-white px-4 py-3.5 transition-colors hover:bg-brand-sand/15">
+                                    <label class="flex cursor-pointer items-start gap-2.5 bg-white px-2.5 py-2 transition-colors hover:bg-brand-sand/15">
                                         <input type="checkbox" wire:model.boolean="teamServerSite.isolate_new_sites" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                                         <span class="min-w-0 flex-1">
                                             <span class="text-sm font-medium text-brand-ink">{{ __('Always use isolation for new sites') }}</span>
@@ -666,13 +640,13 @@
                                     </label>
                                 </div>
 
-                                <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="grid gap-2.5 sm:grid-cols-2">
                                     <div>
                                         <label for="team-default-server-sort" class="block text-xs font-semibold text-brand-ink">{{ __('Default server sort') }}</label>
                                         <select
                                             id="team-default-server-sort"
                                             wire:model="teamServerSite.default_server_sort"
-                                            class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                            class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                         >
                                             @foreach (config('user_preferences.server_sort_options', []) as $value => $label)
                                                 <option value="{{ $value }}">{{ __($label) }}</option>
@@ -685,7 +659,7 @@
                                         <select
                                             id="team-default-site-sort"
                                             wire:model="teamServerSite.default_site_sort"
-                                            class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                            class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                         >
                                             @foreach (config('user_preferences.site_sort_options', []) as $value => $label)
                                                 <option value="{{ $value }}">{{ __($label) }}</option>

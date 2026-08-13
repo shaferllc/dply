@@ -70,16 +70,6 @@
                     <x-heroicon-o-squares-2x2 class="{{ $ni }}" aria-hidden="true" />
                     {{ __('Overview') }}
                 </a>
-                @can('update', $org)
-                    <a
-                        href="{{ route('organizations.settings', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('general')])
-                    >
-                        <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('General') }}
-                    </a>
-                @endcan
                 @if ($org->hasAdminAccess(auth()->user()))
                     <a
                         href="{{ route('organizations.activity', $org) }}"
@@ -115,6 +105,30 @@
                         <x-heroicon-o-chart-bar class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Billing analytics') }}
                     </a>
+                @endcan
+                {{-- Realtime and Queues moved to the Services nav row (/realtime,
+                     /queues). They are products, not organization settings — see
+                     docs/adr/managed-services-tier.md, decision 1. The old
+                     org-scoped URLs still resolve, via OrgScopedRedirectController. --}}
+                @can('viewAny', \App\Models\ProviderCredential::class)
+                    <a
+                        href="{{ route('organizations.credentials', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('providers')])
+                    >
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Credentials') }}
+                    </a>
+                @endcan
+                @can('update', $org)
+                    <a
+                        href="{{ route('organizations.settings', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('general')])
+                    >
+                        <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('General') }}
+                    </a>
                     <a
                         href="{{ route('billing.invoices', $org) }}"
                         wire:navigate
@@ -140,20 +154,6 @@
                     >
                         <x-heroicon-o-bell class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Notification channels') }}
-                    </a>
-                @endcan
-                {{-- Realtime and Queues moved to the Services nav row (/realtime,
-                     /queues). They are products, not organization settings — see
-                     docs/adr/managed-services-tier.md, decision 1. The old
-                     org-scoped URLs still resolve, via OrgScopedRedirectController. --}}
-                @can('viewAny', \App\Models\ProviderCredential::class)
-                    <a
-                        href="{{ route('organizations.credentials', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('providers')])
-                    >
-                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Credentials') }}
                     </a>
                 @endcan
                 @can('view', $org)
@@ -207,6 +207,14 @@
                 </button>
                 <nav class="mt-2 space-y-0.5" aria-label="{{ __('Documentation guides') }}" x-show="! collapsed" x-collapse>
                     <a
+                        href="{{ route('docs.index') }}"
+                        wire:navigate
+                        @class([$navBase, request()->routeIs('docs.index') ? $docNavOn : $docNavOff])
+                    >
+                        <x-heroicon-o-rectangle-stack class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('All docs') }}
+                    </a>
+                    <a
                         href="{{ route('docs.connect-provider') }}"
                         wire:navigate
                         @class([$navBase, request()->routeIs('docs.connect-provider') ? $docNavOn : $docNavOff])
@@ -221,14 +229,6 @@
                     >
                         <x-heroicon-o-user-group class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Roles & plan limits') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.index') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.index') ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-rectangle-stack class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('All docs') }}
                     </a>
                 </nav>
             </div>

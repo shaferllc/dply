@@ -152,6 +152,7 @@ use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
+use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -533,10 +534,20 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/profile/ssh-keys', SettingsSshKeys::class)->name('profile.ssh-keys');
     Route::livewire('/profile/api-keys', SettingsApiKeys::class)->name('profile.api-keys');
     Route::livewire('/profile/cli', SettingsCliAuthentications::class)->name('profile.cli');
-    // Destinations moved into the product they configure (/backups/storage).
-    // The old profile URL keeps its route NAME so ~14 existing links resolve;
-    // it now redirects. See docs/adr/backups-as-a-product.md, decision 13.
-    Route::redirect('/profile/backup-configurations', '/backups/storage', 301)->name('profile.backup-configurations');
+    // Destinations live in the product they configure (/backups/storage, see
+    // docs/adr/backups-as-a-product.md decision 13) — that page keeps the usage
+    // console. This settings surface is the same rows and the same modal without
+    // the analytics, so the settings nav has somewhere to land instead of
+    // bouncing the user out to the Backups product.
+    //
+    // Served from /profile/backup-destinations, NOT the old
+    // /profile/backup-configurations: that path shipped a 301 to /backups/storage
+    // for a while, and browsers cache permanent redirects indefinitely — anyone
+    // who loaded it then never reaches the server again. The old path keeps its
+    // route name (so existing route() calls resolve) and now 302s — temporary,
+    // so we don't poison caches a second time.
+    Route::livewire('/profile/backup-destinations', SettingsBackupConfigurations::class)->name('profile.backup-destinations');
+    Route::redirect('/profile/backup-configurations', '/profile/backup-destinations')->name('profile.backup-configurations');
     Route::livewire('/profile/notification-channels', SettingsNotificationChannels::class)->name('profile.notification-channels');
     Route::livewire('/profile/notification-channels/bulk-assign', BulkNotificationAssignments::class)->name('profile.notification-channels.bulk-assign');
     Route::livewire('/profile/delete-account', ProfileDeleteAccount::class)->name('profile.delete-account');

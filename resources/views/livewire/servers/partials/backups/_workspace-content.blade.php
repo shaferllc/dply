@@ -3,8 +3,8 @@
 
     @php
         $backupsDescription = ($siteDedicatedContext ?? false)
-            ? __('Database and site-files backup runs for this site, plus recurring schedules. Backups write to the destination configured in Settings → Backup configurations.')
-            : __('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup configurations.');
+            ? __('Database and site-files backup runs for this site, plus recurring schedules. Backups write to the destination configured in Settings → Backup destinations.')
+            : __('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup destinations.');
     @endphp
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
@@ -242,7 +242,7 @@
             dense
             icon="heroicon-o-server-stack"
             :title="__('Where database backups are kept')"
-            :note="__('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup configurations.')"
+            :note="__('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup destinations.')"
             class="border-b border-brand-ink/10"
         />
         <form wire:submit="saveDatabaseBackupSettings" class="space-y-3 px-4 py-3.5 sm:px-5">

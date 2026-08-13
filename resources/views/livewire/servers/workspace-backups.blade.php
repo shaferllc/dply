@@ -84,7 +84,7 @@
         :server="$server"
         active="backups"
         :title="__('Backups')"
-        :description="__('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup configurations.')"
+        :description="__('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup destinations.')"
         hide-hero
     >
         @include('livewire.servers.partials.backups._workspace-content')

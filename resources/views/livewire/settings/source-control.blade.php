@@ -19,83 +19,77 @@
     @endpush
 
     <x-profile-shell
+        dense
         :title="__('Source control')"
-        :description="__('Link GitHub, GitLab, or Bitbucket via OAuth, or paste a personal access token. Tokens unlock clone, browse, and webhook automation — and let you connect self-hosted hosts that OAuth can\'t cover.')"
+        :description="__('Link GitHub, GitLab, or Bitbucket via OAuth, or paste a personal access token for self-hosted hosts and machine users.')"
         icon="heroicon-o-code-bracket"
     >
         <x-slot:actions>
-            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Back to profile') }}
-            </x-outline-link>
+            {{-- No "Back to profile": the breadcrumb already covers it. --}}
             @if (auth()->user()->currentOrganization())
-                <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
-                    <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                <a
+                    href="{{ route('credentials.index') }}"
+                    wire:navigate
+                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Credentials') }}
-                </x-outline-link>
+                </a>
             @endif
         </x-slot:actions>
 
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Source control at a glance') }}">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hosts') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $providersWithAny }}</span>
-                        <span class="text-xs text-brand-moss">/ {{ count($providers) }} {{ __('linked') }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $providersWithAny }}</span>
+                        <span class="truncate text-xs text-brand-moss">/ {{ count($providers) }} {{ __('linked') }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('GitHub, GitLab, Bitbucket') }}</p>
                 </div>
                 <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $totalOAuth > 0,
-                    'border-brand-ink/10 bg-white/80' => $totalOAuth === 0,
+                    'px-3 py-2',
+                    'bg-brand-sage/10' => $totalOAuth > 0,
+                    'bg-white' => $totalOAuth === 0,
                 ])>
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('OAuth') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalOAuth }}</span>
-                        <span class="text-xs text-brand-moss">{{ trans_choice('account|accounts', $totalOAuth) }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalOAuth }}</span>
+                        <span class="truncate text-xs text-brand-moss">{{ trans_choice('account|accounts', $totalOAuth) }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Browser sign-in flow') }}</p>
                 </div>
                 <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-violet-200 bg-violet-50' => $totalPats > 0,
-                    'border-brand-ink/10 bg-white/80' => $totalPats === 0,
+                    'px-3 py-2',
+                    'bg-violet-50' => $totalPats > 0,
+                    'bg-white' => $totalPats === 0,
                 ])>
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalPats }}</span>
-                        <span class="text-xs text-brand-moss">{{ trans_choice('PAT|PATs', $totalPats) }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalPats }}</span>
+                        <span class="truncate text-xs text-brand-moss">{{ trans_choice('PAT|PATs', $totalPats) }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Self-hosted + machine users') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
 
         {{-- Prefer the terminal? Point at the CLI install + sign-in steps on
              /profile/cli instead of duplicating them here. --}}
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Prefer the command line?') }}</p>
-                    <p class="mt-0.5 text-sm leading-relaxed text-brand-moss">{{ __('Install the dply CLI to link repositories and deploy straight from your terminal.') }}</p>
-                </div>
-            </div>
-            <a href="{{ route('profile.cli') }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:self-auto">
-                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2 sm:px-4">
+            <p class="flex min-w-0 items-center gap-1.5 text-xs text-brand-moss">
+                <x-heroicon-o-command-line class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                {{ __('Prefer the command line? Link repos and deploy from your terminal.') }}
+            </p>
+            <a href="{{ route('profile.cli') }}" wire:navigate class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Install the CLI') }}
             </a>
         </div>
 
         @error('unlink')
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                <div class="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-800" role="alert">
                     <span class="inline-flex items-center gap-1.5 font-semibold">
-                        <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ $message }}
                     </span>
                 </div>
@@ -110,52 +104,43 @@
             @endphp
 
             <div class="border-b border-brand-ink/10 last:border-b-0" aria-labelledby="sc-heading-{{ $provider['id'] }}">
-                {{-- Provider header strip. Brand icon stays in a sand tile
-                     for visual consistency with the rest of the family,
-                     while OAuth/PAT counts show as a quick-read chip. --}}
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <h3 id="sc-heading-{{ $provider['id'] }}" class="text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link an OAuth account or paste a personal access token for self-hosted hosts and machine-user workflows.') }}</p>
-                    </div>
+                {{-- Provider header strip: identity, linked count, and both
+                     actions (OAuth link + add PAT) on one line. The per-provider
+                     blurb lives in the shell description now. --}}
+                <div class="flex flex-wrap items-center gap-2 bg-brand-sand/15 px-3 py-2 sm:px-4">
+                    <x-oauth-provider-icon :provider="$provider['id']" size="h-4 w-4 shrink-0" />
+                    <h3 id="sc-heading-{{ $provider['id'] }}" class="min-w-0 flex-1 truncate text-sm font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
                     @if ($hasAny)
-                        <span class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                        <span class="shrink-0 inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-1.5 py-px text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
                             <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                             {{ $providerLinkedCount }}
                         </span>
                     @endif
-                </div>
-
-                {{-- Action row: OAuth link button + PAT add button. --}}
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
                     @if ($provider['oauth_enabled'])
                         <a
                             href="{{ route('oauth.redirect', ['provider' => $provider['id']]) }}"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Link :name', ['name' => $provider['name']]) }}
                         </a>
                     @endif
                     <button
                         type="button"
                         wire:click="startAddPat('{{ $provider['id'] }}')"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add personal access token') }}
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Add token') }}
                     </button>
                 </div>
 
                 {{-- PAT inline editor. --}}
                 @if ($addingPatProvider === $provider['id'])
-                    <div class="space-y-4 border-t border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6">
+                    <div class="space-y-2.5 border-t border-brand-ink/10 bg-brand-sage/5 px-3 py-2.5 sm:px-4">
                         <div>
                             <p class="text-sm font-semibold text-brand-ink">{{ __('Add a :name personal access token', ['name' => $provider['name']]) }}</p>
-                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                 @if ($provider['id'] === 'github')
                                     {{ __('Classic PATs need repo and admin:repo_hook scopes. Fine-grained tokens need Contents (Read), Metadata (Read), and Webhooks (Read & Write) for the target repositories.') }}
                                 @elseif ($provider['id'] === 'gitlab')
@@ -166,7 +151,7 @@
                             </p>
                         </div>
 
-                        <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-2.5 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="pat-label-{{ $provider['id'] }}" :value="__('Label (optional)')" />
                                 <x-text-input id="pat-label-{{ $provider['id'] }}" wire:model="patLabel" class="mt-1 block w-full" placeholder="{{ __('e.g. machine user, work account') }}" />
@@ -193,10 +178,10 @@
                             </div>
                         @endif
 
-                        <div class="flex flex-wrap justify-end gap-2 border-t border-brand-ink/10 pt-3">
+                        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-2">
                             <button type="button" wire:click="cancelAddPat" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
-                            <button type="button" wire:click="savePat" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
-                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <button type="button" wire:click="savePat" class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                                <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Validate and save') }}
                             </button>
                         </div>
@@ -205,16 +190,13 @@
 
                 {{-- Linked accounts + tokens list. --}}
                 @if (! $hasAny)
-                    <div class="px-5 py-8 text-center sm:px-6">
-                        <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
-                        </span>
-                        <p class="mt-3 text-sm text-brand-moss">{{ __('No linked accounts or tokens yet.') }}</p>
+                    <div class="px-3 py-3 text-center sm:px-4">
+                        <p class="text-xs text-brand-mist">{{ __('No linked accounts or tokens yet.') }}</p>
                     </div>
                 @else
                     <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
                         @foreach ($provider['accounts'] as $account)
-                            <li wire:key="sc-oauth-{{ $account->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+                            <li wire:key="sc-oauth-{{ $account->id }}" class="flex flex-col gap-1.5 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('OAuth') }}</span>
@@ -246,20 +228,20 @@
                                         @endif
                                     </p>
                                 </div>
-                                <div class="flex flex-wrap items-center justify-end gap-3">
+                                <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
                                     @if ($editingId === (string) $account->id)
-                                        <button type="button" wire:click="saveEdit" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="saveEdit" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Save') }}
                                         </button>
                                         <button type="button" wire:click="cancelEdit" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                                     @else
-                                        <button type="button" wire:click="startEdit('{{ $account->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="startEdit('{{ $account->id }}')" class="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
-                                            <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Unlink') }}
                                         </button>
                                     @endif
@@ -268,7 +250,7 @@
                         @endforeach
 
                         @foreach ($provider['pats'] as $pat)
-                            <li wire:key="sc-pat-{{ $pat->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+                            <li wire:key="sc-pat-{{ $pat->id }}" class="flex flex-col gap-1.5 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-700">{{ __('PAT') }}</span>
@@ -326,10 +308,10 @@
                                         </div>
                                     @endif
                                 </div>
-                                <div class="flex flex-wrap items-center justify-end gap-3">
+                                <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
                                     @if ($editingPatId === (string) $pat->id)
-                                        <button type="button" wire:click="saveEditPat" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="saveEditPat" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Save') }}
                                         </button>
                                         <button type="button" wire:click="cancelEditPat" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
@@ -340,17 +322,17 @@
                                             wire:click="validatePat('{{ $pat->id }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="validatePat('{{ $pat->id }}')"
-                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-progress disabled:opacity-60">
-                                            <x-heroicon-o-shield-check class="h-4 w-4 shrink-0" wire:loading.remove wire:target="validatePat('{{ $pat->id }}')" aria-hidden="true" />
-                                            <span wire:loading wire:target="validatePat('{{ $pat->id }}')" class="inline-flex h-4 w-4 shrink-0 items-center justify-center"><x-spinner size="sm" /></span>
+                                            class="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-progress disabled:opacity-60">
+                                            <x-heroicon-o-shield-check class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="validatePat('{{ $pat->id }}')" aria-hidden="true" />
+                                            <span wire:loading wire:target="validatePat('{{ $pat->id }}')" class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center"><x-spinner size="sm" /></span>
                                             {{ __('Validate') }}
                                         </button>
-                                        <button type="button" wire:click="startEditPat('{{ $pat->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="startEditPat('{{ $pat->id }}')" class="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
-                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Remove') }}
                                         </button>
                                     @endif
@@ -361,12 +343,12 @@
                 @endif
             </div>
         @empty
-            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
-                <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                    <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
+            <div class="flex flex-col items-center justify-center px-3 py-10 text-center sm:px-4">
+                <span class="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-code-bracket-square class="h-4 w-4" aria-hidden="true" />
                 </span>
-                <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No Git providers available') }}</p>
-                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                <p class="mt-2.5 text-sm font-semibold text-brand-ink">{{ __('No Git providers available') }}</p>
+                <p class="mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                     {{ __('Ask an administrator to configure GitHub, GitLab, or Bitbucket OAuth, or add a personal access token for any provider.') }}
                 </p>
             </div>

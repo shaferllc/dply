@@ -20,78 +20,69 @@
     @endpush
 
     <x-profile-shell
+        dense
         :title="__('API keys')"
-        :description="__('Personal access tokens for the dply HTTP API. Each token is scoped to an organization with explicit permissions and an optional IP allow-list.')"
+        :description="__('Personal access tokens for the dply HTTP API — scoped to an organization, with explicit permissions and an optional IP allow-list.')"
         icon="heroicon-o-bolt"
     >
-        <x-slot:actions>
-            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Back to profile') }}
-            </x-outline-link>
-            @if ($showShellAdd)
+        {{-- No "Back to profile": the breadcrumb already covers it. --}}
+        @if ($showShellAdd)
+            <x-slot:actions>
                 <button
                     type="button"
                     wire:click="openCreateApiTokenModal"
                     @disabled($createDisabled)
-                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Add API token') }}
                 </button>
-            @endif
-        </x-slot:actions>
+            </x-slot:actions>
+        @endif
 
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('API tokens at a glance') }}">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalTokens }}</span>
-                        <span class="text-xs text-brand-moss">{{ __('total') }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalTokens }}</span>
+                        <span class="truncate text-xs text-brand-moss">
+                            {{ $totalTokens !== $activeTokens ? __(':n active', ['n' => $activeTokens]) : __('all active') }}
+                        </span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">
-                        @if ($totalTokens !== $activeTokens)
-                            {{ trans_choice(':n active|:n active', $activeTokens, ['n' => $activeTokens]) }}
-                        @else
-                            {{ __('All active') }}
-                        @endif
-                    </p>
                 </div>
                 <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-amber-200 bg-amber-50/90' => $expiringSoon > 0,
-                    'border-brand-ink/10 bg-white/80' => $expiringSoon === 0,
+                    'px-3 py-2',
+                    'bg-amber-50' => $expiringSoon > 0,
+                    'bg-white' => $expiringSoon === 0,
                 ])>
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expiring') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $expiringSoon }}</span>
-                        <span class="text-xs text-brand-moss">{{ __('soon') }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $expiringSoon }}</span>
+                        <span class="truncate text-xs text-brand-moss">{{ __('within 14 days') }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Within 14 days') }}</p>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
-                        <span class="text-xs text-brand-moss">{{ trans_choice('org|orgs', $orgCount) }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
+                        <span class="truncate text-xs text-brand-moss">{{ trans_choice('org you can issue against|orgs you can issue against', $orgCount) }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('You can issue against') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
 
         @if ($errors->isNotEmpty())
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <x-livewire-validation-errors />
             </div>
         @endif
 
         @if (! $canCreate)
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6" role="status">
-                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4" role="status">
+                <div class="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-950">
                     <span class="inline-flex items-center gap-1.5 font-semibold">
-                        <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Admin access required') }}
                     </span>
                     <p class="mt-1 leading-relaxed">{{ __('You need to be an organization admin to create API tokens. Ask an owner to promote you or create an organization first.') }}</p>
@@ -99,10 +90,10 @@
             </div>
         @else
             @if ($createDisabled)
-                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6" role="status">
-                    <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4" role="status">
+                    <div class="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs text-sky-950">
                         <span class="inline-flex items-center gap-1.5 font-semibold">
-                            <x-heroicon-m-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-information-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Pro plan required to create tokens') }}
                         </span>
                         <p class="mt-1 leading-relaxed">{{ __('Token creation needs an active Pro subscription on the selected organization. Existing tokens can still be revoked.') }}</p>
@@ -111,37 +102,35 @@
             @endif
 
             @if ($new_token_plaintext)
-                <div class="border-b border-brand-ink/10 bg-emerald-50/70" role="status">
-                    <div class="flex items-start gap-3 border-b border-emerald-200/60 px-5 py-4 sm:px-6">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200">
-                            <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700/80">{{ __('Created') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-emerald-950">{{ __('Copy this token now — you won\'t see it again') }}</h3>
-                            <p class="mt-1 text-sm text-emerald-900/80">{{ __('Token name:') }} <span class="font-semibold">{{ $new_token_name }}</span></p>
-                        </div>
+                {{-- One-shot token reveal: header line, the value, copy + dismiss.
+                     The icon tile and the three stacked prose lines were chrome
+                     around a string you're meant to grab and leave. --}}
+                <div class="border-b border-brand-ink/10 bg-emerald-50/70 px-3 py-2 sm:px-4" role="status">
+                    <div class="flex flex-wrap items-baseline gap-x-2">
+                        <p class="inline-flex items-center gap-1 text-sm font-semibold text-emerald-950">
+                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                            {{ __('Copy this token now — you won\'t see it again') }}
+                        </p>
+                        <p class="min-w-0 truncate text-xs text-emerald-900/80">{{ $new_token_name }}</p>
                     </div>
-                    <div class="space-y-3 px-5 py-4 sm:px-6">
-                        <div class="flex flex-wrap items-stretch gap-2">
-                            <code class="min-w-0 flex-1 break-all rounded-lg border border-emerald-200 bg-white px-3 py-2.5 font-mono text-xs text-brand-ink">{{ $new_token_plaintext }}</code>
-                            <button
-                                type="button"
-                                x-data="{ copied: false }"
-                                x-on:click="navigator.clipboard.writeText(@js($new_token_plaintext)); copied = true; setTimeout(() => copied = false, 2000)"
-                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
-                            >
-                                <span x-show="!copied" class="inline-flex items-center gap-1.5">
-                                    <x-heroicon-o-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Copy') }}
-                                </span>
-                                <span x-show="copied" x-cloak class="inline-flex items-center gap-1.5">
-                                    <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Copied') }}
-                                </span>
-                            </button>
-                        </div>
-                        <button type="button" wire:click="clearNewToken" class="text-xs font-semibold text-emerald-900 underline underline-offset-2 hover:no-underline">
+                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <code class="min-w-0 flex-1 break-all rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 font-mono text-xs text-brand-ink">{{ $new_token_plaintext }}</code>
+                        <button
+                            type="button"
+                            x-data="{ copied: false }"
+                            x-on:click="navigator.clipboard.writeText(@js($new_token_plaintext)); copied = true; setTimeout(() => copied = false, 2000)"
+                            class="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                        >
+                            <span x-show="!copied" class="inline-flex items-center gap-1">
+                                <x-heroicon-o-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Copy') }}
+                            </span>
+                            <span x-show="copied" x-cloak class="inline-flex items-center gap-1">
+                                <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Copied') }}
+                            </span>
+                        </button>
+                        <button type="button" wire:click="clearNewToken" class="shrink-0 text-xs font-semibold text-emerald-900 underline underline-offset-2 hover:no-underline">
                             {{ __('Dismiss') }}
                         </button>
                     </div>
@@ -149,12 +138,12 @@
             @endif
 
             @if ($tokens->isNotEmpty() || $hasApiTokenSearch)
-                <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
-                    <div class="w-full sm:max-w-sm">
+                <div class="flex flex-col gap-2 border-b border-brand-ink/10 px-3 py-2 sm:flex-row sm:items-center sm:justify-end sm:px-4">
+                    <div class="w-full sm:max-w-xs">
                         <label for="api_token_search" class="sr-only">{{ __('Search') }}</label>
                         <div class="relative">
-                            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist">
-                                <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
+                            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-brand-mist">
+                                <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" aria-hidden="true" />
                             </span>
                             <input
                                 id="api_token_search"
@@ -162,7 +151,7 @@
                                 wire:model.live.debounce.300ms="token_list_search"
                                 placeholder="{{ __('Search tokens by name…') }}"
                                 autocomplete="off"
-                                class="w-full rounded-lg border-brand-ink/15 bg-white py-2 ps-9 pe-3 text-sm text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                class="h-7 w-full rounded-md border-brand-ink/15 bg-white py-0 ps-8 pe-2.5 text-xs text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                             />
                         </div>
                     </div>
@@ -170,30 +159,30 @@
             @endif
 
             @if (! $hasApiTokenSearch && $tokens->isEmpty())
-                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
-                    <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
+                <div class="flex flex-col items-center justify-center px-3 py-10 text-center sm:px-4">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No API tokens yet') }}</p>
-                    <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    <p class="mt-2.5 text-sm font-semibold text-brand-ink">{{ __('No API tokens yet') }}</p>
+                    <p class="mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                         {{ __('Issue your first token to call the HTTP API from CI, scripts, or other automation.') }}
                     </p>
                     <button
                         type="button"
                         wire:click="openCreateApiTokenModal"
                         @disabled($createDisabled)
-                        class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        class="mt-3 inline-flex h-7 items-center gap-1.5 rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Add API token') }}
                     </button>
                 </div>
             @elseif ($hasApiTokenSearch && $tokens->isEmpty())
-                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+                <div class="flex flex-col items-center justify-center px-3 py-10 text-center sm:px-4">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No tokens match this search.') }}</p>
+                    <p class="mt-2 text-sm font-medium text-brand-ink">{{ __('No tokens match this search.') }}</p>
                     <button type="button" wire:click="$set('token_list_search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
                 </div>
             @else
@@ -203,54 +192,44 @@
                             $expired = $t->expires_at !== null && $t->expires_at->isPast();
                             $expiringSoonRow = $t->expires_at !== null && $t->expires_at->isFuture() && $t->expires_at->diffInDays(now()) <= 14;
                         @endphp
-                        <li wire:key="api-token-{{ $t->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
-                            <div class="min-w-0 flex-1 space-y-1">
+                        <li wire:key="api-token-{{ $t->id }}" class="flex flex-col gap-1.5 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
+                            <div class="min-w-0 flex-1">
+                                {{-- Name, state, masked value and metadata share one
+                                     wrapping line; abilities keep their own so a
+                                     long scope list can't push the row open. --}}
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $t->name }}</span>
                                     @if ($expired)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-700">
+                                        <span class="inline-flex shrink-0 items-center gap-0.5 rounded border border-red-200 bg-red-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-red-700">
                                             <x-heroicon-m-no-symbol class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Expired') }}
                                         </span>
                                     @elseif ($expiringSoonRow)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">
+                                        <span class="inline-flex shrink-0 items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-amber-900">
                                             <x-heroicon-m-clock class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Expiring') }}
                                         </span>
                                     @endif
-                                </div>
-                                <p class="font-mono text-xs text-brand-mist">{{ $t->masked_display }}</p>
-                                <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
-                                    @if ($t->last_used_at)
-                                        <span class="inline-flex items-center gap-1">
-                                            <x-heroicon-m-bolt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
-                                            {{ __('Last used :time', ['time' => $t->last_used_at->diffForHumans()]) }}
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 text-brand-mist">
-                                            <x-heroicon-m-minus-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            {{ __('Never used') }}
-                                        </span>
-                                    @endif
-                                    @if ($t->expires_at)
-                                        <span class="text-brand-mist">·</span>
-                                        <span>{{ __('Expires :date', ['date' => $t->expires_at->format('M j, Y')]) }}</span>
-                                    @endif
+                                    <span class="truncate font-mono text-xs text-brand-mist">{{ $t->masked_display }}</span>
+                                    <span class="truncate text-xs text-brand-moss">
+                                        {{ $t->last_used_at
+                                            ? __('used :time', ['time' => $t->last_used_at->diffForHumans()])
+                                            : __('never used') }}@if ($t->expires_at) · {{ __('expires :date', ['date' => $t->expires_at->format('M j, Y')]) }}@endif
+                                    </span>
                                     @if ($t->allowed_ips)
-                                        <span class="text-brand-mist">·</span>
-                                        <span class="inline-flex items-center gap-1">
+                                        <span class="inline-flex shrink-0 items-center gap-1 text-xs text-brand-moss">
                                             <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             <span class="font-mono">{{ implode(', ', $t->allowed_ips) }}</span>
                                         </span>
                                     @endif
-                                </p>
+                                </div>
                                 @if ($t->abilities)
-                                    <p class="flex flex-wrap gap-1 pt-1">
+                                    <p class="mt-0.5 flex flex-wrap gap-1">
                                         @foreach (array_slice($t->abilities, 0, 6) as $ability)
-                                            <code class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $ability }}</code>
+                                            <code class="inline-flex items-center rounded bg-brand-sand/55 px-1 py-px font-mono text-2xs text-brand-moss">{{ $ability }}</code>
                                         @endforeach
                                         @if (count($t->abilities) > 6)
-                                            <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">+{{ count($t->abilities) - 6 }}</span>
+                                            <span class="inline-flex items-center rounded bg-brand-sand/55 px-1 py-px font-mono text-2xs text-brand-moss">+{{ count($t->abilities) - 6 }}</span>
                                         @endif
                                     </p>
                                 @endif
@@ -258,9 +237,9 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 self-start rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 sm:self-auto"
                             >
-                                <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Revoke') }}
                             </button>
                         </li>
@@ -294,7 +273,7 @@
                         @if ($isDeployerRole)
                             <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
                                 <span class="inline-flex items-center gap-1.5 font-semibold">
-                                    <x-heroicon-m-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-information-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Deploy-only role') }}
                                 </span>
                                 <p class="mt-1 text-xs leading-relaxed">{{ __('Tokens can only include server and site read + deploy permissions, matching organization policy.') }}</p>
@@ -356,7 +335,7 @@
                             @if (count($selected_abilities) === 0)
                                 <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
                                     <span class="inline-flex items-center gap-1.5 font-semibold">
-                                        <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('No permissions selected') }}
                                     </span>
                                     <p class="mt-1 leading-relaxed">{{ __('Pick at least one permission so the token can do something with the API.') }}</p>

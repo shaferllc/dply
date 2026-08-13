@@ -20,9 +20,9 @@
         $postureSub = __('Add 2FA or a passkey');
     }
     $postureTile = [
-        'success' => 'border-brand-sage/30 bg-brand-sage/8',
-        'info' => 'border-sky-200 bg-sky-50',
-        'warning' => 'border-amber-200 bg-amber-50',
+        'success' => 'bg-brand-sage/10',
+        'info' => 'bg-sky-50',
+        'warning' => 'bg-amber-50',
     ][$postureTone];
     $postureDot = [
         'success' => 'bg-brand-sage',
@@ -58,74 +58,70 @@
     @endpush
 
     <x-profile-shell
+        dense
         :title="__('Security')"
-        :description="__('Password, passkeys, OAuth sign-in, and two-factor authentication. Layer at least two of these so a stolen credential alone can\'t reach your account.')"
+        :description="__('Password, passkeys, OAuth sign-in, and 2FA — layer at least two so a stolen credential alone can\'t reach your account.')"
         icon="heroicon-o-shield-check"
     >
-        <x-slot:actions>
-            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Back to profile') }}
-            </x-outline-link>
-            <x-outline-link href="{{ route('two-factor.setup') }}" wire:navigate>
-                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Two-factor') }}
-            </x-outline-link>
-        </x-slot:actions>
+        {{-- No header actions: the breadcrumb already goes back to Profile, and
+             2FA setup lives in its own section header below. --}}
 
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border px-4 py-3 {{ $postureTile }}">
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Security at a glance') }}">
+                <div class="px-3 py-2 {{ $postureTile }}">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Posture') }}</dt>
-                    <dd class="mt-1 flex items-center gap-1.5">
-                        <span class="inline-block h-2 w-2 rounded-full {{ $postureDot }}" aria-hidden="true"></span>
-                        <span class="text-sm font-semibold text-brand-ink">{{ $postureLabel }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $postureDot }}" aria-hidden="true"></span>
+                            {{ $postureLabel }}
+                        </span>
+                        <span class="truncate text-xs text-brand-moss" title="{{ $postureSub }}">{{ $postureSub }}</span>
                     </dd>
-                    <p class="mt-1 truncate text-xs text-brand-moss" title="{{ $postureSub }}">{{ $postureSub }}</p>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Passkeys') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $passkeyCount }}</span>
-                        <span class="text-xs text-brand-moss">{{ trans_choice('registered|registered', $passkeyCount) }}</span>
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $passkeyCount }}</span>
+                        <span class="truncate text-xs text-brand-moss">{{ __('registered') }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Device PIN / fingerprint') }}</p>
                 </div>
                 <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $twoFactorOn,
-                    'border-amber-200 bg-amber-50' => ! $twoFactorOn,
+                    'px-3 py-2',
+                    'bg-brand-sage/10' => $twoFactorOn,
+                    'bg-amber-50' => ! $twoFactorOn,
                 ])>
                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2FA') }}</dt>
-                    <dd class="mt-1 flex items-center gap-1.5">
-                        @if ($twoFactorOn)
-                            <x-heroicon-m-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                            <span class="text-sm font-semibold text-brand-ink">{{ __('Enabled') }}</span>
-                        @else
-                            <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0 text-amber-900" aria-hidden="true" />
-                            <span class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</span>
-                        @endif
+                    <dd class="mt-0.5 flex items-baseline gap-1.5">
+                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            @if ($twoFactorOn)
+                                <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0 text-brand-forest" aria-hidden="true" />
+                                {{ __('Enabled') }}
+                            @else
+                                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0 text-amber-900" aria-hidden="true" />
+                                {{ __('Off') }}
+                            @endif
+                        </span>
+                        <span class="truncate text-xs text-brand-moss">{{ __('authenticator code') }}</span>
                     </dd>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Authenticator code') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
 
         {{-- Password --}}
         <div class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                <x-icon-badge>
-                    <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use a long, random password and store it in a password manager. Saving here only updates the fields below.') }}</p>
-                </div>
-                <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                    <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Saved') }}
-                </p>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-lock-closed"
+                :title="__('Password')"
+                :note="__('Use a long, random password and store it in a password manager.')"
+            >
+                <x-slot:actions>
+                    <p x-show="passwordSaved" x-transition x-cloak class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                        <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Saved') }}
+                    </p>
+                </x-slot:actions>
+            </x-workspace-panel-head>
             <form wire:submit="updatePassword" autocomplete="on">
                 {{-- Hidden username so password managers can pair the new value
                      with the right login. Without this, browsers complain. --}}
@@ -141,8 +137,8 @@
                         tabindex="-1"
                     />
                 </div>
-                <div class="space-y-5 px-5 py-5 sm:px-6">
-                    <div class="grid gap-5 sm:grid-cols-2">
+                <div class="px-3 py-2.5 sm:px-4">
+                    <div class="grid gap-2.5 sm:grid-cols-2">
                         <div class="sm:col-span-2">
                             <x-input-label for="security_current_password" :value="__('Current password')" />
                             <x-text-input id="security_current_password" wire:model="current_password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
@@ -173,62 +169,53 @@
 
         {{-- Passkeys --}}
         <div class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                <x-icon-badge>
-                    <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sign in with your device PIN, fingerprint, or a security key. Multiple passkeys per account are supported.') }}</p>
-                </div>
-                @if ($passkeyCount > 0)
-                    <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
-                @endif
-            </div>
-            <div class="px-5 py-5 sm:px-6">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-finger-print"
+                :title="__('Passkeys')"
+                :count="$passkeyCount > 0 ? $passkeyCount : null"
+                :note="__('Sign in with your device PIN, fingerprint, or a security key.')"
+            />
+            <div class="px-3 py-2.5 sm:px-4">
                 @error('passkey')
-                    <p class="mb-3 text-sm text-red-600">{{ $message }}</p>
+                    <p class="mb-2 text-xs text-red-600">{{ $message }}</p>
                 @enderror
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div class="flex-1">
-                        <x-input-label for="dply-passkey-alias" :value="__('Passkey name')" />
-                        <x-text-input
+                        <label for="dply-passkey-alias" class="sr-only">{{ __('Passkey name') }}</label>
+                        <input
                             id="dply-passkey-alias"
                             type="text"
-                            class="mt-1 block w-full"
                             maxlength="255"
                             autocomplete="off"
-                            placeholder="{{ __('e.g. Work laptop') }}"
+                            placeholder="{{ __('Name this passkey — e.g. Work laptop') }}"
+                            class="h-7 w-full rounded-md border-brand-ink/15 bg-white py-0 px-2.5 text-xs text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                         />
                     </div>
                     <button
                         type="button"
                         id="dply-passkey-register-btn"
-                        class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:opacity-60"
+                        class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Add a passkey') }}
                     </button>
                 </div>
-                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Optional — helps you recognize this passkey in the list below.') }}</p>
-                <p id="dply-passkey-register-error" class="mt-2 hidden text-sm text-red-700" role="alert"></p>
+                <p id="dply-passkey-register-error" class="mt-1.5 hidden text-xs text-red-700" role="alert"></p>
             </div>
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
-                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Registered') }}</p>
+            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-1.5 sm:px-4">
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Registered') }}</p>
             </div>
             @if ($passkeys->isEmpty())
-                <div class="px-5 py-8 text-center sm:px-6">
-                    <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <p class="mt-3 text-sm text-brand-moss">{{ __('No passkeys registered yet.') }}</p>
+                <div class="px-3 py-3 text-center sm:px-4">
+                    <p class="text-xs text-brand-mist">{{ __('No passkeys registered yet.') }}</p>
                 </div>
             @else
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($passkeys as $cred)
-                        <li class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
-                            <div class="min-w-0 flex-1 space-y-1">
+                        <li class="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
+                            <div class="min-w-0 flex-1">
                                 <label class="sr-only" for="passkey-alias-{{ $cred->getKey() }}">{{ __('Passkey name') }}</label>
                                 <input
                                     id="passkey-alias-{{ $cred->getKey() }}"
@@ -241,7 +228,7 @@
                                     class="block w-full max-w-md border-0 bg-transparent p-0 text-sm font-semibold text-brand-ink focus:ring-0"
                                     placeholder="{{ __('Passkey name') }}"
                                 />
-                                <p class="text-xs text-brand-mist">{{ __('Added :time', ['time' => $cred->created_at->diffForHumans()]) }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">{{ __('Added :time', ['time' => $cred->created_at->diffForHumans()]) }}</p>
                                 @error('passkeyAliases.'.$cred->getKey())
                                     <p class="text-xs text-red-600">{{ $message }}</p>
                                 @enderror
@@ -249,9 +236,9 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('removePasskey', @js([(string) $cred->getKey()]), @js(__('Remove passkey')), @js(__('Remove this passkey? You\'ll need another way to sign in if it was your only method.')), @js(__('Remove')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                             >
-                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Remove') }}
                             </button>
                         </li>
@@ -263,124 +250,114 @@
         {{-- OAuth sign-in --}}
         @if (! empty($oauthProviders))
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-arrow-top-right-on-square class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link GitHub, GitLab, or Bitbucket so you can sign in with the same account you use for Git.') }}</p>
-                    </div>
-                    @if ($linkedOAuth > 0)
-                        <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
-                    @endif
-                </div>
-                <div class="space-y-3 px-5 py-5 sm:px-6">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-arrow-top-right-on-square"
+                    :title="__('OAuth sign-in')"
+                    :count="$linkedOAuth > 0 ? $linkedOAuth : null"
+                    :note="__('Sign in with the same GitHub, GitLab, or Bitbucket account you use for Git.')"
+                />
+                <div class="px-3 py-2.5 sm:px-4">
                     @error('unlink')
-                        <p class="text-sm text-red-600">{{ $message }}</p>
+                        <p class="mb-2 text-xs text-red-600">{{ $message }}</p>
                     @enderror
-                    @foreach ($oauthProviders as $p)
-                        @php $linked = $socialAccounts->where('provider', $p['id']); @endphp
-                        <div class="overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
-                                <span class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                                    <x-oauth-provider-icon :provider="$p['id']" />
-                                    {{ $p['name'] }}
-                                    @if ($linked->isNotEmpty())
-                                        <span class="ms-1 inline-flex items-center gap-1 text-xs font-medium text-brand-forest">
-                                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
-                                            {{ trans_choice(':n linked|:n linked', $linked->count(), ['n' => $linked->count()]) }}
-                                        </span>
-                                    @endif
-                                </span>
-                                <a
-                                    href="{{ route('oauth.redirect', ['provider' => $p['id'], 'return' => 'security']) }}"
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Link account') }}
-                                </a>
-                            </div>
-                            @if ($linked->isEmpty())
-                                <p class="px-4 py-3 text-sm text-brand-mist">{{ __('No accounts linked.') }}</p>
-                            @else
-                                <ul class="divide-y divide-brand-ink/10">
+                    <div class="overflow-hidden rounded-lg border border-brand-ink/10 bg-white">
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($oauthProviders as $p)
+                                @php $linked = $socialAccounts->where('provider', $p['id']); @endphp
+                                <li>
+                                    <div class="flex flex-wrap items-center gap-2 bg-brand-sand/30 px-2.5 py-1.5">
+                                        <x-oauth-provider-icon :provider="$p['id']" size="h-4 w-4" />
+                                        <span class="text-sm font-semibold text-brand-ink">{{ $p['name'] }}</span>
+                                        @if ($linked->isNotEmpty())
+                                            <span class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest">
+                                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                                {{ trans_choice(':n linked|:n linked', $linked->count(), ['n' => $linked->count()]) }}
+                                            </span>
+                                        @else
+                                            <span class="text-xs text-brand-mist">{{ __('Not linked') }}</span>
+                                        @endif
+                                        <a
+                                            href="{{ route('oauth.redirect', ['provider' => $p['id'], 'return' => 'security']) }}"
+                                            class="ms-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50"
+                                        >
+                                            <x-heroicon-o-link class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Link account') }}
+                                        </a>
+                                    </div>
                                     @foreach ($linked as $account)
-                                        <li class="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-brand-sand/15">
-                                            <span class="truncate font-medium text-brand-ink">{{ $account->nickname ?? $account->provider_id }}</span>
+                                        <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-2.5 py-1.5 transition-colors hover:bg-brand-sand/15">
+                                            <span class="truncate text-xs font-medium text-brand-ink">{{ $account->nickname ?? $account->provider_id }}</span>
                                             <button
                                                 type="button"
                                                 wire:click="openConfirmActionModal('unlinkOAuthAccount', [{{ $account->id }}], @js(__('Unlink account')), @js(__('Unlink this account? You can link it again later from this page.')), @js(__('Unlink')), true)"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                             >
-                                                <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-link-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                 {{ __('Unlink') }}
                                             </button>
-                                        </li>
+                                        </div>
                                     @endforeach
-                                </ul>
-                            @endif
-                        </div>
-                    @endforeach
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             </div>
         @endif
 
         {{-- Two-factor authentication --}}
         <div>
-            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
-                <x-icon-badge>
-                    <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Require a code from your authenticator app when signing in. A stolen password alone won\'t reach your account.') }}</p>
-                </div>
-                <span @class([
-                    'shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1',
-                    'bg-brand-sage/15 text-brand-forest ring-brand-sage/20' => $twoFactorOn,
-                    'bg-amber-50 text-amber-900 ring-amber-200' => ! $twoFactorOn,
-                ])>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-device-phone-mobile"
+                :title="__('Two-factor authentication')"
+                :note="__('Require a code from your authenticator app when signing in.')"
+                :tone="$twoFactorOn ? null : 'amber'"
+            >
+                <x-slot:actions>
                     <span @class([
-                        'inline-block h-1.5 w-1.5 rounded-full',
-                        'bg-brand-sage' => $twoFactorOn,
-                        'bg-amber-500' => ! $twoFactorOn,
-                    ])></span>
-                    {{ $twoFactorOn ? __('Enabled') : __('Disabled') }}
-                </span>
-            </div>
-            <div class="px-5 py-5 sm:px-6">
-                @if (session('status') === 'two-factor-enabled' && session('recovery_codes'))
-                    <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                        <p class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-900">
-                            <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        'inline-flex items-center gap-1 rounded-full px-1.5 py-px text-2xs font-semibold ring-1',
+                        'bg-brand-sage/15 text-brand-forest ring-brand-sage/20' => $twoFactorOn,
+                        'bg-amber-50 text-amber-900 ring-amber-200' => ! $twoFactorOn,
+                    ])>
+                        <span @class([
+                            'inline-block h-1.5 w-1.5 rounded-full',
+                            'bg-brand-sage' => $twoFactorOn,
+                            'bg-amber-500' => ! $twoFactorOn,
+                        ])></span>
+                        {{ $twoFactorOn ? __('Enabled') : __('Disabled') }}
+                    </span>
+                    @if ($twoFactorOn)
+                        <a href="{{ route('two-factor.setup') }}" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Manage or disable') }}
+                        </a>
+                    @else
+                        <a href="{{ route('two-factor.setup') }}" class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
+                            <x-heroicon-o-shield-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Set up 2FA') }}
+                        </a>
+                    @endif
+                </x-slot:actions>
+            </x-workspace-panel-head>
+            @if (session('status') === 'two-factor-enabled' && session('recovery_codes'))
+                {{-- Recovery codes are the only thing worth a body row here: the
+                     enable/disable action now rides in the header strip. --}}
+                <div class="px-3 py-2.5 sm:px-4">
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+                        <p class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900">
+                            <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Store these recovery codes in a secure place. Each code can only be used once.') }}
                         </p>
-                        <div class="mt-3 grid grid-cols-2 gap-2 font-mono text-sm text-amber-950">
+                        <div class="mt-2 grid grid-cols-2 gap-1.5 font-mono text-xs text-amber-950 sm:grid-cols-4">
                             @foreach (session('recovery_codes') as $code)
-                                <span class="rounded bg-white/60 px-2 py-1">{{ $code }}</span>
+                                <span class="rounded bg-white/60 px-1.5 py-0.5">{{ $code }}</span>
                             @endforeach
                         </div>
                     </div>
-                @endif
-                @if ($twoFactorOn)
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <p class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-forest">
-                            <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Two-factor authentication is enabled.') }}
-                        </p>
-                        <a href="{{ route('two-factor.setup') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Manage or disable') }}
-                        </a>
-                    </div>
-                @else
-                    <a href="{{ route('two-factor.setup') }}" class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
-                        <x-heroicon-o-shield-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Set up two-factor authentication') }}
-                    </a>
-                @endif
-            </div>
+                </div>
+            @endif
         </div>
     </x-profile-shell>
 
