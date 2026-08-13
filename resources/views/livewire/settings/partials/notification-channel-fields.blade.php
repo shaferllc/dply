@@ -15,103 +15,127 @@
     @endphp
 
     <div class="space-y-4">
-        @if ($slackMode === 'oauth')
-            @if ($slackInstallations->isEmpty())
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your Slack workspace') }}</p>
-                    <p class="mt-1 text-xs text-brand-moss">
-                        {{ __('Approve dply once, then pick a channel here — no webhook URLs to copy. Connecting again later adds more workspaces.') }}
+        {{-- No workspace connected yet — offer the connect path in *both* modes,
+             and even where the deployment has no Slack app registered. Hiding the
+             prompt there left operators staring at a bare webhook box with no hint
+             the channel picker exists; the redirect already turns an unconfigured
+             deployment into a plain explanation rather than a broken flow. --}}
+        @if ($slackInstallations->isEmpty())
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your Slack workspace') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">
+                    {{ __('Approve dply once, then pick a channel here — no webhook URLs to copy. Connecting again later adds more workspaces.') }}
+                </p>
+                {{-- return_to is appended here, not server-side: this markup is
+                     usually rendered by a Livewire update whose request path is
+                     the Livewire endpoint, not the page. --}}
+                <a
+                    href="{{ $this->slackConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->slackConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink/90"
+                >
+                    <x-heroicon-o-plus-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add to Slack') }}
+                </a>
+
+                @unless ($slackOauthReady)
+                    <p class="mt-2 text-xs text-brand-moss">
+                        {{ __('Not set up on this deployment yet — paste an incoming webhook URL below instead.') }}
                     </p>
-                    {{-- return_to is appended here, not server-side: this markup is
-                         usually rendered by a Livewire update whose request path is
-                         the Livewire endpoint, not the page. --}}
-                    <a
-                        href="{{ $this->slackConnectUrl() }}"
-                        x-on:click.prevent="window.location.href = @js($this->slackConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
-                        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink/90"
-                    >
-                        <x-heroicon-o-plus-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add to Slack') }}
-                    </a>
-                </div>
-            @else
-                @if ($slackInstallations->count() > 1)
-                    <div>
-                        <x-input-label for="{{ $p }}slack_installation_id" :value="__('Workspace')" />
-                        <select
-                            id="{{ $p }}slack_installation_id"
-                            wire:model.live="{{ $p }}slack_installation_id"
-                            class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        >
-                            @foreach ($slackInstallations as $installation)
-                                <option value="{{ $installation->id }}">{{ $installation->team_name }}</option>
-                            @endforeach
-                        </select>
-                        @error($p.'slack_installation_id')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                @endif
+                @endunless
 
-                <div>
-                    <div class="flex items-end justify-between gap-3">
-                        <x-input-label for="{{ $p }}slack_channel_id" :value="__('Channel')" />
-                        <button
-                            type="button"
-                            wire:click="refreshSlackChannels('{{ $p }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshSlackChannels"
-                            class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss transition hover:text-brand-ink disabled:opacity-50"
-                        >
-                            {{ __('Refresh') }}
-                        </button>
-                    </div>
-                    <select
-                        id="{{ $p }}slack_channel_id"
-                        wire:model="{{ $p }}slack_channel_id"
-                        class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                    >
-                        <option value="">{{ __('Select a channel…') }}</option>
-                        @foreach ($slackChannels as $slackChannel)
-                            <option value="{{ $slackChannel['id'] }}">
-                                {{ $slackChannel['is_private'] ? '🔒 ' : '#' }}{{ $slackChannel['name'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error($p.'slack_channel_id')
-                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
-                    @if ($slackChannels === [])
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('No channels came back. The Slack connection may have been revoked — reconnect the workspace.') }}
-                        </p>
-                    @else
-                        {{-- Slack grants no scope for posting into a private channel uninvited, so this is a real prerequisite, not a nicety. --}}
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Private channels (🔒) need dply invited first: run /invite @dply in that channel.') }}
-                        </p>
-                    @endif
-                </div>
-
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <a
-                        href="{{ $this->slackConnectUrl() }}"
-                        x-on:click.prevent="window.location.href = @js($this->slackConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
-                        class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
-                    >
-                        {{ __('Add another workspace') }}
-                    </a>
-                    <span class="text-brand-ink/20" aria-hidden="true">·</span>
+                {{-- The escape hatch has to live here too: with no install to pick
+                     from, the picker branch below renders nothing, so without this
+                     the webhook fields were unreachable. --}}
+                @if ($slackMode === 'oauth')
                     <button
                         type="button"
                         wire:click="$set('{{ $p }}slack_mode', 'webhook')"
-                        class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                        class="mt-3 block text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
                     >
                         {{ __('Use a webhook URL instead') }}
                     </button>
+                @endif
+            </div>
+        @endif
+
+        @if ($slackMode === 'oauth' && $slackInstallations->isNotEmpty())
+            @if ($slackInstallations->count() > 1)
+                <div>
+                    <x-input-label for="{{ $p }}slack_installation_id" :value="__('Workspace')" />
+                    <select
+                        id="{{ $p }}slack_installation_id"
+                        wire:model.live="{{ $p }}slack_installation_id"
+                        class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                    >
+                        @foreach ($slackInstallations as $installation)
+                            <option value="{{ $installation->id }}">{{ $installation->team_name }}</option>
+                        @endforeach
+                    </select>
+                    @error($p.'slack_installation_id')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
             @endif
-        @else
+
+            <div>
+                <div class="flex items-end justify-between gap-3">
+                    <x-input-label for="{{ $p }}slack_channel_id" :value="__('Channel')" />
+                    <button
+                        type="button"
+                        wire:click="refreshSlackChannels('{{ $p }}')"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshSlackChannels"
+                        class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss transition hover:text-brand-ink disabled:opacity-50"
+                    >
+                        {{ __('Refresh') }}
+                    </button>
+                </div>
+                <select
+                    id="{{ $p }}slack_channel_id"
+                    wire:model="{{ $p }}slack_channel_id"
+                    class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                >
+                    <option value="">{{ __('Select a channel…') }}</option>
+                    @foreach ($slackChannels as $slackChannel)
+                        <option value="{{ $slackChannel['id'] }}">
+                            {{ $slackChannel['is_private'] ? '🔒 ' : '#' }}{{ $slackChannel['name'] }}
+                        </option>
+                    @endforeach
+                </select>
+                @error($p.'slack_channel_id')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+                @if ($slackChannels === [])
+                    <p class="mt-1 text-xs text-brand-moss">
+                        {{ __('No channels came back. The Slack connection may have been revoked — reconnect the workspace.') }}
+                    </p>
+                @else
+                    {{-- Slack grants no scope for posting into a private channel uninvited, so this is a real prerequisite, not a nicety. --}}
+                    <p class="mt-1 text-xs text-brand-moss">
+                        {{ __('Private channels (🔒) need dply invited first: run /invite @dply in that channel.') }}
+                    </p>
+                @endif
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <a
+                    href="{{ $this->slackConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->slackConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                >
+                    {{ __('Add another workspace') }}
+                </a>
+                <span class="text-brand-ink/20" aria-hidden="true">·</span>
+                <button
+                    type="button"
+                    wire:click="$set('{{ $p }}slack_mode', 'webhook')"
+                    class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                >
+                    {{ __('Use a webhook URL instead') }}
+                </button>
+            </div>
+        @elseif ($slackMode !== 'oauth')
             <div>
                 <x-input-label for="{{ $p }}slack_webhook_url" :value="__('Webhook URL')" />
                 <input
@@ -137,13 +161,15 @@
                 />
             </div>
 
-            @if ($slackOauthReady)
+            {{-- Only a switch-back: with no install the connect prompt above is
+                 already the way back to the picker. --}}
+            @if ($slackInstallations->isNotEmpty())
                 <button
                     type="button"
                     wire:click="$set('{{ $p }}slack_mode', 'oauth')"
                     class="text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
                 >
-                    {{ $slackInstallations->isEmpty() ? __('Connect Slack instead') : __('Pick from a connected workspace instead') }}
+                    {{ __('Pick from a connected workspace instead') }}
                 </button>
             @endif
         @endif
@@ -157,100 +183,118 @@
     @endphp
 
     <div class="space-y-4">
-        @if ($discordMode === 'oauth')
-            @if ($discordInstallations->isEmpty())
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your Discord server') }}</p>
-                    <p class="mt-1 text-xs text-brand-moss">
-                        {{ __('Adds the dply bot to your server so you can pick a channel here — no webhook URLs to copy. You can connect more than one server.') }}
+        {{-- Same shape as Slack above: the connect prompt shows in both modes
+             while nothing is connected, unconfigured deployment included. --}}
+        @if ($discordInstallations->isEmpty())
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your Discord server') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">
+                    {{ __('Adds the dply bot to your server so you can pick a channel here — no webhook URLs to copy. You can connect more than one server.') }}
+                </p>
+                <a
+                    href="{{ $this->discordConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->discordConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink/90"
+                >
+                    <x-heroicon-o-plus-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add to Discord') }}
+                </a>
+
+                @unless ($discordOauthReady)
+                    <p class="mt-2 text-xs text-brand-moss">
+                        {{ __('Not set up on this deployment yet — paste a webhook URL below instead.') }}
                     </p>
-                    <a
-                        href="{{ $this->discordConnectUrl() }}"
-                        x-on:click.prevent="window.location.href = @js($this->discordConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
-                        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink/90"
-                    >
-                        <x-heroicon-o-plus-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add to Discord') }}
-                    </a>
-                </div>
-            @else
-                @if ($discordInstallations->count() > 1)
-                    <div>
-                        <x-input-label for="{{ $p }}discord_installation_id" :value="__('Server')" />
-                        <select
-                            id="{{ $p }}discord_installation_id"
-                            wire:model.live="{{ $p }}discord_installation_id"
-                            class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                        >
-                            @foreach ($discordInstallations as $installation)
-                                <option value="{{ $installation->id }}">{{ $installation->guild_name }}</option>
-                            @endforeach
-                        </select>
-                        @error($p.'discord_installation_id')
-                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                @endif
+                @endunless
 
-                <div>
-                    <div class="flex items-end justify-between gap-3">
-                        <x-input-label for="{{ $p }}discord_channel_id" :value="__('Channel')" />
-                        <button
-                            type="button"
-                            wire:click="refreshDiscordChannels('{{ $p }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshDiscordChannels"
-                            class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss transition hover:text-brand-ink disabled:opacity-50"
-                        >
-                            {{ __('Refresh') }}
-                        </button>
-                    </div>
-                    <select
-                        id="{{ $p }}discord_channel_id"
-                        wire:model="{{ $p }}discord_channel_id"
-                        class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                    >
-                        <option value="">{{ __('Select a channel…') }}</option>
-                        @foreach ($discordChannels as $discordChannel)
-                            <option value="{{ $discordChannel['id'] }}">
-                                {{ $discordChannel['is_announcement'] ? '📣 ' : '#' }}{{ $discordChannel['name'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error($p.'discord_channel_id')
-                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
-                    @if ($discordChannels === [])
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('No channels came back. The dply bot may have been removed from the server, or it cannot see any channels — reconnect it.') }}
-                        </p>
-                    @else
-                        {{-- A channel-level permission overwrite beats the server-wide grant, and only shows up as a failed send. --}}
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Channels with restricted permissions need the dply role allowed to View Channel and Send Messages.') }}
-                        </p>
-                    @endif
-                </div>
-
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <a
-                        href="{{ $this->discordConnectUrl() }}"
-                        x-on:click.prevent="window.location.href = @js($this->discordConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
-                        class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
-                    >
-                        {{ __('Add another server') }}
-                    </a>
-                    <span class="text-brand-ink/20" aria-hidden="true">·</span>
+                @if ($discordMode === 'oauth')
                     <button
                         type="button"
                         wire:click="$set('{{ $p }}discord_mode', 'webhook')"
-                        class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                        class="mt-3 block text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
                     >
                         {{ __('Use a webhook URL instead') }}
                     </button>
+                @endif
+            </div>
+        @endif
+
+        @if ($discordMode === 'oauth' && $discordInstallations->isNotEmpty())
+            @if ($discordInstallations->count() > 1)
+                <div>
+                    <x-input-label for="{{ $p }}discord_installation_id" :value="__('Server')" />
+                    <select
+                        id="{{ $p }}discord_installation_id"
+                        wire:model.live="{{ $p }}discord_installation_id"
+                        class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                    >
+                        @foreach ($discordInstallations as $installation)
+                            <option value="{{ $installation->id }}">{{ $installation->guild_name }}</option>
+                        @endforeach
+                    </select>
+                    @error($p.'discord_installation_id')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
             @endif
-        @else
+
+            <div>
+                <div class="flex items-end justify-between gap-3">
+                    <x-input-label for="{{ $p }}discord_channel_id" :value="__('Channel')" />
+                    <button
+                        type="button"
+                        wire:click="refreshDiscordChannels('{{ $p }}')"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshDiscordChannels"
+                        class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss transition hover:text-brand-ink disabled:opacity-50"
+                    >
+                        {{ __('Refresh') }}
+                    </button>
+                </div>
+                <select
+                    id="{{ $p }}discord_channel_id"
+                    wire:model="{{ $p }}discord_channel_id"
+                    class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                >
+                    <option value="">{{ __('Select a channel…') }}</option>
+                    @foreach ($discordChannels as $discordChannel)
+                        <option value="{{ $discordChannel['id'] }}">
+                            {{ $discordChannel['is_announcement'] ? '📣 ' : '#' }}{{ $discordChannel['name'] }}
+                        </option>
+                    @endforeach
+                </select>
+                @error($p.'discord_channel_id')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+                @if ($discordChannels === [])
+                    <p class="mt-1 text-xs text-brand-moss">
+                        {{ __('No channels came back. The dply bot may have been removed from the server, or it cannot see any channels — reconnect it.') }}
+                    </p>
+                @else
+                    {{-- A channel-level permission overwrite beats the server-wide grant, and only shows up as a failed send. --}}
+                    <p class="mt-1 text-xs text-brand-moss">
+                        {{ __('Channels with restricted permissions need the dply role allowed to View Channel and Send Messages.') }}
+                    </p>
+                @endif
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <a
+                    href="{{ $this->discordConnectUrl() }}"
+                    x-on:click.prevent="window.location.href = @js($this->discordConnectUrl()) + '&return_to=' + encodeURIComponent(window.location.pathname + window.location.search)"
+                    class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                >
+                    {{ __('Add another server') }}
+                </a>
+                <span class="text-brand-ink/20" aria-hidden="true">·</span>
+                <button
+                    type="button"
+                    wire:click="$set('{{ $p }}discord_mode', 'webhook')"
+                    class="font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                >
+                    {{ __('Use a webhook URL instead') }}
+                </button>
+            </div>
+        @elseif ($discordMode !== 'oauth')
             <div>
                 <x-input-label for="{{ $p }}discord_webhook_url" :value="__('Webhook URL')" />
                 <input
@@ -266,13 +310,13 @@
                 @enderror
             </div>
 
-            @if ($discordOauthReady)
+            @if ($discordInstallations->isNotEmpty())
                 <button
                     type="button"
                     wire:click="$set('{{ $p }}discord_mode', 'oauth')"
                     class="text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
                 >
-                    {{ $discordInstallations->isEmpty() ? __('Connect Discord instead') : __('Pick from a connected server instead') }}
+                    {{ __('Pick from a connected server instead') }}
                 </button>
             @endif
         @endif
@@ -300,37 +344,40 @@
     @endphp
 
     <div class="space-y-4">
-        @if ($telegramMode === 'connected')
-            @if ($telegramWaiting)
-                {{-- Telegram never redirects back, so the form waits here and polls
-                     the claim check instead. Polling stops the moment it resolves. --}}
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4" wire:poll.2s="pollTelegramConnect">
-                    <div class="flex items-start gap-3">
-                        <span class="mt-0.5 flex h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/20 border-t-brand-ink" aria-hidden="true"></span>
-                        <div class="min-w-0">
-                            <p class="text-sm font-semibold text-brand-ink">{{ __('Waiting for you to pick a chat…') }}</p>
-                            <p class="mt-1 text-xs text-brand-moss">
-                                {{ __('Telegram should have opened. Choose the group to add the dply bot to, and this will finish by itself.') }}
-                            </p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                <a href="{{ $this->telegramConnectLink }}" target="_blank" rel="noopener" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
-                                    {{ __('Reopen Telegram') }}
-                                </a>
-                                @if ($this->telegramDirectMessageLink() !== '')
-                                    <span class="text-brand-ink/20" aria-hidden="true">·</span>
-                                    <a href="{{ $this->telegramDirectMessageLink() }}" target="_blank" rel="noopener" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
-                                        {{ __('Send to me directly instead') }}
-                                    </a>
-                                @endif
+        @if ($telegramMode === 'connected' && $telegramWaiting)
+            {{-- Telegram never redirects back, so the form waits here and polls
+                 the claim check instead. Polling stops the moment it resolves. --}}
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4" wire:poll.2s="pollTelegramConnect">
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/20 border-t-brand-ink" aria-hidden="true"></span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Waiting for you to pick a chat…') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">
+                            {{ __('Telegram should have opened. Choose the group to add the dply bot to, and this will finish by itself.') }}
+                        </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            <a href="{{ $this->telegramConnectLink }}" target="_blank" rel="noopener" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
+                                {{ __('Reopen Telegram') }}
+                            </a>
+                            @if ($this->telegramDirectMessageLink() !== '')
                                 <span class="text-brand-ink/20" aria-hidden="true">·</span>
-                                <button type="button" wire:click="cancelTelegramConnect" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
-                                    {{ __('Cancel') }}
-                                </button>
-                            </div>
+                                <a href="{{ $this->telegramDirectMessageLink() }}" target="_blank" rel="noopener" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
+                                    {{ __('Send to me directly instead') }}
+                                </a>
+                            @endif
+                            <span class="text-brand-ink/20" aria-hidden="true">·</span>
+                            <button type="button" wire:click="cancelTelegramConnect" class="font-semibold text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
+                                {{ __('Cancel') }}
+                            </button>
                         </div>
                     </div>
                 </div>
-            @elseif ($telegramChats->isEmpty())
+            </div>
+        @else
+            {{-- Nothing connected: the prompt shows in both modes, and on a
+                 deployment with no bot token too — startTelegramConnect() answers
+                 with a plain explanation rather than a dead button. --}}
+            @if ($telegramChats->isEmpty())
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Connect a Telegram chat') }}</p>
                     <p class="mt-1 text-xs text-brand-moss">
@@ -346,8 +393,26 @@
                         <x-heroicon-o-plus-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Connect Telegram') }}
                     </button>
+
+                    @unless ($telegramBotReady)
+                        <p class="mt-2 text-xs text-brand-moss">
+                            {{ __('Not set up on this deployment yet — enter a bot token below instead.') }}
+                        </p>
+                    @endunless
+
+                    @if ($telegramMode === 'connected')
+                        <button
+                            type="button"
+                            wire:click="$set('{{ $p }}telegram_mode', 'manual')"
+                            class="mt-3 block text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                        >
+                            {{ __('Enter a bot token manually instead') }}
+                        </button>
+                    @endif
                 </div>
-            @else
+            @endif
+
+            @if ($telegramMode === 'connected' && $telegramChats->isNotEmpty())
                 <div>
                     <x-input-label for="{{ $p }}telegram_installation_id" :value="__('Chat')" />
                     <select
@@ -380,18 +445,20 @@
                         {{ __('Enter a bot token manually instead') }}
                     </button>
                 </div>
-            @endif
-        @else
-            @include('livewire.settings.partials.notification-channel-telegram-manual', ['p' => $p])
+            @elseif ($telegramMode !== 'connected')
+                @include('livewire.settings.partials.notification-channel-telegram-manual', ['p' => $p])
 
-            @if ($telegramBotReady)
-                <button
-                    type="button"
-                    wire:click="$set('{{ $p }}telegram_mode', 'connected')"
-                    class="text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
-                >
-                    {{ $telegramChats->isEmpty() ? __('Connect Telegram instead') : __('Pick from a connected chat instead') }}
-                </button>
+                {{-- Only a switch-back: with no chat connected the prompt above is
+                     already the way to the picker. --}}
+                @if ($telegramChats->isNotEmpty())
+                    <button
+                        type="button"
+                        wire:click="$set('{{ $p }}telegram_mode', 'connected')"
+                        class="text-xs font-semibold text-brand-moss underline-offset-2 transition hover:text-brand-ink hover:underline"
+                    >
+                        {{ __('Pick from a connected chat instead') }}
+                    </button>
+                @endif
             @endif
         @endif
     </div>
