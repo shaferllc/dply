@@ -286,7 +286,10 @@ class SshKeys extends Component
             return new Collection;
         }
 
+        // Machines only — there is no SSH surface on an Edge app / function
+        // namespace / Cloud container to install a key on.
         return Server::query()
+            ->onlyMachineHosts()
             ->where(function ($q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn ($q2) => $q2->whereNull('organization_id')->where('user_id', Auth::id()));

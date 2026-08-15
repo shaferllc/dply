@@ -63,7 +63,7 @@
     @if ($supportsRemote)
         <div class="rounded-2xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream/30 via-white to-white p-5 sm:p-6">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0 flex-1">
@@ -82,7 +82,7 @@
                     wire:target="chooseDatabaseNetworkAccess"
                     aria-pressed="{{ $networkMode === 'local' ? 'true' : 'false' }}"
                     @class([
-                        'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                        'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                         'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $networkMode === 'local',
                         'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $networkMode !== 'local',
                     ])
@@ -98,7 +98,7 @@
                     wire:target="chooseDatabaseNetworkAccess"
                     aria-pressed="{{ $networkMode === 'remote' ? 'true' : 'false' }}"
                     @class([
-                        'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                        'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                         'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $networkMode === 'remote',
                         'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $networkMode !== 'remote',
                     ])

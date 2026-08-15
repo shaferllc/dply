@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\StoreManagedServer;
 use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -124,7 +125,7 @@ class CreateManaged extends Component
         return view('livewire.servers.create-managed', [
             'regions' => $platform->regions(),
             'sizes' => $sizes,
-            'profiles' => (array) config('server_provision_options.install_profiles', []),
+            'profiles' => FilterServerProvisionOptionsForCreateForm::offeredInstallProfiles(),
             'selectedMonthlyCents' => $selectedMonthlyCents,
             // Beta context: the box is free (comped until cutover) and pinned to
             // CX22; once the single grant is used the create flow is disabled.

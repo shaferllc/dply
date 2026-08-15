@@ -47,10 +47,11 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-breadcrumb-trail :items="$breadcrumbs" />
 
     <x-profile-shell
+        dense
         :title="__('Servers')"
         :description="$isProductionSurface
             ? __('Live servers from the connected control plane — Manage opens the real workspace with Production data.')
@@ -61,9 +62,9 @@
             <a
                 href="{{ $sitesIndexUrl }}"
                 wire:navigate
-                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                 {{ __('Sites') }}
                 <span aria-hidden="true">→</span>
             </a>
@@ -73,7 +74,9 @@
         </x-slot:actions>
 
         <x-slot:stats>
-            <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {{-- Dense profile-shell gives the stats slot a bare bordered strip,
+                 so padding lives here and lines up with the panel head above. --}}
+            <dl class="grid grid-cols-2 gap-2 px-3 py-2 sm:grid-cols-4 sm:px-4">
                 @foreach ($summaryStats as $stat)
                     <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
                         <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
@@ -87,13 +90,13 @@
         </x-slot:stats>
 
         @if (isset($alert) && filled(trim((string) $alert)))
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
                 {{ $alert }}
             </div>
         @endif
 
         @if (isset($banners) && filled(trim((string) $banners)))
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6 space-y-4">
+            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4 space-y-2">
                 {{ $banners }}
             </div>
         @endif
@@ -118,7 +121,7 @@
                     ];
                 }
             @endphp
-            <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-5 py-3 text-sm sm:px-6" aria-label="{{ __('Operations') }}">
+            <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-3 py-2 text-sm sm:px-4" aria-label="{{ __('Operations') }}">
                 <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Operations') }}</span>
                 @foreach ($serversPillTiles as $opsTile)
                     <a
@@ -137,7 +140,7 @@
             @if (isset($empty) && ! $empty->isEmpty())
                 {{ $empty }}
             @else
-                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="servers-empty-heading">
+                <div class="flex flex-col items-center justify-center px-3 py-10 text-center sm:px-4" aria-labelledby="servers-empty-heading">
                     <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                     </span>
@@ -152,7 +155,7 @@
                 </div>
             @endif
         @else
-            <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-3 sm:px-5">
+            <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <div class="min-w-0 flex-1">
                     <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
                     <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
@@ -243,7 +246,7 @@
             </div>
 
             @if ($groupedRows->flatten()->isEmpty())
-                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                <div class="flex flex-col items-center justify-center px-3 py-10 text-center sm:px-4">
                     <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
                     </span>
@@ -256,7 +259,7 @@
                     </button>
                 </div>
             @elseif ($viewMode === 'grid')
-                <div class="space-y-8 px-4 py-4 sm:px-5 sm:py-5">
+                <div class="space-y-5 px-3 py-3 sm:px-4">
                     @foreach ($groupedRows as $groupLabel => $groupServers)
                         <div wire:key="group-grid-{{ \Illuminate\Support\Str::slug((string) $groupLabel) }}">
                             <div class="mb-3 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-2">
@@ -277,7 +280,7 @@
             @else
                 @foreach ($groupedRows as $groupLabel => $groupServers)
                     <div wire:key="group-{{ \Illuminate\Support\Str::slug((string) $groupLabel) }}">
-                        <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-6">
+                        <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-3 py-1.5 sm:px-4">
                             <h2 class="flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-ink">
                                 <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ $groupLabel }}</span>

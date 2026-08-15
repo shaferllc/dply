@@ -21,6 +21,25 @@ test('catalog lists the v1 presets in order', function () {
         'custom',
     ]);
 });
+test('only laravel and wordpress are pickable for now', function () {
+    // config/server_create.php is the switch — see also StepType::availableModes()
+    // and StepWhere::availableProviderHostKinds().
+    $catalog = new ServerCreatePresetCatalog;
+
+    $available = array_column(
+        array_filter($catalog->all(), fn (array $p) => $p['available']),
+        'id',
+    );
+
+    expect($available)->toBe(['laravel', 'wordpress']);
+
+    // Everything else still ships in the catalog — it renders as a disabled
+    // "Coming soon" tile rather than disappearing from the picker.
+    foreach (['rails', 'nextjs', 'django', 'polyglot', 'static', 'database', 'custom'] as $id) {
+        expect($catalog->isAvailable($id))->toBeFalse();
+        expect($catalog->find($id))->not->toBeNull();
+    }
+});
 test('wordpress preset uses mariadb redis php 84', function () {
     $wp = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_WORDPRESS);
 

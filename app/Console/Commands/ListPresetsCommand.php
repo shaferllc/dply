@@ -49,6 +49,7 @@ class ListPresetsCommand extends Command
                     'cache' => $p['cache'],
                     'runtimes' => $p['runtimes'],
                     'featured' => $p['featured'],
+                    'available' => $p['available'],
                 ], $presets),
             ], JSON_PRETTY_PRINT));
 
@@ -69,15 +70,17 @@ class ListPresetsCommand extends Command
             $rows[] = [
                 $preset['id'].$marker,
                 $preset['name'],
+                $preset['available'] ? 'live' : 'soon',
                 $preset['role'],
                 implode(' + ', $stack) ?: '—',
                 $preset['database'] ?? '—',
             ];
         }
 
-        $this->table(['id', 'name', 'role', 'runtimes', 'database'], $rows);
+        $this->table(['id', 'name', 'status', 'role', 'runtimes', 'database'], $rows);
         $this->newLine();
         $this->line('<fg=gray>★ = featured (surfaced first in the wizard).</>');
+        $this->line('<fg=gray>soon = renders as a disabled "Coming soon" tile (ServerCreatePresetCatalog::AVAILABLE_IDS).</>');
         $this->line('<fg=gray>Use </><fg=white>dply:list-presets --id=&lt;id&gt;</><fg=gray> for the full meta payload.</>');
 
         return self::SUCCESS;

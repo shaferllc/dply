@@ -151,6 +151,14 @@ final class ProductionServerMaterializer
             );
         }
 
+        // Host kind decides whether this row is a machine at all. Mirroring it
+        // keeps a non-VM host out of the local /servers list through the same
+        // scopes the remote uses, instead of it landing as a plain "custom" VM
+        // that can never be SSHed into.
+        if (is_string($payload['host_kind'] ?? null) && $payload['host_kind'] !== '') {
+            $meta['host_kind'] = $payload['host_kind'];
+        }
+
         if (isset($payload['tags']) && is_array($payload['tags'])) {
             $meta['tags'] = array_values(array_filter(array_map(
                 static fn ($tag): string => is_string($tag) ? trim($tag) : '',

@@ -8,7 +8,7 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="1" :reached="1" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     @if ($migrationSourcePloiServerId || $migrationSourceForgeServerId)
@@ -100,12 +100,12 @@
                         <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </x-slot:actions>
                 </x-workspace-panel-head>
-                <div class="px-4 py-3.5 sm:px-5">
+                <div class="px-3 py-3 sm:px-4">
                     {{-- Server-driven: classes follow $form->mode so a fast A/B/A
                          click sequence can never desync the UI from server state.
                          Both buttons disable while either action is in flight,
                          which queues only one selection change at a time. --}}
-                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                         @php $providerSelected = $form->mode === 'provider'; @endphp
                         <button
                             type="button"
@@ -115,14 +115,14 @@
                             wire:target="chooseProviderMode,chooseCustomMode,chooseImportMode"
                             aria-pressed="{{ $providerSelected ? 'true' : 'false' }}"
                             @class([
-                                'group relative flex flex-col rounded-xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
+                                'group relative flex flex-col rounded-xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
                                 'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $providerSelected,
                                 'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => ! $providerSelected,
                             ])
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <span @class([
-                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
+                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
                                     'bg-brand-sage text-white ring-brand-sage/30' => $providerSelected,
                                     'bg-brand-sage/15 text-brand-forest ring-brand-sage/25 group-hover:bg-brand-sage/20' => ! $providerSelected,
                                 ])>
@@ -134,9 +134,9 @@
                                     'text-brand-ink/15' => ! $providerSelected,
                                 ]) aria-hidden="true" />
                             </div>
-                            <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Provision with a provider') }}</span>
-                            <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('We talk to DigitalOcean, AWS, Hetzner, Vultr, Linode and friends, then bring up a fresh VM ready for your stack.') }}</span>
-                            <div class="mt-3 flex flex-wrap gap-1.5">
+                            <span class="mt-2.5 block text-sm font-semibold text-brand-ink">{{ __('Provision with a provider') }}</span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-moss">{{ __('We talk to DigitalOcean, AWS, Hetzner, Vultr, Linode and friends, then bring up a fresh VM ready for your stack.') }}</span>
+                            <div class="mt-2 flex flex-wrap gap-1">
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('AWS') }}</span>
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
@@ -155,14 +155,14 @@
                             wire:target="chooseProviderMode,chooseCustomMode,chooseImportMode"
                             aria-pressed="{{ $customSelected ? 'true' : 'false' }}"
                             @class([
-                                'group relative flex flex-col rounded-xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
+                                'group relative flex flex-col rounded-xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
                                 'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $customSelected,
                                 'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => ! $customSelected,
                             ])
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <span @class([
-                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
+                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
                                     'bg-brand-sage text-white ring-brand-sage/30' => $customSelected,
                                     'bg-brand-sand/55 text-brand-forest ring-brand-ink/10 group-hover:bg-brand-sage/15 group-hover:text-brand-forest group-hover:ring-brand-sage/20' => ! $customSelected,
                                 ])>
@@ -174,9 +174,9 @@
                                     'text-brand-ink/15' => ! $customSelected,
                                 ]) aria-hidden="true" />
                             </div>
-                            <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Custom server (BYO)') }}</span>
-                            <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Bring your own machine: dply connects over SSH and treats it like any other host. No cloud APIs.') }}</span>
-                            <div class="mt-3 flex flex-wrap gap-1.5">
+                            <span class="mt-2.5 block text-sm font-semibold text-brand-ink">{{ __('Custom server (BYO)') }}</span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-moss">{{ __('Bring your own machine: dply connects over SSH and treats it like any other host. No cloud APIs.') }}</span>
+                            <div class="mt-2 flex flex-wrap gap-1">
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('SSH key auth') }}</span>
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Bare metal') }}</span>
                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Existing VPS') }}</span>
@@ -186,41 +186,59 @@
                         {{-- Import: custom mode's sibling — dply doesn't build the
                              machine, but everything it would have typed in comes
                              from the provider API instead of the operator. --}}
-                        @php $importSelected = $form->mode === 'import'; @endphp
+                        @php
+                            $importSelected = $form->mode === 'import';
+                            $importEnabled = \App\Livewire\Servers\Create\StepType::importModeEnabled();
+                        @endphp
                         <button
                             type="button"
                             wire:key="mode-import-{{ $importSelected ? 'on' : 'off' }}"
-                            wire:click="chooseImportMode"
-                            wire:loading.attr="disabled"
-                            wire:target="chooseProviderMode,chooseCustomMode,chooseImportMode"
-                            aria-pressed="{{ $importSelected ? 'true' : 'false' }}"
+                            @if ($importEnabled)
+                                wire:click="chooseImportMode"
+                                wire:loading.attr="disabled"
+                                wire:target="chooseProviderMode,chooseCustomMode,chooseImportMode"
+                                aria-pressed="{{ $importSelected ? 'true' : 'false' }}"
+                            @else
+                                disabled
+                                aria-disabled="true"
+                                title="{{ __('Coming soon') }}"
+                            @endif
                             @class([
-                                'group relative flex flex-col rounded-xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
-                                'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $importSelected,
-                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => ! $importSelected,
+                                'group relative flex flex-col rounded-xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-70',
+                                'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $importEnabled && $importSelected,
+                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => $importEnabled && ! $importSelected,
+                                'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $importEnabled,
                             ])
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <span @class([
-                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
-                                    'bg-brand-sage text-white ring-brand-sage/30' => $importSelected,
-                                    'bg-brand-sand/55 text-brand-forest ring-brand-ink/10 group-hover:bg-brand-sage/15 group-hover:text-brand-forest group-hover:ring-brand-sage/20' => ! $importSelected,
+                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
+                                    'bg-brand-sage text-white ring-brand-sage/30' => $importEnabled && $importSelected,
+                                    'bg-brand-sand/55 text-brand-forest ring-brand-ink/10 group-hover:bg-brand-sage/15 group-hover:text-brand-forest group-hover:ring-brand-sage/20' => $importEnabled && ! $importSelected,
+                                    'bg-brand-ink/5 text-brand-mist ring-brand-ink/10' => ! $importEnabled,
                                 ])>
                                     <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
                                 </span>
-                                <x-heroicon-s-check-circle @class([
-                                    'h-6 w-6 shrink-0 transition-colors',
-                                    'text-brand-sage' => $importSelected,
-                                    'text-brand-ink/15' => ! $importSelected,
-                                ]) aria-hidden="true" />
+                                @if ($importEnabled)
+                                    <x-heroicon-s-check-circle @class([
+                                        'h-6 w-6 shrink-0 transition-colors',
+                                        'text-brand-sage' => $importSelected,
+                                        'text-brand-ink/15' => ! $importSelected,
+                                    ]) aria-hidden="true" />
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                                @endif
                             </div>
-                            <span class="mt-4 block text-sm font-semibold text-brand-ink">{{ __('Scan & import existing') }}</span>
-                            <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Like custom, but we read it from the provider API: dply lists the machines on your account that it does not manage yet.') }}</span>
-                            <div class="mt-3 flex flex-wrap gap-1.5">
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('DigitalOcean') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hetzner') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Linode') }}</span>
-                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Vultr') }}</span>
+                            <span @class(['mt-4 block text-sm font-semibold', 'text-brand-ink' => $importEnabled, 'text-brand-moss' => ! $importEnabled])>{{ __('Scan & import existing') }}</span>
+                            <span @class(['mt-1 block text-xs leading-relaxed', 'text-brand-moss' => $importEnabled, 'text-brand-mist' => ! $importEnabled])>{{ __('Like custom, but we read it from the provider API: dply lists the machines on your account that it does not manage yet.') }}</span>
+                            <div class="mt-2 flex flex-wrap gap-1">
+                                @foreach ([__('DigitalOcean'), __('Hetzner'), __('Linode'), __('Vultr')] as $importProvider)
+                                    <span @class([
+                                        'inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
+                                        'border-brand-ink/10 bg-brand-sand/40 text-brand-moss' => $importEnabled,
+                                        'border-brand-ink/8 bg-brand-ink/[0.03] text-brand-mist' => ! $importEnabled,
+                                    ])>{{ $importProvider }}</span>
+                                @endforeach
                             </div>
                         </button>
                     </div>
@@ -240,7 +258,7 @@
                     :note="__('Letters, digits, dot, underscore, hyphen — up to 64 chars.')"
                     class="border-b border-brand-ink/10"
                 />
-                <div class="px-4 py-3.5 sm:px-5">
+                <div class="px-3 py-3 sm:px-4">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                         <div class="relative flex-1">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-brand-mist">

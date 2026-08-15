@@ -372,7 +372,9 @@ class OrgNetworking extends Component
         $org = Auth::user()->currentOrganization();
         $onNet = $network->servers->pluck('id');
 
+        // Machines only — a placeholder host has no NIC to attach.
         return Server::query()
+            ->onlyMachineHosts()
             ->where('organization_id', $org->id)
             ->where('provider', 'hetzner')
             ->whereNotIn('id', $onNet)
@@ -470,6 +472,7 @@ class OrgNetworking extends Component
         }
 
         $orgServers = Server::query()
+            ->onlyMachineHosts()
             ->where('organization_id', $org->id)
             ->where('status', Server::STATUS_READY)
             ->orderBy('name')

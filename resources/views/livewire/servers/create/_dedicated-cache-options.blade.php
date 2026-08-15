@@ -93,7 +93,7 @@
                     aria-pressed="{{ $selected ? 'true' : 'false' }}"
                     @disabled($comingSoon)
                     @class([
-                        'group relative flex w-full flex-col items-start rounded-2xl border-2 p-4 text-left transition-all disabled:cursor-wait',
+                        'group relative flex w-full flex-col items-start rounded-2xl border-2 p-3 text-left transition-all disabled:cursor-wait',
                         'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/10 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selected && ! $comingSoon,
                         'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => ! $selected && ! $comingSoon,
                         'cursor-not-allowed border-brand-ink/5 bg-brand-sand/20 opacity-80' => $comingSoon,
@@ -105,7 +105,7 @@
 
                     <span class="flex w-full items-start gap-3">
                         <span @class([
-                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
+                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
                             $card['iconWrap'],
                         ])>
                             <x-dynamic-component :component="$card['icon']" class="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -167,7 +167,7 @@
     {{-- Network access --}}
     <div class="rounded-2xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream/30 via-white to-white p-5 sm:p-6">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0 flex-1">
@@ -187,7 +187,7 @@
                 wire:target="chooseCacheNetworkAccess"
                 aria-pressed="{{ $networkMode === 'local' ? 'true' : 'false' }}"
                 @class([
-                    'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                    'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                     'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $networkMode === 'local',
                     'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $networkMode !== 'local',
                 ])
@@ -232,7 +232,7 @@
                 aria-pressed="{{ $networkMode === 'remote' ? 'true' : 'false' }}"
                 @disabled($remoteDisabled)
                 @class([
-                    'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                    'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                     'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $networkMode === 'remote' && ! $remoteDisabled,
                     'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $networkMode !== 'remote' && ! $remoteDisabled,
                     'cursor-not-allowed border-brand-ink/5 bg-brand-sand/10 opacity-70' => $remoteDisabled,
@@ -358,7 +358,7 @@
     @if ($supportsAuth)
         <div class="rounded-2xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream/30 via-white to-white p-5 sm:p-6">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0 flex-1">
@@ -377,7 +377,7 @@
                     wire:target="chooseCacheAuthMode"
                     aria-pressed="{{ $authMode === 'open' ? 'true' : 'false' }}"
                     @class([
-                        'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                        'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                         'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $authMode === 'open',
                         'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $authMode !== 'open',
                     ])
@@ -404,7 +404,7 @@
                     wire:target="chooseCacheAuthMode"
                     aria-pressed="{{ $authMode === 'password' ? 'true' : 'false' }}"
                     @class([
-                        'flex flex-col rounded-2xl border-2 p-4 text-left transition-all',
+                        'flex flex-col rounded-2xl border-2 p-3 text-left transition-all',
                         'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/25 ring-offset-2 ring-offset-white' => $authMode === 'password',
                         'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:bg-brand-sand/10' => $authMode !== 'password',
                     ])

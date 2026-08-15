@@ -21,6 +21,32 @@ class StepType extends Component
 {
     use InteractsWithServerCreateDraft;
 
+    /**
+     * "Scan & import existing" is switched off in config/server_create.php: the
+     * tile renders as a disabled "Coming soon" card, the action refuses, and
+     * the mode drops out of the accepted values so a stale draft can't walk
+     * into the scan step either.
+     *
+     * {@see \App\Livewire\Servers\Create\StepScan} is untouched and still works
+     * the moment the switch flips back.
+     */
+    public static function importModeEnabled(): bool
+    {
+        return (bool) config('server_create.import_mode_enabled', true);
+    }
+
+    /**
+     * Server-create modes on offer right now.
+     *
+     * @return list<string>
+     */
+    public static function availableModes(): array
+    {
+        return self::importModeEnabled()
+            ? ['provider', 'custom', 'import']
+            : ['provider', 'custom'];
+    }
+
     public ServerCreateForm $form;
 
     public ?string $launchSource = null;
@@ -55,12 +81,18 @@ class StepType extends Component
 
         $this->hydrateFormFromDraft($this->form, $draft);
 
+        // A draft saved while a mode was still on the menu must not strand the
+        // operator on a step whose only selection is now refused.
+        if (! in_array($this->form->mode, self::availableModes(), true)) {
+            $this->form->mode = 'provider';
+        }
+
         if ($draft === null) {
             // Defaults for a brand-new draft.
             if ($this->form->name === '') {
                 $this->form->name = ServerNameGenerator::generate();
             }
-            if ($this->form->mode === '' || ! in_array($this->form->mode, ['provider', 'custom', 'import'], true)) {
+            if ($this->form->mode === '' || ! in_array($this->form->mode, self::availableModes(), true)) {
                 $this->form->mode = 'provider';
             }
 
@@ -190,6 +222,12 @@ class StepType extends Component
      */
     public function chooseImportMode(): void
     {
+        // The tile is rendered disabled while import is off, but wire:click is
+        // still reachable — refuse here rather than trusting the markup.
+        if (! self::importModeEnabled()) {
+            return;
+        }
+
         $this->form->mode = 'import';
         // The provider is chosen on the scan step, alongside the credential.
         if ($this->form->type === 'custom') {
@@ -203,7 +241,7 @@ class StepType extends Component
 
         // Import mode adopts the provider's own name, so there is nothing to
         // validate here — the name field isn't even shown.
-        $rules = ['form.mode' => ['required', Rule::in(['provider', 'custom', 'import'])]];
+        $rules = ['form.mode' => ['required', Rule::in(self::availableModes())]];
         if ($this->form->mode !== 'import') {
             $rules['form.name'] = ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'];
         }

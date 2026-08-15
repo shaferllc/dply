@@ -15,7 +15,7 @@ return [
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', true), // https://www.vultr.com/
         'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', true), // https://upcloud.com/
 
-        'ovh' => env('DPLY_SERVER_PROVIDER_OVH', true), // https://www.ovhcloud.com/en/public-cloud/
+        'ovh' => env('DPLY_SERVER_PROVIDER_OVH', false), // https://www.ovhcloud.com/en/public-cloud/ — off for now; shown as coming soon
 
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/

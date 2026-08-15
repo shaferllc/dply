@@ -851,42 +851,34 @@ class Server extends Model
     }
 
     /**
-     * Query-side counterpart to {@see isDplyEdgeHost()}: drop the placeholder
-     * host rows dply creates to back Edge sites.
+     * Real machines only — every surface that says "servers" wants this.
      *
-     * These aren't machines — you don't provision, SSH into, or spec-tier them,
-     * and {@see WorkspaceOverview} already bounces them to
-     * /edge if you open one. Listing them in the fleet made "8 servers" count
-     * two Edge apps that live on the Edge surface, alongside a "Provisioning…"
-     * label and an empty metrics row that will never fill in.
+     * Edge apps, function namespaces, and Cloud containers are all backed by
+     * placeholder host rows so their Sites can share the workspace URL shape.
+     * They aren't machines: you don't provision, SSH into, or spec-tier them,
+     * and {@see \App\Livewire\Servers\WorkspaceOverview} bounces you to /edge,
+     * /serverless or /cloud if you open one. Listing them made "8 servers"
+     * count two Edge apps, each with a "Provisioning…" label and an empty
+     * metrics row that will never fill in.
      *
-     * The `meta->>'host_kind' is null` leg matters: a plain `!=` comparison
+     * Allowlisted rather than subtractive on purpose. This replaced a pair of
+     * scopes (withoutEdgeHosts / withoutServerlessHosts) that each excluded
+     * their own kinds by name and so both missed the three Cloud kinds
+     * entirely. A new managed-product host kind added tomorrow is excluded
+     * here by default instead of leaking into the fleet until someone notices.
+     *
+     * The `meta->>'host_kind' is null` leg matters: a plain IN comparison
      * yields NULL for rows with no host_kind (every BYO VM), which would filter
      * out the entire real fleet.
      */
-    public function scopeWithoutEdgeHosts(EloquentBuilder $query): EloquentBuilder
+    public function scopeOnlyMachineHosts(EloquentBuilder $query): EloquentBuilder
     {
         return $query->where(function (EloquentBuilder $q): void {
             $q->whereNull('meta->host_kind')
-                ->orWhere('meta->host_kind', '!=', self::HOST_KIND_DPLY_EDGE);
-        });
-    }
-
-    /**
-     * Query-side counterpart to {@see isServerlessHost()}: drop DO Functions /
-     * AWS Lambda namespace rows from the Servers inventory.
-     *
-     * Those hosts exist so function Sites can share the workspace URL shape, but
-     * they are not machines — they belong on `/serverless`, not `/servers`.
-     * Same null-host_kind leg as {@see scopeWithoutEdgeHosts()}.
-     */
-    public function scopeWithoutServerlessHosts(EloquentBuilder $query): EloquentBuilder
-    {
-        return $query->where(function (EloquentBuilder $q): void {
-            $q->whereNull('meta->host_kind')
-                ->orWhereNotIn('meta->host_kind', [
-                    self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-                    self::HOST_KIND_AWS_LAMBDA,
+                ->orWhereIn('meta->host_kind', [
+                    self::HOST_KIND_VM,
+                    self::HOST_KIND_DOCKER,
+                    self::HOST_KIND_KUBERNETES,
                 ]);
         });
     }

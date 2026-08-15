@@ -141,7 +141,9 @@ class Index extends Component
 
     protected function serversQuery(string $organizationId): Builder
     {
+        // Machines only, same as /servers — this is the fleet view.
         $query = Server::query()
+            ->onlyMachineHosts()
             ->where(function (Builder $q) use ($organizationId): void {
                 $q->where('organization_id', $organizationId)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));

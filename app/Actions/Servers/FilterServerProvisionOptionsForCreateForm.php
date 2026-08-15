@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 
 /**
  * Applies optional per-row rules from config/server_provision_options.php:
+ * - enabled: `false` withdraws the row from every picker (temporary rollbacks)
  * - providers: whitelist of form.type values (e.g. digitalocean, aws)
  * - exclude_providers: blacklist of form.type values
  * - requires_linked_credential: row is omitted until the org has a credential for this provider
@@ -24,12 +25,45 @@ final class FilterServerProvisionOptionsForCreateForm
 
     /** @var list<string> */
     private const STRIP_ROW_KEYS = [
+        'enabled',
         'providers',
         'exclude_providers',
         'requires_linked_credential',
         'only_server_roles',
         'exclude_server_roles',
     ];
+
+    /**
+     * Install profiles that should appear in the picker.
+     *
+     * Withdrawn profiles stay in config because their ids are internal
+     * identity — role → profile mapping, the dedicated database/cache create
+     * flows, and `Server::meta.install_profile` all resolve against the raw
+     * list. Only the picker filters.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function offeredInstallProfiles(): array
+    {
+        $rows = (array) config('server_provision_options.install_profiles', []);
+
+        return array_values(array_filter(
+            $rows,
+            static fn (mixed $row): bool => is_array($row) && ($row['enabled'] ?? true) !== false,
+        ));
+    }
+
+    /**
+     * A row is offered unless it carries an explicit `enabled => false`. Kept
+     * separate from the provider/role rules because it's a blanket withdrawal:
+     * it applies on the custom-provider path too, which skips filterRows().
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function rowIsEnabled(array $row): bool
+    {
+        return ($row['enabled'] ?? true) !== false;
+    }
 
     /**
      * @return array{
@@ -120,6 +154,9 @@ final class FilterServerProvisionOptionsForCreateForm
                 if (! is_array($row) || ! isset($row['id'])) {
                     continue;
                 }
+                if (! $this->rowIsEnabled($row)) {
+                    continue;
+                }
                 $stripped[] = Arr::except($row, self::STRIP_ROW_KEYS);
             }
             $out[$key] = array_values($stripped);
@@ -141,6 +178,9 @@ final class FilterServerProvisionOptionsForCreateForm
         $filtered = [];
         foreach ($rows as $row) {
             if (! is_array($row) || ! isset($row['id'])) {
+                continue;
+            }
+            if (! $this->rowIsEnabled($row)) {
                 continue;
             }
             if (($row['requires_linked_credential'] ?? false) === true && ! $hasLinkedCredentialForProvider) {

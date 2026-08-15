@@ -110,9 +110,9 @@ return [
     ],
 
     /*
-    | Database engines offered for install on BYO servers. MySQL, PostgreSQL,
-    | and SQLite are always available; the engines below start as "coming
-    | soon" until their install + operate path is validated. When a flag is
+    | Database engines offered for install on BYO servers. MySQL, MariaDB,
+    | PostgreSQL, and SQLite are always available; the engines below start as
+    | "coming soon" until their install + operate path is validated. When a flag is
     | off the engine shows a Soon badge + teaser in the Databases workspace
     | and is filtered out of the server-create database picker. Resolved
     | per-org by the hybrid resolver, so platform admin can flip them on
@@ -120,13 +120,13 @@ return [
     | App\Support\Servers\DatabaseEngineAvailability (`database.{engine}`).
     */
     'database' => [
-        // All parked: MySQL / PostgreSQL / SQLite are the only engines offered.
-        // Off now means HIDDEN, not "Soon" — see the cache note above.
+        // MySQL and MariaDB are the generally-available relational engines;
+        // MariaDB graduated out of this gate (see DatabaseEngineAvailability).
+        // Off below means HIDDEN, not "Soon" — see the cache note above.
         // NOTE: clickhouse backs the dply Logs add-on. Parking it only removes
         // it from the Databases tab strip and the create-server picker; an
         // existing ClickHouse install keeps working and stays manageable. A NEW
         // logs store can no longer be installed from the UI while this is off.
-        'mariadb' => false,
         'mongodb' => false,
         'clickhouse' => false,
     ],

@@ -6,7 +6,7 @@
     };
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     {{-- Import mode leaves the four-step build path: the machine exists, so
          there is no "what it runs" to choose. Two pills say so plainly. --}}
     <nav aria-label="{{ __('Import server progress') }}" class="mb-4">

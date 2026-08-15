@@ -78,6 +78,8 @@ final class ServerProviderGate
         'oracle',
         // VPS & cloud
         'upcloud',
+        // Other providers
+        'ovh',
         // DNS & CDN
         'gandi',
         'namecheap',

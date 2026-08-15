@@ -9,7 +9,7 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="4" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     @if (! $canCreateServer && $billingUrl)
@@ -61,10 +61,14 @@
     @endphp
 
     <form wire:submit.prevent="store" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-      <div class="space-y-6 min-w-0">
+      <div class="space-y-4 min-w-0">
 
         {{-- Hero --}}
+        {{-- Compact, and the facts ride as inline chips rather than three
+             bordered tiles — same shape Step 1 uses for its draft summary. The
+             tile version cost ~90px of header for three short values. --}}
         <x-hero-card
+            compact
             :eyebrow="__('Step :n of :total', ['n' => 4, 'total' => $totalSteps])"
             :title="__('Review and launch')"
             :description="__('Confirm what dply is about to spin up. The preflight panel on the right surfaces anything blocking before you can create.')"
@@ -73,16 +77,11 @@
         >
             @if (! empty($heroStats))
                 <x-slot:stats>
-                    <dl @class([
-                        'grid gap-2',
-                        'grid-cols-1' => count($heroStats) === 1,
-                        'grid-cols-2' => count($heroStats) === 2,
-                        'grid-cols-2 sm:grid-cols-3' => count($heroStats) === 3,
-                    ])>
+                    <dl class="flex flex-wrap items-center gap-1.5">
                         @foreach ($heroStats as $stat)
-                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
-                                <dd class="mt-1 truncate text-sm font-semibold text-brand-ink {{ $stat['mono'] ? 'font-mono tabular-nums' : '' }}">{{ $stat['value'] }}</dd>
+                            <div class="inline-flex min-w-0 items-baseline gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2 py-1">
+                                <dt class="shrink-0 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
+                                <dd class="truncate text-xs font-semibold text-brand-ink {{ $stat['mono'] ? 'font-mono tabular-nums' : '' }}">{{ $stat['value'] }}</dd>
                             </div>
                         @endforeach
                     </dl>
@@ -476,7 +475,7 @@
            The preflight checks panel stays in the main column where
            it has room; the cost preview lifts up here so the operator
            sees pricing at a glance while scanning the summary. --}}
-      <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+      <aside class="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div data-testid="k8s-billing-disclosure" class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">

@@ -5,13 +5,22 @@ namespace Tests\Unit\Servers\ServerImageCatalogTest;
 use App\Models\Server;
 use App\Support\Servers\ServerImageCatalog;
 
-test('offers ubuntu and debian options for supported providers', function () {
+test('offers only the enabled images for supported providers', function () {
     $keys = array_column(ServerImageCatalog::optionsForProvider('digitalocean'), 'id');
 
-    expect($keys)->toContain('ubuntu-24-04')
-        ->toContain('ubuntu-22-04')
-        ->toContain('debian-12')
-        ->toContain('debian-11');
+    expect($keys)->toContain('ubuntu-24-04');
+});
+
+test('images marked enabled=false are withdrawn from the picker and validation', function () {
+    $keys = array_column(ServerImageCatalog::optionsForProvider('digitalocean'), 'id');
+
+    // Still mapped in config (so provisioned servers resolve), just not offered.
+    foreach (['ubuntu-22-04', 'ubuntu-20-04', 'debian-12', 'debian-11'] as $retired) {
+        expect($keys)->not->toContain($retired);
+        expect(ServerImageCatalog::isOffered($retired))->toBeFalse();
+        expect(ServerImageCatalog::isValidForProvider('digitalocean', $retired))->toBeFalse();
+        expect(ServerImageCatalog::allowedKeysForProvider('digitalocean'))->not->toContain($retired);
+    }
 });
 
 test('resolves a chosen key to the provider-native slug', function () {
@@ -40,9 +49,9 @@ test('default key for provider prefers the global default when supported', funct
 });
 
 test('validates whether a key is offered for a provider', function () {
-    expect(ServerImageCatalog::isValidForProvider('hetzner', 'debian-11'))->toBeTrue();
+    expect(ServerImageCatalog::isValidForProvider('hetzner', 'ubuntu-24-04'))->toBeTrue();
     expect(ServerImageCatalog::isValidForProvider('hetzner', 'windows-2022'))->toBeFalse();
-    expect(ServerImageCatalog::allowedKeysForProvider('hetzner'))->toContain('debian-11');
+    expect(ServerImageCatalog::allowedKeysForProvider('hetzner'))->toContain('ubuntu-24-04');
 });
 
 test('resolves a slug from a server meta os_image', function () {

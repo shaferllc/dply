@@ -8,25 +8,28 @@ use Laravel\Pennant\Feature;
 
 /**
  * Single source of truth for which database engines are generally available vs.
- * "coming soon". MySQL, PostgreSQL, and SQLite are always available; MariaDB,
- * MongoDB, and ClickHouse are gated behind per-engine Pennant flags
+ * "coming soon". MySQL, MariaDB, PostgreSQL, and SQLite are always available;
+ * MongoDB and ClickHouse are gated behind per-engine Pennant flags
  * (`database.{engine}`) so platform admin can flip them on per-org or
  * platform-wide — mirroring {@see CacheEngineAvailability}.
  *
  * Consumed everywhere an engine can be offered or installed:
  *   - the Databases workspace tab strip + engine panel (Soon badge + teaser),
  *   - the WorkspaceDatabases install guard,
- *   - the server-create database picker (MariaDB variants).
+ *   - the server-create database picker.
  */
 final class DatabaseEngineAvailability
 {
     /**
      * Engines gated behind a `database.{engine}` Pennant flag. Anything not
-     * listed here (mysql, postgres, sqlite) is always available.
+     * listed here (mysql, mariadb, postgres, sqlite) is always available.
+     *
+     * MariaDB graduated out of the gate — it ships alongside MySQL as one of
+     * the two generally-available relational engines.
      *
      * @var list<string>
      */
-    public const GATED_ENGINES = ['mariadb', 'mongodb', 'clickhouse'];
+    public const GATED_ENGINES = ['mongodb', 'clickhouse'];
 
     public static function isComingSoon(string $engine): bool
     {

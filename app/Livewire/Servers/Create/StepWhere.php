@@ -41,6 +41,34 @@ class StepWhere extends Component
         ServerCreateActions::afterProviderCredentialStored insteadof ManagesProviderCredentials;
     }
 
+    /** Every host kind the wizard knows how to render, live or not. */
+    public const ALL_PROVIDER_HOST_KINDS = ['vm', 'docker', 'kubernetes'];
+
+    /**
+     * Host kinds on offer, from config/server_create.php. Anything switched off
+     * renders as a disabled "Coming soon" tile: the action refuses it,
+     * validation rejects it, and a draft that already carries one is pulled
+     * back to a plain VM.
+     *
+     * The Docker / Kubernetes wizard machinery behind them is untouched.
+     *
+     * @return list<string>
+     */
+    public static function availableProviderHostKinds(): array
+    {
+        $kinds = config('server_create.available_provider_host_kinds', self::ALL_PROVIDER_HOST_KINDS);
+
+        return is_array($kinds) ? array_values(array_filter(
+            self::ALL_PROVIDER_HOST_KINDS,
+            static fn (string $kind): bool => in_array($kind, $kinds, true),
+        )) : self::ALL_PROVIDER_HOST_KINDS;
+    }
+
+    public static function providerHostKindAvailable(string $kind): bool
+    {
+        return in_array($kind, self::availableProviderHostKinds(), true);
+    }
+
     public ServerCreateForm $form;
 
     public function mount(): mixed
@@ -52,6 +80,17 @@ class StepWhere extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
+
+        // A draft saved while Docker / Kubernetes were still on the menu would
+        // otherwise sit on a selection the step now refuses to validate.
+        if (! self::providerHostKindAvailable($this->form->provider_host_kind)) {
+            $this->form->provider_host_kind = 'vm';
+            if (in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true)) {
+                $this->form->type = '';
+                $this->active_provider = '';
+            }
+        }
+
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
             if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
@@ -145,7 +184,8 @@ class StepWhere extends Component
 
     public function chooseProviderHostKind(string $kind): void
     {
-        if (! in_array($kind, ['vm', 'docker', 'kubernetes'], true)) {
+        // Coming-soon kinds render disabled, but wire:click stays reachable.
+        if (! self::providerHostKindAvailable($kind)) {
             return;
         }
         $this->form->provider_host_kind = $kind;
@@ -377,7 +417,7 @@ class StepWhere extends Component
 
             $rules = [
                 'form.type' => ['required', 'string', 'max:64'],
-                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker', 'kubernetes'])],
+                'form.provider_host_kind' => ['required', Rule::in(self::availableProviderHostKinds())],
                 'form.provider_credential_id' => ['required', 'string'],
             ];
             $attributes = [

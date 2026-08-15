@@ -725,14 +725,16 @@ test('install refuses a coming soon database engine before queueing', function (
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
+    // mongodb, not mariadb: MariaDB is generally available now, so it is no
+    // longer an example of a gated engine (see DatabaseEngineAvailability).
     Livewire::actingAs($user)
         ->test(WorkspaceDatabases::class, ['server' => $server])
-        ->call('installDatabaseEngine', 'mariadb');
+        ->call('installDatabaseEngine', 'mongodb');
 
     Queue::assertNotPushed(InstallDatabaseEngineJob::class);
     $this->assertDatabaseMissing('server_database_engines', [
         'server_id' => $server->id,
-        'engine' => 'mariadb',
+        'engine' => 'mongodb',
     ]);
 });
 

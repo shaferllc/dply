@@ -35,12 +35,12 @@ return [
         [
             'id' => 'php_api',
             'label' => 'PHP API',
-            'summary' => 'Lean PHP API server with NGINX, PHP, and PostgreSQL.',
+            'summary' => 'Lean PHP API server with NGINX, PHP, and MySQL.',
             'server_role' => 'application',
             'cache_service' => 'redis',
             'webserver' => 'nginx',
             'php_version' => '8.3',
-            'database' => 'postgres17',
+            'database' => 'mysql84',
         ],
         [
             'id' => 'queue_worker',
@@ -48,12 +48,26 @@ return [
             'summary' => 'Background worker host focused on queues and scheduled jobs.',
             'server_role' => 'worker',
             'cache_service' => 'none',
-            'webserver' => 'caddy',
+            'webserver' => 'nginx',
             'php_version' => '8.3',
             'database' => 'none',
         ],
+        // ── Not offered in the profile picker ──────────────────────────────
+        // Each of these only restated a server_role and zeroed every other
+        // field, so the same machine appeared in both the profile and role
+        // pickers — two controls, one decision. Pick them from the role picker
+        // instead; a profile earns a slot only by bundling a distinct package
+        // set over a role (Laravel app vs PHP API over `application`, Queue
+        // worker's PHP + Supervisor preset over `worker`).
+        //
+        // They stay defined because the ids are internal identity, not just
+        // picker rows: ServerCreateActions maps role → profile id, the
+        // dedicated database/cache create flows set them directly, and
+        // Server::meta.install_profile is read back against them. Deleting the
+        // rows would strand every one of those lookups.
         [
             'id' => 'database_node',
+            'enabled' => false,
             'label' => 'Database node',
             'summary' => 'Dedicated database host with no web stack.',
             'server_role' => 'database',
@@ -64,6 +78,7 @@ return [
         ],
         [
             'id' => 'static_app_host',
+            'enabled' => false,
             'label' => 'Static app host',
             'summary' => 'Minimal host for static sites, proxies, or simple edge delivery.',
             'server_role' => 'plain',
@@ -74,6 +89,7 @@ return [
         ],
         [
             'id' => 'redis_server',
+            'enabled' => false,
             'label' => 'Cache / key-value server',
             'summary' => 'Dedicated cache host — Redis, Valkey, KeyDB, Dragonfly, or Memcached.',
             'server_role' => 'redis',
@@ -84,6 +100,7 @@ return [
         ],
         [
             'id' => 'valkey_server',
+            'enabled' => false,
             'label' => 'Valkey server',
             'summary' => 'Dedicated Valkey host for cache and queue workloads.',
             'server_role' => 'valkey',
@@ -98,9 +115,9 @@ return [
         [
             'id' => 'application',
             'label' => 'Web server',
-            'detail' => 'NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik; database (selectable); Redis or Valkey; Memcached; Certbot; Composer; PHP; NPM; Supervisor; Fail2ban; automatic security updates; UFW',
+            'detail' => 'NGINX; database (selectable); Redis or Valkey; Memcached; Certbot; Composer; PHP; NPM; Supervisor; Fail2ban; automatic security updates; UFW',
             'summary' => 'Best for hosting PHP apps with a full application stack on one server.',
-            'installs' => ['NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik', 'PHP', 'Composer', 'NPM', 'Selectable database', 'Redis or Valkey', 'Memcached', 'Certbot', 'Supervisor', 'Fail2ban', 'Automatic security updates', 'UFW'],
+            'installs' => ['NGINX', 'PHP', 'Composer', 'NPM', 'Selectable database', 'Redis or Valkey', 'Memcached', 'Certbot', 'Supervisor', 'Fail2ban', 'Automatic security updates', 'UFW'],
             'best_for' => 'Laravel, WordPress, and other app servers that need web, cache, queue, and database services together.',
             'does_not_include' => 'Does not split web, database, and cache services across dedicated machines.',
         ],
@@ -143,9 +160,9 @@ return [
         [
             'id' => 'worker',
             'label' => 'Worker server',
-            'detail' => 'PHP, Supervisor, Caddy (private placeholder)',
-            'summary' => 'Runs background jobs and queue workers; Caddy is installed only to host the standard deploy pipeline (no public traffic).',
-            'installs' => ['PHP', 'Supervisor', 'Caddy (placeholder vhost)'],
+            'detail' => 'PHP, Supervisor, NGINX (private placeholder)',
+            'summary' => 'Runs background jobs and queue workers; NGINX is installed only to host the standard deploy pipeline (no public traffic).',
+            'installs' => ['PHP', 'Supervisor', 'NGINX (placeholder vhost)'],
             'best_for' => 'Queues, scheduled jobs, Horizon-style workloads, and offloading background processing from the main app server.',
             'does_not_include' => 'Does not expose public web traffic, install SSL tooling, or install a database engine.',
         ],
@@ -184,10 +201,11 @@ return [
             'pros' => ['Battle-tested default', 'Fast and predictable', 'Strong reverse proxy support'],
             'cons' => ['Manual config is less beginner-friendly', 'Not as hands-off as Caddy'],
             'recommended' => true,
-            'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain', 'worker'],
+            'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain'],
         ],
         [
             'id' => 'apache',
+            'enabled' => false,
             'label' => 'Apache (httpd)',
             'summary' => 'Best when you need broad PHP app and legacy hosting compatibility.',
             'pros' => ['Wide shared-hosting compatibility', 'Good fit for older PHP apps', 'Flexible module ecosystem'],
@@ -196,6 +214,7 @@ return [
         ],
         [
             'id' => 'caddy',
+            'enabled' => false,
             'label' => 'Caddy',
             'summary' => 'Simplest option when you want automatic HTTPS and easy config.',
             'pros' => ['Automatic HTTPS by default', 'Clean configuration format', 'Great for simpler setups'],
@@ -204,6 +223,7 @@ return [
         ],
         [
             'id' => 'openlitespeed',
+            'enabled' => false,
             'label' => 'OpenLiteSpeed',
             'summary' => 'Useful when PHP throughput matters and you want LiteSpeed-style caching.',
             'pros' => ['Strong PHP performance', 'Built-in LiteSpeed cache features', 'Good fit for some WordPress workloads'],
@@ -212,6 +232,7 @@ return [
         ],
         [
             'id' => 'traefik',
+            'enabled' => false,
             'label' => 'Traefik',
             'summary' => 'Best for proxy-first routing and multi-service edge patterns.',
             'pros' => ['Excellent reverse proxy and routing model', 'Great for multi-service setups', 'Friendly for dynamic edge-style configs'],
@@ -267,18 +288,18 @@ return [
         ['id' => 'mariadb114', 'label' => 'MariaDB 11.4', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'mariadb11', 'label' => 'MariaDB 11', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'mariadb1011', 'label' => 'MariaDB 10.11 (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'postgres18', 'label' => 'PostgreSQL 18', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'postgres17', 'label' => 'PostgreSQL 17', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'postgres16', 'label' => 'PostgreSQL 16', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'postgres15', 'label' => 'PostgreSQL 15', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'postgres14', 'label' => 'PostgreSQL 14', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'sqlite3', 'label' => 'SQLite 3', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'postgres18', 'enabled' => false, 'label' => 'PostgreSQL 18', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'postgres17', 'enabled' => false, 'label' => 'PostgreSQL 17', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'postgres16', 'enabled' => false, 'label' => 'PostgreSQL 16', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'postgres15', 'enabled' => false, 'label' => 'PostgreSQL 15', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'postgres14', 'enabled' => false, 'label' => 'PostgreSQL 14', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'sqlite3', 'enabled' => false, 'label' => 'SQLite 3', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         // Document + OLAP engines. Gated behind database.mongodb / database.clickhouse
         // (DatabaseEngineAvailability::familyForProvisionOption maps the id → flag),
         // so they're hidden from the picker until the flag is on. ClickHouse is the
         // store for the dply logs add-on.
-        ['id' => 'mongodb', 'label' => 'MongoDB 7.0', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'clickhouse', 'label' => 'ClickHouse (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'mongodb', 'enabled' => false, 'label' => 'MongoDB 7.0', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'clickhouse', 'enabled' => false, 'label' => 'ClickHouse (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         // Same broadening as php_versions — Static-host preset is role
         // 'static' with no DB; the role list shouldn't gate that.
         ['id' => 'none', 'label' => 'None (external or not on this host)'],

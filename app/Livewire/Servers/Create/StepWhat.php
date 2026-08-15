@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Create;
 
+use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\ResolveKubernetesClusters;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
@@ -38,6 +40,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class StepWhat extends Component
 {
+    use DispatchesToastNotifications;
     use InteractsWithServerCreateDraft;
     use ServerCreateActions;
 
@@ -519,6 +522,15 @@ class StepWhat extends Component
             return;
         }
 
+        // Coming-soon templates render as disabled tiles, but the wire:click is
+        // still a public entry point — refuse them here too rather than trusting
+        // the markup.
+        if (! $catalog->isAvailable($presetId)) {
+            $this->toastError(__(':name is coming soon.', ['name' => $preset['name']]));
+
+            return;
+        }
+
         $this->selectedPreset = $presetId;
         $this->selectedBlueprintId = '';
         $this->form->server_blueprint_id = '';
@@ -672,7 +684,7 @@ class StepWhat extends Component
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
             'reachedStep' => $this->currentDraft()?->step ?? 3,
             'provisionOptions' => $context['provisionOptions'],
-            'installProfiles' => config('server_provision_options.install_profiles', []),
+            'installProfiles' => FilterServerProvisionOptionsForCreateForm::offeredInstallProfiles(),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
             'selectedPreset' => $this->selectedPreset,
             'orgBlueprints' => $orgBlueprints,

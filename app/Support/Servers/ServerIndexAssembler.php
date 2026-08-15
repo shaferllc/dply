@@ -131,6 +131,11 @@ final class ServerIndexAssembler
             'server_role' => is_array($server->meta) && is_string($server->meta['server_role'] ?? null)
                 ? $server->meta['server_role']
                 : null,
+            // What kind of host this row actually is (vm / docker / kubernetes /
+            // …). A consumer that mirrors these rows needs it to avoid treating
+            // a non-machine host as a VM — and to apply the same
+            // onlyMachineHosts() judgement locally.
+            'host_kind' => $server->hostKind(),
             'installed_stack' => InstalledStack::fromMeta($server)->toArray(),
             // Reachability verdict already ships as health_status; the timestamp
             // is what renders "Last checked 2 days ago" next to it.

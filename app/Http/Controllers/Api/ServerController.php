@@ -22,7 +22,14 @@ class ServerController extends Controller
     {
         $organization = $request->attributes->get('api_organization');
 
+        // Machines only, same as the /servers UI. Edge apps, function
+        // namespaces and Cloud containers are placeholder host rows belonging
+        // to /edge, /serverless and /cloud; shipping them here put "servers" in
+        // a consumer's fleet that can't be SSHed into, sized, or provisioned —
+        // and the local production mirror then materialized them as if they
+        // were VMs.
         $servers = Server::query()
+            ->onlyMachineHosts()
             ->where('organization_id', $organization->id)
             ->with([
                 'workspace:id,name',

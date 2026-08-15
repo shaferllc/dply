@@ -9,11 +9,11 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="3" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-      <div class="space-y-6 min-w-0">
+      <div class="space-y-4 min-w-0">
         {{-- Hero --}}
         @php
             if ($isKubernetes) {
@@ -339,21 +339,32 @@
                     @foreach ($featuredPresets as $preset)
                         <button
                             type="button"
-                            wire:click="applyPreset('{{ $preset['id'] }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="applyPreset"
+                            @if ($preset['available'])
+                                wire:click="applyPreset('{{ $preset['id'] }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="applyPreset"
+                            @else
+                                disabled
+                                aria-disabled="true"
+                                title="{{ __('Coming soon') }}"
+                            @endif
                             @class([
                                 'group relative flex flex-col items-start rounded-2xl border-2 p-5 text-left shadow-sm transition-all disabled:cursor-wait',
-                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
-                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
+                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $preset['available'] && $selectedPreset === $preset['id'],
+                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $preset['available'] && $selectedPreset !== $preset['id'],
+                                // Coming soon: readable but plainly inert — no hover
+                                // lift, no pointer, muted body copy.
+                                'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $preset['available'],
                             ])
                         >
-                            @if ($preset['id'] === 'polyglot')
+                            @if (! $preset['available'])
+                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                            @elseif ($preset['id'] === 'polyglot')
                                 <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-gold ring-1 ring-brand-gold/30">{{ __('Differentiator') }}</span>
                             @endif
-                            <span class="text-sm font-semibold text-brand-ink">{{ $preset['name'] }}</span>
-                            <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $preset['description'] }}</span>
-                            @if ($selectedPreset === $preset['id'])
+                            <span @class(['text-sm font-semibold', 'text-brand-ink' => $preset['available'], 'text-brand-moss' => ! $preset['available']])>{{ $preset['name'] }}</span>
+                            <span @class(['mt-1 text-xs leading-5', 'text-brand-moss' => $preset['available'], 'text-brand-mist' => ! $preset['available']])>{{ $preset['description'] }}</span>
+                            @if ($preset['available'] && $selectedPreset === $preset['id'])
                                 <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                                     <x-heroicon-m-check class="h-3 w-3" />
                                     {{ __('Picked') }}
@@ -380,17 +391,27 @@
                         @foreach ($otherPresets as $preset)
                             <button
                                 type="button"
-                                wire:click="applyPreset('{{ $preset['id'] }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="applyPreset"
+                                @if ($preset['available'])
+                                    wire:click="applyPreset('{{ $preset['id'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyPreset"
+                                @else
+                                    disabled
+                                    aria-disabled="true"
+                                    title="{{ __('Coming soon') }}"
+                                @endif
                                 @class([
-                                    'relative flex flex-col items-start rounded-2xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait',
-                                    'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
-                                    'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
+                                    'relative flex flex-col items-start rounded-2xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait',
+                                    'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $preset['available'] && $selectedPreset === $preset['id'],
+                                    'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $preset['available'] && $selectedPreset !== $preset['id'],
+                                    'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $preset['available'],
                                 ])
                             >
-                                <span class="text-sm font-semibold text-brand-ink">{{ $preset['name'] }}</span>
-                                <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $preset['description'] }}</span>
+                                @unless ($preset['available'])
+                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                                @endunless
+                                <span @class(['text-sm font-semibold', 'text-brand-ink' => $preset['available'], 'text-brand-moss' => ! $preset['available']])>{{ $preset['name'] }}</span>
+                                <span @class(['mt-1 text-xs leading-5', 'text-brand-moss' => $preset['available'], 'text-brand-mist' => ! $preset['available']])>{{ $preset['description'] }}</span>
                                 <span
                                     wire:loading
                                     wire:target="applyPreset('{{ $preset['id'] }}')"
@@ -433,7 +454,7 @@
                     :note="__('Override below if needed')"
                     class="border-b border-brand-ink/10"
                 />
-                <div class="px-4 py-3.5 sm:px-5">
+                <div class="px-3 py-3 sm:px-4">
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         @if ($selectedInstallProfile)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
@@ -510,7 +531,7 @@
                 :note="__('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.')"
                 class="border-b border-brand-ink/10"
             />
-            <div class="px-4 py-3.5 sm:px-5">
+            <div class="px-3 py-3 sm:px-4">
                 <div class="sm:max-w-md">
                     @include('livewire.servers.create._rich-select', [
                         'id' => 'os_image',
@@ -758,7 +779,7 @@
       </div>
 
       {{-- Sidebar: explain the new vocabulary so the user gets it. --}}
-      <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+      <aside class="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">

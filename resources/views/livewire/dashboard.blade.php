@@ -81,7 +81,9 @@
     $primaryLabel = multi_surface_active() ? __('Open launchpad') : __('Add a server');
     $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights');
     $shellDescription = __('Run infrastructure, track health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
-    $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors';
+    // Sized for the dense one-line panel head, and matching the Marketplace /
+    // Open servers buttons further down so every control on the page is one size.
+    $headerBtn = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors';
 
     $serversStatClass = $serverCount > 0
         ? 'group relative rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-3 py-2 transition hover:border-brand-sage/50 focus-within:ring-2 focus-within:ring-brand-sage/40'
@@ -95,8 +97,9 @@
 @endphp
 
 <div class="contents">
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <x-profile-shell
+            dense
             :title="__('Welcome back, :name', ['name' => $displayName])"
             :description="$shellDescription"
             icon="heroicon-o-squares-2x2"
@@ -107,7 +110,7 @@
                     wire:navigate
                     class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
                 >
-                    <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Credentials') }}
                 </a>
                 <button
@@ -115,7 +118,7 @@
                     class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
                     x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
                 >
-                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    <x-heroicon-o-document-text class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Setup guide') }}
                 </button>
                 <a
@@ -123,13 +126,15 @@
                     wire:navigate
                     class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
                 >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ $primaryLabel }}
                 </a>
             </x-slot:actions>
 
             <x-slot:stats>
-                <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {{-- Dense profile-shell hands the stats slot a bare bordered strip,
+                     so the padding lives here and matches the panel head above. --}}
+                <dl class="grid grid-cols-1 gap-2 px-3 py-2 sm:grid-cols-3 sm:px-4">
                     <div class="{{ $serversStatClass }}">
                         <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View servers') }}"></a>
                         <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
@@ -178,16 +183,14 @@
             </x-slot:stats>
 
             @if ($healthAlert !== null)
-                <div class="border-b border-brand-ink/10 bg-rose-50/80 px-5 py-4 sm:px-6" role="alert">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-800 ring-1 ring-rose-200/80">
-                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
-                                <h2 class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Infrastructure needs attention') }}</h2>
-                                <p class="mt-1 text-xs leading-relaxed text-rose-800">
+                <div class="border-b border-brand-ink/10 bg-rose-50/80 px-3 py-2 sm:px-4" role="alert">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
+                            <div class="min-w-0 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2">
+                                <h2 class="text-sm font-semibold text-rose-900">{{ __('Infrastructure needs attention') }}</h2>
+                                <span class="hidden h-4 w-px shrink-0 bg-rose-900/15 sm:block" aria-hidden="true"></span>
+                                <p class="text-xs leading-relaxed text-rose-800">
                                     @if ($healthAlert['failed_latest'] > 0)
                                         {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $healthAlert['failed_latest'], ['count' => $healthAlert['failed_latest']]) }}
                                     @endif
@@ -200,42 +203,40 @@
                                 </p>
                             </div>
                         </div>
-                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
+                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
                             {{ __('View infrastructure health') }}
-                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         </a>
                     </div>
                 </div>
             @endif
 
             @unless ($hasProviderCredentials)
-                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-4 sm:px-6">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80">
-                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                                <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h2>
-                                <p class="mt-1 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.') }}</p>
+                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-3 py-2 sm:px-4">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <x-heroicon-o-shield-exclamation class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                            <div class="min-w-0 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2">
+                                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h2>
+                                <span class="hidden h-4 w-px shrink-0 bg-amber-900/15 sm:block" aria-hidden="true"></span>
+                                <p class="text-xs leading-relaxed text-brand-moss">{{ __('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.') }}</p>
                             </div>
                         </div>
-                        <div class="flex shrink-0 flex-wrap gap-2 sm:items-center">
+                        <div class="flex shrink-0 flex-wrap gap-1.5 sm:items-center">
                             <a
                                 href="{{ route('credentials.index') }}"
                                 wire:navigate
-                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
                             >
-                                <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-key class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Connect provider') }}
                             </a>
                             <a
                                 href="{{ route('docs.connect-provider') }}"
                                 wire:navigate
-                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-document-text class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Setup guide') }}
                             </a>
                         </div>
@@ -246,46 +247,47 @@
             {{-- Platform surfaces + Quick actions --}}
             <div class="grid gap-0 border-b border-brand-ink/10 xl:grid-cols-[1.7fr_1fr] xl:divide-x xl:divide-brand-ink/10">
                 <section class="min-w-0" aria-labelledby="dashboard-platform-heading">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Platform') }}</p>
-                            <h2 id="dashboard-platform-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Operate from one place') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Jump straight into the surface you need — every workspace lives next to the next.') }}</p>
-                        </div>
+                    <x-workspace-panel-head
+                        dense
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-rectangle-stack"
+                        title-id="dashboard-platform-heading"
+                        :title="__('Platform')"
+                        :note="__('Jump straight into the surface you need — every workspace lives next to the next.')"
+                    >
                         @feature('surface.marketplace')
-                            <a
-                                href="{{ route('marketplace.index') }}"
-                                wire:navigate
-                                class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Marketplace') }}
-                            </a>
+                            <x-slot:actions>
+                                <a
+                                    href="{{ route('marketplace.index') }}"
+                                    wire:navigate
+                                    class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Marketplace') }}
+                                </a>
+                            </x-slot:actions>
                         @endfeature
-                    </div>
-                    <div class="grid gap-3 p-5 sm:grid-cols-2 sm:px-6 sm:py-5">
+                    </x-workspace-panel-head>
+                    <div class="grid gap-2 px-3 py-3 sm:grid-cols-2 sm:px-4">
                         @foreach ($platformSurfaces as $surface)
                             <a
                                 href="{{ $surface['href'] }}"
                                 wire:navigate
-                                class="group flex items-start gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md"
+                                class="group flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md"
                             >
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $tonePalette['sage'] }}">
                                     @switch($surface['icon'])
                                         @case('server-stack')
-                                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                                            <x-heroicon-o-server-stack class="h-4 w-4" aria-hidden="true" />
                                             @break
                                         @case('globe-alt')
-                                            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                                            <x-heroicon-o-globe-alt class="h-4 w-4" aria-hidden="true" />
                                             @break
                                         @case('rectangle-stack')
-                                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                                            <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
                                             @break
                                         @case('building-office-2')
-                                            <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
+                                            <x-heroicon-o-building-office-2 class="h-4 w-4" aria-hidden="true" />
                                             @break
                                     @endswitch
                                 </span>
@@ -294,7 +296,7 @@
                                         <span class="text-sm font-semibold text-brand-ink">{{ $surface['title'] }}</span>
                                         <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
                                     </div>
-                                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $surface['description'] }}</p>
+                                    <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $surface['description'] }}</p>
                                 </div>
                             </a>
                         @endforeach
@@ -302,26 +304,24 @@
                 </section>
 
                 <section class="min-w-0" aria-labelledby="dashboard-shortcuts-heading">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shortcuts') }}</p>
-                            <h2 id="dashboard-shortcuts-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Keep the workspace ready') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Setup tasks that unblock provisioning, access, and team ops.') }}</p>
-                        </div>
-                    </div>
+                    <x-workspace-panel-head
+                        dense
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-bolt"
+                        title-id="dashboard-shortcuts-heading"
+                        :title="__('Shortcuts')"
+                        :note="__('Setup tasks that unblock provisioning, access, and team ops.')"
+                    />
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($quickActions as $action)
                             <li>
                                 <a
                                     href="{{ $action['href'] }}"
                                     wire:navigate
-                                    class="group flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6"
+                                    class="group flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-4"
                                 >
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette[$action['tone']] }}">
+                                    <div class="flex min-w-0 items-start gap-2.5">
+                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $tonePalette[$action['tone']] }}">
                                             @switch($action['icon'])
                                                 @case('key')
                                                     <x-heroicon-o-key class="h-4 w-4" aria-hidden="true" />
@@ -339,7 +339,7 @@
                                         </span>
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-brand-ink">{{ $action['title'] }}</p>
-                                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
+                                            <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $action['description'] }}</p>
                                         </div>
                                     </div>
                                     <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
@@ -354,24 +354,25 @@
             <div class="{{ $insightsGridClass }}">
                 @if ($hasWorkspaceInsights)
                     <section class="min-w-0 border-b border-brand-ink/10 lg:border-b-0" aria-labelledby="dashboard-insights-heading">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
-                                <h2 id="dashboard-insights-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('What needs attention first') }}</h2>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across every server plus the noisiest ones.') }}</p>
-                            </div>
-                            <a
-                                href="{{ route('servers.index') }}"
-                                wire:navigate
-                                class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-m-server-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Open servers') }}
-                            </a>
-                        </div>
+                        <x-workspace-panel-head
+                            dense
+                            class="border-b border-brand-ink/10"
+                            icon="heroicon-o-chart-bar"
+                            title-id="dashboard-insights-heading"
+                            :title="__('What needs attention first')"
+                            :note="__('Severity rollup across every server plus the noisiest ones.')"
+                        >
+                            <x-slot:actions>
+                                <a
+                                    href="{{ route('servers.index') }}"
+                                    wire:navigate
+                                    class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-m-server-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Open servers') }}
+                                </a>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
                         @if ($orgInsights && ($openFindings > 0 || $avgHealthScore !== null))
                             @php
@@ -385,7 +386,7 @@
                                     ? 'rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2'
                                     : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
                             @endphp
-                            <div class="grid gap-2 px-5 py-5 sm:grid-cols-3 sm:px-6">
+                            <div class="grid gap-2 px-3 py-3 sm:grid-cols-3 sm:px-4">
                                 <div class="{{ $criticalClass }}">
                                     <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
                                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -416,7 +417,7 @@
                                             <a
                                                 href="{{ route('servers.insights', $row['id']) }}"
                                                 wire:navigate
-                                                class="flex items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-brand-sand/15 sm:px-6"
+                                                class="flex items-center justify-between gap-4 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4"
                                             >
                                                 <div class="min-w-0 flex-1">
                                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</p>
@@ -441,7 +442,7 @@
                                 </ul>
                             @endif
                         @else
-                            <div class="flex flex-col items-center justify-center px-5 py-12 text-center sm:px-6">
+                            <div class="flex flex-col items-center justify-center px-3 py-8 text-center sm:px-4">
                                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                     <x-heroicon-o-sparkles class="h-6 w-6" aria-hidden="true" />
                                 </span>
@@ -469,22 +470,18 @@
                 @endif
 
                 <section class="min-w-0" aria-labelledby="dashboard-recent-servers-heading">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-                            <h2 id="dashboard-recent-servers-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Recent servers') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The five most recently added boxes in your workspace.') }}</p>
-                        </div>
-                        @if ($serverCount > 0)
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $serverCount }}</span>
-                        @endif
-                    </div>
+                    <x-workspace-panel-head
+                        dense
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-server-stack"
+                        title-id="dashboard-recent-servers-heading"
+                        :title="__('Recent servers')"
+                        :note="__('The five most recently added boxes in your workspace.')"
+                        :count="$serverCount > 0 ? $serverCount : null"
+                    />
 
                     @if ($servers->isEmpty())
-                        <div class="flex flex-col items-center justify-center px-5 py-12 text-center sm:px-6">
+                        <div class="flex flex-col items-center justify-center px-3 py-8 text-center sm:px-4">
                             <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                             </span>
@@ -521,7 +518,7 @@
                                     <a
                                         href="{{ route('servers.show', $server) }}"
                                         wire:navigate
-                                        class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6"
+                                        class="flex items-center justify-between gap-4 px-3 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-4"
                                     >
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -530,6 +527,9 @@
                                                     <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
                                                 @endif
                                             </div>
+                                            {{-- One meta line, not two: host/provider facts and the
+                                                 site/age facts wrap together, which costs a row of
+                                                 height only when the column is genuinely too narrow. --}}
                                             <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                                 @if ($server->ip_address)
                                                     <span class="font-mono text-brand-moss">{{ $server->ip_address }}</span>
@@ -546,15 +546,14 @@
                                                     <span aria-hidden="true" class="text-brand-mist/50">·</span>
                                                     <span class="font-mono">{{ $server->size }}</span>
                                                 @endif
-                                            </p>
-                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
-                                                <span class="inline-flex items-center gap-1">
+                                                <span aria-hidden="true" class="text-brand-mist/50">·</span>
+                                                <span class="inline-flex items-center gap-1 text-brand-moss">
                                                     <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
                                                     {{ $server->sites_count }} {{ trans_choice('site|sites', $server->sites_count) }}
                                                 </span>
                                                 @if ($server->created_at)
                                                     <span aria-hidden="true" class="text-brand-mist/50">·</span>
-                                                    <span class="inline-flex items-center gap-1">
+                                                    <span class="inline-flex items-center gap-1 text-brand-moss">
                                                         <x-heroicon-m-clock class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
                                                         {{ __('added :time', ['time' => $server->created_at->diffForHumans()]) }}
                                                     </span>
@@ -569,7 +568,7 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 text-right sm:px-6">
+                        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 text-right sm:px-4">
                             <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
                                 {{ __('View all servers') }}
                                 <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />

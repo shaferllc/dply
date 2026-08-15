@@ -123,7 +123,13 @@ final class ListExistingProviderServers
      */
     private function query(Organization $org, ?string $providerType = null): Collection
     {
+        // Machines only. Every caller of this query — the "Where your servers
+        // are installed" panel, the region counts behind the region picker, and
+        // the role rollups — is answering "what infrastructure do I already run
+        // on this provider", and an Edge app or a function namespace is not
+        // infrastructure you can co-locate a new VM with.
         $query = Server::query()
+            ->onlyMachineHosts()
             ->where('organization_id', $org->id)
             ->whereNotNull('provider')
             ->withCount('sites')

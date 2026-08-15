@@ -20,6 +20,11 @@ return [
     | To add a provider to the picker, add its slug under each image below — no
     | other code changes are needed for the catalog to resolve it.
     |
+    | `enabled => false` takes an image out of the picker (and out of create
+    | validation) without deleting its slug map: servers already provisioned on
+    | that image keep resolving to the right native slug and keep their label on
+    | review/summary screens. Flip it back to true to re-offer the image.
+    |
     */
 
     'default' => 'ubuntu-24-04',
@@ -39,6 +44,7 @@ return [
         ],
 
         'ubuntu-22-04' => [
+            'enabled' => false,
             'label' => 'Ubuntu 22.04 LTS',
             'family' => 'ubuntu',
             'slugs' => [
@@ -50,6 +56,7 @@ return [
         ],
 
         'ubuntu-20-04' => [
+            'enabled' => false,
             'label' => 'Ubuntu 20.04 LTS',
             'family' => 'ubuntu',
             'slugs' => [
@@ -62,6 +69,7 @@ return [
         ],
 
         'debian-12' => [
+            'enabled' => false,
             'label' => 'Debian 12 (Bookworm)',
             'family' => 'debian',
             'slugs' => [
@@ -73,6 +81,7 @@ return [
         ],
 
         'debian-11' => [
+            'enabled' => false,
             'label' => 'Debian 11 (Bullseye)',
             'family' => 'debian',
             'slugs' => [

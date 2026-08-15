@@ -120,12 +120,11 @@ return [
                     'cache.keydb' => 'KeyDB',
                     'cache.dragonfly' => 'Dragonfly',
                 ],
-                // Database engines. MySQL / PostgreSQL / SQLite are always
-                // available (no flag). Each leaf off = "coming soon": Soon
-                // badge + teaser in the Databases workspace, hidden from the
-                // server-create database picker (MariaDB variants).
+                // Database engines. MySQL / MariaDB / PostgreSQL / SQLite are
+                // always available (no flag). Each leaf off = "coming soon":
+                // Soon badge + teaser in the Databases workspace, hidden from
+                // the server-create database picker.
                 'Database engines' => [
-                    'database.mariadb' => 'MariaDB',
                     'database.mongodb' => 'MongoDB',
                     'database.clickhouse' => 'ClickHouse',
                 ],
