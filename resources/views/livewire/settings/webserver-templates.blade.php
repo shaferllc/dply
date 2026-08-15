@@ -33,20 +33,20 @@
         >
             <x-slot:stats>
                 <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Templates at a glance') }}">
-                    <x-fleet-stat :label="__('Templates')">
+                    <x-infrastructure-stat :label="__('Templates')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->count() }}</span>
                             <span class="text-xs text-brand-moss">{{ trans_choice('saved|saved', $templates->count()) }}</span>
                         </p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Engines')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Engines')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->pluck('engine')->unique()->count() }}</span>
                             <span class="text-xs text-brand-moss">{{ __('in use') }}</span>
                         </p>
                         <p class="mt-1 text-xs text-brand-mist">{{ count($engines) }} {{ __('supported') }}</p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Editor')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Editor')">
                         <p class="mt-2 flex items-center gap-1.5">
                             @if ($editingId)
                                 <x-heroicon-m-pencil-square class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
@@ -57,7 +57,7 @@
                             @endif
                         </p>
                         <p class="mt-1 truncate text-xs text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
-                    </x-fleet-stat>
+                    </x-infrastructure-stat>
                 </dl>
             </x-slot:stats>
 

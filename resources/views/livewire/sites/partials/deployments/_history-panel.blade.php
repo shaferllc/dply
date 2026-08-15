@@ -168,7 +168,7 @@
                                 <span class="font-mono text-2xs text-brand-mist">{{ $deployment->id }}</span>
                                 @if ($isFailed && ops_copilot_active())
                                     <a
-                                        href="{{ route('fleet.copilot', ['site' => $site->id]) }}"
+                                        href="{{ route('infrastructure.copilot', ['site' => $site->id]) }}"
                                         wire:navigate
                                         class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-forest hover:text-brand-sage"
                                     >

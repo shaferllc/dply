@@ -30,7 +30,7 @@ class Show extends Component
                 'teams',
                 'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
                 'apiTokens',
-                'notificationWebhookDestinations',
+                'notificationChannels',
             ]);
     }
 

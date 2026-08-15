@@ -6,6 +6,7 @@ use App\Actions\Organizations\EnsureUserHasWorkspaceOrganization;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Forms\RegisterForm;
 use App\Models\BetaInvitation;
+use App\Models\OrganizationInvitation;
 use App\Models\User;
 use App\Modules\Referrals\Services\ReferralAttribution;
 use Illuminate\Auth\Events\Registered;
@@ -32,6 +33,16 @@ class Register extends Component
     public ?string $invite = null;
 
     /**
+     * Organization-invitation token from the Teams/Members invite email
+     * (?org_invite=…). Distinct from the beta `invite` above: this one doesn't
+     * grant beta, it means a real workspace is waiting for this address. It
+     * likewise opens the door when public signups are closed — someone with a
+     * live invitation is not a cold signup.
+     */
+    #[Url(as: 'org_invite')]
+    public ?string $orgInvite = null;
+
+    /**
      * Email is locked to the invited address when redeeming — preserves the
      * 1:1 invite→person→free-box attribution.
      */
@@ -40,10 +51,19 @@ class Register extends Component
     public function mount(): void
     {
         $invitation = $this->resolveInvitation();
+        $orgInvitation = $this->resolveOrgInvitation();
+
+        // An organization invitation is its own reason to let someone in: the
+        // address was invited by name, so lock the form to it and skip the
+        // closed-signups gate.
+        if ($orgInvitation !== null) {
+            $this->form->email = $orgInvitation->email;
+            $this->emailLocked = true;
+        }
 
         // A valid, unredeemed invite bypasses the closed-signups gate. Without
         // one, closed signups send the visitor to the waitlist as before.
-        if ($invitation === null && ! Feature::active('global.signups_open')) {
+        if ($invitation === null && $orgInvitation === null && ! Feature::active('global.signups_open')) {
             // A token that's present but no longer valid is a warm lead — funnel
             // them to the waitlist with a friendly note rather than a dead end.
             if (filled($this->invite)) {
@@ -83,6 +103,26 @@ class Register extends Component
     }
 
     /**
+     * The live organization invitation for the current token, or null when
+     * absent/invalid/expired, or when that address already has an account
+     * (they should sign in and accept, not register a second time).
+     */
+    private function resolveOrgInvitation(): ?OrganizationInvitation
+    {
+        if (blank($this->orgInvite)) {
+            return null;
+        }
+
+        $invitation = OrganizationInvitation::where('token', $this->orgInvite)->first();
+
+        if ($invitation === null || $invitation->isExpired()) {
+            return null;
+        }
+
+        return User::where('email', $invitation->email)->exists() ? null : $invitation;
+    }
+
+    /**
      * The redeemable invite for the current token, or null when absent/invalid.
      */
     private function resolveInvitation(): ?BetaInvitation
@@ -99,12 +139,17 @@ class Register extends Component
     public function submit(): mixed
     {
         $invitation = $this->resolveInvitation();
+        $orgInvitation = $this->resolveOrgInvitation();
 
         // Re-pin the email to the invite server-side — never trust a client that
         // edited the locked field.
+        if ($orgInvitation !== null) {
+            $this->form->email = $orgInvitation->email;
+        }
+
         if ($invitation !== null) {
             $this->form->email = $invitation->email;
-        } elseif (! Feature::active('global.signups_open')) {
+        } elseif ($orgInvitation === null && ! Feature::active('global.signups_open')) {
             // Token went stale between mount and submit (expired/redeemed/revoked)
             // and signups are still closed — don't mint an account.
             session()->flash('status', __('That beta invite is no longer valid. Join the waitlist and we’ll send a fresh one.'));
@@ -136,9 +181,14 @@ class Register extends Component
         session()->regenerate();
         session(['current_organization_id' => $organization->id]);
 
-        $target = $user->hasVerifiedEmail()
-            ? route('dashboard')
-            : route('verification.notice');
+        // Straight back to the invitation they came from, so the account they
+        // just made lands them in the workspace that invited them rather than
+        // in a fresh empty one.
+        $target = match (true) {
+            $orgInvitation !== null => route('invitations.accept', ['token' => $orgInvitation->token]),
+            $user->hasVerifiedEmail() => route('dashboard'),
+            default => route('verification.notice'),
+        };
 
         return $this->redirect($target, navigate: true);
     }

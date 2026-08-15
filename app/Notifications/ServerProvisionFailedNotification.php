@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Server;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -25,6 +29,9 @@ use Illuminate\Support\Str;
  */
 class ServerProvisionFailedNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -35,7 +42,7 @@ class ServerProvisionFailedNotification extends Notification implements ShouldQu
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -74,5 +81,24 @@ class ServerProvisionFailedNotification extends Notification implements ShouldQu
             'ip' => $this->server->ip_address,
             'error_excerpt' => $this->errorExcerpt,
         ];
+    }
+
+    /**
+     * Provisioning has already exhausted auto-retry by the time this fires, so
+     * the server is stuck until a human acts — the definition of critical.
+     */
+    public function pagerDutySeverity(object $notifiable): ?string
+    {
+        return PagerDutyMessage::SEVERITY_CRITICAL;
+    }
+
+    public function pagerDutyDedupKey(object $notifiable): ?string
+    {
+        return 'dply:provision-failed:'.$this->server->id;
+    }
+
+    public function pagerDutySource(object $notifiable): string
+    {
+        return (string) ($this->server->name ?: $this->server->id);
     }
 }

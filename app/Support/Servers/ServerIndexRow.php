@@ -137,10 +137,14 @@ final readonly class ServerIndexRow
                 && ((string) ($row['setup_status'] ?? '')) === Server::SETUP_STATUS_DONE;
         }
 
+        // Manage stays in this app: live.servers.show materializes the remote
+        // host into a local mirror stub and opens the real workspace, so the
+        // Production row is operable here instead of bouncing to the remote
+        // control plane. Journey has no local mirror equivalent and stays remote.
         return self::fromPayload(
             $row,
-            manageHref: rtrim($remoteBaseUrl, '/').'/servers/'.$id,
-            manageExternal: true,
+            manageHref: route('live.servers.show', $id),
+            manageExternal: false,
             workspaceHref: null,
             insightsHref: null,
             journeyHref: rtrim($remoteBaseUrl, '/').'/servers/'.$id.'/journey',
@@ -307,14 +311,23 @@ final readonly class ServerIndexRow
         $sites = self::listOfMaps($row['sites'] ?? null);
         $services = self::listOfMaps($row['services'] ?? null);
         $related = self::listOfMaps($row['related'] ?? null);
-        if ($rewriteNestedHrefs && $remoteBaseUrl !== '') {
-            $sites = array_map(static function (array $site) use ($remoteBaseUrl, $id): array {
-                $site['href'] = rtrim($remoteBaseUrl, '/').'/servers/'.$id.'/sites/'.($site['id'] ?? '');
+        // Nested cards point at the local mirror entries, matching manageHref.
+        // These render with wire:navigate whenever manageExternal is false, so
+        // they have to be app-relative — an absolute remote URL would break it.
+        if ($rewriteNestedHrefs) {
+            $sites = array_map(static function (array $site): array {
+                $siteId = (string) ($site['id'] ?? '');
+                if ($siteId !== '') {
+                    $site['href'] = route('live.sites.show', $siteId);
+                }
 
                 return $site;
             }, $sites);
-            $related = array_map(static function (array $peer) use ($remoteBaseUrl): array {
-                $peer['href'] = rtrim($remoteBaseUrl, '/').'/servers/'.($peer['id'] ?? '');
+            $related = array_map(static function (array $peer): array {
+                $peerId = (string) ($peer['id'] ?? '');
+                if ($peerId !== '') {
+                    $peer['href'] = route('live.servers.show', $peerId);
+                }
 
                 return $peer;
             }, $related);

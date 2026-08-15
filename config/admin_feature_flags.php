@@ -194,7 +194,6 @@ return [
             'description' => 'Cross-line org surfaces and launch workflows.',
             'groups' => [
                 'Surfaces' => [
-                    'surface.fleet' => 'Fleet ops views',
                     'surface.marketplace' => 'Marketplace',
                     'surface.projects' => 'Projects',
                     'surface.scripts' => 'Scripts',

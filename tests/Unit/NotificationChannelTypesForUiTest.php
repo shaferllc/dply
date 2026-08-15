@@ -10,6 +10,14 @@ test('types for ui intersects with config', function () {
     expect(NotificationChannel::typesForUi())->toBe(['slack', 'webhook']);
 });
 
+test('intercom is a known type and surfaces when enabled', function () {
+    expect(NotificationChannel::types())->toContain(NotificationChannel::TYPE_INTERCOM);
+
+    config(['notification_channels.enabled_types' => ['slack', 'intercom']]);
+
+    expect(NotificationChannel::typesForUi())->toContain(NotificationChannel::TYPE_INTERCOM);
+});
+
 test('types for ui preserves type when disabled in config', function () {
     config(['notification_channels.enabled_types' => ['slack']]);
 

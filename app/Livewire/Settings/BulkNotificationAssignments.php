@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\BuildsIntercomChannelInput;
+use App\Livewire\Concerns\BuildsPagerDutyChannelInput;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -9,7 +11,10 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
 use App\Support\NotificationSubscriptionRules;
 use App\Support\ServerSystemdServiceNotificationKeys;
 use Illuminate\Contracts\View\View;
@@ -24,6 +29,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class BulkNotificationAssignments extends Component
 {
+    use BuildsIntercomChannelInput;
+    use BuildsPagerDutyChannelInput;
     use DispatchesToastNotifications;
 
     /** @var list<int|string> */
@@ -75,6 +82,34 @@ class BulkNotificationAssignments extends Component
     public string $quick_new_mobile_device_token = '';
 
     public string $quick_new_mobile_platform = 'ios';
+
+    public string $quick_new_intercom_access_token = '';
+
+    public string $quick_new_intercom_region = 'us';
+
+    public string $quick_new_intercom_admin_id = '';
+
+    public string $quick_new_intercom_recipient = '';
+
+    public string $quick_new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $quick_new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $quick_new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $quick_new_intercom_subject = '';
+
+    public string $quick_new_pagerduty_routing_key = '';
+
+    public string $quick_new_pagerduty_region = 'us';
+
+    public string $quick_new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $quick_new_pagerduty_source = '';
+
+    public string $quick_new_pagerduty_component = '';
+
+    public string $quick_new_pagerduty_group = '';
 
     public string $quick_new_webhook_url = '';
 
@@ -435,7 +470,7 @@ class BulkNotificationAssignments extends Component
                 'quick_new_pushover_user_key' => ['required', 'string', 'max:255'],
             ],
             NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000'],
+                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000', MicrosoftTeamsClient::urlRule()],
             ],
             NotificationChannel::TYPE_ROCKETCHAT => $base + [
                 'quick_new_rocketchat_webhook_url' => ['required', 'url', 'max:2000'],
@@ -447,6 +482,8 @@ class BulkNotificationAssignments extends Component
                 'quick_new_mobile_device_token' => ['required', 'string', 'max:4000'],
                 'quick_new_mobile_platform' => ['required', 'string', 'in:ios,android'],
             ],
+            NotificationChannel::TYPE_INTERCOM => $base + $this->intercomValidationRules('quick_new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $base + $this->pagerDutyValidationRules('quick_new_'),
             default => $base + [
                 'quick_new_webhook_url' => ['required', 'url', 'max:2000'],
             ],
@@ -458,7 +495,7 @@ class BulkNotificationAssignments extends Component
      */
     protected function quickChannelValidationAttributes(): array
     {
-        return [
+        return $this->intercomValidationAttributes('quick_new_') + $this->pagerDutyValidationAttributes('quick_new_') + [
             'quick_new_owner_scope' => __('owner'),
             'quick_new_type' => __('type'),
             'quick_new_label' => __('label'),
@@ -506,6 +543,8 @@ class BulkNotificationAssignments extends Component
                 'device_token' => $this->quick_new_mobile_device_token,
                 'platform' => $this->quick_new_mobile_platform,
             ],
+            NotificationChannel::TYPE_INTERCOM => $this->intercomConfigFromInput('quick_new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $this->pagerDutyConfigFromInput('quick_new_'),
             default => ['url' => $this->quick_new_webhook_url],
         };
     }
@@ -526,6 +565,20 @@ class BulkNotificationAssignments extends Component
         $this->quick_new_google_chat_webhook_url = '';
         $this->quick_new_mobile_device_token = '';
         $this->quick_new_mobile_platform = 'ios';
+        $this->quick_new_intercom_access_token = '';
+        $this->quick_new_intercom_region = 'us';
+        $this->quick_new_intercom_admin_id = '';
+        $this->quick_new_intercom_recipient = '';
+        $this->quick_new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->quick_new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->quick_new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->quick_new_intercom_subject = '';
+        $this->quick_new_pagerduty_routing_key = '';
+        $this->quick_new_pagerduty_region = 'us';
+        $this->quick_new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->quick_new_pagerduty_source = '';
+        $this->quick_new_pagerduty_component = '';
+        $this->quick_new_pagerduty_group = '';
         $this->quick_new_webhook_url = '';
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\ProductionData;
 
-use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Models\ProductionDataConnection;
 use App\Models\Server;
@@ -24,6 +23,7 @@ final class ProductionSiteMaterializer
 {
     public function __construct(
         private readonly ProductionDataMirror $mirror,
+        private readonly ProductionServerMaterializer $servers,
     ) {}
 
     /**
@@ -130,6 +130,10 @@ final class ProductionSiteMaterializer
     }
 
     /**
+     * Delegates to ProductionServerMaterializer so the mirror-stub shape lives
+     * in one place. A site payload names the host `server_name`, so map it onto
+     * the server payload's `name` before handing it over.
+     *
      * @param  array<string, mixed>  $payload
      */
     private function upsertServer(
@@ -138,36 +142,9 @@ final class ProductionSiteMaterializer
         User $user,
         string $serverId,
     ): Server {
-        $org = $user->currentOrganization();
-        $server = Server::query()->find($serverId);
-
-        if ($server !== null && (int) $server->organization_id !== (int) $org->id) {
-            throw new RuntimeException('Production server id collides with a local server in another organization.');
-        }
-
-        if ($server === null) {
-            $server = new Server;
-            $server->id = $serverId;
-        }
-
-        $meta = is_array($server->meta) ? $server->meta : [];
-        $meta['production_data_mirror'] = true;
-        $meta['production_base_url'] = $connection->base_url;
-
-        $server->fill([
-            'user_id' => $server->user_id ?: $user->id,
-            'organization_id' => $org->id,
-            'name' => (string) (($payload['server_name'] ?? $server->name) ?: 'production-server'),
-            'provider' => $server->provider ?? ServerProvider::Custom,
-            'status' => Server::STATUS_READY,
-            'setup_status' => Server::SETUP_STATUS_DONE,
-            'ssh_port' => $server->ssh_port ?: 22,
-            'ssh_user' => $server->ssh_user ?: 'dply',
-            'meta' => $meta,
-        ]);
-        $server->save();
-
-        return $server;
+        return $this->servers->upsert($connection, $user, $serverId, array_filter([
+            'name' => $payload['server_name'] ?? null,
+        ], static fn ($value): bool => $value !== null));
     }
 
     /**

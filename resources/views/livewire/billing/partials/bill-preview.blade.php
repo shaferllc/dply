@@ -11,7 +11,7 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/30 px-5 py-5 sm:px-6">
+    <div class="border-b border-brand-ink/10 bg-brand-cream/30 px-3 py-3 sm:px-4">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-gold/90">{{ __('What would it cost?') }}</h2>
@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+    <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
         <span class="text-xs font-semibold uppercase tracking-wider text-brand-ink/60 mr-2">{{ __('Quick picks') }}</span>
         @foreach ($presets as $preset)
             <button type="button"
@@ -51,11 +51,11 @@
         </button>
     </div>
 
-    <div class="px-5 py-4 text-xs text-brand-moss sm:px-6">
+    <div class="px-3 py-2 text-xs text-brand-moss sm:px-4">
         {{ __('Add servers of any size — your plan is set by total server count, not size. Managed products are billed separately.') }}
     </div>
 
-    <div class="px-5 pb-5 sm:px-6">
+    <div class="px-3 pb-3 sm:px-4">
         <div class="flex items-center gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-brand-cream/30">
             <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-brand-ink">{{ __('Servers') }}</p>
@@ -83,7 +83,7 @@
         </div>
     </div>
 
-    <div class="border-t border-brand-ink/10 bg-brand-cream/40 px-5 py-5 text-sm sm:px-6">
+    <div class="border-t border-brand-ink/10 bg-brand-cream/40 px-3 py-3 text-sm sm:px-4">
         <div class="flex items-center justify-between">
             <span class="text-brand-moss">
                 {{ __('Plan') }} (<span x-text="previewServerCount"></span> <span x-text="previewServerCount === 1 ? '{{ __('server') }}' : '{{ __('servers') }}'"></span>)

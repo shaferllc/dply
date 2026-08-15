@@ -310,11 +310,6 @@ return [
             'group' => 'organization',
         ],
         [
-            'route' => 'organizations.automation',
-            'slug' => 'org-automation',
-            'group' => 'organization',
-        ],
-        [
             'route' => 'organizations.members',
             'slug' => 'org-members',
             'group' => 'organization',

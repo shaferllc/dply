@@ -50,13 +50,16 @@
     @persist('site-sidebar-'.$site->id)
     <div class="{{ $card }}">
         <div class="ws-hide-collapsed border-b border-brand-ink/10 p-4 sm:p-5">
-            @if ($site->usesEdgeRuntime())
+            {{-- The @feature guards keep these "back to the index" links from
+                 pointing at a parked surface: the workspace stays reachable for
+                 existing sites, but its index is gated. --}}
+            @if ($site->usesEdgeRuntime() && feature('surface.edge'))
                 <a href="{{ route('edge.index') }}" wire:navigate
                     class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Back to Edge sites') }}
                 </a>
-            @elseif ($site->usesFunctionsRuntime())
+            @elseif ($site->usesFunctionsRuntime() && feature('surface.serverless'))
                 <a href="{{ route('serverless.index') }}" wire:navigate
                     class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />

@@ -3,6 +3,9 @@
 namespace App\Livewire\Organizations;
 
 use App\Actions\Organizations\DeleteOrganizationAction;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ApiToken;
 use App\Models\Organization;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
@@ -10,13 +13,25 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\WithFileUploads;
 
+/**
+ * Every organization-level setting an admin can change.
+ *
+ * The old "Automation & API" tab (email defaults, Cloud alert destinations,
+ * Edge data region, API tokens) folded in here in 2026-08: none of it was
+ * automation the org *ran*, it was all settings that happened to be about
+ * automated things, and splitting them across two admin pages meant no single
+ * place answered "what is configured for this org".
+ */
 #[Layout('layouts.app')]
 class Settings extends Component
 {
+    use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
     use WithFileUploads;
 
     public Organization $organization;
@@ -35,6 +50,19 @@ class Settings extends Component
 
     public string $delete_confirm = '';
 
+    public bool $deploy_email_notifications_enabled = true;
+
+    public bool $email_server_credentials_enabled = false;
+
+    public bool $email_database_credentials_enabled = false;
+
+    public string $edge_data_region = 'default';
+
+    public string $alert_slack_webhook_url = '';
+
+    /** Comma- or newline-separated emails for the destinations textarea. */
+    public string $alert_extra_emails_input = '';
+
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -47,6 +75,34 @@ class Settings extends Component
         $this->email = (string) ($organization->email ?? '');
         $this->description = (string) ($organization->description ?? '');
         $this->timezone = (string) ($organization->timezone ?? '');
+        $this->loadOrganizationRelations();
+    }
+
+    /**
+     * Post-mutation reload: re-fetch from the DB to pick up the change.
+     *
+     * NB: do not rename loadOrganizationRelations() to hydrateOrganization().
+     * Livewire treats `hydrate{Property}` as a lifecycle hook for the public
+     * $organization property and invokes it from outside the class — which
+     * lands in __call for a protected method and throws BadMethodCallException.
+     */
+    protected function refreshOrganization(): void
+    {
+        $this->organization = $this->organization->fresh();
+        $this->loadOrganizationRelations();
+    }
+
+    protected function loadOrganizationRelations(): void
+    {
+        $this->organization->load(['apiTokens']);
+
+        $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
+        $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
+        $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
+        $this->edge_data_region = (string) ($this->organization->edge_data_region ?: 'default');
+        $this->alert_slack_webhook_url = (string) ($this->organization->alert_slack_webhook_url ?: '');
+        $emails = (array) ($this->organization->alert_extra_emails ?? []);
+        $this->alert_extra_emails_input = implode("\n", array_filter($emails, 'is_string'));
     }
 
     public function saveGeneral(): void
@@ -82,7 +138,7 @@ class Settings extends Component
             $this->organization->only(['name', 'slug', 'email', 'description', 'timezone']),
         );
 
-        session()->flash('settings_status', __('Organization settings saved.'));
+        $this->toastSuccess(__('Organization settings saved.'));
     }
 
     /** Fires when an icon file is chosen — validate, store, set it immediately. */
@@ -112,7 +168,7 @@ class Settings extends Component
 
         $this->reset('org_icon_upload');
         $this->recordIconChange($old, $path);
-        session()->flash('settings_status', __('Icon updated.'));
+        $this->toastSuccess(__('Icon updated.'));
     }
 
     public function removeOrgIcon(): void
@@ -126,7 +182,184 @@ class Settings extends Component
             $this->recordIconChange($old, null);
         }
 
-        session()->flash('settings_status', __('Icon removed.'));
+        $this->toastSuccess(__('Icon removed.'));
+    }
+
+    public function updatedDeployEmailNotificationsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'deploy_email_notifications_enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.deploy_email_notifications_updated', null, null, [
+            'enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Deploy email preferences updated.'));
+    }
+
+    public function updatedEmailServerCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_server_credentials_enabled' => $this->email_server_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_server_credentials_updated', null, null, [
+            'enabled' => $this->email_server_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Server credentials email preference updated.'));
+    }
+
+    public function updatedEmailDatabaseCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_database_credentials_enabled' => $this->email_database_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_database_credentials_updated', null, null, [
+            'enabled' => $this->email_database_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Database credentials email preference updated.'));
+    }
+
+    public function updatedEdgeDataRegion(): void
+    {
+        $this->authorize('update', $this->organization);
+        // Data residency only applies when the Edge surface is on (the UI is
+        // gated the same way) — block a stale/forged client from writing it.
+        abort_unless(Feature::active('surface.edge'), 404);
+
+        $allowed = ['default', 'eu', 'weur', 'eeur', 'wnam', 'enam', 'apac', 'oc'];
+        if (! in_array($this->edge_data_region, $allowed, true)) {
+            $this->edge_data_region = 'default';
+        }
+
+        $previous = (string) ($this->organization->edge_data_region ?: 'default');
+        $this->organization->update(['edge_data_region' => $this->edge_data_region]);
+
+        audit_log(
+            $this->organization,
+            auth()->user(),
+            'organization.edge_data_region_updated',
+            null,
+            ['edge_data_region' => $previous],
+            ['edge_data_region' => $this->edge_data_region],
+        );
+
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Edge data region updated.'));
+    }
+
+    public function saveAlertDestinations(): void
+    {
+        $this->authorize('update', $this->organization);
+        // Cloud alerts only exist when the Cloud surface is on (the UI is gated
+        // the same way) — block a stale/forged client from writing them anyway.
+        abort_unless(Feature::active('surface.cloud'), 404);
+
+        $this->validate([
+            'alert_slack_webhook_url' => ['nullable', 'url', 'max:500', 'starts_with:https://'],
+            'alert_extra_emails_input' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'alert_slack_webhook_url.starts_with' => __('Slack webhook URLs start with https://'),
+        ]);
+
+        // Parse the textarea: one email per line or comma-separated.
+        $raw = preg_split('/[\s,]+/', $this->alert_extra_emails_input) ?: [];
+        $emails = [];
+        foreach ($raw as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate === '') {
+                continue;
+            }
+            if (filter_var($candidate, FILTER_VALIDATE_EMAIL) === false) {
+                $this->addError('alert_extra_emails_input', __('Invalid email: :email', ['email' => $candidate]));
+
+                return;
+            }
+            $emails[$candidate] = true;
+        }
+        $emails = array_keys($emails);
+
+        $previous = [
+            'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
+            'alert_extra_emails' => $this->organization->alert_extra_emails,
+        ];
+
+        $this->organization->update([
+            'alert_slack_webhook_url' => trim($this->alert_slack_webhook_url) ?: null,
+            'alert_extra_emails' => $emails,
+        ]);
+
+        audit_log(
+            $this->organization,
+            auth()->user(),
+            'organization.alert_destinations_updated',
+            null,
+            $previous,
+            [
+                'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
+                'alert_extra_emails' => $this->organization->alert_extra_emails,
+            ],
+        );
+
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Alert destinations saved.'));
+    }
+
+    /**
+     * Opens the confirm modal without embedding JSON in wire:click (which breaks HTML attributes).
+     */
+    public function promptRevokeApiToken(string $apiTokenId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $apiToken = ApiToken::query()
+            ->where('organization_id', $this->organization->id)
+            ->whereKey($apiTokenId)
+            ->first();
+
+        if ($apiToken === null) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'revokeApiToken',
+            [$apiToken->id],
+            __('Revoke API token'),
+            __('Revoke :name? Integrations using this token will stop working immediately. This cannot be undone.', ['name' => $apiToken->name]),
+            __('Revoke token'),
+            true
+        );
+    }
+
+    public function revokeApiToken(int|string $apiTokenId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $apiToken = ApiToken::where('organization_id', $this->organization->id)->findOrFail($apiTokenId);
+
+        // Same audit shape the API keys settings page writes — an admin
+        // revoking another member's token is exactly the event you want a
+        // trail for, and this path had none.
+        $snapshot = [
+            'token_id' => (string) $apiToken->id,
+            'token_name' => $apiToken->name,
+            'token_prefix' => $apiToken->token_prefix,
+            'abilities' => $apiToken->abilities,
+            'expires_at' => $apiToken->expires_at?->toIso8601String(),
+        ];
+        $apiToken->delete();
+
+        audit_log($this->organization, auth()->user(), 'api_token.revoked', null, $snapshot, null);
+
+        $this->refreshOrganization();
+        $this->toastSuccess(__('API token revoked.'));
     }
 
     public function deleteOrganization(DeleteOrganizationAction $action): mixed

@@ -67,7 +67,7 @@ Module→shell dependency fails the build.
 | **Backups** | Site/DB backup engine. |
 | **Snapshots** | Server/site snapshots. |
 | **Realtime** | Managed Pusher-compatible relay (Cloudflare Workers + DO). |
-| **Notifications** | Notification channels + event dispatch (server errors, webserver ops). |
+| **Notifications** | Notification channels + event dispatch (server errors, webserver ops). Also owns the **Laravel notification drivers** under `Channels/<Provider>/` (Intercom, PagerDuty, MicrosoftTeams) registered by `NotificationsServiceProvider` — the module's only provider, added when the first driver landed. |
 | **Marketplace** | Script/runbook marketplace + imports. |
 | **Roadmap** | Public roadmap + admin kanban + post-deploy AI auto-update. |
 | **Docs** | `/docs` front-matter docs system (manifest, contextual sidebar). |

@@ -35,10 +35,6 @@ final class OrganizationCostObservatory
         $unknownCount = (int) collect($serverRows)->where('source', 'unknown')->count();
         $dplyCents = $state->monthlyTotalCents;
 
-        $forgePerServer = (int) config('subscription.observatory.forge_per_server_cents', 1200);
-        $forgeServerCount = max(1, $state->serverCount());
-        $forgeBaselineCents = $forgePerServer * $forgeServerCount;
-
         return [
             'dply_platform_cents' => $dplyCents,
             'provider_infrastructure_cents' => $knownProviderCents,
@@ -47,13 +43,6 @@ final class OrganizationCostObservatory
             'provider_unknown_count' => $unknownCount,
             'provider_server_count' => count($serverRows),
             'servers' => $serverRows,
-            'comparison' => [
-                'forge_per_server_cents' => $forgePerServer,
-                'forge_baseline_cents' => $forgeBaselineCents,
-                'forge_plus_provider_cents' => $forgeBaselineCents + $knownProviderCents,
-                'dply_plus_provider_cents' => $dplyCents + $knownProviderCents,
-                'delta_vs_forge_cents' => ($dplyCents + $knownProviderCents) - ($forgeBaselineCents + $knownProviderCents),
-            ],
             'disclaimer' => __('Provider costs are catalog estimates or notes you saved on each server — not invoiced amounts. Dply bills its platform fee separately from your cloud provider.'),
         ];
     }

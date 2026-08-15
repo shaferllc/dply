@@ -5,7 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * DEPRECATED (2026-08-14) — superseded by NotificationChannel + NotificationSubscription.
+ *
+ * This was a second, weaker fan-out off the same NotificationEvent: 3 drivers vs
+ * 10, 9 hard-coded events vs the full config/notification_events.php catalogue,
+ * pasted URLs only, no test-send, and a Teams driver still posting a MessageCard
+ * to an Office 365 connector Microsoft retired in May 2026.
+ *
+ * All UI and the routing call are gone; rows were copied across by
+ * 2026_08_14_120000_migrate_webhook_destinations_to_notification_channels.
+ * The class and table are kept only so that migration stays recoverable by hand —
+ * drop both once you are satisfied nothing was lost.
+ */
 /**
  * @property string $id
  * @property string $driver
@@ -17,8 +31,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $webhook_url
  * @property-read ?Organization $organization
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class NotificationWebhookDestination extends Model
 {

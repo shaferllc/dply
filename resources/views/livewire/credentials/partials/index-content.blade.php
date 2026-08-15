@@ -130,23 +130,23 @@
          so an empty workspace doesn't read as a wall of greyed-out tiles. --}}
     @if ($credentials->isEmpty())
         <section @class([
-            'rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-5 sm:p-6' => empty($useOrgShell),
-            'border-b border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+            'rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-4' => empty($useOrgShell),
+            'border-b border-brand-ink/10 bg-brand-sage/5 px-5 py-3 sm:px-6' => ! empty($useOrgShell),
         ])>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
-                    <x-heroicon-o-link class="h-6 w-6" aria-hidden="true" />
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
+                    <x-heroicon-o-link class="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your first provider') }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a provider below to link an API token. Tokens are encrypted before they hit disk and verified when possible.') }}</p>
+                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Pick a provider below to link an API token. Tokens are encrypted before they hit disk and verified when possible.') }}</p>
                 </div>
                 <button
                     type="button"
                     x-on:click="$dispatch('open-add-provider-credential-modal')"
-                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition hover:bg-brand-forest"
+                    class="inline-flex h-6 shrink-0 items-center gap-1 rounded-lg bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
                 >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Connect a provider') }}
                 </button>
             </div>
@@ -161,8 +161,8 @@
          section still paints its padding and bottom rule as a blank band. --}}
     @if (! empty($providerNav))
     <section aria-label="{{ __('Pick a provider') }}" @class([
-        'space-y-6' => empty($useOrgShell),
-        'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+        'space-y-4' => empty($useOrgShell),
+        'space-y-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6' => ! empty($useOrgShell),
     ])>
         @foreach ($providerNav as $group)
             @php
@@ -202,7 +202,7 @@
                         @endif
                     </span>
                 </div>
-                <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($groupItems as $item)
                         @php
                             $count = $this->credentialCountFor($item['id']);
@@ -219,72 +219,67 @@
                                 @endif
                                 @disabled($isComing)
                                 @class([
-                                    'group relative flex w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
-                                    'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $count === 0,
-                                    'border-brand-sage/35 hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $count > 0,
+                                    'group relative flex h-full w-full items-center gap-2.5 rounded-xl border bg-white p-2.5 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
+                                    'border-brand-ink/10 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $count === 0,
+                                    'border-brand-sage/35 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $count > 0,
                                     'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
                                 ])
                             >
-                                <div class="flex w-full items-start justify-between gap-2">
-                                    <span @class([
-                                        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-brand-ink/10',
-                                        'bg-brand-sage/12 text-brand-forest' => $count > 0 && ! $isComing,
-                                        'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $count === 0 || $isComing,
-                                    ])>
-                                        <x-credentials-provider-icon :provider="$item['id']" class="h-5 w-5" />
-                                    </span>
-                                    @if ($isComing)
-                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
-                                    @elseif ($count > 0)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
-                                            <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                            {{ $count }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
-                                    <p class="mt-0.5 text-xs text-brand-moss">
+                                {{-- Horizontal card: icon, identity, state. A quarter
+                                     the height of the old stacked tile, and the whole
+                                     row still reads left-to-right in one pass. --}}
+                                <span @class([
+                                    'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-brand-ink/10',
+                                    'bg-brand-sage/12 text-brand-forest' => $count > 0 && ! $isComing,
+                                    'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $count === 0 || $isComing,
+                                ])>
+                                    <x-credentials-provider-icon :provider="$item['id']" class="h-4 w-4" />
+                                </span>
+
+                                {{-- The name owns its own line at full width: sharing a
+                                     row with the count and action chips squeezed it to
+                                     nothing on narrow columns. State + capability dots
+                                     ride the line beneath it. --}}
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-sm font-semibold text-brand-ink" title="{{ $item['label'] }}">{{ $item['label'] }}</span>
+                                    <span class="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-brand-moss">
                                         @if ($isComing)
-                                            {{ __('Coming soon') }}
+                                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                                         @elseif ($count === 0)
-                                            {{ __('Not connected') }}
+                                            <span class="truncate">{{ __('Not connected') }}</span>
                                         @else
-                                            {{ trans_choice(':n credential|:n credentials', $count, ['n' => $count]) }}
-                                            @if ($firstCred?->created_at)
-                                                <span class="text-brand-mist"> · </span>
-                                                <span title="{{ $firstCred->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $firstCred->created_at->diffForHumans()]) }}</span>
+                                            <span class="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-brand-sage/15 px-1.5 font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                                <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
+                                                {{ $count }}
+                                            </span>
+                                            {{-- Capability dots: the colour is the
+                                                 information, the label is the fallback
+                                                 where the column is wide enough. --}}
+                                            @foreach (array_slice($sampleCaps, 0, 3) as $cap)
+                                                @php $chip = $capabilityDot($cap); @endphp
+                                                <span class="inline-flex shrink-0 items-center gap-1" title="{{ $chip['label'] }}">
+                                                    <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
+                                                </span>
+                                            @endforeach
+                                            @if (empty($sampleCaps) && $firstCred?->created_at)
+                                                <span class="truncate" title="{{ $firstCred->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $firstCred->created_at->diffForHumans()]) }}</span>
                                             @endif
                                         @endif
-                                    </p>
-                                </div>
-                                @if (! empty($sampleCaps))
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        @foreach ($sampleCaps as $cap)
-                                            @php $chip = $capabilityDot($cap); @endphp
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
-                                                <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
-                                                {{ $chip['label'] }}
-                                            </span>
-                                        @endforeach
-                                    </div>
-                                @endif
+                                    </span>
+                                </span>
 
-                                {{-- Trailing action hint. Visually a button-shaped
-                                     chip, semantically a span — the whole card IS the
-                                     trigger so we don't nest <button>s. --}}
+                                {{-- Trailing affordance. Visually a chip, semantically a
+                                     span — the whole card IS the trigger, so we don't
+                                     nest <button>s. --}}
                                 @unless ($isComing)
-                                    <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
-                                        <span class="inline-flex items-center gap-1.5">
-                                            @if ($count > 0)
-                                                <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Manage') }}
-                                            @else
-                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Add new') }}
-                                            @endif
-                                        </span>
-                                        <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                    <span class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
+                                        @if ($count > 0)
+                                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <span>{{ __('Manage') }}</span>
+                                        @else
+                                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <span>{{ __('Add') }}</span>
+                                        @endif
                                     </span>
                                 @endunless
                             </button>
@@ -302,8 +297,8 @@
          rather than showing a single connected/not-connected state. --}}
     @if (! empty($storageNav))
         <section aria-label="{{ __('Backup storage') }}" @class([
-            'space-y-6' => empty($useOrgShell),
-            'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+            'space-y-4' => empty($useOrgShell),
+            'space-y-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6' => ! empty($useOrgShell),
         ])>
             @foreach ($storageNav as $group)
                 @php
@@ -327,11 +322,11 @@
                             @endif
                         </span>
                     </div>
-                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                    <p class="mt-0.5 text-2xs leading-relaxed text-brand-moss">
                         {{ __('Where scheduled database dumps ship. Without one, a dump stays on the server that made it.') }}
                         <a href="{{ route('backups.storage') }}" wire:navigate class="font-semibold text-brand-sage hover:text-brand-ink">{{ __('See what uses each destination') }}</a>
                     </p>
-                    <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($storageItems as $item)
                             @php
                                 $destinations = $this->storageDestinationsFor($item['id']);
@@ -345,24 +340,24 @@
                                      <button> — the rows are buttons themselves, and
                                      nesting them would be invalid. --}}
                                 @if (! $isComing && $storageTotal > 0)
-                                    <div class="flex h-full w-full flex-col gap-3 rounded-2xl border border-brand-sage/35 bg-white p-4 shadow-sm">
-                                        <div class="flex w-full items-start justify-between gap-2">
-                                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/12 text-brand-forest ring-1 ring-brand-ink/10">
-                                                <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
+                                    <div class="flex h-full w-full flex-col gap-2 rounded-xl border border-brand-sage/35 bg-white p-2.5 shadow-sm">
+                                        <div class="flex w-full items-center gap-2.5">
+                                            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sage/12 text-brand-forest ring-1 ring-brand-ink/10">
+                                                <x-heroicon-o-cloud-arrow-up class="h-4 w-4" aria-hidden="true" />
                                             </span>
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                            <span class="min-w-0 flex-1">
+                                                <span class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</span>
+                                                <span class="mt-0.5 block truncate text-2xs text-brand-moss">
+                                                    {{ trans_choice(':n destination|:n destinations', $storageTotal, ['n' => $storageTotal]) }}
+                                                </span>
+                                            </span>
+                                            <span class="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
                                                 <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
                                                 {{ $storageTotal }}
                                             </span>
                                         </div>
-                                        <div class="min-w-0 w-full">
-                                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
-                                            <p class="mt-0.5 text-xs text-brand-moss">
-                                                {{ trans_choice(':n destination|:n destinations', $storageTotal, ['n' => $storageTotal]) }}
-                                            </p>
-                                        </div>
 
-                                        <ul class="w-full space-y-1.5">
+                                        <ul class="w-full space-y-1">
                                             @foreach ($destinations as $destination)
                                                 <li wire:key="dest-{{ $destination->id }}">
                                                     <button
@@ -392,13 +387,10 @@
                                         <button
                                             type="button"
                                             wire:click="openStorageModal('{{ $item['id'] }}')"
-                                            class="group mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition hover:border-brand-sage/35 hover:bg-brand-sage/8 hover:text-brand-forest"
+                                            class="mt-auto inline-flex h-6 w-full items-center justify-center gap-1 rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2 text-xs font-semibold text-brand-ink transition hover:border-brand-sage/35 hover:bg-brand-sage/8 hover:text-brand-forest"
                                         >
-                                            <span class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Add another') }}
-                                            </span>
-                                            <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Add another') }}
                                         </button>
                                     </div>
                                 @else
@@ -409,32 +401,29 @@
                                     @endif
                                     @disabled($isComing)
                                     @class([
-                                        'group relative flex h-full w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
-                                        'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing,
+                                        'group relative flex h-full w-full items-center gap-2.5 rounded-xl border bg-white p-2.5 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
+                                        'border-brand-ink/10 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing,
                                         'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
                                     ])
                                 >
-                                    <div class="flex w-full items-start justify-between gap-2">
-                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10 group-hover:bg-brand-sand/70">
-                                            <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
+                                    <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10 group-hover:bg-brand-sand/70">
+                                        <x-heroicon-o-cloud-arrow-up class="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</span>
+                                            @if ($isComing)
+                                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                            @endif
                                         </span>
-                                        @if ($isComing)
-                                            <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
-                                        @endif
-                                    </div>
-                                    <div class="min-w-0 w-full">
-                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
-                                        <p class="mt-0.5 text-xs text-brand-moss">
+                                        <span class="mt-0.5 block truncate text-2xs text-brand-moss">
                                             {{ $isComing ? __('Coming soon') : __('Not configured') }}
-                                        </p>
-                                    </div>
+                                        </span>
+                                    </span>
                                     @unless ($isComing)
-                                        <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
-                                            <span class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Add new') }}
-                                            </span>
-                                            <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                        <span class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/10 bg-brand-cream/40 px-2 text-xs font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
+                                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <span>{{ __('Add') }}</span>
                                         </span>
                                     @endunless
                                 </button>

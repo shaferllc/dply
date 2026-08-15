@@ -5,13 +5,10 @@
     $openFindings = (int) ($fleetInsights['total_open'] ?? 0);
     $avgHealthScore = $fleetInsights['avg_health_score'] ?? null;
 
-    // Card click-through targets. Servers always go to the fleet list; findings
-    // and health land on the fleet health view when that surface is enabled,
-    // otherwise fall back to the servers list so the cards are never dead links.
+    // Card click-through targets. Servers go to the servers list; findings and
+    // health land on the org-wide Infrastructure health view.
     $serversCardHref = route('servers.index');
-    $insightsCardHref = \Laravel\Pennant\Feature::active('surface.fleet')
-        ? route('fleet.health')
-        : route('servers.index');
+    $insightsCardHref = route('infrastructure.health');
 
     $tonePalette = [
         'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
@@ -203,12 +200,10 @@
                                 </p>
                             </div>
                         </div>
-                        @feature('surface.fleet')
-                            <a href="{{ route('fleet.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
-                                {{ __('View fleet health') }}
-                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            </a>
-                        @endfeature
+                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
+                            {{ __('View fleet health') }}
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        </a>
                     </div>
                 </div>
             @endif

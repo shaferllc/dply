@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\QuickDownload;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use App\Services\Servers\QuickDownloadNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,6 +23,9 @@ use Illuminate\Support\Number;
  */
 class QuickDownloadReadyNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -33,7 +39,7 @@ class QuickDownloadReadyNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage

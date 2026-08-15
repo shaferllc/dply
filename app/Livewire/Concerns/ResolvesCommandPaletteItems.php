@@ -76,7 +76,7 @@ trait ResolvesCommandPaletteItems
                 ['Dashboard', 'home overview', 'dashboard', 'squares-2x2'],
                 ['Networking', 'firewall dns network load balancer', 'networking.index', 'share'],
                 ['Infrastructure', 'infrastructure fleet overview', 'infrastructure.index', 'rectangle-group'],
-                ['Fleet health', 'fleet health monitoring', 'fleet.health', 'heart', [], 'surface.fleet'],
+                ['Infrastructure health', 'infrastructure health monitoring fleet', 'infrastructure.health', 'heart'],
                 ['Cloud apps', 'cloud paas managed', 'cloud.index', 'cube', [], 'surface.cloud'],
                 ['Cloud databases', 'database postgres mysql redis', 'cloud.databases.index', 'circle-stack', [], 'surface.cloud'],
                 ['Serverless', 'functions faas', 'serverless.index', 'bolt', [], 'surface.serverless'],

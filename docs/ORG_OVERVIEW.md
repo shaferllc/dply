@@ -20,9 +20,8 @@ The left sidebar is your map of the organization:
 | Section | What lives there |
 | --- | --- |
 | **Overview** | This page — summary and quick links |
-| **General** | Name, icon, region defaults, and other organization settings |
+| **General** | Name, icon, email defaults, data residency, and the organization's API tokens |
 | **Activity** | Audit trail of everything that changes |
-| **Automation** | API tokens, webhooks, and notification defaults |
 | **Billing & plan** | Subscription, plan limits, and payment method |
 | **Billing analytics / Invoices** | Usage breakdowns and downloadable invoices |
 | **Members** | People, roles, and pending invitations |

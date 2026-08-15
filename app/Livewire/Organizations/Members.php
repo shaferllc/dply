@@ -5,8 +5,8 @@ namespace App\Livewire\Organizations;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
-use App\Notifications\OrganizationInvitationNotification;
 use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Notifications\OrganizationInvitationNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -32,7 +32,8 @@ class Members extends Component
         // the view needs, rather than re-querying it via refreshOrganization().
         $this->organization = $organization->load([
             'users',
-            'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
+            'invitations' => fn ($q) => $q->where('expires_at', '>', now())->with('team'),
+            'teams.users',
         ]);
     }
 
@@ -41,7 +42,8 @@ class Members extends Component
         $this->organization = $this->organization->fresh()
             ->load([
                 'users',
-                'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
+                'invitations' => fn ($q) => $q->where('expires_at', '>', now())->with('team'),
+                'teams.users',
             ]);
     }
 

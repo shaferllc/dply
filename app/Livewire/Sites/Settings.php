@@ -24,7 +24,6 @@ use App\Livewire\Sites\Concerns\ManagesSiteSystemUsers;
 use App\Livewire\Sites\Concerns\ManagesSiteTenantDomains;
 use App\Livewire\Sites\Concerns\ManagesSiteWorkerPool;
 use App\Models\ErrorEvent;
-use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
@@ -349,11 +348,6 @@ class Settings extends Show
                     'events' => (array) config('notification_events.categories.site_errors.events', []),
                 ],
             ];
-            $viewData['siteIntegrationWebhookDestinations'] = NotificationWebhookDestination::query()
-                ->where('organization_id', $this->site->organization_id)
-                ->where('site_id', $this->site->id)
-                ->orderBy('name')
-                ->get();
         }
 
         if (in_array($section, ['settings', 'general'], true)) {

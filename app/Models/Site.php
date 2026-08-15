@@ -17,6 +17,7 @@ use App\Models\Concerns\Site\TracksProvisioningStatus;
 use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Support\Sites\SiteRelationPurger;
 use Database\Factories\SiteFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -91,8 +92,8 @@ use Illuminate\Support\Str;
  * @property array<string, mixed> $meta
  * @property ?string $dns_provider_credential_id
  * @property string $dns_zone
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * @property-read ?string $php_version
  * @property-read int $code_action_count
  */
@@ -101,7 +102,7 @@ class Site extends Model
     use DerivesWorkerEnvironment;
     use GuardsSiteAccess;
 
-    /** @use HasFactory<\Database\Factories\SiteFactory> */
+    /** @use HasFactory<SiteFactory> */
     use HasFactory, HasUlids;
 
     use HasSiteRelationships;
@@ -480,6 +481,25 @@ class Site extends Model
             $this->slug = $base.'-'.$i;
             $i++;
         }
+    }
+
+    /**
+     * Cloud (container) apps.
+     *
+     * The predicate is `type = Container` OR a non-null `container_backend`:
+     * sites created through the Cloud surface carry the type, while some
+     * imported/legacy rows only ever got the backend column. Extracted from
+     * App\Livewire\Cloud\Index so callers stop re-deriving it — getting one
+     * half of the OR wrong silently hides apps.
+     *
+     * @param  Builder<Site>  $query
+     */
+    public function scopeCloudApps(Builder $query): void
+    {
+        $query->where(function ($q): void {
+            $q->where('type', SiteType::Container)
+                ->orWhereNotNull('container_backend');
+        });
     }
 
     protected function slugTaken(): bool

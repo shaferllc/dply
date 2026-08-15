@@ -94,6 +94,75 @@ return [
         ],
     ],
 
+    /*
+     | Intercom, behind the "Intercom" notification channel and Laravel's
+     | `intercom` notification driver (App\Modules\Notifications\Channels\Intercom).
+     | Get the token at https://app.intercom.com/a/apps/_/developer-hub → your app
+     | (create one if needed; it never has to be published) → Configure →
+     | Authentication. Enable the "Write conversations" permission there BEFORE
+     | copying the token — changing permissions does not update an already-issued
+     | token. The token is scoped to ONE workspace and ONE region.
+     |
+     | Optional, and normally left unset: operators paste their own token on each
+     | notification channel so every org reaches its own Intercom workspace. This
+     | app-level token is only the fallback for `$user->notify()` on a notifiable
+     | with no Intercom channel of its own — the setup that
+     | laravel-notification-channels/intercom documents. INTERCOM_ADMIN_ID is the
+     | teammate messages are sent as (Intercom → Settings → Teammates, the numeric
+     | ID in the teammate's URL, on the same workspace as the token); Intercom
+     | rejects a message with no `from`, so without it the fallback cannot send.
+     |
+     | INTERCOM_REGION is us (default), eu, or au. A token issued for one region
+     | 401s against the others, which reads exactly like a bad token.
+     | See docs/NOTIFICATIONS_INTERCOM.md.
+     */
+    'intercom' => [
+        'token' => env('INTERCOM_API_KEY'),
+        'region' => env('INTERCOM_REGION', 'us'),
+        'admin_id' => env('INTERCOM_ADMIN_ID'),
+    ],
+
+    /*
+     | PagerDuty, behind the "PagerDuty" notification channel and Laravel's
+     | `PagerDuty` notification driver (App\Modules\Notifications\Channels\PagerDuty).
+     |
+     | The credential is an Events API v2 *integration key*, taken from a single
+     | PagerDuty service: PagerDuty → Services → your service → Integrations →
+     | Add an integration → Events API v2. Note "v2" — the older Events API v1
+     | key has a different payload shape and is not supported.
+     |
+     | Optional, and normally left unset: operators paste their own key on each
+     | notification channel, which is how they choose WHICH service (and so which
+     | escalation policy) an alert pages. This app-level key is only the fallback
+     | for $user->notify() on a notifiable with no PagerDuty channel of its own.
+     |
+     | PAGERDUTY_REGION is us (default) or eu. A key from one region is rejected
+     | by the other with a 400 that names the routing key — so it reads like a
+     | bad key rather than a wrong region.
+     | See docs/NOTIFICATIONS_PAGERDUTY.md.
+     */
+    'pagerduty' => [
+        'routing_key' => env('PAGERDUTY_ROUTING_KEY'),
+        'region' => env('PAGERDUTY_REGION', 'us'),
+    ],
+
+    /*
+     | Microsoft Teams, behind the "Microsoft Teams" notification channel and the
+     | `microsoftTeams` notification driver.
+     |
+     | There is nothing to set here. Each channel stores its own Power Automate
+     | Workflows URL, which already encodes the target team and channel — there is
+     | no app-level credential to share.
+     |
+     | Worth recording why the payload looks the way it does: dply posts an
+     | Adaptive Card to a Workflows webhook, NOT a MessageCard to an Office 365
+     | connector. Microsoft retired connectors between 18 and 22 May 2026, so the
+     | "Incoming Webhook" that most Teams guides still describe no longer
+     | delivers. MicrosoftTeamsClient refuses a *.webhook.office.com URL outright
+     | rather than posting into the void.
+     | See docs/NOTIFICATIONS_MICROSOFT_TEAMS.md.
+     */
+
     'digitalocean' => [
         'default_image' => env('DIGITALOCEAN_DEFAULT_IMAGE', 'ubuntu-24-04-x64'),
 

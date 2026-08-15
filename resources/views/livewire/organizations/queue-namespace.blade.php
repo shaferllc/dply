@@ -45,7 +45,7 @@
 
             <x-slot:stats>
                 <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="{{ __('Queue at a glance') }}">
-                    <x-fleet-stat :label="__('Status')">
+                    <x-infrastructure-stat :label="__('Status')">
                         <p class="mt-2">
                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$ns->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                                 {{ ucfirst($ns->status) }}
@@ -54,8 +54,8 @@
                         <p class="mt-1 text-xs text-brand-mist">
                             {{ $paused ? __('Pushes rejected; drains still work') : __('Accepting pushes') }}
                         </p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Queued now')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Queued now')">
                         <p class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">
                             {{ $depth ? number_format($depth['total']) : '—' }}
                         </p>
@@ -69,8 +69,8 @@
                                 {{ __('Depth unavailable') }}
                             @endif
                         </p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Jobs this month')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Jobs this month')">
                         <p class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format($usedJobs) }}</p>
                         <p @class(['mt-1 text-xs', 'text-amber-700' => $overIncluded, 'text-brand-mist' => ! $overIncluded])>
                             @if ($entitlement->monthlyIncludedJobs > 0)
@@ -79,11 +79,11 @@
                                 {{ __('Unlimited on this plan') }}
                             @endif
                         </p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Credentials')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Credentials')">
                         <p class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ $liveCredentialCount }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ __('of :max live', ['max' => $maxLiveCredentials]) }}</p>
-                    </x-fleet-stat>
+                    </x-infrastructure-stat>
                 </dl>
             </x-slot:stats>
 

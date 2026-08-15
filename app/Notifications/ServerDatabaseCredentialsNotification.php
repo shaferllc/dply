@@ -6,6 +6,9 @@ namespace App\Notifications;
 
 use App\Models\Server;
 use App\Models\ServerDatabase;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -21,6 +24,9 @@ use Illuminate\Support\Facades\URL;
  */
 class ServerDatabaseCredentialsNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -33,7 +39,7 @@ class ServerDatabaseCredentialsNotification extends Notification implements Shou
     /** @return array<int, string> */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage

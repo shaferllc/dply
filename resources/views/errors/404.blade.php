@@ -25,7 +25,7 @@
                     {{ __('Sites') }}
                 </a>
                 <span class="text-brand-moss/50">|</span>
-                <a href="{{ route('fleet.health') }}" class="text-brand-ink underline decoration-brand-ink/30 underline-offset-2 hover:text-brand-forest">
+                <a href="{{ route('infrastructure.health') }}" class="text-brand-ink underline decoration-brand-ink/30 underline-offset-2 hover:text-brand-forest">
                     {{ __('Fleet') }}
                 </a>
             </div>

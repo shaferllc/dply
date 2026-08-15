@@ -3,6 +3,10 @@
 namespace App\Notifications;
 
 use App\Models\NotificationEvent;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -10,6 +14,9 @@ use Illuminate\Notifications\Notification;
 
 class SiteDeploymentCompletedNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -23,7 +30,7 @@ class SiteDeploymentCompletedNotification extends Notification implements Should
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -55,5 +62,31 @@ class SiteDeploymentCompletedNotification extends Notification implements Should
         }
 
         return $mail;
+    }
+
+    /**
+     * This fires on every deploy, good or bad. Only a failure is an incident.
+     */
+    public function pagerDutySeverity(object $notifiable): ?string
+    {
+        $status = (string) (($this->event->metadata ?? [])['status'] ?? 'completed');
+
+        return in_array($status, ['failed', 'failure', 'error'], true)
+            ? PagerDutyMessage::SEVERITY_ERROR
+            : null;
+    }
+
+    /**
+     * Keyed on the site, not the deployment: a site failing to deploy five times
+     * running is one problem, and resolving it should close one incident.
+     */
+    public function pagerDutyDedupKey(object $notifiable): ?string
+    {
+        return 'dply:deploy-failed:'.$this->event->resource_id;
+    }
+
+    public function pagerDutySource(object $notifiable): string
+    {
+        return (string) ((($this->event->metadata ?? [])['site_name']) ?: config('app.name'));
     }
 }

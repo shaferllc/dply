@@ -7,6 +7,14 @@ use App\Models\NotificationWebhookDestination;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * DEAD CODE (2026-08-14) — no longer called.
+ *
+ * NotificationRoutingResolver used to invoke this immediately after fanning out
+ * to notification channels, producing two deliveries for the same event. That
+ * call is gone; this file is retained only alongside the deprecated
+ * NotificationWebhookDestination model and should be deleted with it.
+ */
 class NotificationWebhookDestinationRouter
 {
     public function route(NotificationEvent $event): void

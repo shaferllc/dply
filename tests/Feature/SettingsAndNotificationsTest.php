@@ -2,9 +2,8 @@
 
 namespace Tests\Feature\SettingsAndNotificationsTest;
 
-use App\Livewire\Organizations\Automation as OrganizationsAutomation;
+use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Settings\Hub as SettingsHub;
-use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,35 +106,11 @@ test('org admin can disable deploy email notifications', function () {
     $org->users()->attach($user->id, ['role' => 'owner']);
 
     Livewire::actingAs($user)
-        ->test(OrganizationsAutomation::class, ['organization' => $org])
+        ->test(OrganizationsSettings::class, ['organization' => $org])
         ->set('deploy_email_notifications_enabled', false);
 
     $this->assertDatabaseHas('organizations', [
         'id' => $org->id,
         'deploy_email_notifications_enabled' => false,
-    ]);
-});
-
-test('org admin can add webhook destination from org overview', function () {
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-
-    Livewire::actingAs($user)
-        ->test(OrganizationsAutomation::class, ['organization' => $org])
-        ->set('int_hook_name', 'Ops room')
-        ->set('int_hook_driver', NotificationWebhookDestination::DRIVER_SLACK)
-        ->set('int_hook_url', 'https://hooks.slack.com/services/T000/B000/XXXX')
-        ->set('int_evt_success', true)
-        ->set('int_evt_failed', true)
-        ->set('int_evt_skipped', false)
-        ->call('saveWebhookDestination')
-        ->assertHasNoErrors();
-
-    $this->assertDatabaseHas('notification_webhook_destinations', [
-        'organization_id' => $org->id,
-        'name' => 'Ops room',
-        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-        'enabled' => true,
     ]);
 });

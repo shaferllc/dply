@@ -492,19 +492,7 @@
         </div>
     </div>
 @elseif ($type === \App\Models\NotificationChannel::TYPE_MICROSOFT_TEAMS)
-    <div>
-        <x-input-label for="{{ $p }}teams_webhook_url" :value="__('Incoming webhook URL')" />
-        <input
-            id="{{ $p }}teams_webhook_url"
-            type="url"
-            wire:model="{{ $p }}teams_webhook_url"
-            class="mt-1 block w-full rounded-xl border border-brand-ink/15 px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-            autocomplete="off"
-        />
-        @error($p.'teams_webhook_url')
-            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-        @enderror
-    </div>
+    @include('livewire.settings.partials.notification-channel-microsoft-teams', ['p' => $p])
 @elseif ($type === \App\Models\NotificationChannel::TYPE_ROCKETCHAT)
     <div>
         <x-input-label for="{{ $p }}rocketchat_webhook_url" :value="__('Webhook URL')" />
@@ -560,6 +548,10 @@
             </select>
         </div>
     </div>
+@elseif ($type === \App\Models\NotificationChannel::TYPE_INTERCOM)
+    @include('livewire.settings.partials.notification-channel-intercom', ['p' => $p])
+@elseif ($type === \App\Models\NotificationChannel::TYPE_PAGERDUTY)
+    @include('livewire.settings.partials.notification-channel-pagerduty', ['p' => $p])
 @else
     <div>
         <x-input-label for="{{ $p }}webhook_url" :value="__('Endpoint URL')" />

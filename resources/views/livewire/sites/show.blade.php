@@ -68,10 +68,15 @@
             </x-slot>
             <x-slot name="actions">
                 @if ($readyForWorkspace && $site->usesEdgeRuntime())
-                    <x-outline-link :href="route('edge.index')" wire:navigate>
-                        <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('All Edge sites') }}
-                    </x-outline-link>
+                    {{-- Existing Edge sites keep their workspace while the Edge
+                         surface is parked, but the index they'd return to is
+                         gated — don't offer a button that lands on the gate. --}}
+                    @feature('surface.edge')
+                        <x-outline-link :href="route('edge.index')" wire:navigate>
+                            <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('All Edge sites') }}
+                        </x-outline-link>
+                    @endfeature
                     @if ($liveUrlForHeader = ($edgeLiveUrl ?? $site->edgeLiveUrl()))
                         <a
                             href="{{ $liveUrlForHeader }}"

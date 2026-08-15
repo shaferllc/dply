@@ -7,6 +7,7 @@ namespace App\Livewire\Infrastructure;
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Pennant\Feature;
@@ -14,27 +15,19 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Org-scoped hub above typed compute indexes (servers, cloud, serverless).
- * Surfaces cross-model counts so operators can orient before drilling in.
+ * Org-scoped hub above typed compute indexes (servers, cloud, serverless),
+ * and the landing page for the cross-product Operations views (health,
+ * deploys, domains, env, blast radius, previews, contracts) that used to
+ * live under a separate /fleet section.
+ *
+ * Deliberately NOT gated on multi_surface_active(): the Operations views are
+ * org-wide and useful to VM-only orgs, so the hub has to stay reachable even
+ * when Cloud/Edge/Serverless are all off. The compute grid below simply shows
+ * fewer cards in that case.
  */
 #[Layout('layouts.app')]
 class Index extends Component
 {
-    public function mount(): void
-    {
-        // Infrastructure dashboard is the cross-surface triage view; when
-        // only VM is active for the org, it's noise — /servers is the
-        // single source of truth. Reappears the moment any non-VM surface
-        // is enabled (admin toggle, env override).
-        abort_unless(multi_surface_active(), 404);
-
-        // Fleet Command Center is the default multi-surface home — the
-        // compute inventory lives there with cross-product ops tiles.
-        if (Feature::active('surface.fleet')) {
-            $this->redirect(route('fleet.index'), navigate: true);
-        }
-    }
-
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -95,8 +88,55 @@ class Index extends Component
             'cloudEnabled' => Feature::active('surface.cloud'),
             'edgeEnabled' => Feature::active('surface.edge'),
             'serverlessEnabled' => Feature::active('surface.serverless'),
-            'fleetEnabled' => Feature::active('surface.fleet'),
+            'runningDeploys' => $this->runningDeployCount($org->id),
+            'successRate' => $this->deploySuccessRate($org->id),
         ]);
+    }
+
+    /**
+     * Deploys currently in flight across every site in the org. Drives the
+     * Operations strip on the hub (previously the standalone overview page).
+     */
+    protected function runningDeployCount(string $organizationId): int
+    {
+        return SiteDeployment::query()
+            ->whereIn('site_id', $this->orgSiteIds($organizationId))
+            ->where('status', SiteDeployment::STATUS_RUNNING)
+            ->count();
+    }
+
+    /**
+     * Deploy success rate over the last 7 days (settled deploys only).
+     *
+     * @return array{percent: ?int, total: int}
+     */
+    protected function deploySuccessRate(string $organizationId): array
+    {
+        $base = SiteDeployment::query()
+            ->whereIn('site_id', $this->orgSiteIds($organizationId))
+            ->where('started_at', '>=', now()->subDays(7))
+            ->whereIn('status', [
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_FAILED,
+            ]);
+
+        $total = (clone $base)->count();
+        $success = (clone $base)->where('status', SiteDeployment::STATUS_SUCCESS)->count();
+
+        return [
+            'percent' => $total > 0 ? (int) round($success / $total * 100) : null,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    protected function orgSiteIds(string $organizationId): \Illuminate\Support\Collection
+    {
+        return Site::query()
+            ->whereIn('server_id', Server::query()->where('organization_id', $organizationId)->select('id'))
+            ->pluck('id');
     }
 
     protected function serversQuery(string $organizationId): Builder

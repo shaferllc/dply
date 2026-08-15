@@ -6,7 +6,6 @@ use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\NotificationChannel;
 use App\Models\NotificationEvent;
-use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -179,46 +178,6 @@ test('site notifications matrix routes different events to different channels an
         'subscribable_id' => $site->id,
         'event_key' => 'site.uptime.down',
     ]);
-});
-
-test('site notifications section creates site scoped integration webhook', function () {
-    Http::fake([
-        '*' => Http::response('ok', 200),
-    ]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_NGINX_ACTIVE,
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'notifications'])
-        ->set('site_int_hook_name', 'CI hook')
-        ->set('site_int_hook_driver', NotificationWebhookDestination::DRIVER_SLACK)
-        ->set('site_int_hook_url', 'https://hooks.example.test/incoming')
-        ->set('site_int_evt_deploy_started', true)
-        ->call('saveSiteIntegrationWebhookDestination')
-        ->assertHasNoErrors();
-
-    $this->assertDatabaseHas('notification_webhook_destinations', [
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'name' => 'CI hook',
-        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-    ]);
-
-    $hook = NotificationWebhookDestination::query()
-        ->where('site_id', $site->id)
-        ->firstOrFail();
-    expect($hook->events ?? [])->toContain('deploy_started');
 });
 
 test('uptime monitor check publishes down then recovered', function () {

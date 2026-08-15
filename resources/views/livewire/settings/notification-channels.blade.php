@@ -40,6 +40,44 @@
                     @endif
                 </x-slot:actions>
 
+                {{-- The org page had no glance row at all while the personal one
+                     did. Same three-up shape, counting what matters here: how
+                     many destinations exist, how many are actually wired to
+                     events, and how many page a human. --}}
+                @php
+                    $routedCount = $channels->where('subscriptions_count', '>', 0)->count();
+                    $pagingCount = $channels->filter(fn ($c) => $c->isPaging())->count();
+                @endphp
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Notification channels at a glance') }}">
+                        <div class="bg-white px-3 py-2">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Channels') }}</dt>
+                            <dd class="mt-0.5 flex items-baseline gap-1.5">
+                                <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
+                                <span class="truncate text-xs text-brand-moss">{{ trans_choice('destination|destinations', $channelCount) }}</span>
+                            </dd>
+                        </div>
+                        <div class="bg-white px-3 py-2">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Routed') }}</dt>
+                            <dd class="mt-0.5 flex items-baseline gap-1.5">
+                                <span class="font-mono text-base font-semibold tabular-nums {{ $channelCount > 0 && $routedCount === 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $routedCount }}</span>
+                                <span class="truncate text-xs text-brand-moss">
+                                    {{ $channelCount > 0 && $routedCount < $channelCount
+                                        ? __(':n not subscribed', ['n' => $channelCount - $routedCount])
+                                        : __('subscribed to events') }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div class="bg-white px-3 py-2">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Paging') }}</dt>
+                            <dd class="mt-0.5 flex items-baseline gap-1.5">
+                                <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $pagingCount }}</span>
+                                <span class="truncate text-xs text-brand-moss">{{ trans_choice('wakes on-call|wake on-call', $pagingCount) }}</span>
+                            </dd>
+                        </div>
+                    </dl>
+                </x-slot:stats>
+
                 @include('livewire.settings.partials.notification-channels-content')
             </x-organization-shell>
         </div>

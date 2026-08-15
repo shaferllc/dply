@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Server;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -22,6 +26,14 @@ use Illuminate\Notifications\Notification;
  */
 class WebserverHealthAlertNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+
+    // Aliased so the override below can build the standard message and then
+    // flip it to a resolve, rather than duplicating the trait's assembly.
+    use DeliversToPagerDuty {
+        toPagerDuty as protected buildPagerDutyMessage;
+    }
     use Queueable;
 
     public function __construct(
@@ -40,7 +52,55 @@ class WebserverHealthAlertNotification extends Notification implements ShouldQue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
+    }
+
+    /**
+     * The notification's own severity vocabulary already matches PagerDuty's
+     * ('warning' | 'critical'), so it passes straight through.
+     *
+     * Recovery still returns a severity — it has to, or viaPagerDuty() would
+     * drop the message and the incident this class opened would never close.
+     * toPagerDuty() turns it into a resolve rather than a trigger.
+     */
+    public function pagerDutySeverity(object $notifiable): ?string
+    {
+        return $this->severity === 'critical'
+            ? PagerDutyMessage::SEVERITY_CRITICAL
+            : PagerDutyMessage::SEVERITY_WARNING;
+    }
+
+    /**
+     * Keyed on (server, engine, metric) — deliberately NOT on the transition,
+     * because the recovery has to name the same incident the trip opened.
+     */
+    public function pagerDutyDedupKey(object $notifiable): ?string
+    {
+        return 'dply:webserver-health:'.$this->server->id.':'.$this->engine.':'.$this->metric;
+    }
+
+    public function pagerDutySource(object $notifiable): string
+    {
+        return (string) ($this->server->name ?: $this->server->id);
+    }
+
+    /**
+     * The one notification in the app that can close its own incident.
+     *
+     * This class is edge-triggered on state transitions, so a 'recovered' event
+     * is exactly the signal PagerDuty's resolve action exists for: the metric is
+     * back under threshold, and whoever was paged should not have to close the
+     * incident by hand.
+     */
+    public function toPagerDuty(object $notifiable): PagerDutyMessage
+    {
+        $message = $this->buildPagerDutyMessage($notifiable);
+
+        if ($this->transition === 'recovered') {
+            $message->resolve();
+        }
+
+        return $message;
     }
 
     public function toMail(object $notifiable): MailMessage

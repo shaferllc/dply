@@ -14,14 +14,6 @@
             >
                 {{ __('Subscriptions') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab
-                id="notif-tab-webhooks"
-                icon="heroicon-o-arrow-up-right"
-                :active="$notifTab === 'webhooks'"
-                wire:click="setNotificationsTab('webhooks')"
-            >
-                {{ __('Integration webhooks') }}
-            </x-server-workspace-tab>
         </x-server-workspace-tablist>
     </div>
 
@@ -95,75 +87,6 @@
         </section>
     @endif
 
-    @if ($notifTab === 'webhooks')
-        <section class="border-b border-brand-ink/10">
-            <x-workspace-panel-head
-                icon="heroicon-o-arrow-up-right"
-                :title="__('Integration webhooks')"
-                :note="__('Dply POSTs to these URLs when matching events occur. Payloads are adapter-specific: Slack uses text, Discord uses content, Teams uses a MessageCard body.')"
-                :count="$siteIntegrationWebhookDestinations->count() ?: null"
-                class="border-b border-brand-ink/10"
-            />
-
-            <div class="space-y-3 px-5 py-4 sm:px-6">
-                <form wire:submit="saveSiteIntegrationWebhookDestination" class="flex max-w-2xl flex-col gap-3">
-                    <div class="flex flex-wrap gap-2">
-                        <input type="text" wire:model="site_int_hook_name" placeholder="{{ __('Destination name') }}" required class="min-w-[140px] flex-1 rounded-md border-brand-ink/15 text-sm shadow-sm">
-                        <select wire:model="site_int_hook_driver" class="rounded-md border-brand-ink/15 text-sm shadow-sm">
-                            <option value="slack">Slack</option>
-                            <option value="discord">Discord</option>
-                            <option value="teams">Microsoft Teams</option>
-                        </select>
-                    </div>
-                    <input type="url" wire:model="site_int_hook_url" placeholder="{{ __('Incoming webhook URL') }}" required class="w-full rounded-md border-brand-ink/15 font-mono text-xs shadow-sm">
-                    <x-input-error :messages="$errors->get('site_int_hook_name')" class="mt-1" />
-                    <x-input-error :messages="$errors->get('site_int_hook_url')" class="mt-1" />
-                    <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-brand-ink">
-                        <span class="w-full text-xs font-medium text-brand-mist">{{ __('Deploy events') }}</span>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_success" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Success') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_failed" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Failed') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_skipped" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Skipped') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_deploy_started" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Deployment started') }}</label>
-                        <span class="w-full text-xs font-medium text-brand-mist">{{ __('Uptime') }}</span>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_down" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor down') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_recovered" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor recovered') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_degraded" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor degraded') }}</label>
-                        <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_ssl_expiring" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('SSL certificate expiring') }}</label>
-                    </div>
-                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveSiteIntegrationWebhookDestination" class="!text-sm w-fit">
-                        <span wire:loading.remove wire:target="saveSiteIntegrationWebhookDestination">{{ __('Add webhook destination') }}</span>
-                        <span wire:loading wire:target="saveSiteIntegrationWebhookDestination">{{ __('Adding…') }}</span>
-                    </x-primary-button>
-                </form>
-
-                @if ($siteIntegrationWebhookDestinations->isEmpty())
-                    <p class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-3 text-sm text-brand-moss">{{ __('No site-scoped webhook destinations yet.') }}</p>
-                @else
-                    <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
-                        @foreach ($siteIntegrationWebhookDestinations as $hook)
-                            <li class="flex flex-wrap justify-between gap-2 px-4 py-3 text-sm">
-                                <div>
-                                    <span class="font-medium text-brand-ink">{{ $hook->name }}</span>
-                                    <span class="ml-2 text-brand-moss">{{ $hook->driver }}</span>
-                                    <span class="ml-2 text-xs {{ $hook->enabled ? 'text-green-700' : 'text-brand-mist' }}">{{ $hook->enabled ? __('on') : __('off') }}</span>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button type="button" wire:click="toggleSiteIntegrationWebhookDestination('{{ $hook->id }}')" class="text-xs text-brand-ink hover:underline">{{ __('Toggle') }}</button>
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('deleteSiteIntegrationWebhookDestination', ['{{ $hook->id }}'], @js(__('Remove webhook destination')), @js(__('Remove this webhook destination? Outbound posts to this URL will stop.')), @js(__('Remove')), true)"
-                                        class="text-xs text-red-600 hover:underline"
-                                    >
-                                        {{ __('Remove') }}
-                                    </button>
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </div>
-        </section>
-    @endif
 
     </div>
 

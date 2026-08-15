@@ -247,16 +247,36 @@ return [
     */
     'surface' => [
 
-        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
-        'fleet' => env('FEATURE_SURFACE_FLEET', true),
+        /*
+        | PARKED — Cloud apps, Edge, and Serverless are pulled from the product
+        | for now; we bring them back later. Hard `false` rather than
+        | env(..., false) on purpose: an env var or a stale `features` row
+        | flipping one of these back on mid-park is exactly the failure we
+        | don't want, and the flags carry no per-org rollout while parked.
+        |
+        | To restore: put back the env() calls below, and re-enable the flag
+        | for the org(s) from /admin/flags (the platform-scope + per-org rows
+        | were set to false when they were parked).
+        |
+        |   'cloud'              => env('FEATURE_SURFACE_CLOUD', true),
+        |   'edge'               => env('FEATURE_SURFACE_EDGE', true),
+        |   'serverless'         => env('FEATURE_SURFACE_SERVERLESS', true),
+        |   'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
+        |
+        | Off means the route groups 404 (routes/web.php `feature:surface.*`)
+        | and every nav entry falls to its "Coming soon" branch. Webhooks and
+        | scheduled jobs stay live regardless — see the note above.
+        */
+        'cloud' => false,
+        'edge' => false,
+        'serverless' => false,
+        'serverless_managed' => false,
+
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
         'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
-        'edge' => env('FEATURE_SURFACE_EDGE', true),
         'realtime' => env('FEATURE_SURFACE_REALTIME', true),
-        'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
-        'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
         'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', true),
         // dply Queue — the managed job queue. Default off: the control plane
         // exists but the data plane does not yet. Runtime dials and pricing
@@ -291,7 +311,14 @@ return [
     | Cloud + Edge surfaces are enabled for the org.
     */
     'launch' => [
-        'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', true),
+        // PARKED with surface.cloud / surface.edge. The full-stack wizard is not
+        // independently useful without them: every plan it builds emits an
+        // `edge.create` handoff (FullStackArchitecturePlanner, launchRoute:
+        // 'edge.create'). Those routes stay registered while parked — only the
+        // feature middleware rejects — so the wizard would still render a plan
+        // whose every "launch" button dead-ends on the gate. Restore with them:
+        //   'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', true),
+        'full_stack_wizard' => false,
         'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', true),
     ],
 

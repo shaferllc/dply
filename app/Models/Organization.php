@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
-use App\Modules\Queue\Models\QueueNamespace;
-use App\Modules\Realtime\Models\RealtimeApp;
-use AppModulesRealtimeModelsRealtimeApp;
-
 use App\Models\Concerns\ManagesOrganizationBeta;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;
 use App\Models\Concerns\ManagesOrganizationQuotas;
 use App\Models\Concerns\ManagesOrganizationSubscription;
 use App\Models\Concerns\ManagesOrganizationTrialState;
+use App\Models\Concerns\RoutesIntercomNotifications;
+use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Database\Factories\OrganizationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,31 +57,31 @@ use Laravel\Cashier\Billable;
  * @property bool $is_internal
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $users
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Team> $teams
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Server> $servers
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Site> $sites
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Script> $scripts
- * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationChannel> $notificationChannels
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WebserverTemplate> $webserverTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSshKey> $organizationSshKeys
- * @property-read \Illuminate\Database\Eloquent\Collection<int, RealtimeApp> $realtimeApps
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationBillingSnapshot> $billingSnapshots
- * @property-read \Illuminate\Database\Eloquent\Collection<int, BillingSubscriptionSyncEvent> $billingSubscriptionSyncEvents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationCronJobTemplate> $cronJobTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSupervisorProgramTemplate> $supervisorProgramTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, FirewallRuleTemplate> $firewallRuleTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ServerBlueprint> $serverBlueprints
+ * @property-read Collection<int, User> $users
+ * @property-read Collection<int, Team> $teams
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, Site> $sites
+ * @property-read Collection<int, Script> $scripts
+ * @property-read Collection<int, NotificationChannel> $notificationChannels
+ * @property-read Collection<int, WebserverTemplate> $webserverTemplates
+ * @property-read Collection<int, OrganizationSshKey> $organizationSshKeys
+ * @property-read Collection<int, RealtimeApp> $realtimeApps
+ * @property-read Collection<int, OrganizationBillingSnapshot> $billingSnapshots
+ * @property-read Collection<int, BillingSubscriptionSyncEvent> $billingSubscriptionSyncEvents
+ * @property-read Collection<int, OrganizationCronJobTemplate> $cronJobTemplates
+ * @property-read Collection<int, OrganizationSupervisorProgramTemplate> $supervisorProgramTemplates
+ * @property-read Collection<int, FirewallRuleTemplate> $firewallRuleTemplates
+ * @property-read Collection<int, ServerBlueprint> $serverBlueprints
  * @property-read ?Script $defaultSiteScript
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Project> $projects
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Workspace> $workspaces
- * @property-read \Illuminate\Database\Eloquent\Collection<int, StatusPage> $statusPages
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderCredential> $providerCredentials
- * @property-read \Illuminate\Database\Eloquent\Collection<int, BackupConfiguration> $backupConfigurations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationInvitation> $invitations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, AuditLog> $auditLogs
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ApiToken> $apiTokens
- * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationWebhookDestination> $notificationWebhookDestinations
+ * @property-read Collection<int, Project> $projects
+ * @property-read Collection<int, Workspace> $workspaces
+ * @property-read Collection<int, StatusPage> $statusPages
+ * @property-read Collection<int, ProviderCredential> $providerCredentials
+ * @property-read Collection<int, BackupConfiguration> $backupConfigurations
+ * @property-read Collection<int, OrganizationInvitation> $invitations
+ * @property-read Collection<int, AuditLog> $auditLogs
+ * @property-read Collection<int, ApiToken> $apiTokens
+ * @property-read Collection<int, NotificationWebhookDestination> $notificationWebhookDestinations
  */
 class Organization extends Model
 {
@@ -94,6 +94,7 @@ class Organization extends Model
     use ManagesOrganizationQuotas;
     use ManagesOrganizationSubscription;
     use ManagesOrganizationTrialState;
+    use RoutesIntercomNotifications;
 
     protected $fillable = [
         'name',
@@ -201,6 +202,19 @@ class Organization extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
+    }
+
+    /**
+     * Whether this org has any Cloud (container) apps.
+     *
+     * Gates the Cloud-alerts section on Automation: that form configures alert
+     * routing for Cloud apps specifically, so showing it to an org with none is
+     * noise. Deliberately an exists() rather than a count — the caller only
+     * needs the boolean.
+     */
+    public function hasCloudApps(): bool
+    {
+        return $this->sites()->cloudApps()->exists();
     }
 
     /** The org's secret-residency encryption key (per-org age keypair), if minted. *

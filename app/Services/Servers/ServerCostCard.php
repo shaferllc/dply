@@ -49,8 +49,6 @@ final class ServerCostCard
         $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 
         $nudge = $this->rightSizeNudge($siteCount, $hardware, $capacity);
-        $forgePerServer = (int) config('subscription.standard.observatory.forge_per_server_cents', 1200);
-        $deltaVsForge = $stackCents - ($forgePerServer + $providerCents);
         $perSiteCents = $siteCount > 0 ? (int) round($stackCents / $siteCount) : null;
 
         $summary = [
@@ -60,8 +58,6 @@ final class ServerCostCard
             'charges_managed_fee' => $chargesManagedFee,
             'site_count' => $siteCount,
             'per_site_cents' => $perSiteCents,
-            'forge_baseline_cents' => $forgePerServer,
-            'delta_vs_forge_cents' => $deltaVsForge,
             'cpu_pct' => $capacity['cpu_pct'],
             'mem_pct' => $capacity['mem_pct'],
             'provider_known' => $providerKnown,
@@ -94,12 +90,6 @@ final class ServerCostCard
                 'dply_cents' => $dplyCents,
                 'formatted' => $this->formatUsdCents($stackCents),
                 'provider_partial' => ! $providerKnown,
-            ],
-            'comparison' => [
-                'forge_per_server_cents' => $forgePerServer,
-                'forge_plus_provider_cents' => $forgePerServer + $providerCents,
-                'dply_plus_provider_cents' => $stackCents,
-                'delta_vs_forge_cents' => $deltaVsForge,
             ],
             'nudge' => $nudge,
             'currency' => $this->currencyView($provider, $stackCents),

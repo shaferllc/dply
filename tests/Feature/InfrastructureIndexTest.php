@@ -25,23 +25,9 @@ test('guest is redirected from infrastructure index', function (): void {
         ->assertRedirect(route('login'));
 });
 
-test('infrastructure index redirects to fleet when multi surface and fleet enabled', function (): void {
+test('infrastructure index shows compute when multi surface active', function (): void {
     Feature::define('surface.cloud', fn () => true);
     Feature::define('surface.edge', fn () => true);
-    Feature::define('surface.fleet', fn () => true);
-    Feature::flushCache();
-
-    $user = ownerWithOrg();
-
-    $this->actingAs($user)
-        ->get(route('infrastructure.index'))
-        ->assertRedirect(route('fleet.index'));
-});
-
-test('infrastructure index shows compute when fleet disabled but multi surface active', function (): void {
-    Feature::define('surface.cloud', fn () => true);
-    Feature::define('surface.edge', fn () => true);
-    Feature::define('surface.fleet', fn () => false);
     Feature::flushCache();
 
     $user = ownerWithOrg();
@@ -56,7 +42,6 @@ test('infrastructure index shows compute when fleet disabled but multi surface a
 test('infrastructure index shows edge card when surface edge active', function (): void {
     Feature::define('surface.cloud', fn () => true);
     Feature::define('surface.edge', fn () => true);
-    Feature::define('surface.fleet', fn () => false);
     Feature::flushCache();
 
     $user = ownerWithOrg();
@@ -72,7 +57,6 @@ test('infrastructure index shows edge card when surface edge active', function (
 test('infrastructure index links edge migration when surface edge inactive', function (): void {
     Feature::define('surface.edge', fn () => false);
     Feature::define('surface.cloud', fn () => true);
-    Feature::define('surface.fleet', fn () => false);
     Feature::flushCache();
 
     $user = ownerWithOrg();

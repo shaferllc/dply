@@ -32,7 +32,7 @@
             @if ($namespaces->isNotEmpty())
                 <x-slot:stats>
                     <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="{{ __('Queues at a glance') }}">
-                        <x-fleet-stat :label="__('Jobs this month')">
+                        <x-infrastructure-stat :label="__('Jobs this month')">
                             <p class="mt-2 flex items-baseline gap-1.5">
                                 <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format($usedJobs) }}</span>
                             </p>
@@ -43,8 +43,8 @@
                                     {{ __('Unlimited on this plan') }}
                                 @endif
                             </p>
-                        </x-fleet-stat>
-                        <x-fleet-stat :label="__('Queues')">
+                        </x-infrastructure-stat>
+                        <x-infrastructure-stat :label="__('Queues')">
                             <p class="mt-2 flex items-baseline gap-1.5">
                                 <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $namespaces->count() }}</span>
                                 <span class="text-xs text-brand-moss">{{ trans_choice('queue|queues', $namespaces->count()) }}</span>
@@ -54,8 +54,8 @@
                                     ? __('Limit :max on this plan', ['max' => number_format($entitlement->maxNamespaces)])
                                     : __('No limit on this plan') }}
                             </p>
-                        </x-fleet-stat>
-                        <x-fleet-stat
+                        </x-infrastructure-stat>
+                        <x-infrastructure-stat
                             :label="__('Managed queue')"
                             @class([
                                 'border-brand-sage/30 bg-brand-sage/8' => $featureActive,
@@ -72,7 +72,7 @@
                                 @endif
                             </p>
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Feature flag') }}</p>
-                        </x-fleet-stat>
+                        </x-infrastructure-stat>
                     </dl>
                 </x-slot:stats>
             @endif

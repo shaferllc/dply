@@ -122,7 +122,6 @@ test('orgs inherit config defaults for gated surfaces', function () {
     expect(Feature::for($org)->active('surface.serverless'))->toBeFalse();
     expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
     expect(Feature::for($org)->active('provider.aws'))->toBeFalse();
-    expect(Feature::for($org)->active('surface.fleet'))->toBeTrue();
 });
 
 test('cloud nav link is coming soon when surface disabled in config', function () {

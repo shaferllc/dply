@@ -93,6 +93,15 @@
     </div>
 @endif
 
+{{-- The two-step model, stated once at the top. Hidden while searching so it
+     doesn't sit between the query and its results. --}}
+@if (! $hasChannelSearch)
+    @include('livewire.settings.partials.notification-channels-explainer', [
+        'canManage' => $canManage,
+        'bulkAssignUrl' => ! empty($showBulkAssign ?? false) ? route('profile.notification-channels.bulk-assign') : null,
+    ])
+@endif
+
 @if ($canManage && count($types) === 0)
     <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
         <div class="rounded-md border border-dashed border-brand-ink/15 bg-brand-cream/30 px-3 py-3 text-center">
@@ -349,13 +358,58 @@
                                     </form>
                                 </td>
                             @else
-                                <td class="px-3 py-1.5 font-semibold text-brand-ink sm:px-4">{{ $channel->label }}</td>
+                                <td class="px-3 py-1.5 sm:px-4">
+                                    <div class="flex min-w-0 items-start gap-2">
+                                        <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-sand/45 text-brand-moss ring-1 ring-brand-ink/10">
+                                            <x-dynamic-component
+                                                :component="\App\Models\NotificationChannel::iconForType($channel->type)"
+                                                class="h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="truncate font-semibold text-brand-ink">{{ $channel->label }}</span>
+                                                @if ($channel->isPaging())
+                                                    {{-- A pager mistaken for a chat room is a 3am phone call. --}}
+                                                    <span
+                                                        class="inline-flex shrink-0 items-center gap-0.5 rounded bg-rose-50 px-1.5 py-px text-2xs font-semibold uppercase tracking-wide text-rose-700 ring-1 ring-rose-200"
+                                                        title="{{ __('Alerts sent here page whoever is on call for the PagerDuty service.') }}"
+                                                    >
+                                                        <x-heroicon-m-bell-alert class="h-3 w-3" aria-hidden="true" />
+                                                        {{ __('Pages on-call') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            {{-- Destination, so two channels of the same type are
+                                                 tellable apart without opening the edit form. --}}
+                                            @php($destination = $channel->describeDestination())
+                                            @if ($destination !== '')
+                                                <p class="mt-px truncate font-mono text-2xs text-brand-mist" title="{{ $destination }}">{{ $destination }}</p>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </td>
                                 <td class="px-3 py-1.5">
                                     <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         {{ \App\Models\NotificationChannel::labelForType($channel->type) }}
                                     </span>
                                 </td>
-                                <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $channel->subscriptions_count }}</td>
+                                <td class="px-3 py-1.5 text-right">
+                                    @if ($channel->subscriptions_count > 0)
+                                        <span class="font-mono tabular-nums text-brand-moss">{{ $channel->subscriptions_count }}</span>
+                                    @else
+                                        {{-- 0 usages is the page's quietest failure: the channel is
+                                             configured, its test passes, and it will never fire. --}}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-px text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200"
+                                            title="{{ __('This channel is not subscribed to any events, so nothing will be delivered to it.') }}"
+                                        >
+                                            <x-heroicon-m-exclamation-triangle class="h-3 w-3" aria-hidden="true" />
+                                            {{ __('Not routed') }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="px-3 py-1.5 text-right sm:px-4">
                                     @if ($canManage)
                                         <div class="flex flex-wrap items-center justify-end gap-1">

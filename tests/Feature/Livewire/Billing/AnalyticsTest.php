@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Billing;
 
-use App\Modules\Billing\Livewire\Analytics;
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Billing\Livewire\Analytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -37,8 +37,13 @@ test('billing analytics page renders for org admin', function () {
         ->assertSee('Billing analytics')
         ->assertSee('Spend by category')
         ->assertSee('Historical spend')
-        ->assertSee('MRR')
-        ->assertSee('Month-end projection')
+        // Vendor framing ("MRR", "ARR", "Recurring revenue") was removed: this
+        // page is customer-facing, so the same figure is their spend, not our
+        // revenue. Asserted absent so it cannot creep back.
+        ->assertDontSee('MRR')
+        ->assertDontSee('Recurring revenue')
+        ->assertSee('Cost forecast')
+        ->assertSee('Projected this month')
         ->assertSee('Stripe sync events')
         ->assertSee('Edge sites')
         ->assertSee('Managed products')
@@ -64,7 +69,7 @@ test('billing analytics shows cost observatory when billing flag enabled', funct
     Livewire::actingAs($admin)
         ->test(Analytics::class, ['organization' => $org])
         ->assertSee('Transparent cost observatory')
-        ->assertSee('vs Forge Hobby')
+        ->assertDontSee('Forge')
         ->assertSee('BYO VM provider estimates');
 });
 

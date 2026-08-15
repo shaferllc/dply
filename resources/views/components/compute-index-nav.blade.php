@@ -17,18 +17,18 @@
         : [
             ['route' => 'sites.index', 'match' => 'sites.index', 'label' => __('Sites'), 'icon' => 'globe-alt'],
             ['route' => 'servers.index', 'match' => 'servers.index', 'label' => __('Servers'), 'icon' => 'server'],
-            // Projects and Fleet are deliberately absent: this row is labelled
-            // Compute, and neither is compute — Projects is a grouping container,
-            // Fleet a cross-server view. Both keep header entry points (Projects
-            // under Apps, Fleet via the featured "Fleet ops" link and the Org
-            // group's Fleet health, which reaches fleet.index through
-            // livewire/fleet/_tabs). Don't re-add them here without renaming the
-            // row.
+            // Projects is deliberately absent: this row is labelled Compute and
+            // Projects is a grouping container, not compute. It keeps its header
+            // entry point under Apps. Don't re-add it here without renaming the
+            // row. Cross-product ops views live under /infrastructure.
             // Backups moved to the Services row — it is a managed capability,
             // not compute (docs/adr/managed-services-tier.md, decision 1).
-            ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt'],
-            ['route' => 'cloud.index', 'match' => 'cloud.*', 'label' => __('Cloud'), 'icon' => 'cloud'],
-            ['route' => 'serverless.index', 'match' => 'serverless.*', 'label' => __('Serverless'), 'icon' => 'cpu-chip'],
+            // These carry a `feature` key because their routes stay registered
+            // while the surface is parked — only the feature middleware rejects
+            // — so Route::has() alone would keep linking them into a 400.
+            ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt', 'feature' => 'surface.edge'],
+            ['route' => 'cloud.index', 'match' => 'cloud.*', 'label' => __('Cloud'), 'icon' => 'cloud', 'feature' => 'surface.cloud'],
+            ['route' => 'serverless.index', 'match' => 'serverless.*', 'label' => __('Serverless'), 'icon' => 'cpu-chip', 'feature' => 'surface.serverless'],
         ];
 @endphp
 

@@ -48,7 +48,7 @@ Organization **HTTP API tokens** can include granular abilities (read servers, d
 
 If your role is **deployer**, tokens you create can only include abilities on the deployer **allowlist** (for example read servers/sites and deploy)—even if the UI would normally offer broader scopes for admins.
 
-Creating new API tokens may require **Pro** when your app instance enables that gate (`DPLY_API_TOKENS_REQUIRE_PAID_PLAN`).
+Creating new API tokens may require **Pro**, depending on how your instance is configured.
 
 ## Profile versus organization settings
 

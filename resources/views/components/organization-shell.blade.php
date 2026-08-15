@@ -79,14 +79,9 @@
                         <x-heroicon-o-clock class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Activity') }}
                     </a>
-                    <a
-                        href="{{ route('organizations.automation', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('automation')])
-                    >
-                        <x-heroicon-o-bolt class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Automation') }}
-                    </a>
+                    {{-- Automation folded into General settings — email defaults,
+                         Cloud alerts, Edge data region, and the org-wide API token
+                         list all live there now. --}}
                 @endif
                 @can('update', $org)
                     <a
@@ -156,6 +151,7 @@
                         {{ __('Notification channels') }}
                     </a>
                 @endcan
+                {{-- Secrets nav temporarily hidden.
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.secrets', $org) }}"
@@ -166,6 +162,7 @@
                         {{ __('Secrets') }}
                     </a>
                 @endcan
+                --}}
                 <a
                     href="{{ route('organizations.teams', $org) }}"
                     wire:navigate
@@ -174,6 +171,7 @@
                     <x-heroicon-o-rectangle-group class="{{ $ni }}" aria-hidden="true" />
                     {{ __('Teams') }}
                 </a>
+                {{-- Webserver templates nav temporarily hidden.
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.webserver-templates', $org) }}"
@@ -184,6 +182,7 @@
                         {{ __('Webserver templates') }}
                     </a>
                 @endcan
+                --}}
             </nav>
             <div
                 class="mt-4 border-t border-brand-ink/10 pt-4"

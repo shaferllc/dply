@@ -9,7 +9,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Modules\Launch\Support\StandbyPlaybook;
-use Laravel\Pennant\Feature;
 
 /**
  * Merges standby blueprint templates with org inventory — hybrid Edge stacks,
@@ -276,14 +275,10 @@ final class StandbyBlueprintPlanner
     private function stepLink(string $key, int $index, array $inventory): array
     {
         if ($key === 'edge_hybrid_origin') {
-            $fleetLink = Feature::active('surface.fleet')
-                ? [route('fleet.blast-radius'), __('Open blast radius')]
-                : [null, null];
-
             return match ($index) {
                 1 => $this->firstCloudOriginLink($inventory),
                 2 => $this->firstHybridEdgeLink($inventory),
-                3 => $fleetLink,
+                3 => [route('infrastructure.blast-radius'), __('Open blast radius')],
                 default => [null, null],
             };
         }
@@ -298,12 +293,8 @@ final class StandbyBlueprintPlanner
         }
 
         if ($key === 'dns_cutover') {
-            $fleetDomains = Feature::active('surface.fleet')
-                ? [route('fleet.domains'), __('Fleet domains')]
-                : [null, null];
-
             return match ($index) {
-                0 => $fleetDomains,
+                0 => [route('infrastructure.domains'), __('Domain inventory')],
                 1 => [route('settings.servers'), __('Credentials')],
                 default => [null, null],
             };

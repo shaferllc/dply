@@ -134,7 +134,7 @@ class OpsCopilot extends Component
             }
         }
 
-        return view('livewire.fleet.ops-copilot', [
+        return view('livewire.infrastructure.ops-copilot', [
             'org' => $org,
             'candidates' => $candidates,
             'selectedSite' => $selectedSite,

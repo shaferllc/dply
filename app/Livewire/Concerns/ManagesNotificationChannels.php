@@ -6,6 +6,9 @@ use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +25,8 @@ use Livewire\Component;
  */
 trait ManagesNotificationChannels
 {
+    use BuildsIntercomChannelInput;
+    use BuildsPagerDutyChannelInput;
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ResolvesDiscordGuilds;
@@ -58,6 +63,34 @@ trait ManagesNotificationChannels
 
     public string $new_mobile_platform = 'ios';
 
+    public string $new_intercom_access_token = '';
+
+    public string $new_intercom_region = 'us';
+
+    public string $new_intercom_admin_id = '';
+
+    public string $new_intercom_recipient = '';
+
+    public string $new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $new_intercom_subject = '';
+
+    public string $new_pagerduty_routing_key = '';
+
+    public string $new_pagerduty_region = 'us';
+
+    public string $new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $new_pagerduty_source = '';
+
+    public string $new_pagerduty_component = '';
+
+    public string $new_pagerduty_group = '';
+
     public string $new_webhook_url = '';
 
     public string $search = '';
@@ -93,6 +126,34 @@ trait ManagesNotificationChannels
     public string $edit_mobile_device_token = '';
 
     public string $edit_mobile_platform = 'ios';
+
+    public string $edit_intercom_access_token = '';
+
+    public string $edit_intercom_region = 'us';
+
+    public string $edit_intercom_admin_id = '';
+
+    public string $edit_intercom_recipient = '';
+
+    public string $edit_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $edit_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $edit_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $edit_intercom_subject = '';
+
+    public string $edit_pagerduty_routing_key = '';
+
+    public string $edit_pagerduty_region = 'us';
+
+    public string $edit_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $edit_pagerduty_source = '';
+
+    public string $edit_pagerduty_component = '';
+
+    public string $edit_pagerduty_group = '';
 
     public string $edit_webhook_url = '';
 
@@ -226,6 +287,20 @@ trait ManagesNotificationChannels
         $this->new_google_chat_webhook_url = '';
         $this->new_mobile_device_token = '';
         $this->new_mobile_platform = 'ios';
+        $this->new_intercom_access_token = '';
+        $this->new_intercom_region = 'us';
+        $this->new_intercom_admin_id = '';
+        $this->new_intercom_recipient = '';
+        $this->new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->new_intercom_subject = '';
+        $this->new_pagerduty_routing_key = '';
+        $this->new_pagerduty_region = 'us';
+        $this->new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->new_pagerduty_source = '';
+        $this->new_pagerduty_component = '';
+        $this->new_pagerduty_group = '';
         $this->new_webhook_url = '';
     }
 
@@ -280,6 +355,22 @@ trait ManagesNotificationChannels
         } elseif ($channel->type === NotificationChannel::TYPE_MOBILE_APP) {
             $this->edit_mobile_device_token = (string) ($cfg['device_token'] ?? '');
             $this->edit_mobile_platform = (string) ($cfg['platform'] ?? 'ios');
+        } elseif ($channel->type === NotificationChannel::TYPE_INTERCOM) {
+            $this->edit_intercom_access_token = (string) ($cfg['access_token'] ?? '');
+            $this->edit_intercom_region = (string) ($cfg['region'] ?? 'us');
+            $this->edit_intercom_admin_id = (string) ($cfg['admin_id'] ?? '');
+            $this->edit_intercom_recipient = (string) ($cfg['recipient'] ?? '');
+            $this->edit_intercom_recipient_type = (string) ($cfg['recipient_type'] ?? NotificationChannel::INTERCOM_TO_USER_EMAIL);
+            $this->edit_intercom_message_type = (string) ($cfg['message_type'] ?? IntercomMessage::TYPE_INAPP);
+            $this->edit_intercom_template = (string) ($cfg['template'] ?? IntercomMessage::TEMPLATE_PLAIN);
+            $this->edit_intercom_subject = (string) ($cfg['subject'] ?? '');
+        } elseif ($channel->type === NotificationChannel::TYPE_PAGERDUTY) {
+            $this->edit_pagerduty_routing_key = (string) ($cfg['routing_key'] ?? '');
+            $this->edit_pagerduty_region = (string) ($cfg['region'] ?? 'us');
+            $this->edit_pagerduty_default_severity = (string) ($cfg['default_severity'] ?? PagerDutyMessage::SEVERITY_ERROR);
+            $this->edit_pagerduty_source = (string) ($cfg['source'] ?? '');
+            $this->edit_pagerduty_component = (string) ($cfg['component'] ?? '');
+            $this->edit_pagerduty_group = (string) ($cfg['group'] ?? '');
         } elseif ($channel->type === NotificationChannel::TYPE_WEBHOOK) {
             $this->edit_webhook_url = (string) ($cfg['url'] ?? '');
         }
@@ -302,6 +393,20 @@ trait ManagesNotificationChannels
         $this->edit_google_chat_webhook_url = '';
         $this->edit_mobile_device_token = '';
         $this->edit_mobile_platform = 'ios';
+        $this->edit_intercom_access_token = '';
+        $this->edit_intercom_region = 'us';
+        $this->edit_intercom_admin_id = '';
+        $this->edit_intercom_recipient = '';
+        $this->edit_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->edit_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->edit_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->edit_intercom_subject = '';
+        $this->edit_pagerduty_routing_key = '';
+        $this->edit_pagerduty_region = 'us';
+        $this->edit_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->edit_pagerduty_source = '';
+        $this->edit_pagerduty_component = '';
+        $this->edit_pagerduty_group = '';
         $this->edit_webhook_url = '';
     }
 
@@ -415,7 +520,7 @@ trait ManagesNotificationChannels
     {
         $p = $prefix;
 
-        return [
+        return $this->intercomValidationAttributes($p) + $this->pagerDutyValidationAttributes($p) + [
             $p.'label' => __('label'),
             $p.'slack_webhook_url' => __('webhook URL'),
             $p.'slack_channel' => __('channel'),
@@ -484,7 +589,7 @@ trait ManagesNotificationChannels
                 $prefix.'pushover_user_key' => ['required', 'string', 'max:64'],
             ],
             NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                $prefix.'teams_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                $prefix.'teams_webhook_url' => ['required', 'string', 'url', 'max:2048', MicrosoftTeamsClient::urlRule()],
             ],
             NotificationChannel::TYPE_ROCKETCHAT => $base + [
                 $prefix.'rocketchat_webhook_url' => ['required', 'string', 'url', 'max:2048'],
@@ -496,6 +601,8 @@ trait ManagesNotificationChannels
                 $prefix.'mobile_device_token' => ['required', 'string', 'max:4096'],
                 $prefix.'mobile_platform' => ['required', 'string', 'in:ios,android'],
             ],
+            NotificationChannel::TYPE_INTERCOM => $base + $this->intercomValidationRules($prefix),
+            NotificationChannel::TYPE_PAGERDUTY => $base + $this->pagerDutyValidationRules($prefix),
             NotificationChannel::TYPE_WEBHOOK => $base + [
                 $prefix.'webhook_url' => ['required', 'string', 'url', 'max:2048'],
             ],
@@ -546,6 +653,8 @@ trait ManagesNotificationChannels
                 'device_token' => $this->{$prefix.'mobile_device_token'},
                 'platform' => $this->{$prefix.'mobile_platform'},
             ],
+            NotificationChannel::TYPE_INTERCOM => $this->intercomConfigFromInput($prefix),
+            NotificationChannel::TYPE_PAGERDUTY => $this->pagerDutyConfigFromInput($prefix),
             NotificationChannel::TYPE_WEBHOOK => [
                 'url' => $this->{$prefix.'webhook_url'},
             ],

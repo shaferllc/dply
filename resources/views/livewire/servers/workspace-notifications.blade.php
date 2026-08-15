@@ -111,43 +111,6 @@
                 >
                     @include('livewire.servers.partials.notifications._outbound-webhook')
 
-                    <x-workspace-panel-head
-                        dense
-                        icon="heroicon-o-arrow-up-right"
-                        :title="__('Organization webhook destinations')"
-                        :note="__('Organization-wide outbound webhook destinations (Slack / Discord / Teams). These apply to every server in the organization and are configured under Organization → Automation. Server events route a limited set today (e.g. Insights alerts).')"
-                        class="border-b border-brand-ink/10"
-                    >
-                        @if ($server->organization_id)
-                            <x-slot:actions>
-                                <a href="{{ route('organizations.automation', $server->organization_id) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                    <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" />
-                                    {{ __('Manage in Automation') }}
-                                </a>
-                            </x-slot:actions>
-                        @endif
-                    </x-workspace-panel-head>
-
-                    <div class="px-5 py-3 sm:px-6">
-                        @if ($organizationWebhookDestinations->isEmpty())
-                            <p class="border-b border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss">
-                                {{ __('No organization-wide webhook destinations yet.') }}
-                            </p>
-                        @else
-                            <ul class="divide-y divide-brand-ink/10 border-y border-brand-ink/10">
-                                @foreach ($organizationWebhookDestinations as $hook)
-                                    <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs" wire:key="srv-orghook-{{ $hook->id }}">
-                                        <div>
-                                            <span class="font-medium text-brand-ink">{{ $hook->name }}</span>
-                                            <span class="ml-2 text-brand-moss">{{ ucfirst($hook->driver) }}</span>
-                                        </div>
-                                        <span class="text-xs {{ $hook->enabled ? 'text-green-700' : 'text-brand-mist' }}">{{ $hook->enabled ? __('on') : __('off') }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </div>
                 </x-server-workspace-tab-panel>
             @endif
         </div>

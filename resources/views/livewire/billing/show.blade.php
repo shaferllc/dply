@@ -72,6 +72,7 @@
              fmt(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
          }">
         <x-organization-shell
+            dense
             :organization="$organization"
             section="billing"
             :title="__('Billing & plan')"
@@ -84,60 +85,64 @@
             ]"
         >
             <x-slot:actions>
-                <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
-                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                <x-outline-link size="xxs" href="{{ route('billing.analytics', $organization) }}" wire:navigate>
+                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Analytics') }}
                 </x-outline-link>
                 @if ($this->canManageBilling)
-                    <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
-                        <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    <x-outline-link size="xxs" href="{{ route('billing.invoices', $organization) }}" wire:navigate>
+                        <x-heroicon-o-document class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('All invoices') }}
                     </x-outline-link>
                 @endif
             </x-slot:actions>
 
+            {{-- Hairline strip, matching invoices / org settings / notification
+                 channels. The status tile keeps its tone tint — it doubles as the
+                 subscription banner. --}}
             <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Billing at a glance') }}">
-                    <x-fleet-stat :label="__('Status')" class="{{ $statusTiles[$statusTone] }}">
-                        <p class="mt-2 flex items-center gap-1.5">
-                            <span class="inline-block h-2 w-2 rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
+                <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Billing at a glance') }}">
+                    <div class="px-3 py-2 {{ $statusTiles[$statusTone] }}">
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="inline-block h-1.5 w-1.5 shrink-0 self-center rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
                             <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
-                        </p>
-                        <p class="mt-1 truncate text-xs text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Servers')">
-                        <p class="mt-2 flex items-baseline gap-1.5">
-                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
-                            <span class="text-xs text-brand-moss">{{ __('billable') }}</span>
-                        </p>
-                        @if ($this->excludedServers->isNotEmpty())
-                            <p class="mt-1 text-xs text-brand-mist">+{{ $this->excludedServers->count() }} {{ __('excluded') }}</p>
-                        @else
-                            <p class="mt-1 text-xs text-brand-mist">{{ __('Counting toward plan') }}</p>
-                        @endif
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Current bill')">
-                        <p class="mt-2 flex items-baseline gap-1">
-                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
-                            <span class="text-xs text-brand-moss">/{{ __('mo') }}</span>
-                        </p>
-                        @if ($this->subscriptionInterval === 'year')
-                            <p class="mt-1 text-xs text-brand-mist">${{ number_format($this->yearlyTotalCents / 100, 0) }}/{{ __('yr') }}</p>
-                        @else
-                            <p class="mt-1 text-xs text-brand-mist">{{ $intervalLabel }}</p>
-                        @endif
-                    </x-fleet-stat>
+                            <span class="truncate text-xs text-brand-moss" title="{{ $statusSub }}">{{ $statusSub }}</span>
+                        </dd>
+                    </div>
+                    <div class="bg-white px-3 py-2">
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Servers') }}</dt>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
+                            <span class="truncate text-xs text-brand-moss">
+                                {{ __('billable') }}@if ($this->excludedServers->isNotEmpty()) · {{ __('+:n excluded', ['n' => $this->excludedServers->count()]) }}@endif
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="bg-white px-3 py-2">
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current bill') }}</dt>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
+                            <span class="truncate text-xs text-brand-moss">
+                                @if ($this->subscriptionInterval === 'year')
+                                    {{ __('/mo · $:n/yr', ['n' => number_format($this->yearlyTotalCents / 100, 0)]) }}
+                                @else
+                                    {{ __('/mo · :interval', ['interval' => $intervalLabel]) }}
+                                @endif
+                            </span>
+                        </dd>
+                    </div>
                 </dl>
             </x-slot:stats>
 
             @if ($errors->isNotEmpty())
-                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-livewire-validation-errors />
                 </div>
             @endif
 
             @if ($betaFeeWaived)
-                <div class="border-b border-brand-ink/10 bg-brand-gold/8 px-5 py-4 sm:px-6">
+                <div class="border-b border-brand-ink/10 bg-brand-gold/8 px-3 py-2 sm:px-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div class="min-w-0">
                             <p class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
@@ -164,7 +169,7 @@
                 || $errors->has('plan')
                 || $errors->has('billing')
             )
-                <div class="space-y-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="space-y-3 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     @if (request()->query('checkout') === 'success')
                         <x-alert tone="success">{{ __('Subscription updated successfully.') }}</x-alert>
                     @endif
@@ -183,7 +188,7 @@
             @endif
 
             <div wire:loading.flex wire:target="switchInterval,cancelSubscription,resumeSubscription"
-                 class="hidden items-center gap-3 border-b border-brand-ink/10 bg-brand-gold/10 px-5 py-3 sm:px-6">
+                 class="hidden items-center gap-3 border-b border-brand-ink/10 bg-brand-gold/10 px-3 py-2 sm:px-4">
                 <x-spinner variant="ink" size="sm" />
                 <span class="text-sm font-medium text-brand-ink">{{ __('Updating your subscription with Stripe…') }}</span>
             </div>
@@ -200,21 +205,16 @@
                     $bundleActive = ($bundle['status'] ?? null) === \App\Models\OrganizationBundleEntitlement::STATUS_ACTIVE;
                 @endphp
                 <section class="border-b border-brand-ink/10">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                        <x-icon-badge>
-                            <x-heroicon-o-gift class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled products') }}</h3>
-                        </div>
-                        <span @class([
-                            'shrink-0 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide',
-                            'bg-brand-forest/10 text-brand-forest' => $bundleActive,
-                            'bg-amber-100 text-amber-800' => ! $bundleActive,
-                        ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
-                    </div>
-                    <div class="px-5 py-5 sm:px-6">
+                    <x-workspace-panel-head dense icon="heroicon-o-gift" :title="__('Bundled products')" :note="__('Included with your plan')">
+                        <x-slot:actions>
+                            <span @class([
+                                'shrink-0 rounded px-1.5 py-px text-2xs font-semibold uppercase tracking-wide',
+                                'bg-brand-forest/10 text-brand-forest' => $bundleActive,
+                                'bg-amber-100 text-amber-800' => ! $bundleActive,
+                            ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-3 py-3 sm:px-4">
                         <p class="text-sm leading-relaxed text-brand-moss">
                             @if ($bundle['entitled'])
                                 {{ __('Your annual plan includes free access to tracely (analytics) and Lookout (error tracking). Sign in to each with your dply account.') }}
@@ -232,25 +232,45 @@
 
             {{-- Payment method --}}
             <section class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-6">
-                    <p class="text-sm text-brand-ink">{{ $this->paymentSummary }}</p>
+                <x-workspace-panel-head dense icon="heroicon-o-credit-card" :title="__('Payment method')" :note="__('Default card on file. Update from the Stripe portal.')" />
+                {{-- "No payment method" is a blocking gap, not a neutral value:
+                     nothing can be charged until it's fixed. Compacting the page
+                     had flattened it into grey body text that read as disabled,
+                     so the empty state gets amber chrome + an icon while a card
+                     on file stays quiet. --}}
+                @php
+                    // Deliberately the block form, not the inline parenthesised one.
+                    // Blade pairs raw php blocks with a text regex, so an inline
+                    // opener inside a file that also uses block form swallows
+                    // everything up to the next terminator — which here ate the
+                    // canManageBilling conditional below and orphaned its close.
+                    // Directive names stay spelled out in prose: writing the literal
+                    // tokens in this comment would terminate this very block.
+                    $hasPaymentMethod = $this->paymentSummary !== 'No payment method';
+                @endphp
+                <div @class([
+                    'flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4',
+                    'bg-amber-50/60' => ! $hasPaymentMethod,
+                ])>
+                    @if ($hasPaymentMethod)
+                        <p class="inline-flex items-center gap-1.5 font-mono text-sm tabular-nums text-brand-ink">
+                            <x-heroicon-o-credit-card class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ $this->paymentSummary }}
+                        </p>
+                    @else
+                        <p class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-900">
+                            <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                            {{ __('No payment method') }}
+                        </p>
+                    @endif
+
                     @if ($this->canManageBilling)
-                        <x-secondary-button type="button" wire:click="portal">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Manage in Stripe') }}
+                        <x-secondary-button size="xs" type="button" wire:click="portal">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $hasPaymentMethod ? __('Manage in Stripe') : __('Add a card') }}
                         </x-secondary-button>
                     @else
-                        <p class="text-sm text-brand-mist">{{ __('Subscribe above to add a payment method.') }}</p>
+                        <p class="text-xs font-medium text-amber-900/80">{{ __('Pick a plan above to add a payment method.') }}</p>
                     @endif
                 </div>
             </section>
@@ -264,69 +284,63 @@
                     $currencies = config('profile_options.currencies', []);
                 @endphp
                 <section class="border-b border-brand-ink/10">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                        <x-icon-badge>
-                            <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
-                        </div>
-                    </div>
-                    <form wire:submit="saveBillingDetails" class="space-y-5 px-5 py-5 sm:px-6">
-                        <div class="grid gap-5 sm:grid-cols-2">
+                    <x-workspace-panel-head dense icon="heroicon-o-identification" :title="__('Billing details')" :note="__('Printed on every Stripe invoice for this organization’s subscription.')" />
+                    <form wire:submit="saveBillingDetails" class="space-y-3 px-3 py-3 sm:px-4">
+                        <div class="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="org_invoice_email" :value="__('Invoice email')" />
                                 <x-text-input id="org_invoice_email" wire:model="invoice_email" type="email" class="mt-1 block w-full" autocomplete="email" />
-                                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
-                                <x-input-error class="mt-2" :messages="$errors->get('invoice_email')" />
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
+                                <x-input-error :messages="$errors->get('invoice_email')" />
                             </div>
                             <div>
                                 <x-input-label for="org_vat_number" :value="__('VAT number')" />
                                 <x-text-input id="org_vat_number" wire:model="vat_number" type="text" class="mt-1 block w-full" placeholder="NL123456789B01" autocomplete="off" />
-                                <p class="mt-1.5 text-xs text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
-                                <x-input-error class="mt-2" :messages="$errors->get('vat_number')" />
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
+                                <x-input-error :messages="$errors->get('vat_number')" />
                             </div>
                         </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="org_billing_currency" :value="__('Currency')" />
                             <select
                                 id="org_billing_currency"
                                 wire:model="billing_currency"
-                                class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                             >
                                 <option value="">{{ __('Select a currency') }}</option>
                                 @foreach ($currencies as $code => $label)
                                     <option value="{{ $code }}">{{ $label }}</option>
                                 @endforeach
                             </select>
-                            <p class="mt-1.5 text-xs text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
-                            <x-input-error class="mt-2" :messages="$errors->get('billing_currency')" />
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
+                            <x-input-error :messages="$errors->get('billing_currency')" />
                         </div>
                         <div>
                             <x-input-label for="org_billing_details" :value="__('Legal details')" />
                             <textarea
                                 id="org_billing_details"
                                 wire:model="billing_details"
-                                rows="4"
-                                class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
+                                rows="2"
+                                class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
                                 placeholder="{{ __('Legal name, address, and other details to show on invoices') }}"
                             ></textarea>
-                            <p class="mt-1.5 text-xs text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
-                            <x-input-error class="mt-2" :messages="$errors->get('billing_details')" />
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
+                            <x-input-error :messages="$errors->get('billing_details')" />
                         </div>
-                        <div class="flex items-center justify-end border-t border-brand-ink/10 pt-4">
-                            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveBillingDetails">
-                                <span wire:loading.remove wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
-                                    <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </div>
+                        <div class="flex items-center justify-end border-t border-brand-ink/10 pt-2">
+                            <button type="submit" wire:loading.attr="disabled" wire:target="saveBillingDetails"
+                                    class="inline-flex h-7 items-center gap-1 rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-70">
+                                <span wire:loading.remove wire:target="saveBillingDetails" class="inline-flex items-center gap-1">
+                                    <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Save billing details') }}
                                 </span>
-                                <span wire:loading wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
+                                <span wire:loading wire:target="saveBillingDetails" class="inline-flex items-center gap-1">
                                     <x-spinner variant="cream" size="sm" />
                                     {{ __('Saving…') }}
                                 </span>
-                            </x-primary-button>
+                            </button>
                         </div>
                     </form>
                 </section>
@@ -335,21 +349,13 @@
             {{-- Subscription — cancel / resume --}}
             @if ($this->canManageBilling)
                 <section class="border-b border-brand-ink/10">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                        <x-icon-badge>
-                            @if ($this->onGracePeriod)
-                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                            @endif
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
-                        </div>
-                    </div>
-                    <div class="px-5 py-5 sm:px-6">
+                    <x-workspace-panel-head
+                        dense
+                        :icon="$this->onGracePeriod ? 'heroicon-o-clock' : 'heroicon-o-arrow-path'"
+                        :title="__('Cancel or resume')"
+                        :note="__('Cancel keeps your data and servers — billing just stops at the end of the period.')"
+                    />
+                    <div class="px-3 py-3 sm:px-4">
                         @if ($this->onGracePeriod)
                             <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
                                 <p class="text-sm font-semibold text-amber-950">
@@ -383,29 +389,23 @@
             {{-- Invoices --}}
             @if ($this->canManageBilling)
                 <section class="border-b border-brand-ink/10">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                        <x-icon-badge>
-                            <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
-                        </div>
-                        <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
-                    </div>
+                    <x-workspace-panel-head dense icon="heroicon-o-document" :title="__('Invoices')" :note="__('Recent invoices from Stripe.')">
+                        <x-slot:actions>
+                            <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
                     @if ($this->invoices->isEmpty())
-                        <div class="px-5 py-10 text-center sm:px-6">
-                            <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                        <div class="px-3 py-8 text-center sm:px-4">
+                            <span class="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-document class="h-4 w-4" aria-hidden="true" />
                             </span>
-                            <p class="mt-3 text-sm text-brand-moss">{{ __('No invoices yet.') }}</p>
+                            <p class="mt-2.5 text-sm text-brand-moss">{{ __('No invoices yet.') }}</p>
                         </div>
                     @else
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($this->invoices as $invoice)
                                 @php $hosted = $invoice->asStripeInvoice()->hosted_invoice_url ?? null; @endphp
-                                <li class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
+                                <li class="flex items-center justify-between gap-4 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
                                     <div class="min-w-0">
                                         <p class="text-sm font-semibold text-brand-ink">{{ $invoice->date()->toFormattedDateString() }}</p>
                                         <p class="mt-0.5 font-mono text-xs text-brand-moss tabular-nums">{{ $invoice->total() }}</p>

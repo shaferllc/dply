@@ -179,11 +179,7 @@ Where EU **VAT** collection applies, your organization can maintain valid tax id
 
 ## API tokens and plan gating
 
-Some installs gate **API token creation** behind an active paid plan. Controlled by:
-
-```env
-DPLY_API_TOKENS_REQUIRE_PAID_PLAN=true
-```
+Some installs gate **API token creation** behind an active paid plan.
 
 Existing tokens stay revocable regardless. Standard and Enterprise satisfy the gate.
 

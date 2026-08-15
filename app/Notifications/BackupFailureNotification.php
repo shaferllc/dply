@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\BackupSchedule;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -16,6 +20,9 @@ use Illuminate\Notifications\Notification;
  */
 class BackupFailureNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -30,7 +37,7 @@ class BackupFailureNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -64,5 +71,28 @@ class BackupFailureNotification extends Notification implements ShouldQueue
         }
 
         return $mail;
+    }
+
+    /**
+     * Null for a test alert: the operator pressed a button to check their email
+     * wiring and should not get paged for it.
+     */
+    public function pagerDutySeverity(object $notifiable): ?string
+    {
+        return $this->isTest ? null : PagerDutyMessage::SEVERITY_ERROR;
+    }
+
+    /**
+     * Keyed on the schedule, so the three consecutive failures that auto-pause
+     * it update one incident rather than opening three.
+     */
+    public function pagerDutyDedupKey(object $notifiable): ?string
+    {
+        return 'dply:backup-failed:'.$this->schedule->id;
+    }
+
+    public function pagerDutySource(object $notifiable): string
+    {
+        return $this->serverName ?: (string) $this->schedule->server_id;
     }
 }

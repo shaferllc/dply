@@ -21,6 +21,17 @@ class UniversalEventNotification extends Notification implements ShouldQueue
     }
 
     /**
+     * Deliberately has NO `intercom` leg, unlike every other notification in
+     * this namespace — do not add the DeliversToIntercom trait here. (Named in
+     * prose rather than a {@see} tag on purpose: a tag makes Pint import the
+     * trait, and an import in this file reads like the opposite of this note.)
+     *
+     * This class is the in-app/broadcast twin of a NotificationEvent that
+     * NotificationRoutingResolver has *already* fanned out to every subscribed
+     * NotificationChannel via sendOperationalMessage() — Intercom channels
+     * included. An Intercom leg here would deliver the same event twice to
+     * anyone holding both an inbox entry and an Intercom subscription.
+     *
      * @return list<string>
      */
     public function via(object $notifiable): array

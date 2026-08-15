@@ -6,7 +6,7 @@
 @endphp
 
 <article class="rounded-xl border border-brand-ink/10 bg-white/40 overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-4 sm:px-5">
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
         <div class="min-w-0">
             <h3 class="font-semibold text-brand-ink truncate">{{ $site['site_name'] }}</h3>
             @if (! empty($site['hostname']))
@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <div class="grid gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
+    <div class="grid gap-2.5 px-3 py-2.5 sm:grid-cols-2 sm:px-4">
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between gap-2">
                 <dt class="text-brand-moss">{{ __('Platform fee') }}</dt>
@@ -67,7 +67,7 @@
     </div>
 
     @if (! empty($site['workspace_url']))
-        <div class="border-t border-brand-ink/10 px-4 py-3 sm:px-5">
+        <div class="border-t border-brand-ink/10 px-3 py-2 sm:px-4">
             <a href="{{ $site['workspace_url'] }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage">
                 {{ __('Open site workspace') }}
                 <x-heroicon-o-arrow-right class="h-4 w-4" />

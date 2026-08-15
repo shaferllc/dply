@@ -14,7 +14,6 @@
             'surface.cloud',
             'surface.edge',
             'surface.serverless',
-            'surface.fleet',
             'surface.projects',
             'surface.status_pages',
             'surface.marketplace',
@@ -31,7 +30,7 @@
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
     $browseActive = $req->routeIs(
         'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
-        'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*',
+        'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'backups.*',
         'live.*',
     );
     $moreMenuActive = $featuresActive
@@ -176,22 +175,21 @@
                                     </button>
                                 </x-slot>
                                 <x-slot name="content">
-                                    {{-- Featured overview row spans the full panel; only shown when more than one surface is live. --}}
-                                    @if (multi_surface_active())
-                                        <a
-                                            href="{{ feature('surface.fleet') ? route('fleet.index') : route('infrastructure.index') }}"
-                                            class="group flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-4 py-3 transition hover:bg-brand-sand/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35"
-                                        >
-                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10 [&>svg]:h-5 [&>svg]:w-5" aria-hidden="true">
-                                                <x-heroicon-o-rectangle-group class="{{ $hi }}" />
-                                            </span>
-                                            <span class="min-w-0 flex-1">
-                                                <span class="block text-sm font-semibold text-brand-ink">{{ feature('surface.fleet') ? __('Fleet ops') : __('Infrastructure') }}</span>
-                                                <span class="block truncate text-xs text-brand-moss">{{ __('Everything across your fleet, in one place') }}</span>
-                                            </span>
-                                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 text-brand-mist transition group-hover:text-brand-forest" aria-hidden="true" />
-                                        </a>
-                                    @endif
+                                    {{-- Featured overview row spans the full panel. Always shown: it is the
+                                         landing page for the org-wide Operations views, not just a compute index. --}}
+                                    <a
+                                        href="{{ route('infrastructure.index') }}"
+                                        class="group flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-4 py-3 transition hover:bg-brand-sand/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35"
+                                    >
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10 [&>svg]:h-5 [&>svg]:w-5" aria-hidden="true">
+                                            <x-heroicon-o-rectangle-group class="{{ $hi }}" />
+                                        </span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block text-sm font-semibold text-brand-ink">{{ __('Infrastructure') }}</span>
+                                            <span class="block truncate text-xs text-brand-moss">{{ __('Every server, site, and deploy in one place') }}</span>
+                                        </span>
+                                        <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 text-brand-mist transition group-hover:text-brand-forest" aria-hidden="true" />
+                                    </a>
 
                                     <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
                                         {{-- Compute --}}
@@ -330,14 +328,12 @@
                                                 </x-slot>
                                                 {{ __('Organizations') }}
                                             </x-dropdown-link>
-                                            @feature('surface.fleet')
-                                                <x-dropdown-link :href="route('fleet.health')" :description="__('Live status across servers')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-heart class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Fleet health') }}
-                                                </x-dropdown-link>
-                                            @endfeature
+                                            <x-dropdown-link :href="route('infrastructure.health')" :description="__('Live status across every server and site')">
+                                                <x-slot name="icon">
+                                                    <x-heroicon-o-heart class="{{ $hi }}" />
+                                                </x-slot>
+                                                {{ __('Health') }}
+                                            </x-dropdown-link>
                                         </div>
                                     </div>
                                 </x-slot>
@@ -552,14 +548,12 @@
                     </x-slot>
                     {{ __('Dashboard') }}
                 </x-responsive-nav-link>
-                @if (multi_surface_active())
-                    <x-responsive-nav-link :href="feature('surface.fleet') ? route('fleet.index') : route('infrastructure.index')" :active="request()->routeIs('infrastructure.*') || request()->routeIs('fleet.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-rectangle-group class="{{ $hi }}" />
-                        </x-slot>
-                        {{ feature('surface.fleet') ? __('Fleet ops') : __('Infrastructure') }}
-                    </x-responsive-nav-link>
-                @endif
+                <x-responsive-nav-link :href="route('infrastructure.index')" :active="request()->routeIs('infrastructure.index')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-rectangle-group class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Infrastructure') }}
+                </x-responsive-nav-link>
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Compute') }}</p>
                 <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
                     <x-slot name="icon">
@@ -674,14 +668,12 @@
                     </x-slot>
                     {{ __('Organizations') }}
                 </x-responsive-nav-link>
-                @feature('surface.fleet')
-                    <x-responsive-nav-link :href="route('fleet.health')" :active="request()->routeIs('fleet.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-heart class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Fleet health') }}
-                    </x-responsive-nav-link>
-                @endfeature
+                <x-responsive-nav-link :href="route('infrastructure.health')" :active="request()->routeIs('infrastructure.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-heart class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Health') }}
+                </x-responsive-nav-link>
                 @feature('surface.status_pages')
                     <x-responsive-nav-link :href="route('status-pages.index')" :active="request()->routeIs('status-pages.*')">
                         <x-slot name="icon">

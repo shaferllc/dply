@@ -14,12 +14,14 @@ use Illuminate\Support\Str;
  * @property ?Carbon $expires_at
  * @property string $invited_by
  * @property ?string $organization_id
+ * @property ?string $team_id
  * @property string $role
  * @property string $token
  * @property-read ?Organization $organization
+ * @property-read ?Team $team
  * @property-read ?User $inviter
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class OrganizationInvitation extends Model
 {
@@ -27,6 +29,7 @@ class OrganizationInvitation extends Model
 
     protected $fillable = [
         'organization_id',
+        'team_id',
         'email',
         'role',
         'token',
@@ -48,6 +51,17 @@ class OrganizationInvitation extends Model
         return $this->belongsTo(Organization::class);
     }
 
+    /**
+     * The team the invite was sent from, when it came from the Teams page.
+     * Null for plain organization invites.
+     *
+     * @return BelongsTo<Team, $this>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+
     /** @return BelongsTo<User, $this> */
     public function inviter(): BelongsTo
     {
@@ -59,10 +73,11 @@ class OrganizationInvitation extends Model
         return $this->expires_at->isPast();
     }
 
-    public static function createFor(Organization $org, string $email, string $role, User $inviter): self
+    public static function createFor(Organization $org, string $email, string $role, User $inviter, ?Team $team = null): self
     {
         return self::create([
             'organization_id' => $org->id,
+            'team_id' => $team?->id,
             'email' => strtolower($email),
             'role' => $role,
             'token' => Str::random(64),

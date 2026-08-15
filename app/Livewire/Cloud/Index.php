@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
@@ -48,10 +47,7 @@ class Index extends Component
         // filter switches without an extra DB round-trip per total.
         $allSites = Site::query()
             ->where('organization_id', $org->id)
-            ->where(function ($q): void {
-                $q->where('type', SiteType::Container)
-                    ->orWhereNotNull('container_backend');
-            })
+            ->cloudApps()
             ->with('server:id,name')
             ->orderByDesc('created_at')
             ->get();

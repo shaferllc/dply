@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Feedback\Notifications;
 
 use App\Models\FeedbackReport;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Support\Admin\PlatformAdmins;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 
 /**
  * Fired to every platform admin when a new feedback/bug report lands.
@@ -18,10 +22,12 @@ use Illuminate\Notifications\Notification;
  * Email is added ONLY for high/critical-severity bugs so routine feedback does
  * not spam admin inboxes.
  *
- * @see \App\Support\Admin\PlatformAdmins::users()
+ * @see PlatformAdmins::users()
  */
 class FeedbackReportSubmitted extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
     use Queueable;
 
     public function __construct(
@@ -41,6 +47,10 @@ class FeedbackReportSubmitted extends Notification implements ShouldQueue
 
         if ($this->report->isHighPriority()) {
             $channels[] = 'mail';
+            // Intercom rides the same high-priority gate as e-mail rather than
+            // firing on every report — same reason: routine feedback shouldn't
+            // spam admins, and Intercom is the noisier of the two.
+            $channels = array_merge($channels, $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable));
         }
 
         return $channels;
@@ -86,7 +96,7 @@ class FeedbackReportSubmitted extends Notification implements ShouldQueue
             ->greeting(__('New :severity bug report', ['severity' => $this->report->severity]))
             ->line(__('Reference: :ref', ['ref' => $this->report->reference]))
             ->line($this->report->title)
-            ->line(\Illuminate\Support\Str::limit($this->report->description, 500))
+            ->line(Str::limit($this->report->description, 500))
             ->action(__('Open in admin'), $url);
     }
 }

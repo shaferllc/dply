@@ -211,11 +211,9 @@ return [
         // which priced servers per size — something the flat-plan model does not
         // do. Server size is no longer a billing input anywhere.
         /*
-        | Cost observatory — comparison baselines for billing analytics.
-        | forge_per_server_cents mirrors Laravel Forge Hobby ($12/server/mo).
+        | Cost observatory — reference rates for billing analytics.
         */
         'observatory' => [
-            'forge_per_server_cents' => (int) env('SUBSCRIPTION_FORGE_PER_SERVER_CENTS', 1200),
             'eur_to_usd_rate' => (float) env('SUBSCRIPTION_EUR_TO_USD_RATE', 1.08),
 
             /*

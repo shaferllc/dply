@@ -15,6 +15,10 @@ use Illuminate\Notifications\Notification;
  * won't-fix state — bell + database only (these are signed-in internal users
  * who'll see the bell; no email). Dispatch is opt-in per admin action via the
  * "notify reporter" toggle on the triage form.
+ *
+ * No `intercom` leg for the same reason there is no `mail` leg: Intercom is an
+ * outbound-message channel like e-mail, not a bell, and this notification is
+ * deliberately in-app only.
  */
 class FeedbackReportStatusChanged extends Notification implements ShouldQueue
 {

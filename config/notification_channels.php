@@ -10,6 +10,9 @@ $default = implode(',', [
     'discord',
     'email',
     'telegram',
+    'intercom',
+    'pagerduty',
+    'microsoft_teams',
     'webhook',
 ]);
 

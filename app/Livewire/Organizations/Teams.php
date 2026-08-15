@@ -4,10 +4,15 @@ namespace App\Livewire\Organizations;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Organization;
+use App\Models\OrganizationInvitation;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Notifications\OrganizationInvitationNotification;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -23,11 +28,18 @@ class Teams extends Component
 
     public string $team_name = '';
 
-    /** @var array<int, string> team id => name for inline edit */
+    /** @var array<string, string> team id (ULID) => name for inline edit */
     public array $teamNames = [];
 
-    /** @var array<int, int> team id => user id for "add member" dropdown */
+    /** @var array<string, string> team id => user id (both ULIDs) for "add member" dropdown */
     public array $addMemberSelected = [];
+
+    /** Team the invite modal is currently sending for. */
+    public ?string $inviteTeamId = null;
+
+    public string $invite_email = '';
+
+    public string $invite_role = 'member';
 
     /** Prevents reverting the team name field when closing the modal after confirm (see confirmActionModal). */
     public bool $suppressTeamRenameRevertOnClose = false;
@@ -47,6 +59,9 @@ class Teams extends Component
             ->load([
                 'users',
                 'teams' => fn ($q) => $q->withCount('users')->with('users'),
+                // Live invites only — expired ones are noise, and the Members
+                // page filters the same way.
+                'invitations' => fn ($q) => $q->where('expires_at', '>', now())->with('team'),
             ]);
         $this->syncTeamNames();
     }
@@ -208,13 +223,16 @@ class Teams extends Component
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);
 
-        $userId = (int) ($this->addMemberSelected[$teamId] ?? 0);
-        if (! $userId) {
+        // Users are keyed by ULID — casting to int silently turned every id
+        // into 1 and looked up a user that doesn't exist.
+        $userId = (string) ($this->addMemberSelected[$teamId] ?? '');
+        if ($userId === '') {
             $this->addError('team_'.$teamId, 'Select a user to add.');
 
             return;
         }
-        if (! $team->organization->hasMember(User::find($userId))) {
+        $user = User::find($userId);
+        if (! $user || ! $team->organization->hasMember($user)) {
             $this->addError('team_'.$teamId, 'User must be an organization member first.');
 
             return;
@@ -229,14 +247,167 @@ class Teams extends Component
 
         audit_log($this->organization, auth()->user(), 'team.member_added', $team, null, [
             'team_id' => (string) $team->id,
-            'user_id' => $userId,
+            'user_id' => (string) $userId,
         ]);
 
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Member added to team.');
     }
 
-    public function promptRemoveTeamMember(string $teamId, int $userId): void
+    public function openInviteModal(string $teamId): void
+    {
+        $team = $this->organization->teams()->findOrFail($teamId);
+        $this->authorize('update', $team);
+
+        $this->inviteTeamId = (string) $team->id;
+        $this->invite_email = '';
+        $this->invite_role = 'member';
+        $this->resetValidation(['invite_email', 'invite_role']);
+        $this->dispatch('open-modal', 'invite-to-team-modal');
+    }
+
+    public function closeInviteModal(): void
+    {
+        $this->inviteTeamId = null;
+        $this->invite_email = '';
+        $this->invite_role = 'member';
+        $this->resetValidation(['invite_email', 'invite_role']);
+        $this->dispatch('close-modal', 'invite-to-team-modal');
+    }
+
+    /**
+     * Invite an email address straight onto a team. Someone who is already an
+     * organization member needs no invitation — they're attached to the team
+     * on the spot. Everyone else gets an org invitation carrying the team, and
+     * joins both when they accept.
+     */
+    public function inviteToTeam(): void
+    {
+        $team = $this->organization->teams()->findOrFail((string) $this->inviteTeamId);
+        $this->authorize('update', $team);
+
+        $this->validate([
+            'invite_email' => 'required|email',
+            'invite_role' => 'nullable|string|in:admin,member,deployer',
+        ]);
+
+        $email = strtolower($this->invite_email);
+
+        $existingMember = $this->organization->users()->where('users.email', $email)->first();
+        if ($existingMember) {
+            if ($team->users()->where('user_id', $existingMember->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'invite_email' => __('That member is already on this team.'),
+                ]);
+            }
+
+            $team->users()->attach($existingMember->id, ['role' => 'member']);
+            audit_log($this->organization, auth()->user(), 'team.member_added', $team, null, [
+                'team_id' => (string) $team->id,
+                'user_id' => $existingMember->id,
+            ]);
+
+            $this->closeInviteModal();
+            $this->refreshOrganization();
+            $this->dispatch('notify', message: $existingMember->name.' was already a member — added to '.$team->name.'.');
+
+            return;
+        }
+
+        // One pending invite per address per org (enforced by a unique index),
+        // so an outstanding invite has to be cancelled on Members before it can
+        // be re-sent for a team.
+        if ($this->organization->invitations()->where('email', $email)->where('expires_at', '>', now())->exists()) {
+            throw ValidationException::withMessages([
+                'invite_email' => __('An invitation has already been sent to that address. Cancel it on Members to re-send it for this team.'),
+            ]);
+        }
+
+        $maxMembers = $this->organization->effectiveMemberSeatCap();
+        if ($maxMembers !== null) {
+            $current = $this->organization->users()->count();
+            $pending = $this->organization->invitations()->where('expires_at', '>', now())->count();
+            if ($current + $pending >= $maxMembers) {
+                throw ValidationException::withMessages([
+                    'invite_email' => __('This organization has reached its member limit (:max).', ['max' => $maxMembers]),
+                ]);
+            }
+        }
+
+        $invitation = OrganizationInvitation::createFor(
+            $this->organization,
+            $email,
+            $this->invite_role ?: 'member',
+            auth()->user(),
+            $team,
+        );
+
+        $event = app(NotificationPublisher::class)->publish(
+            eventKey: 'organization.invitation.sent',
+            subject: $this->organization,
+            title: 'Invitation sent',
+            body: $email.' was invited to join '.$this->organization->name.' on the team '.$team->name.'.',
+            url: route('organizations.teams', $this->organization, absolute: true),
+            actor: auth()->user(),
+            recipientUsers: $this->organization->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')->all(),
+            metadata: [
+                'invitation_id' => $invitation->id,
+                'invitation_token' => $invitation->token,
+                'email' => $email,
+                'role' => $invitation->role,
+                'organization_name' => $this->organization->name,
+                'team_name' => $team->name,
+                'inviter_name' => auth()->user()?->name ?? auth()->user()?->email ?? __('Someone'),
+            ],
+        );
+        Notification::route('mail', $email)->notify(new OrganizationInvitationNotification($event));
+        audit_log($this->organization, auth()->user(), 'invitation.sent', $invitation);
+
+        $this->closeInviteModal();
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Invitation sent to '.$email.'.');
+    }
+
+    /**
+     * Roles assignable through invites. Owner is tied to org ownership and is
+     * not granted via invitation — mirrors the Members page.
+     *
+     * @return array<string, string>
+     */
+    public function inviteableRoles(): array
+    {
+        return [
+            'member' => __('Member'),
+            'admin' => __('Admin'),
+            'deployer' => __('Deployer'),
+        ];
+    }
+
+    public function promptCancelInvitation(string $invitationId): void
+    {
+        $this->openConfirmActionModal(
+            'cancelInvitation',
+            [$invitationId],
+            __('Cancel invitation'),
+            __('Cancel this invitation?'),
+            __('Cancel invitation'),
+            true,
+        );
+    }
+
+    public function cancelInvitation(int|string $invitationId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $invitation = $this->organization->invitations()->findOrFail($invitationId);
+        $invitation->delete();
+        audit_log($this->organization, auth()->user(), 'invitation.cancelled', $invitation);
+
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Invitation cancelled.');
+    }
+
+    public function promptRemoveTeamMember(string $teamId, int|string $userId): void
     {
         $team = $this->organization->teams->firstWhere('id', $teamId);
         $member = $team ? User::find($userId) : null;
@@ -254,7 +425,7 @@ class Teams extends Component
         );
     }
 
-    public function removeTeamMember(int|string $teamId, int $userId): void
+    public function removeTeamMember(int|string $teamId, int|string $userId): void
     {
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);
@@ -262,7 +433,7 @@ class Teams extends Component
 
         audit_log($this->organization, auth()->user(), 'team.member_removed', $team, [
             'team_id' => (string) $team->id,
-            'user_id' => $userId,
+            'user_id' => (string) $userId,
         ], null);
 
         $this->refreshOrganization();

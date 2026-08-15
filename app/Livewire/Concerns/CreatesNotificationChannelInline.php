@@ -8,7 +8,10 @@ use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -39,6 +42,8 @@ use Illuminate\Validation\Rule;
  */
 trait CreatesNotificationChannelInline
 {
+    use BuildsIntercomChannelInput;
+    use BuildsPagerDutyChannelInput;
     use DispatchesToastNotifications;
     use ResolvesDiscordGuilds;
     use ResolvesSlackWorkspaces;
@@ -76,6 +81,34 @@ trait CreatesNotificationChannelInline
     public string $new_mobile_device_token = '';
 
     public string $new_mobile_platform = 'ios';
+
+    public string $new_intercom_access_token = '';
+
+    public string $new_intercom_region = 'us';
+
+    public string $new_intercom_admin_id = '';
+
+    public string $new_intercom_recipient = '';
+
+    public string $new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $new_intercom_subject = '';
+
+    public string $new_pagerduty_routing_key = '';
+
+    public string $new_pagerduty_region = 'us';
+
+    public string $new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $new_pagerduty_source = '';
+
+    public string $new_pagerduty_component = '';
+
+    public string $new_pagerduty_group = '';
 
     public string $new_webhook_url = '';
 
@@ -238,6 +271,20 @@ trait CreatesNotificationChannelInline
         $this->new_google_chat_webhook_url = '';
         $this->new_mobile_device_token = '';
         $this->new_mobile_platform = 'ios';
+        $this->new_intercom_access_token = '';
+        $this->new_intercom_region = 'us';
+        $this->new_intercom_admin_id = '';
+        $this->new_intercom_recipient = '';
+        $this->new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->new_intercom_subject = '';
+        $this->new_pagerduty_routing_key = '';
+        $this->new_pagerduty_region = 'us';
+        $this->new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->new_pagerduty_source = '';
+        $this->new_pagerduty_component = '';
+        $this->new_pagerduty_group = '';
         $this->new_webhook_url = '';
     }
 
@@ -282,7 +329,7 @@ trait CreatesNotificationChannelInline
                 'new_pushover_user_key' => ['required', 'string', 'max:64'],
             ],
             NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                'new_teams_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                'new_teams_webhook_url' => ['required', 'string', 'url', 'max:2048', MicrosoftTeamsClient::urlRule()],
             ],
             NotificationChannel::TYPE_ROCKETCHAT => $base + [
                 'new_rocketchat_webhook_url' => ['required', 'string', 'url', 'max:2048'],
@@ -294,6 +341,8 @@ trait CreatesNotificationChannelInline
                 'new_mobile_device_token' => ['required', 'string', 'max:4096'],
                 'new_mobile_platform' => ['required', 'string', 'in:ios,android'],
             ],
+            NotificationChannel::TYPE_INTERCOM => $base + $this->intercomValidationRules('new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $base + $this->pagerDutyValidationRules('new_'),
             NotificationChannel::TYPE_WEBHOOK => $base + [
                 'new_webhook_url' => ['required', 'string', 'url', 'max:2048'],
             ],
@@ -306,7 +355,7 @@ trait CreatesNotificationChannelInline
      */
     protected function newChannelValidationAttributes(): array
     {
-        return [
+        return $this->intercomValidationAttributes('new_') + $this->pagerDutyValidationAttributes('new_') + [
             'new_label' => __('label'),
             'new_slack_webhook_url' => __('webhook URL'),
             'new_slack_channel' => __('channel'),
@@ -373,6 +422,8 @@ trait CreatesNotificationChannelInline
                 'device_token' => $this->new_mobile_device_token,
                 'platform' => $this->new_mobile_platform,
             ],
+            NotificationChannel::TYPE_INTERCOM => $this->intercomConfigFromInput('new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $this->pagerDutyConfigFromInput('new_'),
             NotificationChannel::TYPE_WEBHOOK => [
                 'url' => $this->new_webhook_url,
             ],

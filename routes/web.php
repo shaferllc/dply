@@ -53,27 +53,26 @@ use App\Livewire\Cloud\DeployDetail;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
-use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
-use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
-use App\Livewire\Fleet\Deploys as FleetDeploys;
-use App\Livewire\Fleet\Domains as FleetDomains;
-use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
-use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
-use App\Livewire\Fleet\Health as FleetHealth;
-use App\Livewire\Fleet\Intelligence as FleetIntelligence;
-use App\Livewire\Fleet\Overview as FleetOverview;
-use App\Livewire\Fleet\Previews as FleetPreviews;
+use App\Livewire\Infrastructure\BlastRadius as InfrastructureBlastRadius;
+use App\Livewire\Infrastructure\DeployContracts as InfrastructureDeployContracts;
+use App\Livewire\Infrastructure\Deploys as InfrastructureDeploys;
+use App\Livewire\Infrastructure\Domains as InfrastructureDomains;
+use App\Livewire\Infrastructure\EnvDrift as InfrastructureEnvDrift;
+use App\Livewire\Infrastructure\EnvSearch as InfrastructureEnvSearch;
+use App\Livewire\Infrastructure\Health as InfrastructureHealth;
+use App\Livewire\Infrastructure\Intelligence as InfrastructureIntelligence;
+use App\Livewire\Infrastructure\Previews as InfrastructurePreviews;
 use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Live\ApiInventory as LiveApiInventory;
 use App\Livewire\Live\Connect as LiveConnect;
 use App\Livewire\Live\Servers\Index as LiveServersIndex;
+use App\Livewire\Live\Servers\Show as LiveServersShow;
 use App\Livewire\Live\Sites\Index as LiveSitesIndex;
 use App\Livewire\Live\Sites\Show as LiveSitesShow;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
-use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
@@ -233,7 +232,7 @@ use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
 use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
 use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
-use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
+use App\Modules\OpsCopilot\Livewire\OpsCopilot as InfrastructureOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
 use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
@@ -441,8 +440,14 @@ Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
     Route::get('/version.json', [CliInstallController::class, 'packageVersion'])->name('cli.version');
 });
 
+// Public on purpose: an invited person usually has no account yet. The page
+// shows who invited them and routes to register/login, and only joins the org
+// once they're signed in as the invited address (see Invitations\Accept).
+Route::livewire('invitations/accept/{token}', InvitationsAccept::class)
+    ->middleware('throttle:30,1')
+    ->name('invitations.accept');
+
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
-    Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
     Route::livewire('/networking', OrgNetworking::class)->name('networking.index');
     // OAuth-style device-flow approval page for the dply CLI. The CLI
@@ -453,21 +458,32 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/edge/sites/{site}/preview-access', EdgePreviewAccessController::class)
         ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
-    Route::middleware('feature:surface.fleet')->group(function (): void {
-        Route::livewire('/fleet', FleetOverview::class)->name('fleet.index');
-        Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
-        Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
-        Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
-        Route::livewire('/fleet/env-drift', FleetEnvDrift::class)->name('fleet.env-drift');
-        Route::livewire('/fleet/intelligence', FleetIntelligence::class)->name('fleet.intelligence');
-        Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
-        Route::livewire('/fleet/blast-radius', FleetBlastRadius::class)->name('fleet.blast-radius');
-        Route::livewire('/fleet/previews', FleetPreviews::class)->name('fleet.previews');
-        Route::livewire('/fleet/deploy-contracts', FleetDeployContracts::class)->name('fleet.deploy-contracts');
-        Route::livewire('/fleet/copilot', FleetOpsCopilot::class)
+    // Cross-product operations views over every server and site in the org.
+    // These sit under /infrastructure alongside the compute hub — there is no
+    // separate "fleet" section (dropped 2026-08-15).
+    Route::prefix('infrastructure')->name('infrastructure.')->group(function (): void {
+        Route::livewire('/health', InfrastructureHealth::class)->name('health');
+        Route::livewire('/domains', InfrastructureDomains::class)->name('domains');
+        Route::livewire('/env-search', InfrastructureEnvSearch::class)->name('env-search');
+        Route::livewire('/env-drift', InfrastructureEnvDrift::class)->name('env-drift');
+        Route::livewire('/intelligence', InfrastructureIntelligence::class)->name('intelligence');
+        Route::livewire('/deploys', InfrastructureDeploys::class)->name('deploys');
+        Route::livewire('/blast-radius', InfrastructureBlastRadius::class)->name('blast-radius');
+        Route::livewire('/previews', InfrastructurePreviews::class)->name('previews');
+        Route::livewire('/deploy-contracts', InfrastructureDeployContracts::class)->name('deploy-contracts');
+        Route::livewire('/copilot', InfrastructureOpsCopilot::class)
             ->middleware('feature:global.ops_copilot')
-            ->name('fleet.copilot');
+            ->name('copilot');
     });
+
+    // Legacy /fleet/* URLs (bookmarks, docs, CLI output) -> /infrastructure/*.
+    Route::redirect('/fleet', '/infrastructure');
+    foreach ([
+        'health', 'domains', 'env-search', 'env-drift', 'intelligence',
+        'deploys', 'blast-radius', 'previews', 'deploy-contracts', 'copilot',
+    ] as $legacyFleetPath) {
+        Route::redirect("/fleet/{$legacyFleetPath}", "/infrastructure/{$legacyFleetPath}");
+    }
     Route::prefix('admin')
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.')
@@ -562,7 +578,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
     Route::get('organizations/{organization}/compliance-export', OrganizationComplianceExportController::class)->name('organizations.compliance-export');
-    Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
+    // The Automation & API tab folded into organization settings (2026-08).
+    // Keeps bookmarks and any missed route() call alive; the settings page
+    // carries the same sections under the same anchors.
+    Route::redirect('organizations/{organization}/automation', 'organizations/{organization}/settings')
+        ->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');
@@ -622,10 +642,19 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('/sites', LiveSitesIndex::class)->name('sites.index');
         Route::livewire('/sites/{remoteSite}', LiveSitesShow::class)->name('sites.show');
         Route::livewire('/servers', LiveServersIndex::class)->name('servers.index');
+        // Mirrors live.sites.show: materialize the remote server locally, then
+        // hand off to the real workspace so Manage stays in this app.
+        Route::livewire('/servers/{remoteServer}', LiveServersShow::class)->name('servers.show');
         Route::livewire('/projects', LiveApiInventory::class)->name('projects.index');
-        Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
-        Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
-        Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
+        // PARKED with surface.cloud / surface.edge / surface.serverless. These
+        // carry no feature middleware, so the flags alone would leave the
+        // Production row linking to live inventories of parked products.
+        // <x-compute-index-nav> guards its production items on Route::has(),
+        // so removing the registration drops the nav entries with them.
+        // Restore alongside the surface flags:
+        // Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
+        // Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
+        // Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
     });
 
     Route::middleware('feature:surface.cloud')->group(function (): void {

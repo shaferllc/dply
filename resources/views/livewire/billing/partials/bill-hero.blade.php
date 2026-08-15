@@ -38,7 +38,7 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="grid gap-8 px-5 py-5 sm:px-6 lg:grid-cols-12">
+    <div class="grid gap-5 px-3 py-3 sm:px-4 lg:grid-cols-12">
         <div class="lg:col-span-5">
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-gold/90">
                 @if ($this->subscription)
@@ -49,7 +49,7 @@
                     {{ __('What you\'d pay today') }}
                 @endif
             </p>
-            <h2 class="mt-2 text-2xl font-bold text-brand-ink">{{ __('Your bill') }}</h2>
+            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Your bill') }}</h2>
             <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                 @if ($this->subscription && $this->nextInvoiceAt)
                     {{ __('Next invoice :date', ['date' => $this->nextInvoiceAt->toFormattedDateString()]) }}.
@@ -106,11 +106,11 @@
                     <div class="mt-5">
                         <div class="flex flex-col sm:flex-row gap-2">
                             <button type="button" wire:click="subscribeStandard('month')"
-                                    class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">
+                                    class="inline-flex items-center justify-center rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">
                                 {{ __('Subscribe — :amount/mo', ['amount' => '$'.number_format($monthlyDollars, 2)]) }}
                             </button>
                             <button type="button" wire:click="subscribeStandard('year')"
-                                    class="inline-flex items-center justify-center rounded-xl border-2 border-brand-ink/15 bg-white px-5 py-3 text-sm font-semibold text-brand-ink hover:border-brand-gold/40 transition-colors">
+                                    class="inline-flex items-center justify-center rounded-lg border-2 border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:border-brand-gold/40 transition-colors">
                                 {{ __('Pay yearly — save 20%') }}
                             </button>
                         </div>
@@ -145,14 +145,14 @@
             </div>
 
             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/50 overflow-hidden">
-                <div class="px-5 py-3 border-b border-brand-ink/10 bg-white/60">
+                <div class="px-3 py-2 border-b border-brand-ink/10 bg-white/60">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-ink/70">
                         {{ __('Breakdown') }} — {{ trans_choice('{0} no billable servers|{1} :count server|[2,*] :count servers', $billableCount, ['count' => $billableCount]) }}
                     </p>
                 </div>
                 <ul class="divide-y divide-brand-ink/5 text-sm">
                     @foreach ($this->tierLineItems as $item)
-                        <li class="flex items-center justify-between px-5 py-3">
+                        <li class="flex items-center justify-between px-3 py-1.5">
                             <div class="min-w-0">
                                 <div class="flex items-baseline gap-3">
                                     <span class="font-medium text-brand-ink">{{ $item['label'] }}</span>
@@ -173,7 +173,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <div class="flex items-center justify-between px-5 py-3 border-t border-brand-ink/10 bg-white/60 text-sm">
+                <div class="flex items-center justify-between px-3 py-2 border-t border-brand-ink/10 bg-white/60 text-sm">
                     <span class="font-semibold text-brand-ink">{{ __('Total') }}</span>
                     <span class="font-bold text-brand-ink tabular-nums">${{ number_format($monthlyDollars, 2) }} <span class="text-xs font-normal text-brand-moss">{{ __('/mo') }}</span></span>
                 </div>

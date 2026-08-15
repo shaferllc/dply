@@ -9,7 +9,6 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerWebhook;
 use App\Livewire\Sites\Settings;
 use App\Models\NotificationChannel;
-use App\Models\NotificationWebhookDestination;
 use App\Models\Server;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionMatrix;
@@ -206,31 +205,11 @@ class WorkspaceNotifications extends Component
         return AssignableNotificationChannels::forUser(Auth::user(), Auth::user()?->currentOrganization());
     }
 
-    /**
-     * Organization-wide outbound webhook destinations (no per-server scope exists),
-     * surfaced read-only here. Managed under Organization → Automation.
-     *
-     * @return Collection<int, NotificationWebhookDestination>
-     */
-    protected function organizationWebhookDestinations(): Collection
-    {
-        if ($this->server->organization_id === null) {
-            return new Collection;
-        }
-
-        return NotificationWebhookDestination::query()
-            ->where('organization_id', $this->server->organization_id)
-            ->whereNull('site_id')
-            ->orderBy('name')
-            ->get();
-    }
-
     public function render(): View
     {
         return view('livewire.servers.workspace-notifications', [
             'assignableNotificationChannels' => $this->assignableChannels(),
             'eventCategories' => $this->eventCategories(),
-            'organizationWebhookDestinations' => $this->organizationWebhookDestinations(),
             // Only query the deliveries log when its tab is showing. The empty
             // stand-in is a paginator too, so the view can call ->links() and
             // ->total() without branching on which one it got.

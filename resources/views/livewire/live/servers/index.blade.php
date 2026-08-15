@@ -22,7 +22,7 @@
         :status-filter="$statusFilter"
         :sort="$sort"
         :tag-filter="$tagFilter"
-        :show-fleet-ops="false"
+        :show-ops-links="false"
         :show-deploy-actions="true"
         :show-mutations="false"
         :show-hero-actions="false"
