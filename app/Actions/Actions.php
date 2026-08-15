@@ -23,6 +23,13 @@ use Illuminate\Http\JsonResponse;
  * it and is type-checked normally.
  *
  * @method mixed handle(mixed ...$arguments)
+ *
+ * @phpstan-consistent-constructor
+ *   The As* traits construct actions late-bound — AsEvent does
+ *   `new static(...$arguments)`, AsResource `new static($item)`. The
+ *   constructor comes from AsDependent and is variadic, so every subclass
+ *   shares it; declaring that makes the late-bound construction safe
+ *   instead of unchecked, and PHPStan now enforces the consistency.
  */
 abstract class Actions
 {

@@ -99,15 +99,32 @@ trait AsDependent
     }
 
     /**
+     * Construction arguments this action was instantiated with.
+     *
+     * AsEvent::dispatchEvent() and friends do `new static(...$arguments)`, and
+     * AsResource::collection() does `new static($item)`; capturing them here is
+     * what makes the variadic signature honest rather than a discarded
+     * parameter, and gives decorators a way to see what an action was built
+     * with.
+     *
+     * @var list<mixed>
+     */
+    protected array $constructorArguments = [];
+
+    /**
      * Register dependencies when action is instantiated.
      *
      * Note: This trait does not call parent::__construct() to avoid conflicts
      * when used in classes without a parent. If your class extends another
      * class with a constructor, you should call parent::__construct() in
      * your own constructor after using this trait.
+     *
+     * @param  mixed  ...$arguments
      */
-    public function __construct()
+    public function __construct(...$arguments)
     {
+        $this->constructorArguments = array_values($arguments);
+
         $dependencies = $this->getDependencies();
         if (! empty($dependencies)) {
             ActionRegistry::registerDependencies(static::class, $dependencies);
