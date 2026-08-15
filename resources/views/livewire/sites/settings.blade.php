@@ -1,26 +1,8 @@
 @php
-    $productionMirrorSite = data_get($site->meta, 'production_data_mirror') === true;
-    $productionConnection = $productionMirrorSite && production_data_mirror_connected()
-        ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
-        : null;
     $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'logs', 'notifications', 'basic-auth', 'danger'];
     $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>
-    @if ($productionConnection)
-        <x-production-data-banner
-            :connection="$productionConnection"
-            :writes-unlocked="app(\App\Services\ProductionData\ProductionDataMirror::class)->writesUnlocked()"
-        >
-            <x-slot:actions>
-                <a href="{{ route('live.sites.index') }}" wire:navigate class="rounded-lg bg-amber-950/10 px-3 py-1.5 text-sm font-semibold hover:bg-amber-950/15">
-                    {{ __('Production sites') }}
-                </a>
-            </x-slot:actions>
-        </x-production-data-banner>
-        <x-production-data-nav :connection="$productionConnection" />
-    @endif
-
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     <x-breadcrumb-trail
         :items="$settingsBreadcrumbs"
@@ -38,7 +20,7 @@
                  Other sections keep the classic hero-card. --}}
             @if (! $usesMergedChrome)
             <x-hero-card
-                :eyebrow="$productionConnection ? __('Production · :section', ['section' => $workspaceTitle]) : $workspaceTitle"
+                :eyebrow="$workspaceTitle"
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
                 :icon="\Illuminate\Support\Str::after($sectionHeader['icon'], 'heroicon-o-')"

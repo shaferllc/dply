@@ -9,25 +9,7 @@
     />
 
     <div class="px-3 py-2.5 sm:px-4">
-        @if ($isProductionMirror)
-            {{-- Repair/inspect open an SSH session in-request. Unlike probe,
-                 install and thresholds there is no remote verb to proxy them
-                 to, so they are pointed at production rather than offered here
-                 as buttons that could only fail. --}}
-            <div class="rounded-lg border border-amber-200/80 bg-amber-50/80 p-3 text-xs text-amber-950">
-                <p class="font-semibold">{{ __('Repair tools run where the SSH key lives.') }}</p>
-                <p class="mt-1">{{ __('This is a mirror of a production host — inspecting the agent and re-deploying its wiring have to run from the control plane that owns it.') }}</p>
-                <a
-                    href="{{ rtrim($productionMirrorBaseUrl ?? '', '/') }}/servers/{{ $server->id }}/monitor"
-                    target="_blank"
-                    rel="noopener"
-                    class="mt-2 inline-flex h-6 items-center gap-1 rounded-md border border-amber-300/80 bg-white px-2 font-semibold text-amber-900 shadow-sm hover:bg-amber-100"
-                >
-                    {{ __('Open Diagnostics on production') }}
-                    <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                </a>
-            </div>
-        @elseif ($isDeployer)
+        @if ($isDeployer)
             <div class="rounded-lg border border-amber-200/80 bg-amber-50/80 p-3 text-xs text-amber-950">
                 {{ __('Your role cannot run repairs or diagnostics. Ask an admin to open this Metrics page if the monitor needs attention.') }}
             </div>

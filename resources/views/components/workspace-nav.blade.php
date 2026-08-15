@@ -1,8 +1,3 @@
-@props([
-    /** local|production — passed through to both rows. */
-    'surface' => 'local',
-])
-
 {{--
     Both workspace rows, stacked: compute on top, services beneath.
 
@@ -12,5 +7,5 @@
     decision 1.
 --}}
 
-<x-compute-index-nav :surface="$surface" />
-<x-services-index-nav :surface="$surface" />
+<x-compute-index-nav />
+<x-services-index-nav />

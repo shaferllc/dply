@@ -18,7 +18,6 @@ use Livewire\Attributes\On;
  */
 trait ManagesMonitorProbe
 {
-    use ManagesMonitorProductionMirror;
 
     #[On('monitoring-probe-requested')]
     public function onMonitoringProbeRequested(): void
@@ -37,12 +36,6 @@ trait ManagesMonitorProbe
     {
         $this->authorize('view', $this->server);
 
-        if ($this->isProductionMirrorServer()) {
-            $this->proxyMonitoringProbeToProduction();
-
-            return;
-        }
-
         if (! $this->serverOpsReady()) {
             return;
         }
@@ -59,14 +52,8 @@ trait ManagesMonitorProbe
         $this->authorize('view', $this->server);
         $this->server->refresh();
 
-        if ($this->isProductionMirrorServer()) {
-            // The flag lives on the remote; pull its current value instead of
-            // ageing out a local one that nothing here ever sets.
-            $this->refreshProductionMirrorMonitoring(force: true);
-        } else {
-            app(ServerMonitoringProbeQueuer::class)->releaseStalePending($this->server);
-            $this->server->refresh();
-        }
+        app(ServerMonitoringProbeQueuer::class)->releaseStalePending($this->server);
+        $this->server->refresh();
 
         $pending = $this->probePendingFromMeta($this->server->meta ?? []);
         if ($this->wasProbePending && ! $pending) {

@@ -5,7 +5,7 @@
     @endif
     class="contents"
 >
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     <x-servers-index-page
         :grouped-rows="$groupedRows"

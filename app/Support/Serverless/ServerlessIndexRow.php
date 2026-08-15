@@ -71,43 +71,6 @@ final readonly class ServerlessIndexRow
         );
     }
 
-    /**
-     * @param  array<string, mixed>  $row
-     */
-    public static function fromProductionApi(array $row): self
-    {
-        $id = (string) ($row['id'] ?? '');
-        $status = (string) ($row['status'] ?? '');
-        $repo = isset($row['repository']) && is_string($row['repository']) && $row['repository'] !== ''
-            ? $row['repository']
-            : (isset($row['git_repository_url']) && is_string($row['git_repository_url']) && $row['git_repository_url'] !== ''
-                ? $row['git_repository_url']
-                : null);
-        $runtime = isset($row['runtime']) && is_string($row['runtime']) && $row['runtime'] !== ''
-            ? $row['runtime']
-            : null;
-        $lastDeployedAt = $row['last_deployed_at'] ?? null;
-        $deployedLabel = null;
-        if (is_string($lastDeployedAt) && $lastDeployedAt !== '') {
-            $deployedLabel = __('Deployed :ago', ['ago' => Carbon::parse($lastDeployedAt)->diffForHumans()]);
-        }
-
-        return new self(
-            id: $id,
-            name: (string) ($row['name'] ?? $row['slug'] ?? '—'),
-            manageHref: $id !== '' ? route('live.sites.show', $id) : null,
-            manageEnabled: $id !== '',
-            journeyHref: null,
-            status: $status,
-            statusLabel: self::statusLabel($status),
-            statusBadgeClass: self::statusBadgeClass($status),
-            repositoryUrl: $repo,
-            runtimeLabel: $runtime,
-            deployedLabel: $deployedLabel ?? __('Never deployed'),
-            isLive: $status === Site::STATUS_FUNCTIONS_ACTIVE,
-        );
-    }
-
     private static function statusLabel(string $status): string
     {
         return match ($status) {

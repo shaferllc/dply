@@ -1,8 +1,3 @@
-@props([
-    /** local|production — same chrome; only route targets differ. */
-    'surface' => 'local',
-])
-
 {{--
     The Services row: managed capabilities your apps lean on, as opposed to the
     compute they run on. Deliberately subordinate to <x-compute-index-nav> —
@@ -17,12 +12,6 @@
 --}}
 
 @php
-    // Accepted for symmetry with <x-compute-index-nav> and the wrapper, but the
-    // targets do not vary: managed services have no production mirror, so
-    // <x-production-data-nav> renders the compute row alone and never reaches
-    // this component.
-    $surface = $surface === 'production' ? 'production' : 'local';
-
     $items = [
         ['route' => 'backups.overview', 'match' => 'backups.*', 'label' => __('Backups'), 'icon' => 'archive-box', 'feature' => 'workspace.backups'],
         ['route' => 'realtime.index', 'match' => 'realtime.*', 'label' => __('Realtime'), 'icon' => 'signal'],

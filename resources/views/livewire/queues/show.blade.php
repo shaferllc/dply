@@ -32,7 +32,7 @@
 @endphp
 
 <div class="contents">
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     {{-- Scoped motion, matching the queues index: the dial draws itself and the
          activity bars rise on first paint. --}}

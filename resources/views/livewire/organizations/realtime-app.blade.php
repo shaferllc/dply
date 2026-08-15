@@ -66,7 +66,7 @@
 @endphp
 
 <div class="contents">
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     {{-- Scoped motion, matching the org console: the dial draws itself and the
          emitting rings give a live app a pulse. --}}

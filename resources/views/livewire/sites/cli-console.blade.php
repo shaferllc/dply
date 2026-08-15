@@ -19,11 +19,6 @@
 
                 <div class="flex min-w-0 items-center gap-2">
                     <span class="truncate font-mono text-xs font-medium text-slate-300">dply · {{ $site->slug }}</span>
-                    @if ($isProductionMirror)
-                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
-                            {{ __('Prod') }}
-                        </span>
-                    @endif
                 </div>
 
                 <div class="ms-auto flex items-center gap-2 text-xs">

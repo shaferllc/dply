@@ -207,62 +207,21 @@ final class SiteShowViewData
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
         ];
 
-        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
-            && function_exists('production_data_mirror_connected')
-            && production_data_mirror_connected();
-
-        if ($isProductionMirror) {
-            $siteHeaderBreadcrumbs[] = [
-                'label' => __('Production'),
-                'href' => route('live.sites.index'),
-                'icon' => 'exclamation-triangle',
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => __('Sites'),
-                'href' => route('live.sites.index'),
-                'icon' => 'globe-alt',
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $server->name,
-                'href' => route('live.servers.index'),
-                'icon' => 'server-stack',
-                'avatar' => $server->name ?: (string) $server->id,
-                'avatar_image' => $server->logoUrl(),
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $site->name,
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-        } elseif ($site->usesEdgeRuntime()) {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
-            $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
-        } elseif ($site->usesFunctionsRuntime()) {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $site->name,
-                'icon' => 'bolt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-        } else {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
-            // Project omitted — see SiteWorkspaceBreadcrumbs.
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $server->name,
-                'href' => route('servers.overview', $server),
-                'icon' => 'server-stack',
-                'avatar' => $server->name ?: (string) $server->id,
-                'avatar_image' => $server->logoUrl(),
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $site->name,
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-        }
+        $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
+        // Project omitted — see SiteWorkspaceBreadcrumbs.
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $server->name,
+            'href' => route('servers.overview', $server),
+            'icon' => 'server-stack',
+            'avatar' => $server->name ?: (string) $server->id,
+            'avatar_image' => $server->logoUrl(),
+        ];
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $site->name,
+            'icon' => 'globe-alt',
+            'avatar' => $site->name ?: (string) $site->id,
+            'avatar_image' => $site->logoUrl(),
+        ];
 
         $provisioningJourney = $site->usesEdgeRuntime() && ! $readyForWorkspace
             ? self::edgeProvisioningJourney($site)

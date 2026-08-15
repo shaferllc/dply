@@ -428,24 +428,4 @@ return [
     */
     'nginx_overwrite_guard' => env('DPLY_NGINX_OVERWRITE_GUARD', 'warn'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Production data mirror (local APP_ENV only)
-    |--------------------------------------------------------------------------
-    | Local Livewire UI that proxies the remote control-plane API so operators
-    | can inspect live org inventory (and deploy / edit BYO env) from localhost
-    | with persistent Production chrome. Hard-gated to APP_ENV=local — never
-    | exposed on staging/production hosts even if a token row exists.
-    */
-    'production_data_mirror' => [
-        'enabled' => env('APP_ENV', 'production') === 'local',
-        'default_base_url' => rtrim((string) env(
-            'DPLY_LIVE_API_BASE_URL',
-            env('DPLY_CLI_DEFAULT_BASE_URL', 'https://dply.dev')
-        ), '/'),
-        'cache_ttl_seconds' => max(5, (int) env('DPLY_LIVE_API_CACHE_TTL', 20)),
-        'http_timeout_seconds' => max(5, (int) env('DPLY_LIVE_API_TIMEOUT', 30)),
-        'token_name' => 'dply Production mirror',
-    ],
-
 ];

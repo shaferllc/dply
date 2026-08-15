@@ -16,22 +16,10 @@
     // InteractsWithServerWorkspace::serverOpsReady().
     $m = $server->meta ?? [];
     $pyOk = (bool) ($m['monitoring_python_installed'] ?? false);
-    // A production mirror holds no SSH key and never will, and WorkspaceMonitor
-    // answers opsReady the same way — the host is provisioned, the actions that
-    // need the key are proxied. Without this the skeleton would show the
-    // provisioning wall for a page that renders tabs.
-    //
-    // pyOk can still be cold on the very first open of a freshly materialized
-    // mirror: the agent state arrives with the component's own pull, so that one
-    // load steps from the install skeleton to the live page.
-    $isProductionMirror = data_get($m, 'production_data_mirror') === true
-        && production_data_mirror_connected();
-    $opsReady = $isProductionMirror || (
-        $server->isReady()
+    $opsReady = $server->isReady()
         && $server->isVmHost()
         && filled($server->ip_address)
-        && filled($server->ssh_private_key)
-    );
+        && filled($server->ssh_private_key);
 
     // Mirrors currentUserIsDeployer() — deployers get no Alert thresholds band.
     $user = auth()->user();

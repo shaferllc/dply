@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Models\Site;
 use App\Models\SiteBackend;
 use App\Models\SiteDeployment;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Services\Sites\Backends\SiteBackendBalancerSync;
 use App\Services\Sites\Backends\SiteBackendReplicator;
 use Illuminate\Bus\Queueable;

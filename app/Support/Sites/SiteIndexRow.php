@@ -67,34 +67,6 @@ final readonly class SiteIndexRow
     }
 
     /**
-     * Production list rows: Manage opens /live/sites/{id}, which materializes
-     * the remote site locally (if needed) and redirects into the real site workspace.
-     *
-     * @param  array<string, mixed>  $row
-     */
-    public static function fromProductionApi(array $row, string $remoteBaseUrl = ''): self
-    {
-        $id = (string) ($row['id'] ?? '');
-        $serverId = isset($row['server_id']) ? (string) $row['server_id'] : '';
-        $serverHref = null;
-        if ($serverId !== '') {
-            if (Server::query()->whereKey($serverId)->exists()) {
-                $serverHref = route('servers.show', $serverId);
-            } elseif ($remoteBaseUrl !== '') {
-                $serverHref = rtrim($remoteBaseUrl, '/').'/servers/'.$serverId;
-            }
-        }
-
-        return self::fromPayload(
-            $row,
-            manageHref: $id !== '' ? route('live.sites.show', $id) : route('live.sites.index'),
-            manageExternal: false,
-            serverHref: $serverHref,
-            workspaceHref: null,
-        );
-    }
-
-    /**
      * @param  array<string, mixed>  $row
      */
     public static function fromPayload(

@@ -13,7 +13,6 @@ namespace App\Livewire\Servers\Concerns;
  */
 trait ManagesMonitorThresholds
 {
-    use ManagesMonitorProductionMirror;
 
 
     /**
@@ -103,19 +102,6 @@ trait ManagesMonitorThresholds
             'thresholdLoadInput' => __('Load threshold'),
         ]);
 
-        // On a mirror these thresholds belong to the control plane that runs the
-        // alerting; writing them here would only decorate a local copy nothing
-        // evaluates.
-        if ($this->isProductionMirrorServer()) {
-            $this->proxyMonitoringThresholdsToProduction([
-                'cpu' => round($this->thresholdCpuInput, 1),
-                'mem' => round($this->thresholdMemInput, 1),
-                'load' => round($this->thresholdLoadInput, 2),
-            ]);
-
-            return;
-        }
-
         $meta = $this->server->meta ?? [];
         $meta['metric_thresholds'] = [
             'cpu_warn_pct' => round($this->thresholdCpuInput, 1),
@@ -139,18 +125,6 @@ trait ManagesMonitorThresholds
 
         if ($this->currentUserIsDeployer()) {
             $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        if ($this->isProductionMirrorServer()) {
-            // No "clear" verb on the remote — writing the org defaults back is
-            // the same end state from the alerting engine's point of view.
-            $this->proxyMonitoringThresholdsToProduction([
-                'cpu' => (float) config('insights.thresholds.cpu_warn_pct', 85),
-                'mem' => (float) config('insights.thresholds.mem_warn_pct', 85),
-                'load' => (float) config('insights.thresholds.load_warn', 4.0),
-            ]);
 
             return;
         }

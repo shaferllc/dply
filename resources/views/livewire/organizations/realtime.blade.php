@@ -28,7 +28,7 @@
 @endphp
 
 <div class="contents">
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     {{-- Scoped motion for the console: the dial draws itself, capacity meters
          fill, and the emitting rings give the relay a pulse. Nothing that

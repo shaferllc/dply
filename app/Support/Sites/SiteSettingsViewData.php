@@ -619,41 +619,6 @@ final class SiteSettingsViewData
      */
     private static function breadcrumbs(Server $server, Site $site, string $section, array $sectionHeader): array
     {
-        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
-            && function_exists('production_data_mirror_connected')
-            && production_data_mirror_connected();
-
-        if ($isProductionMirror) {
-            $items = [
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
-                ['label' => __('Sites'), 'href' => route('live.sites.index'), 'icon' => 'globe-alt'],
-                [
-                    'label' => $server->name,
-                    'href' => route('live.servers.index'),
-                    'icon' => 'server-stack',
-                    'avatar' => $server->name ?: (string) $server->id,
-                    'avatar_image' => $server->logoUrl(),
-                ],
-                [
-                    'label' => $site->name,
-                    'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                    'icon' => 'globe-alt',
-                    'avatar' => $site->name ?: (string) $site->id,
-                    'avatar_image' => $site->logoUrl(),
-                ],
-            ];
-
-            if ($section !== 'general') {
-                $items[] = [
-                    'label' => $sectionHeader['title'],
-                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
-                ];
-            }
-
-            return $items;
-        }
-
         if ($site->usesEdgeRuntime()) {
             $items = [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],

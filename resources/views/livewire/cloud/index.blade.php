@@ -1,5 +1,5 @@
 <div class="contents">
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     <x-cloud-index-page
         :rows="$rows"

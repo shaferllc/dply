@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\WorkerPools\WorkerMemberProviderProbe;
 use App\Services\WorkerPools\WorkerPoolManager;

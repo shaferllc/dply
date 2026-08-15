@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Models\ApiToken;
-use App\Models\ProductionDataConnection;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\ProductionData\ProductionDataMirror;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 
 /**
  * In-browser dply CLI runner — runs packages/dply-cli against this app's API
- * (or the Production control plane for mirrored sites) using a short-lived
- * session token / Production connection token.
+ * using a short-lived session token.
  */
 class CliConsole extends Component
 {
@@ -74,20 +71,7 @@ class CliConsole extends Component
                 'cmd' => $raw,
                 'out' => '',
                 'exit' => null,
-                'error' => $this->isProductionMirror()
-                    ? 'Production data is not connected. Open Production → Connect, then retry.'
-                    : 'Could not mint a short-lived API token for this console.',
-            ];
-
-            return;
-        }
-
-        if ($this->isProductionMirror() && $this->looksLikeWriteCommand($args) && ! app(ProductionDataMirror::class)->writesUnlocked()) {
-            $this->history[] = [
-                'cmd' => $raw,
-                'out' => '',
-                'exit' => null,
-                'error' => 'Production writes are locked. Unlock writes from a Production Deploy/Sync confirm first, then retry.',
+                'error' => 'Could not mint a short-lived API token for this console.',
             ];
 
             return;
@@ -141,7 +125,6 @@ class CliConsole extends Component
         return view('livewire.sites.cli-console', [
             'cliReady' => $this->cliInvocation() !== null,
             'apiHost' => $this->apiAuth()['base_url'] ?? config('app.url'),
-            'isProductionMirror' => $this->isProductionMirror(),
             'presetCommands' => $this->presetCommands(),
         ]);
     }
@@ -168,18 +151,6 @@ class CliConsole extends Component
      */
     private function apiAuth(): ?array
     {
-        if ($this->isProductionMirror()) {
-            $connection = $this->productionConnection();
-            if ($connection === null || blank($connection->api_token)) {
-                return null;
-            }
-
-            return [
-                'token' => (string) $connection->api_token,
-                'base_url' => rtrim((string) $connection->base_url, '/'),
-            ];
-        }
-
         return [
             'token' => $this->sessionToken(),
             'base_url' => rtrim((string) config('app.url'), '/'),
@@ -212,17 +183,6 @@ class CliConsole extends Component
         session([$key => $plaintext]);
 
         return $plaintext;
-    }
-
-    private function isProductionMirror(): bool
-    {
-        return data_get($this->site->meta, 'production_data_mirror') === true
-            && production_data_mirror_connected();
-    }
-
-    private function productionConnection(): ?ProductionDataConnection
-    {
-        return app(ProductionDataMirror::class)->connectionFor(auth()->user());
     }
 
     private function looksLikeWriteCommand(string $args): bool

@@ -1,21 +1,11 @@
 @php
-    $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
-        && production_data_mirror_connected();
-    $productionConnection = $isProductionMirror
-        ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
-        : null;
-    $cliBaseUrl = rtrim((string) ($productionConnection?->base_url ?: config('app.url')), '/');
-    $installUrl = $isProductionMirror
-        ? $cliBaseUrl.'/cli/install.sh'
-        : route('cli.install');
+    $cliBaseUrl = rtrim((string) config('app.url'), '/');
+    $installUrl = route('cli.install');
     $siteFlag = '--site '.$site->id;
     $cliNestedInShell = (bool) ($cliNestedInShell ?? false);
 
     $localCommands = array_values(array_filter([
         ['label' => __('Install'), 'command' => 'curl -fsSL '.$installUrl.' | bash -s -- --login --base-url '.$cliBaseUrl],
-        $isProductionMirror
-            ? ['label' => __('Login'), 'command' => 'dply login --base-url '.$cliBaseUrl]
-            : null,
         ['label' => __('Link'), 'command' => 'dply link --byo '.$site->id],
         ['label' => __('Show'), 'command' => 'dply site show '.$siteFlag],
         ['label' => __('Status'), 'command' => 'dply site status '.$siteFlag],
@@ -30,15 +20,6 @@
 @elseif ($cliNestedInShell)
     {{-- Console first; local install is one disclosure under it. --}}
     <div class="px-4 py-5 sm:px-6">
-        @if ($isProductionMirror)
-            <div class="mb-3 flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-inset ring-amber-200">
-                    <x-heroicon-s-exclamation-triangle class="h-3.5 w-3.5" aria-hidden="true" />
-                    {{ __('Production API — :host', ['host' => $productionConnection?->hostLabel() ?: 'Production']) }}
-                </span>
-            </div>
-        @endif
-
         @livewire('sites.cli-console', ['site' => $site, 'server' => $server], key('cli-console-'.$site->id))
     </div>
 
@@ -52,10 +33,6 @@
             {{ $site->id }}
             <span class="mx-1.5 text-brand-mist/50" aria-hidden="true">·</span>
             {{ $site->slug }}
-            @if ($isProductionMirror)
-                <span class="mx-1.5 text-brand-mist/50" aria-hidden="true">·</span>
-                {{ $cliBaseUrl }}
-            @endif
         </p>
     </div>
 @else

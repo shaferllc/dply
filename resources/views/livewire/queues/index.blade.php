@@ -32,7 +32,7 @@
 @endphp
 
 <div class="contents">
-    <x-workspace-nav surface="local" />
+    <x-workspace-nav />
 
     {{-- Scoped motion for the console: the dial draws itself and the activity
          bars rise on first paint. Nothing loops — a queue console that pulses

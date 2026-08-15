@@ -5,7 +5,6 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\AuthenticateQueueCredential;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
-use App\Http\Middleware\EnsureProductionDataMirror;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
@@ -69,7 +68,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
-            'production.mirror' => EnsureProductionDataMirror::class,
         ]);
         // Machine/external callback paths come from the single canonical list
         // (App\Support\MachineCallbackPaths) the guest gates also use, so a new

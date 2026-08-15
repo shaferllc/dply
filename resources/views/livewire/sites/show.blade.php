@@ -1,24 +1,4 @@
-@php
-    $productionMirrorSite = data_get($site->meta, 'production_data_mirror') === true;
-    $productionConnection = $productionMirrorSite && production_data_mirror_connected()
-        ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
-        : null;
-@endphp
 <div>
-    @if ($productionConnection)
-        <x-production-data-banner
-            :connection="$productionConnection"
-            :writes-unlocked="app(\App\Services\ProductionData\ProductionDataMirror::class)->writesUnlocked()"
-        >
-            <x-slot:actions>
-                <a href="{{ route('live.sites.index') }}" wire:navigate class="rounded-lg bg-amber-950/10 px-3 py-1.5 text-sm font-semibold hover:bg-amber-950/15">
-                    {{ __('Production sites') }}
-                </a>
-            </x-slot:actions>
-        </x-production-data-banner>
-        <x-production-data-nav :connection="$productionConnection" />
-    @endif
-
     @if ($site->server_id)
         <div
             id="dply-site-provisioning-context"
@@ -37,15 +17,10 @@
     </div>
     <div class="dply-page-shell pt-4">
         <x-page-header
-            :eyebrow="$productionConnection ? __('Production') : null"
-            :title="$productionConnection
-                ? __('Site workspace')
-                : ($readyForWorkspace
-                    ? ($site->usesEdgeRuntime() ? __('Edge site') : __('Site workspace'))
-                    : ($site->usesEdgeRuntime() ? __('Edge deployment') : __('Site setup')))"
-            :description="$productionConnection
-                ? __('You are viewing a Production site — mutations can affect the live control plane.')
-                : ($readyForWorkspace
+            :title="$readyForWorkspace
+                ? ($site->usesEdgeRuntime() ? __('Edge site') : __('Site workspace'))
+                : ($site->usesEdgeRuntime() ? __('Edge deployment') : __('Site setup'))"
+            :description="($readyForWorkspace
                     ? ($site->usesEdgeRuntime()
                         ? __('Manage builds, domains, deploys, and delivery for this Edge site.')
                         : __('Manage this site from one workspace with General as the default landing section.'))

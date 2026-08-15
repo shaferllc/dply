@@ -82,55 +82,6 @@ final readonly class EdgeIndexRow
         );
     }
 
-    /**
-     * @param  array<string, mixed>  $row
-     */
-    public static function fromProductionApi(array $row, bool $isPreviewChild = false): self
-    {
-        $id = (string) ($row['id'] ?? '');
-        $status = (string) ($row['status'] ?? '');
-        $runtimeMode = (string) ($row['runtime_mode'] ?? 'static');
-        $liveUrl = isset($row['live_url']) && is_string($row['live_url']) && $row['live_url'] !== ''
-            ? $row['live_url']
-            : null;
-        $hostname = isset($row['hostname']) && is_string($row['hostname']) && $row['hostname'] !== ''
-            ? $row['hostname']
-            : null;
-        if ($hostname === null && $liveUrl !== null) {
-            $parsed = parse_url($liveUrl, PHP_URL_HOST);
-            $hostname = is_string($parsed) && $parsed !== '' ? $parsed : null;
-        }
-        $repo = isset($row['repository']) && is_string($row['repository']) && $row['repository'] !== ''
-            ? $row['repository']
-            : null;
-        $branch = isset($row['branch']) && is_string($row['branch']) && $row['branch'] !== ''
-            ? $row['branch']
-            : null;
-        $isPreview = (bool) ($row['is_preview'] ?? false);
-
-        return new self(
-            id: $id,
-            name: (string) ($row['name'] ?? $row['slug'] ?? '—'),
-            manageHref: $id !== '' ? route('live.sites.show', $id) : null,
-            manageEnabled: $id !== '',
-            status: $status,
-            statusLabel: self::statusLabel($status),
-            statusBadgeClass: self::statusBadgeClass($status),
-            sourceLabel: $repo !== null ? $repo.'@'.($branch ?? 'main') : null,
-            sourceRepo: $repo,
-            sourceBranch: $branch,
-            runtimeLabel: $runtimeMode === 'hybrid' ? __('Hybrid') : __('Static'),
-            frameworkLabel: null,
-            hostname: $hostname,
-            liveUrl: $liveUrl,
-            isPreviewChild: $isPreviewChild || $isPreview,
-            previewBranch: $isPreview ? ($branch ?? __('Preview')) : null,
-            previewPrNumber: null,
-            canDelete: false,
-            canQuickLook: false,
-        );
-    }
-
     private static function statusLabel(string $status): string
     {
         return match ($status) {

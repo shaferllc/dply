@@ -7,7 +7,6 @@ use App\Modules\Billing\Services\EdgeOrganizationUsageReader;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Billing\Services\ServerlessOrganizationUsageReader;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
-use App\Services\ProductionData\ProductionDataMirror;
 use App\Services\Servers\ServerProviderCostEstimator;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,7 +103,6 @@ abstract class TestCase extends BaseTestCase
         EdgeOrganizationUsageReader::flushMemo();
         ServerlessOrganizationUsageReader::flushMemo();
         ServerProviderCostEstimator::flushCredentialMemo();
-        ProductionDataMirror::forgetConnectionMemo();
         AssignableNotificationChannels::flushMemo();
 
         parent::tearDown();

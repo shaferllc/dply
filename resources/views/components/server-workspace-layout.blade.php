@@ -18,44 +18,6 @@
     'hideHero' => false,
 ])
 
-@php
-    // Server workspace half of the production-data banner that sites/show and
-    // sites/settings already carry. Without it these pages look like any other
-    // local workspace right up until an SSH-backed section refuses to run — the
-    // operator has no standing signal that the host belongs to another control
-    // plane. Same derivation as the site pages: mirrored row + a live
-    // connection, since an expired one can't reach anything to warn about.
-    $productionMirrorServer = data_get($server->meta ?? [], 'production_data_mirror') === true;
-    $productionConnection = $productionMirrorServer && production_data_mirror_connected()
-        ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
-        : null;
-@endphp
-
-{{-- Livewire full-page views need a single root; the banner is a sibling of the
-     shell so it spans edge-to-edge like it does on the site pages.
-
-     NOT `class="contents"`. Every workspace lazy-load skeleton renders through
-     this component, and Livewire's #[Lazy] stamps `x-intersect` onto the
-     placeholder's ROOT element (SupportLazyLoading::generatePlaceholderHtml).
-     `display: contents` generates no principal box, so IntersectionObserver
-     never fires, __lazyLoad is never called, and the skeleton sits there
-     forever. A plain block wrapper is layout-neutral here — the shell centres
-     itself and the banner is full-bleed either way — and matches what
-     sites/show and sites/settings already do. --}}
-<div>
-@if ($productionConnection)
-    <x-production-data-banner
-        :connection="$productionConnection"
-        :writes-unlocked="app(\App\Services\ProductionData\ProductionDataMirror::class)->writesUnlocked()"
-    >
-        <x-slot:actions>
-            <a href="{{ route('live.servers.index') }}" wire:navigate class="rounded-lg bg-amber-950/10 px-3 py-1.5 text-sm font-semibold hover:bg-amber-950/15">
-                {{ __('Production servers') }}
-            </a>
-        </x-slot:actions>
-    </x-production-data-banner>
-@endif
-
 <x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
     @if (($showNavigation ?? ($server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE)) === true)
         @include('livewire.servers.partials.workspace-mobile-nav', ['server' => $server, 'active' => $active])
@@ -228,4 +190,3 @@
 
     {{ $modals ?? '' }}
 </x-server-workspace-shell>
-</div>

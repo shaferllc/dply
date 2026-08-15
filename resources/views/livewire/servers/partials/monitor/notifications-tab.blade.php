@@ -87,4 +87,5 @@
             <span wire:loading wire:target="saveFeatureNotificationSubscriptions">{{ __('Saving…') }}</span>
         </x-primary-button>
     </div>
+    @endif
 </div>

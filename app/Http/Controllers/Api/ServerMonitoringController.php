@@ -19,11 +19,8 @@ use Illuminate\Support\Carbon;
  * REST surface for a server's metrics agent: its state, its samples, and the
  * three operations the Metrics workspace can start.
  *
- * Exists so a *consumer* control plane can render the Metrics page for a host
- * it does not hold SSH credentials for — the local production-data mirror
- * (see {@see \App\Services\ProductionData\ProductionServerMaterializer}) reads
- * `show` to materialize agent state + snapshots, and posts to the write routes
- * instead of dispatching SSH jobs it could only fail.
+ * Exists so an external consumer can read agent state + snapshots and start
+ * the write operations over REST instead of dispatching SSH jobs directly.
  */
 class ServerMonitoringController extends Controller
 {

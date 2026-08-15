@@ -64,12 +64,6 @@ use App\Livewire\Infrastructure\Intelligence as InfrastructureIntelligence;
 use App\Livewire\Infrastructure\Previews as InfrastructurePreviews;
 use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
-use App\Livewire\Live\ApiInventory as LiveApiInventory;
-use App\Livewire\Live\Connect as LiveConnect;
-use App\Livewire\Live\Servers\Index as LiveServersIndex;
-use App\Livewire\Live\Servers\Show as LiveServersShow;
-use App\Livewire\Live\Sites\Index as LiveSitesIndex;
-use App\Livewire\Live\Sites\Show as LiveSitesShow;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
@@ -248,7 +242,6 @@ use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
 use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
 use App\Modules\Serverless\Support\ServerlessTestingDomains;
-use App\Services\ProductionData\ProductionDataMirror;
 use App\Support\Admin\AdminFeatureFlags;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -262,15 +255,16 @@ Broadcast::routes(['middleware' => ['web', 'auth']]);
 // Standalone diagnostic page for Redis-backend failures. Lives outside the
 // `web` middleware group on purpose — StartSession/CSRF/Pennant all touch
 // Cache, so if Redis is down a normal route would recurse on the very error
-// it tries to render. This handler reads env vars only.
+// it tries to render. Reads only the config repository, which is an in-memory
+// array by this point — no Cache, no Redis, no DB.
 Route::get('/_redis-unreachable', function () {
     return response()->view('errors.redis-unreachable', [
         'message' => __('Connection timed out — see config block below.'),
-        'host' => (string) env('REDIS_HOST', '127.0.0.1'),
-        'port' => (string) env('REDIS_PORT', '6379'),
-        'cacheStore' => (string) env('CACHE_STORE', 'database'),
-        'queueConnection' => (string) env('QUEUE_CONNECTION', 'sync'),
-        'timeout' => (string) env('REDIS_TIMEOUT', '2.0'),
+        'host' => (string) config('database.redis.default.host', '127.0.0.1'),
+        'port' => (string) config('database.redis.default.port', '6379'),
+        'cacheStore' => (string) config('cache.default', 'database'),
+        'queueConnection' => (string) config('queue.default', 'sync'),
+        'timeout' => (string) config('database.redis.default.timeout', '2.0'),
     ], 503);
 })->withoutMiddleware(['web']);
 
@@ -630,32 +624,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
-
-    // Local-only Production data mirror — proxies remote /api/v1 into Livewire UI.
-    Route::middleware('production.mirror')->prefix('live')->name('live.')->group(function (): void {
-        Route::get('/', function () {
-            $connected = app(ProductionDataMirror::class)->connectionFor(auth()->user()) !== null;
-
-            return redirect()->route($connected ? 'live.sites.index' : 'live.connect');
-        })->name('index');
-        Route::livewire('/connect', LiveConnect::class)->name('connect');
-        Route::livewire('/sites', LiveSitesIndex::class)->name('sites.index');
-        Route::livewire('/sites/{remoteSite}', LiveSitesShow::class)->name('sites.show');
-        Route::livewire('/servers', LiveServersIndex::class)->name('servers.index');
-        // Mirrors live.sites.show: materialize the remote server locally, then
-        // hand off to the real workspace so Manage stays in this app.
-        Route::livewire('/servers/{remoteServer}', LiveServersShow::class)->name('servers.show');
-        Route::livewire('/projects', LiveApiInventory::class)->name('projects.index');
-        // PARKED with surface.cloud / surface.edge / surface.serverless. These
-        // carry no feature middleware, so the flags alone would leave the
-        // Production row linking to live inventories of parked products.
-        // <x-compute-index-nav> guards its production items on Route::has(),
-        // so removing the registration drops the nav entries with them.
-        // Restore alongside the surface flags:
-        // Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
-        // Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
-        // Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
-    });
 
     Route::middleware('feature:surface.cloud')->group(function (): void {
         Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
