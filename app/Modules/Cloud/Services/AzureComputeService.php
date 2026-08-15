@@ -150,9 +150,12 @@ class AzureComputeService
     }
 
     /**
-     * @return list<array<string, int|string|null>>
+     * One created VM's resource ids — not a list. The previous list<> wrapper
+     * hid every offset from callers (ProvisionAzureServerJob reads vm_id /
+     * nic_id / pip_id straight off this).
      *
      * @param  array<string, mixed> $tags  Resource tags, e.g. ProviderResourceTags::labels()
+     * @return array{vm_id: string, nic_id: string, pip_id: string}
      */
     public function createLinuxVm(
         string $resourceGroup,

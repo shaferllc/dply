@@ -57,7 +57,13 @@ class ActionManager
     /** @var class-string<JobDecorator> */
     public static string $jobDecorator = JobDecorator::class;
 
-    /** @var class-string<JobDecorator&ShouldBeUnique> */
+    /**
+     * class-string<UniqueJobDecorator>, not <JobDecorator&ShouldBeUnique>:
+     * AsJob::makeUniqueJob() declares UniqueJobDecorator as its return type, and
+     * useUniqueJobDecorator() below only accepts a subclass of it.
+     *
+     * @var class-string<UniqueJobDecorator>
+     */
     public static string $uniqueJobDecorator = UniqueJobDecorator::class;
 
     /** @var DesignPattern[] */
@@ -85,7 +91,7 @@ class ActionManager
     }
 
     /**
-     * @param  class-string<JobDecorator&ShouldBeUnique>  $uniqueJobDecoratorClass
+     * @param  class-string<UniqueJobDecorator>  $uniqueJobDecoratorClass
      */
     public static function useUniqueJobDecorator(string $uniqueJobDecoratorClass): void
     {
