@@ -25,6 +25,7 @@ use App\Modules\Cloud\Services\VultrService;
 use App\Services\Servers\ServerNetworkMap;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\RemoteCidr;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Lazy;
@@ -706,7 +707,7 @@ class WorkspaceNetworking extends Component
         $destination = trim($this->route_destination);
         $gateway = trim($this->route_gateway);
 
-        if (! $this->isValidRemoteCidr($destination)) {
+        if (! RemoteCidr::isValid($destination)) {
             $this->addError('route_destination', __('Enter a valid CIDR (e.g. 192.168.1.0/24).'));
 
             return;

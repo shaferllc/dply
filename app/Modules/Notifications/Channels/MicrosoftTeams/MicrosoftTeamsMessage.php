@@ -62,7 +62,7 @@ class MicrosoftTeamsMessage
 
     public static function create(?string $content = null): self
     {
-        $message = new static;
+        $message = new self;
 
         if ($content !== null && $content !== '') {
             $message->content($content);

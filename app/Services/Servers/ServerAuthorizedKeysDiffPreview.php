@@ -136,8 +136,8 @@ class ServerAuthorizedKeysDiffPreview
             $out[$targetUser] = [
                 'remote' => $remote,
                 'desired' => $desired,
-                'added' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($added)))))))))))))))))))))))))))))))),
-                'removed' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($removed)))))))))))))))))))))))))))))))),
+                'added' => array_values($added),
+                'removed' => array_values($removed),
                 // Stays on the server after the next sync: desired keys already present PLUS every
                 // foreign key dply preserves. The workspace shows these so operators see what's in
                 // place (incl. Dply's auto-injected operational/recovery keys and their own keys).

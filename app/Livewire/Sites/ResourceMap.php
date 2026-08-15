@@ -8,7 +8,6 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
-use App\Livewire\Sites\Concerns\ManagesSiteEnvRequirements;
 use App\Livewire\Sites\Concerns\ManagesSiteReleaseHealth;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
@@ -45,7 +44,11 @@ class ResourceMap extends Component
     // (SSH probe) and surface its banner; these traits supply seedQueuedConsoleAction,
     // consoleActionSubject, and the dismiss/remediation plumbing (same recipe as
     // SiteEnvironment). No mount hooks, so they don't load env state here.
-    use ManagesSiteEnvRequirements;
+    // (ManagesSiteEnvRequirements removed: neither this class nor resource-map
+    // .blade.php — nor anything it includes — referenced a single member of it,
+    // but its methods write $missing_env_values and call
+    // autoPushAfterCacheMutation(), which live in ManagesSiteEnvVars/EnvCrud and
+    // were never mixed in here. SiteEnvironment pairs them; this did not.)
     // Release-health card: detects php-fpm serving a stale release after a
     // deploy (OPcache symlink pin) and offers a one-click flush/re-sync.
     use ManagesSiteReleaseHealth;

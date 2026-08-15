@@ -61,11 +61,6 @@ class Create extends Component
     public string $branch = 'main';
 
     /**
-     * @var list<array{id: string, provider: string, label: string}>
-     */
-    public array $linkedSourceControlAccounts = [];
-
-    /**
      * @var list<array{label: string, url: string, branch: string}>
      */
     public array $availableRepositories = [];

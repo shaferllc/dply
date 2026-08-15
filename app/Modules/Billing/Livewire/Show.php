@@ -23,6 +23,16 @@ use Livewire\Component;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Livewire exposes #[Computed] methods and the older get<Name>Property()
+ * methods as $this-><name> in PHP and Blade. PHPStan cannot see that
+ * magic, so the contract is stated here.
+ *
+ * @property-read \Laravel\Cashier\Subscription|null $subscription
+ * @property-read string|null $subscriptionInterval
+ * @property-read \Illuminate\Support\Collection<int, \App\Models\Server> $billableServers
+ * @property-read \App\Modules\Billing\Services\DesiredBillingState $billingState
+ */
 #[Layout('layouts.app')]
 class Show extends Component
 {

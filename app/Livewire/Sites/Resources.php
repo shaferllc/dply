@@ -32,6 +32,12 @@ use Livewire\Component;
  * the high-leverage "what's wired to this site" view that Laravel
  * Cloud popularised. Only renders for container sites — VM / serverless
  * sites use their own runtime panels.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read \Illuminate\Support\Collection<int, \App\Models\CloudDatabase> $attachedDatabases
+ * @property-read \Illuminate\Support\Collection<int, \App\Models\CloudWorker> $workers
  */
 #[Layout('layouts.app')]
 class Resources extends Component

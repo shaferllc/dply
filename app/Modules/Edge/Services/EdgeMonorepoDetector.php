@@ -154,7 +154,7 @@ final class EdgeMonorepoDetector
 
         usort($packages, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
 
-        return array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($packages))))))))))))))))))))))))))))))));
+        return array_values($packages);
     }
 
     private function shouldSkipDirectory(string $name): bool

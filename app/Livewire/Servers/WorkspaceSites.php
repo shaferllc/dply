@@ -32,6 +32,15 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+/**
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read bool $canAddSite
+ * @property-read array{redeploy_count: int, renewable_count: int, site_names: list<string>} $selectedBulkPreview
+ * @property-read array{blocked_reason: string, can_create: bool} $siteCreateAccess
+ * @property-read bool $supportsQuickAdd
+ */
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSites extends Component

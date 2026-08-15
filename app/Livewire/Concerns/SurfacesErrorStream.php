@@ -20,6 +20,12 @@ use Livewire\Attributes\Url;
  * dismiss, retry, facets — lives here so the two views can't drift.
  *
  * Hosts must also use Livewire\WithPagination and a toast trait.
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read array<string, int> $facets
  */
 trait SurfacesErrorStream
 {

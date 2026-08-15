@@ -14,6 +14,13 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
 
+/**
+ * Livewire exposes #[Computed] methods and the older get<Name>Property()
+ * methods as $this-><name> in PHP and Blade. PHPStan cannot see that
+ * magic, so the contract is stated here.
+ *
+ * @property-read \Illuminate\Pagination\LengthAwarePaginator $rowsPaginator
+ */
 #[Layout('layouts.app')]
 class Invoices extends Component
 {

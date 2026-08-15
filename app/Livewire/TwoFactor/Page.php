@@ -12,6 +12,14 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use PragmaRX\Google2FA\Google2FA;
 
+/**
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read bool $isManageMode
+ * @property-read bool $needsStart
+ */
 #[Layout('layouts.settings')]
 class Page extends Component
 {

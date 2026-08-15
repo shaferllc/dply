@@ -22,6 +22,11 @@ use Livewire\Component;
  * the inline Alpine controller in the blade view) — it dispatches the
  * 'debug-task-runner-activity' Livewire event which triggers a re-render of
  * the recent() / running() computed props for the Recent / All tabs.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read string|null $organizationId
  */
 class TaskRunnerPanel extends Component
 {

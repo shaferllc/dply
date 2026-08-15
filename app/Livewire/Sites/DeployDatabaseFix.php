@@ -46,6 +46,11 @@ use Livewire\Component;
  *
  * The read-only diagnosis is visible to anyone who can view the deploy; the fix
  * actions are gated to the site's update policy (Q9).
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read bool $retryReady
  */
 class DeployDatabaseFix extends Component
 {

@@ -33,6 +33,12 @@ use Livewire\Component;
  * surfaces render from one {@see DeployStatus} snapshot — so they can't drift,
  * double-fire, or disagree on "is a deploy running". The `site-deploy-changed`
  * event keeps the two refreshed in lockstep without waiting on the poll tick.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read \App\Support\Sites\DeployStatus|null $status
+ * @property-read list<array<string, mixed>> $syncRows
  */
 class DeployControl extends Component
 {

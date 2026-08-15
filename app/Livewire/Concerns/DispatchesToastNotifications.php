@@ -20,6 +20,22 @@ trait DispatchesToastNotifications
         );
     }
 
+    /**
+     * Neutral, non-actionable notice. Billing\Show called this for VAT soft
+     * warnings before it existed, which fataled the save. toast-stack.blade.php
+     * styles only 'error' and 'warning' specially, so 'info' renders with the
+     * same neutral treatment as 'success'.
+     */
+    protected function toastInfo(string|\Stringable $message): void
+    {
+        $this->dispatch(
+            'notify',
+            message: (string) $message,
+            type: 'info',
+            position: NotificationToastPosition::resolvedFor(auth()->user()),
+        );
+    }
+
     protected function toastWarning(string|\Stringable $message): void
     {
         $this->dispatch(

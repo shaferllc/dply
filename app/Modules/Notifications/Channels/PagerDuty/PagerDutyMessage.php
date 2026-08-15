@@ -71,7 +71,7 @@ class PagerDutyMessage
 
     public static function create(): self
     {
-        return new static;
+        return new self;
     }
 
     public function setRoutingKey(string $value): self

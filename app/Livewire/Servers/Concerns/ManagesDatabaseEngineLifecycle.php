@@ -18,6 +18,7 @@ use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Support\Servers\DatabaseEngineAvailability;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\RemoteCidr;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Support\Facades\DB;
@@ -473,25 +474,7 @@ trait ManagesDatabaseEngineLifecycle
 
     private function isValidRemoteCidr(string $value): bool
     {
-        if ($value === '' || $value === 'any') {
-            return false;
-        }
-
-        $parts = array_filter(array_map('trim', explode(',', $value)));
-        foreach ($parts as $part) {
-            if (! str_contains($part, '/')) {
-                return false;
-            }
-            [$ip, $prefix] = explode('/', $part, 2);
-            if (! filter_var($ip, FILTER_VALIDATE_IP)) {
-                return false;
-            }
-            if (! is_numeric($prefix) || (int) $prefix < 0 || (int) $prefix > 128) {
-                return false;
-            }
-        }
-
-        return true;
+        return RemoteCidr::isValid($value);
     }
 
     /**

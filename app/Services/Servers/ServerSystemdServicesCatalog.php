@@ -27,7 +27,7 @@ final class ServerSystemdServicesCatalog
         $merged = array_unique($merged);
         sort($merged);
 
-        return array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($merged))))))))))))))))))))))))))))))));
+        return array_values($merged);
     }
 
     /**

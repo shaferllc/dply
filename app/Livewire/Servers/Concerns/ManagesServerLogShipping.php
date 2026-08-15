@@ -20,6 +20,12 @@ use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
  *
  * Requires the host component to also use {@see DispatchesToastNotifications}
  * and {@see InteractsWithServerWorkspace} (provides $server + authorize()).
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read array<string, string> $logShippingSourceCatalog
  */
 trait ManagesServerLogShipping
 {

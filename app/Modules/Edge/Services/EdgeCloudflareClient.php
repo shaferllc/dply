@@ -273,7 +273,7 @@ class EdgeCloudflareClient
         $metadata = array_merge(
             [
                 'main_module' => $entryModulePath,
-                'bindings' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($bindings)))))))))))))))))))))))))))))))),
+                'bindings' => array_values($bindings),
             ],
             array_intersect_key($metaExtras, array_flip(['compatibility_date', 'compatibility_flags', 'tags'])),
         );

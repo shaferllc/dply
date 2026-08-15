@@ -20,6 +20,11 @@ use Livewire\Component;
  * Add / remove load-balanced web backends for a site (multi-backend, the
  * substrate under rolling + canary). Nested section component embedded by
  * settings.blade.php. See docs/MULTI_BACKEND_SITES.md.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read \Illuminate\Support\Collection<int, \App\Models\SiteBackend> $backends
  */
 class Backends extends Component
 {

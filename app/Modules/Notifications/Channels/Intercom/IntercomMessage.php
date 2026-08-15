@@ -58,7 +58,7 @@ class IntercomMessage
 
     public static function create(?string $body = null): self
     {
-        return new static($body);
+        return new self($body);
     }
 
     public function body(string $body): self

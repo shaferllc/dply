@@ -24,6 +24,11 @@ use Livewire\Attributes\Computed;
  *
  * Requires the host component to also use {@see GuardsBilledDeploys} (for
  * blockedByDeployPause) and {@see DispatchesToastNotifications}.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read list<array<string, mixed>> $watchedRows
  */
 trait WatchesSiteDeploys
 {

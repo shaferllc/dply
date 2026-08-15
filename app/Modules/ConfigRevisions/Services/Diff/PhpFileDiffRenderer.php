@@ -3,7 +3,7 @@
 namespace App\Modules\ConfigRevisions\Services\Diff;
 
 use SebastianBergmann\Diff\Differ;
-use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;
+use SebastianBergmann\Diff\Output\StrictUnifiedDiffOutputBuilder;
 
 /**
  * Diff renderer for single-file snapshots shaped as
@@ -36,7 +36,15 @@ class PhpFileDiffRenderer implements ConfigRevisionDiffRenderer
             return '';
         }
 
-        $builder = new UnifiedDiffOutputBuilder('', false);
+        // sebastian/diff 9.0 removed UnifiedDiffOutputBuilder; Strict… is the
+        // surviving unified-diff builder. 'header' => '' reproduces the old
+        // empty-header argument (a non-null header is used verbatim, so
+        // fromFile/toFile stay unnecessary) and addLineNumbers: false keeps the
+        // bare `@@ @@` hunk headers this renderer emitted before.
+        $builder = new StrictUnifiedDiffOutputBuilder([
+            'header' => '',
+            'addLineNumbers' => false,
+        ]);
         $differ = new Differ($builder);
 
         return $differ->diff($from, $to);

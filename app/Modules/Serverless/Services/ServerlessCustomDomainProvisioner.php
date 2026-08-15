@@ -193,7 +193,7 @@ final class ServerlessCustomDomainProvisioner
             $remaining[] = $entry;
         }
 
-        $routing['custom_domains'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($remaining))))))))))))))))))))))))))))))));
+        $routing['custom_domains'] = array_values($remaining);
         $serverless['routing'] = $routing;
         $meta['serverless'] = $serverless;
         $site->forceFill(['meta' => $meta])->save();

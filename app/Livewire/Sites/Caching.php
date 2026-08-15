@@ -23,6 +23,12 @@ use Livewire\Component;
  *
  * Saving here writes the meta and dispatches `ApplySiteWebserverConfigJob`
  * so the on-disk vhost picks up the new directives.
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read list<string> $availableMethods
  */
 #[Layout('layouts.app')]
 class Caching extends Component

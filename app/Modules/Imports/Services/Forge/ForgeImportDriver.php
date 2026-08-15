@@ -103,7 +103,20 @@ class ForgeImportDriver implements ImportDriver
     }
 
     /**
-     * @return list<array<string, array<string, mixed>|int|string|null>>
+     * One normalised site, not a list — this returns normaliseSite()'s row
+     * directly. The previous list<> annotation hid $site['raw'] from callers.
+     *
+     * @return array{
+     *     id: int,
+     *     domain: string,
+     *     site_type: string,
+     *     php_version: ?string,
+     *     repository_url: ?string,
+     *     repository_branch: ?string,
+     *     web_directory: ?string,
+     *     status: ?string,
+     *     raw: array<string, mixed>,
+     * }
      */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {

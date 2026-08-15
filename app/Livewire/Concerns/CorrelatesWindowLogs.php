@@ -18,6 +18,12 @@ use Carbon\CarbonInterface;
  * Requires the host component to expose a `$server` property (the server whose
  * logs to read). The host supplies its own public action that resolves the
  * window from its domain object and calls {@see presentWindowLogs()}.
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read bool $showWindowLogCorrelation
  */
 trait CorrelatesWindowLogs
 {

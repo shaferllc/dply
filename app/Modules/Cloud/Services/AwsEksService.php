@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Cloud\Services;
 
 use App\Models\ProviderCredential;
-use Aws\Eks\EksClient;
+use Aws\EKS\EKSClient;
 use Aws\Exception\AwsException;
 
 /**
@@ -16,7 +16,7 @@ use Aws\Exception\AwsException;
  */
 class AwsEksService
 {
-    protected EksClient $client;
+    protected EKSClient $client;
 
     protected string $region;
 
@@ -46,7 +46,7 @@ class AwsEksService
             $config['handler'] = app()->make('aws.eks.handler');
         }
 
-        $this->client = new EksClient($config);
+        $this->client = new EKSClient($config);
     }
 
     /**
