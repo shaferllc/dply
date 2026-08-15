@@ -559,8 +559,10 @@ trait AsMail
             return $this->buildMail();
         }
 
-        // Try getViewName() and getMailData() methods
-        if (method_exists($this, 'getViewName') && method_exists($this, 'getMailData')) {
+        // Try getViewName() and getMailData() methods. view() comes from the
+        // Mailable host, not this trait — without that guard a non-Mailable
+        // action reaching this branch fatals instead of falling through.
+        if (method_exists($this, 'getViewName') && method_exists($this, 'getMailData') && method_exists($this, 'view')) {
             $viewName = $this->getViewName();
             $data = $this->getMailData();
 

@@ -23,7 +23,9 @@ class AttributeValidator
      */
     public static function for($action): self
     {
-        return new static($action);
+        // new self, not new static: the declared return type is self, so a
+        // subclass instance would not satisfy it anyway.
+        return new self($action);
     }
 
     /**

@@ -18,7 +18,11 @@ final class ApplyFakeCloudProvisionAsReady
 {
     use AsObject;
 
-    public function handle(Server $server): void
+    /**
+     * Returns the refreshed server rather than void: AsObject::chain() and
+     * run() propagate handle()'s result, so a void action cannot be composed.
+     */
+    public function handle(Server $server): Server
     {
         if (! FakeCloudProvision::enabled()) {
             throw new \LogicException('Fake cloud provision is not enabled.');
@@ -77,5 +81,7 @@ final class ApplyFakeCloudProvisionAsReady
         $server->refresh();
 
         ServerProvisionDispatch::afterReady($server);
+
+        return $server;
     }
 }

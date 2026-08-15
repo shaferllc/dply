@@ -99,7 +99,12 @@ class DistributedLockDecorator
         if (! $acquired) {
             // Fallback: try Redis SET NX EX for better reliability
             if (config('cache.default') === 'redis') {
-                $acquired = Redis::set($this->lockKey, $this->getLockValue(), 'EX', $ttl, 'NX') === true;
+                // Via ->connection(), not the facade: the facade documents the
+                // phpredis 3-arg set($key, $value, $options), but PhpRedisConnection
+                // takes the expanded ('EX', $ttl, 'NX') form and builds the options
+                // array itself — passing an array here would be used as an array key
+                // and fatal. The connection is the accurate type for this call.
+                $acquired = Redis::connection()->set($this->lockKey, $this->getLockValue(), 'EX', $ttl, 'NX') === true;
                 $this->lockAcquired = $acquired;
             }
         }

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Event;
  *
  * Features:
  * - Static dispatch methods (dispatch, dispatchIf, dispatchUnless)
- * - Synchronous dispatch methods (dispatchSync, dispatchSyncIf, dispatchSyncUnless)
+ * - Synchronous dispatch methods (dispatchEventSync, dispatchEventSyncIf, dispatchEventSyncUnless)
  * - After-response dispatch methods (dispatchAfterResponse, dispatchAfterResponseIf, dispatchAfterResponseUnless)
  * - Conditional event dispatching
  * - Integration with Laravel's event system
@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\Event;
  * - `dispatchIf(bool $condition, ...$arguments)` - Dispatch if condition is true
  * - `dispatchUnless(bool $condition, ...$arguments)` - Dispatch if condition is false
  * - `dispatchSync(...$arguments)` - Dispatch synchronously (bypass queue)
- * - `dispatchSyncIf(bool $condition, ...$arguments)` - Dispatch synchronously if condition is true
+ * - `dispatchEventSyncIf(bool $condition, ...$arguments)` - Dispatch synchronously if condition is true
  * - `dispatchSyncUnless(bool $condition, ...$arguments)` - Dispatch synchronously unless condition is true
  * - `dispatchAfterResponse(...$arguments)` - Dispatch after HTTP response is sent
  * - `dispatchAfterResponseIf(bool $condition, ...$arguments)` - Dispatch after response if condition is true
@@ -754,7 +754,7 @@ use Illuminate\Support\Facades\Event;
  * CriticalEvent::dispatchSync('System critical alert');
  *
  * // Conditional synchronous dispatch
- * CriticalEvent::dispatchSyncIf(
+ * CriticalEvent::dispatchEventSyncIf(
  *     $system->isCritical(),
  *     'Critical system failure'
  * );
@@ -948,7 +948,7 @@ trait AsEvent
      * @param  mixed  ...$arguments
      * @return mixed|null
      */
-    public static function dispatchSyncIf(bool $condition, ...$arguments): mixed
+    public static function dispatchEventSyncIf(bool $condition, ...$arguments): mixed
     {
         if ($condition) {
             return static::dispatchEventSync(...$arguments);

@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @see ActionManager
  *
- * @method static void registerRoutes($paths = 'app/Actions')
- * @method static void registerCommands($paths = 'app/Actions')
+ * @method static void registerRoutesForAction(string $className)
+ * @method static void registerCommandsForAction(string $className)
  */
 class Actions extends Facade
 {

@@ -14,10 +14,7 @@ use App\Actions\Decorators\LazyDecorator;
 use App\Actions\Decorators\LifecycleDecorator;
 use App\Actions\Decorators\LockDecorator;
 use App\Actions\Decorators\LoggerDecorator;
-use App\Actions\Decorators\RequiresBillingFeatureDecorator;
-use App\Actions\Decorators\RequiresCapabilityDecorator;
 use App\Actions\Decorators\RequiresPlanDecorator;
-use App\Actions\Decorators\RequiresRoleDecorator;
 use App\Actions\Decorators\RequiresSubscriptionDecorator;
 use App\Actions\Decorators\TestableDecorator;
 use App\Actions\Decorators\ThrottleDecorator;
@@ -39,10 +36,7 @@ use App\Actions\DesignPatterns\LazyDesignPattern;
 use App\Actions\DesignPatterns\LifecycleDesignPattern;
 use App\Actions\DesignPatterns\LockDesignPattern;
 use App\Actions\DesignPatterns\LoggerDesignPattern;
-use App\Actions\DesignPatterns\RequiresBillingFeatureDesignPattern;
-use App\Actions\DesignPatterns\RequiresCapabilityDesignPattern;
 use App\Actions\DesignPatterns\RequiresPlanDesignPattern;
-use App\Actions\DesignPatterns\RequiresRoleDesignPattern;
 use App\Actions\DesignPatterns\RequiresSubscriptionDesignPattern;
 use App\Actions\DesignPatterns\TestableDesignPattern;
 use App\Actions\DesignPatterns\ThrottleDesignPattern;
@@ -57,7 +51,6 @@ use Illuminate\Console\Application as Artisan;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
-use Lorisleiva\Lody\Lody;
 
 class ActionManager
 {
@@ -302,10 +295,7 @@ class ActionManager
             LifecycleDesignPattern::class => LifecycleDecorator::class,
             LockDesignPattern::class => LockDecorator::class,
             LoggerDesignPattern::class => LoggerDecorator::class,
-            RequiresBillingFeatureDesignPattern::class => RequiresBillingFeatureDecorator::class,
-            RequiresCapabilityDesignPattern::class => RequiresCapabilityDecorator::class,
             RequiresPlanDesignPattern::class => RequiresPlanDecorator::class,
-            RequiresRoleDesignPattern::class => RequiresRoleDecorator::class,
             RequiresSubscriptionDesignPattern::class => RequiresSubscriptionDecorator::class,
             ValidationDesignPattern::class => ValidationDecorator::class,
             VersionDesignPattern::class => VersionDecorator::class,
@@ -350,32 +340,12 @@ class ActionManager
     }
 
     /**
-     * @param  array<int, string>|string  $paths
+     * Bulk registration by directory scan (registerRoutes/registerCommands) was
+     * removed with the lorisleiva/lody dependency, which was never installed —
+     * every call fataled. Register individually via the *ForAction methods.
+     *
+     * @see ActionRegistry::discover() for the Finder-based replacement scan.
      */
-    public function registerRoutes(array|string $paths = 'app/Actions'): void
-    {
-        Lody::classes($paths)
-            ->isNotAbstract()
-            ->hasTrait(AsController::class)
-            ->hasStaticMethod('routes')
-            ->each(fn (string $classname) => $this->registerRoutesForAction($classname));
-    }
-
-    /**
-     * @param  array<int, string>|string  $paths
-     */
-    public function registerCommands(array|string $paths = 'app/Actions'): void
-    {
-        Lody::classes($paths)
-            ->isNotAbstract()
-            ->hasTrait(AsCommand::class)
-            ->filter(function (string $classname): bool {
-                return property_exists($classname, 'commandSignature')
-                    || method_exists($classname, 'getCommandSignature');
-            })
-            ->each(fn (string $classname) => $this->registerCommandsForAction($classname));
-    }
-
     public function registerRoutesForAction(string $className): void
     {
         $className::routes(app(Router::class));

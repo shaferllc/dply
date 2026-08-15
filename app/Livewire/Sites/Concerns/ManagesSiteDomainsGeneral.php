@@ -13,6 +13,7 @@ use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Modules\Cloud\Services\AzureDnsService;
+use App\Modules\Cloud\Services\VultrService;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Cloud\Services\GcpDnsService;

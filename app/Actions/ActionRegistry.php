@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use Illuminate\Support\Collection;
-use Lorisleiva\Lody\Lody;
+use ReflectionClass;
+use Symfony\Component\Finder\Finder;
 
 /**
  * Action Registry - Discover and manage actions.
@@ -110,11 +111,7 @@ class ActionRegistry
             }
 
             try {
-                $classes = Lody::classes($path)
-                    ->whereInstanceOf(Actions::class)
-                    ->isNotAbstract();
-
-                $actions = $actions->merge($classes);
+                $actions = $actions->merge(static::classesIn($path));
             } catch (\Exception $e) {
                 // Skip this path if there's an error
                 continue;
@@ -124,6 +121,62 @@ class ActionRegistry
         static::$actions = $actions->unique()->values();
 
         return static::$actions;
+    }
+
+    /**
+     * Concrete Actions subclasses declared under $path.
+     *
+     * Replaces the previous Lody::classes() scan — lorisleiva/lody was never a
+     * declared dependency, so discover() threw on every call and the catch above
+     * silently returned an empty collection. Symfony Finder ships with Laravel.
+     *
+     * @return Collection<int, class-string>
+     */
+    protected static function classesIn(string $path): Collection
+    {
+        $classes = collect();
+
+        foreach (Finder::create()->files()->in($path)->name('*.php') as $file) {
+            $class = static::classNameFor($file->getRealPath());
+
+            if ($class === null || ! class_exists($class)) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Actions::class)) {
+                continue;
+            }
+
+            $classes->push($class);
+        }
+
+        return $classes;
+    }
+
+    /**
+     * Map an absolute file path to its PSR-4 class name via composer's app/ root.
+     *
+     * @return class-string|null
+     */
+    protected static function classNameFor(string $file): ?string
+    {
+        $appPath = realpath(app_path());
+
+        if ($appPath === false || ! str_starts_with($file, $appPath)) {
+            return null;
+        }
+
+        $relative = trim(substr($file, strlen($appPath)), DIRECTORY_SEPARATOR);
+        $class = app()->getNamespace().str_replace(
+            [DIRECTORY_SEPARATOR, '.php'],
+            ['\\', ''],
+            $relative
+        );
+
+        /** @var class-string */
+        return $class;
     }
 
     /**

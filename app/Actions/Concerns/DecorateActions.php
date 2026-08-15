@@ -28,6 +28,11 @@ trait DecorateActions
         return $this->action->{$property};
     }
 
+    protected function setProperty(string $property, mixed $value): void
+    {
+        $this->action->{$property} = $value;
+    }
+
     protected function hasMethod(string $method): bool
     {
         return isset($this->action) && method_exists($this->action, $method);

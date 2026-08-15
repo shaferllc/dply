@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Fluent;
+use Illuminate\Support\Testing\Fakes\QueueFake;
 use PHPUnit\Framework\Assert as PHPUnit;
 use Throwable;
 
@@ -950,7 +951,15 @@ trait AsJob
             ? ActionManager::$uniqueJobDecorator
             : ActionManager::$jobDecorator;
 
-        $count = Queue::pushed($decoratorClass, function (JobDecorator $job, $queue) use ($callback) {
+        // pushed() lives on QueueFake, not the Queue contract — resolve the fake
+        // explicitly so a missing Queue::fake() fails with this message rather
+        // than an opaque "undefined method" on the real queue manager.
+        $fake = Queue::getFacadeRoot();
+        if (! $fake instanceof QueueFake) {
+            PHPUnit::fail('assertPushed() requires Queue::fake() to be called first.');
+        }
+
+        $count = $fake->pushed($decoratorClass, function (JobDecorator $job, $queue) use ($callback) {
             if (! $job->decorates(static::class)) {
                 return false;
             }

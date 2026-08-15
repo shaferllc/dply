@@ -89,6 +89,12 @@ use Illuminate\Support\Str;
  * - `getBroadcastChannel(...$arguments)` - Configure broadcast channel
  * - `getBroadcastEventName()` - Configure broadcast event name
  * - `getBroadcastPayload($result, array $arguments)` - Customize broadcast payload
+ *
+ * Subclasses define handle() with their own domain signature, so it cannot be
+ * declared `abstract` here (not contravariant with a variadic parent). The tag
+ * states the contract the As* traits call through; a real handle() overrides it.
+ *
+ * @method mixed handle(mixed ...$arguments)
  */
 #[WatermarkMode('append')]
 #[WatermarkEnabled(true)]

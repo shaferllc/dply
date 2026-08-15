@@ -87,7 +87,11 @@ final class ResolveServerCreateCatalog
             'hetzner' => $this->catalogHetzner($credentials, $credential, $selectedRegion),
             'linode' => $this->catalogLinode($credentials, $credential),
             'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
-            'ovh' => $this->catalogOvh($credentials, $credential, $selectedRegion),
+            // No 'ovh' arm: catalogOvh() was never written, so listing it here
+            // fataled the create screen the moment DPLY_SERVER_PROVIDER_OVH was
+            // flipped on. OVH is COMING_SOON, so it falls to `default` (empty
+            // catalog + credentials) like gcp and every other unbuilt provider.
+            // Add the arm back together with the catalogOvh() implementation.
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
             'aws' => $this->catalogAws($credentials, $credential),
             'azure' => $this->catalogAzure($credentials, $credential, $selectedRegion),

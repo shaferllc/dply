@@ -23,6 +23,9 @@ parameters:
     excludePaths:
         - app/*/Tests/*
         - app/**/Tests/*
+        # Same intent, lowercase dir name: app/Actions/{Concerns,Decorators,Attributes}/tests
+        - app/*/tests/*
+        - app/**/tests/*
 
         # FIXME: these three trigger PHPStan *internal* errors (which abort the
         # run rather than report cleanly), so they're excluded until fixed:

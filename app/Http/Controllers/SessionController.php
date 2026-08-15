@@ -38,6 +38,33 @@ class SessionController extends Controller
     }
 
     /**
+     * Delete one of this user's sessions. Scoped by user_id so a caller can
+     * never revoke a session that isn't theirs.
+     *
+     * @return bool Whether a row was actually deleted.
+     */
+    public static function deleteSessionForUser(int|string $userId, string $sessionId): bool
+    {
+        return DB::table(config('session.table', 'sessions'))
+            ->where('id', $sessionId)
+            ->where('user_id', $userId)
+            ->delete() > 0;
+    }
+
+    /**
+     * Delete every session for this user except the current one.
+     *
+     * @return int Number of sessions revoked.
+     */
+    public static function deleteOtherSessionsForUser(int|string $userId, string $currentSessionId): int
+    {
+        return DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $userId)
+            ->where('id', '!=', $currentSessionId)
+            ->delete();
+    }
+
+    /**
      * Revoke a single session. Only the session owner can revoke.
      */
     public function revoke(Request $request, string $sessionId): RedirectResponse
@@ -47,19 +74,13 @@ class SessionController extends Controller
             abort(403);
         }
 
-        $table = config('session.table', 'sessions');
         $currentId = $request->session()->getId();
 
         if ($sessionId === $currentId) {
             return redirect()->route('settings.profile')->with('error', __('You cannot revoke your current session.'));
         }
 
-        $deleted = DB::table($table)
-            ->where('id', $sessionId)
-            ->where('user_id', $userId)
-            ->delete();
-
-        if ($deleted) {
+        if (static::deleteSessionForUser($userId, $sessionId)) {
             return redirect()->route('settings.profile')->with('status', 'session-revoked');
         }
 
@@ -76,13 +97,7 @@ class SessionController extends Controller
             abort(403);
         }
 
-        $table = config('session.table', 'sessions');
-        $currentId = $request->session()->getId();
-
-        DB::table($table)
-            ->where('user_id', $userId)
-            ->where('id', '!=', $currentId)
-            ->delete();
+        static::deleteOtherSessionsForUser($userId, $request->session()->getId());
 
         return redirect()->route('settings.profile')->with('status', 'sessions-revoked');
     }
