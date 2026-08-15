@@ -19,7 +19,6 @@ class SourceControlRepositoryBrowser
     /**
      * @return list<array{id: string, provider: string, label: string, kind: string}>
      */
-    /** @return array<string, mixed> */
     public function accountsForUser(User $user): array
     {
         $cacheKey = 'source-control.accounts.'.(string) $user->getKey();
@@ -46,7 +45,6 @@ class SourceControlRepositoryBrowser
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */

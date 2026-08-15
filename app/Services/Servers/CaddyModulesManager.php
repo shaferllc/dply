@@ -28,7 +28,6 @@ class CaddyModulesManager
      *     unreadable: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -76,7 +75,6 @@ class CaddyModulesManager
     /**
      * @return list<array{path: string, version: string, label: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -121,7 +119,6 @@ class CaddyModulesManager
      *     compiled: bool,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      * @param  array<string, mixed> $installedModules
@@ -344,7 +341,6 @@ BASH;
     /**
      * @return list<array{id: string, namespace: string, kind: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -382,7 +378,6 @@ BASH;
      * @param  array<string, mixed> $installedModules
      * @return list<array<string, string>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      * @param  array<string, mixed> $installedModules
@@ -414,7 +409,6 @@ BASH;
      * @param  array<string, mixed> $installedModules
      * @return list<mixed>
      */
-    /** @return array<string, mixed> */
     public function availableCatalog(array $manifestPlugins, array $installedModules): array
     {
         $satisfied = array_flip($this->satisfiedPluginPaths($manifestPlugins, $installedModules));
@@ -438,7 +432,6 @@ BASH;
      *     module_ids: list<string>,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      * @param  array<string, mixed> $installedModules
@@ -487,7 +480,6 @@ BASH;
      * @param  array<string, mixed> $manifestPlugins
      * }
      */
-    /** @return array<string, mixed> */
     public function packageInfoForInstall(string $path): array
     {
         $path = trim($path);

@@ -23,7 +23,6 @@ class ApacheCustomVhostsConfig
     /**
      * @return array{vhosts: list<array{slug: string, path: string, server_name: string, server_aliases: list<string>, document_root: string, php_socket: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $available = rtrim((string) config('sites.apache_sites_available'), '/');

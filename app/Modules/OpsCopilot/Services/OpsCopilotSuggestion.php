@@ -38,7 +38,6 @@ final class OpsCopilotSuggestion
     /**
      * @return SuggestionArray
      */
-    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

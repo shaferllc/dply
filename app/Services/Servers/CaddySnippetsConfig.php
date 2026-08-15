@@ -40,7 +40,6 @@ class CaddySnippetsConfig
      *
      * @return array{snippets: list<array{name: string, body: string, raw: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);

@@ -32,7 +32,6 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function describeFunction(string $functionName): array
     {
         try {
@@ -44,7 +43,6 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
         return $this->configurationToArnRevision($result['Configuration'] ?? []);
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function updateFunctionCodeWithZip(string $functionName, string $zipBinary): array
     {
@@ -64,7 +62,6 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
         ]);
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function updateFunctionCodeFromS3(string $functionName, string $bucket, string $key, ?string $objectVersion = null): array
     {

@@ -40,7 +40,6 @@ class WorkerPoolExposureApplier
     /**
      * @return array{applied: list<string>, warnings: list<string>}
      */
-    /** @return array<string, mixed> */
     public function applyForPool(WorkerPool $pool, ?string $actorId = null): array
     {
         $pool->load('servers');
@@ -85,8 +84,8 @@ class WorkerPoolExposureApplier
 
     /**
      * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeBackendPort(WorkerPool $pool, Server $backend, int $port, array $cidrs, ?string $actorId, array &$applied, array &$warnings): void
     {
@@ -112,8 +111,8 @@ class WorkerPoolExposureApplier
 
     /**
      * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeDatabase(WorkerPool $pool, Server $backend, ServerDatabaseEngine $engine, array $cidrs, array &$applied, array &$warnings): void
     {
@@ -151,8 +150,8 @@ class WorkerPoolExposureApplier
 
     /**
      * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeCache(WorkerPool $pool, Server $backend, ServerCacheService $cache, array $cidrs, ?string $actorId, array &$applied, array &$warnings): void
     {

@@ -258,7 +258,6 @@ BASH;
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -505,7 +504,6 @@ YAML;
      * @param  array<string, mixed> $parsed
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function ensureDplyTraefikStaticDefaults(Server $server, array $parsed): array
     {
         if ($server->edgeProxy() !== 'traefik') {

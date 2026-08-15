@@ -27,7 +27,6 @@ class AtomicSiteDeployer
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // A resume re-attaches to an already-staged release and runs only the

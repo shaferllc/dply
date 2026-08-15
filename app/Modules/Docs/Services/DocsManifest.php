@@ -92,7 +92,6 @@ final class DocsManifest
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function publishedSlugs(): array
     {
@@ -120,7 +119,6 @@ final class DocsManifest
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -142,7 +140,6 @@ final class DocsManifest
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function prevNext(string $slug): array
     {
         $list = $this->orderedList();
@@ -178,7 +175,6 @@ final class DocsManifest
      *
      * @return array<string, array{key: string, label: string, slugs: list<string>}>
      */
-    /** @return array<string, mixed> */
     public function groups(): array
     {
         $labels = [

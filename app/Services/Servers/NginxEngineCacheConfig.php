@@ -56,7 +56,6 @@ class NginxEngineCacheConfig
      *     conf_path: string,
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $feature = ServerWebserverCacheFeature::findOrCreateFor(

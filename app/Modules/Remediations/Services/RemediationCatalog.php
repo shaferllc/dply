@@ -60,7 +60,6 @@ class RemediationCatalog
      *
      * @return list<class-string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

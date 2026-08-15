@@ -35,7 +35,6 @@ class EdgeDeliveryFeaturesEnsurer
      *     access_gates_republished: int,
      * }
      */
-    /** @return array<string, mixed> */
     public function ensurePlatform(bool $deployWorker = true): array
     {
         if (FakeEdgeProvision::enabled()) {

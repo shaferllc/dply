@@ -58,7 +58,6 @@ final class ServerAccessMap
      *     edges: list<array<string, mixed>>,
      * }
      */
-    /** @return array<string, mixed> */
     public function build(Server $server, array $reportRows): array
     {
         $siteCounts = $this->deletionPolicy->siteCountsByUsername($server);

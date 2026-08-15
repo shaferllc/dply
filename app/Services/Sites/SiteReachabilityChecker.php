@@ -44,7 +44,6 @@ class SiteReachabilityChecker
      *   checks: list<array{hostname: string, url: string, ok: bool, error: ?string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function check(Site $site): array
     {
         $previewDomains = $site->previewDomains instanceof Collection
@@ -171,7 +170,6 @@ class SiteReachabilityChecker
      *   checked_at: string
      * }
      */
-    /** @return array<string, mixed> */
     public function checkHostname(Site $site, string $hostname): array
     {
         $hostname = strtolower(trim($hostname));

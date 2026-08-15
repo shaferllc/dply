@@ -87,7 +87,6 @@ class TaskFailed
     /**
      * Exclude unserializable properties from serialization.
      */
-    /** @return array<string, mixed> */
     public function __serialize(): array
     {
         $data = get_object_vars($this);
@@ -237,7 +236,6 @@ class TaskFailed
      * Get the task data.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();
@@ -257,7 +255,6 @@ class TaskFailed
      * Get failure details.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getFailureDetails(): array
     {
         return [

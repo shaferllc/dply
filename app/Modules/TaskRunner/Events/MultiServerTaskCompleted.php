@@ -131,7 +131,6 @@ class MultiServerTaskCompleted
      * Get the successful connections.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getSuccessfulConnections(): array
     {
         return $this->summary['successful_connections'] ?? [];
@@ -163,7 +162,6 @@ class MultiServerTaskCompleted
      * Get performance metrics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [

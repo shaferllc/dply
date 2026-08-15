@@ -74,7 +74,6 @@ class ServerlessLoggingShimInjector
      *
      * @return array{supported: bool, shim_file: string, function: string, entry_file: string}
      */
-    /** @return array<string, mixed> */
     public function plan(string $language, string $entryFile): array
     {
         $language = strtolower(trim($language));
@@ -97,7 +96,6 @@ class ServerlessLoggingShimInjector
      *
      * @return array{ran: bool, shim_file: string, function: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function inject(string $workingDirectory, string $language, string $entryFile): array
     {
         $language = strtolower(trim($language));

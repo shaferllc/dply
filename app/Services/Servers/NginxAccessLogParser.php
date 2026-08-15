@@ -45,7 +45,6 @@ class NginxAccessLogParser
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -69,7 +68,6 @@ class NginxAccessLogParser
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function parseLine(string $line): array
     {
         if (! preg_match(self::COMBINED, trim($line), $m)) {
@@ -130,7 +128,6 @@ class NginxAccessLogParser
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function summarize(array $rows): array
     {
         $parsed = array_filter($rows, fn ($r) => ($r['parsed'] ?? false) === true);

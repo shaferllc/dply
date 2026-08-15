@@ -382,7 +382,6 @@ BASH;
     /**
      * Run a one-off mysql command (used after exec to read exit status from same connection — caller must use one SSH exec chain).
      * Prefer {@see mysqlExecute} which runs a single remote bash -lc.
-     * @return array<string, mixed>
      */
     public function mysqlRunWithExit(Server $server, string $sql, int $timeout = 120): array
     {
@@ -398,7 +397,6 @@ BASH;
     }
 
     /**
-     * @return array<string, mixed>
      */
     public function postgresRun(Server $server, string $sql, int $timeout = 120): array
     {

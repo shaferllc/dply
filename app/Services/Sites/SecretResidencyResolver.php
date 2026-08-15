@@ -42,7 +42,6 @@ class SecretResidencyResolver
      *                                          for THIS push only and never persisted (Tier 2b). Null for every other tier.
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function resolve(Site $site, array $vars, ?string $ephemeralIdentity = null): array
     {
         if (! $this->hasPlaceholder($vars)) {

@@ -14,7 +14,6 @@ final class ServerSystemdServicesCatalog
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -155,7 +154,6 @@ final class ServerSystemdServicesCatalog
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -181,7 +179,6 @@ final class ServerSystemdServicesCatalog
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -267,7 +264,6 @@ final class ServerSystemdServicesCatalog
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

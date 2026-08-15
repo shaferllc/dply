@@ -39,7 +39,6 @@ class StandardSubscriptionCreator
      *
      * @throws RuntimeException when a paid plan's Stripe price is not configured.
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int<1, max>|string>>
      */

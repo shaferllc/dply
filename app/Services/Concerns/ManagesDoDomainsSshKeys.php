@@ -20,7 +20,6 @@ trait ManagesDoDomainsSshKeys
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getSshKeys(): array
     {
         $response = $this->request('get', '/account/keys');
@@ -36,7 +35,6 @@ trait ManagesDoDomainsSshKeys
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function addSshKey(string $name, string $publicKey): array
     {
         $response = $this->request('post', '/account/keys', [
@@ -109,7 +107,6 @@ trait ManagesDoDomainsSshKeys
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getDomainRecords(string $domain, array $query = []): array
     {
         $all = [];

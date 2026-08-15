@@ -244,7 +244,6 @@ BASH;
     /**
      * @return array{values: array<string, string>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         return [

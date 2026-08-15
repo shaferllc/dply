@@ -46,7 +46,6 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function probe(): array
     {
         $response = $this->http()->get(self::BASE.'/user');

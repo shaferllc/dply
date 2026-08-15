@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $id
  * @property string $cookie_secret
  * @property string $method
- * @property string $password_salt
- * @property string $password_verifier
+ * @property ?string $password_salt
+ * @property ?string $password_verifier
  * @property ?string $site_id
  * @property-read ?Site $site
  * @property-read Collection<int, SiteAccessGatePassword> $passwords

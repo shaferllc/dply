@@ -20,7 +20,6 @@ trait ProvisionsDoAppPlatform
 
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new DigitalOceanAppPlatformService($credential);
@@ -52,7 +51,6 @@ trait ProvisionsDoAppPlatform
         ];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function provisionFromSource(Site $site, ProviderCredential $credential): array
     {
@@ -148,7 +146,6 @@ trait ProvisionsDoAppPlatform
         ];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function redeploy(Site $site, ProviderCredential $credential): array
     {

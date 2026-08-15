@@ -66,7 +66,6 @@ class RollbackException extends Exception
      * Get the rollback context.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getContext(): array
     {
         return $this->context;

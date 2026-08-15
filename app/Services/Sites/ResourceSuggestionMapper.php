@@ -49,9 +49,7 @@ class ResourceSuggestionMapper
      *     note: ?string,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      */
     public function map(): array
     {
@@ -143,7 +141,6 @@ class ResourceSuggestionMapper
      *     matched_keys: list<string>,
      * }>
      */
-    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         $keys = [];
@@ -163,7 +160,6 @@ class ResourceSuggestionMapper
      * @param  array<string, mixed> $keys
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      * @param  array<string, mixed> $keys

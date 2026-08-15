@@ -32,7 +32,6 @@ final class LaravelComposerPackageDetector
      * @return LaravelPackageFlags
      * @param  array<string, mixed> $composerJson
      */
-    /** @return array<string, mixed> */
     public function flags(?array $composerJson): array
     {
         $out = [

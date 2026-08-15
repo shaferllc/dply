@@ -31,7 +31,6 @@ final class UnifiedPreviewCatalog
      *     parent_name: string|null,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string|null>>
      */

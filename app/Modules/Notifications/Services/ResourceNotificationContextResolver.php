@@ -23,7 +23,6 @@ class ResourceNotificationContextResolver
      *     stakeholder_user_ids: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function resolve(?Model $subject): array
     {
         if ($subject instanceof Server) {

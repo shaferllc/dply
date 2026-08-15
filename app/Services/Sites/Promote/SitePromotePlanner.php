@@ -14,9 +14,7 @@ final class SitePromotePlanner
     /**
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      */
     public function previewSteps(Site $source): array
     {
@@ -46,9 +44,7 @@ final class SitePromotePlanner
     /**
      * @return array<int, array<string, array|string|null>>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      */
     public function cutoverSteps(Site $destination, ?Site $source = null): array
     {
@@ -129,7 +125,6 @@ final class SitePromotePlanner
     /**
      * @return array<int, array<string, array|string|null>>
      */
-    /** @return array<string, mixed> */
     public function summary(Site $destination, ?Site $source = null): array
     {
         $promote = is_array($destination->meta['promote'] ?? null) ? $destination->meta['promote'] : [];

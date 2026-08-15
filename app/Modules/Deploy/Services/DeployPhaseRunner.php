@@ -51,7 +51,6 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -72,7 +71,6 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -97,7 +95,6 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -130,7 +127,6 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */

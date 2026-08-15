@@ -49,7 +49,6 @@ class WebserverSmokeTestRunner
      *     truncated: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function run(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);

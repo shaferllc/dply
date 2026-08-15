@@ -94,7 +94,6 @@ final class DeployContractPolicy
     /**
      * @return array{requires: list<string>, min_replay_pass_rate: ?float, require_replay: ?bool}
      */
-    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

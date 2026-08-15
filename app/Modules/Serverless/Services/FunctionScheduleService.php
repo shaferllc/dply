@@ -49,7 +49,6 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string, triggers: list<array<string, mixed>>}
      */
-    /** @return array<string, mixed> */
     public function list(Site $site): array
     {
         return $this->run(
@@ -62,7 +61,6 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function add(Site $site, string $name, string $cron): array
     {
         $function = $this->actionName($site);
@@ -80,7 +78,6 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function remove(Site $site, string $name): array
     {
         return $this->run($site, function (DigitalOceanService $do, string $ns) use ($name): array {

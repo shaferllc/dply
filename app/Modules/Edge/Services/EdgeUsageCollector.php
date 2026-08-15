@@ -31,7 +31,6 @@ class EdgeUsageCollector
     /**
      * @return array{sites: int, snapshots: int, source: string}
      */
-    /** @return array<string, mixed> */
     public function collectForDate(CarbonInterface $date, bool $dryRun = false): array
     {
         $periodStart = $date->copy()->startOfDay();

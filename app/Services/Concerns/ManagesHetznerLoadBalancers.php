@@ -82,7 +82,6 @@ trait ManagesHetznerLoadBalancers
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function getLoadBalancer(int $id): array
     {
         $response = $this->request('get', "/load_balancers/{$id}");

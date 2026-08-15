@@ -34,7 +34,6 @@ final class ServerHealthCockpit
      *     monitoring: array<string, mixed>,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get(['id', 'name', 'server_id', 'deploy_strategy', 'releases_to_keep']);

@@ -130,7 +130,6 @@ class MonitoringService
      * Generate monitoring dashboard data.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function generateDashboardData(): array
     {
         $recentTasks = Task::where('created_at', '>=', now()->subDays(7))->get();
@@ -156,7 +155,6 @@ class MonitoringService
      * Perform system health check.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function performSystemHealthCheck(): array
     {
         $checks = [
@@ -190,7 +188,6 @@ class MonitoringService
      * Get monitoring statistics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getMonitoringStats(): array
     {
         $stats = [
@@ -435,7 +432,6 @@ class MonitoringService
      * Check database connectivity.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkDatabaseConnectivity(): array
     {
         try {
@@ -459,7 +455,6 @@ class MonitoringService
      * Check cache connectivity.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkCacheConnectivity(): array
     {
         try {
@@ -484,7 +479,6 @@ class MonitoringService
      * Check queue connectivity.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkQueueConnectivity(): array
     {
         return [
@@ -498,7 +492,6 @@ class MonitoringService
      * Check disk space.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkDiskSpace(): array
     {
         try {
@@ -526,7 +519,6 @@ class MonitoringService
      * Check memory usage.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkMemoryUsage(): array
     {
         try {
@@ -554,7 +546,6 @@ class MonitoringService
      * Check CPU usage.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function checkCpuUsage(): array
     {
         $loads = sys_getloadavg();
@@ -641,7 +632,6 @@ class MonitoringService
      * Get alert summary.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function getAlertSummary(): array
     {
         try {
@@ -720,7 +710,6 @@ class MonitoringService
      * Get system status.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function getSystemStatus(): array
     {
         return [

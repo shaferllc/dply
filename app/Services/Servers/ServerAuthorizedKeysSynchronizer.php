@@ -137,7 +137,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  array<string, mixed> $targets
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function buildSyncPayload(Server $server, array $targets): array
     {
         $fingerprints = [];
@@ -166,7 +165,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  array<string, mixed> $targets
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      */
@@ -265,7 +263,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -310,7 +307,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -378,7 +374,6 @@ class ServerAuthorizedKeysSynchronizer
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     protected function hiddenManagedTargets(Server $server): array
     {
         return trim((string) $server->openSshPublicKeyFromRecoveryPrivate()) !== ''

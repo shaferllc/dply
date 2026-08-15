@@ -52,7 +52,6 @@ class ScaffoldComposerPipeline
     /**
      * @return array{ok: bool, failed_step: ?string, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function run(Site $site): array
     {
         $recipe = $this->recipe($site);

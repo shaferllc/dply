@@ -362,7 +362,6 @@ class SiteProvisioner
     /**
      * @return array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string}
      */
-    /** @return array<string, mixed> */
     public function checkReadiness(Site $site): array
     {
         $site->loadMissing(['server', 'domains']);

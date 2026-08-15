@@ -25,7 +25,6 @@ final class OrganizationCostObservatory
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function forOrganization(Organization $organization, DesiredBillingState $state): array
     {
         $servers = $this->infrastructureServers($organization);
@@ -77,7 +76,6 @@ final class OrganizationCostObservatory
      *   detail: ?string,
      * }
      */
-    /** @return array<string, mixed> */
     public function providerEstimateForServer(Server $server): array
     {
         $server->loadMissing('providerCredential');

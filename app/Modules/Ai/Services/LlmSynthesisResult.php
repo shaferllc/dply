@@ -32,7 +32,6 @@ final class LlmSynthesisResult
     /**
      * @return array{narrative: string, suggestions: list<ParsedSuggestion>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int|null}
      */
-    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

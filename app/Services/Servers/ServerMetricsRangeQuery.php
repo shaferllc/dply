@@ -101,7 +101,6 @@ final class ServerMetricsRangeQuery
      *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
      * }
      */
-    /** @return array<string, mixed> */
     public function fetch(Server $server, string $range): array
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();
@@ -185,7 +184,6 @@ final class ServerMetricsRangeQuery
      *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
      * }
      */
-    /** @return array<string, mixed> */
     public function fetchEngineHealth(Server $server, string $engine, string $range): array
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();

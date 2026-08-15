@@ -30,7 +30,6 @@ final class ServerReleaseHygiene
      *     prune_command: array{name: string, description: string, installed: bool},
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get([

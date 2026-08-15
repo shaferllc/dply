@@ -97,7 +97,6 @@ class PendingTask
     /**
      * Exclude the onOutput closure from serialization.
      */
-    /** @return array<string, mixed> */
     public function __serialize(): array
     {
         $data = get_object_vars($this);

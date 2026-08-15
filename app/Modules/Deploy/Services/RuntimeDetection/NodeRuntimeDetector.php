@@ -71,8 +71,8 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $packageJson
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectVersion(
         string $workingDirectory,
@@ -117,7 +117,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectFramework(array $deps, array &$reasons): ?string
     {
@@ -146,7 +146,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $scripts
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectBuildCommand(array $scripts, array &$reasons): ?string
     {
@@ -162,7 +162,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
     /**
      * @param  array<string, mixed> $scripts
      * @param  array<string, mixed> $packageJson
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectStartCommand(
         array $scripts,
@@ -201,7 +201,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $scripts
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectAppPort(array $scripts, ?string $framework, array &$reasons): int
     {
@@ -229,7 +229,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
     /**
      * @param  array<string, mixed> $scripts
      * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(array $scripts, array $deps, array &$reasons): array
@@ -282,7 +282,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectOutputDirectory(?string $framework, array &$reasons): ?string
     {

@@ -32,7 +32,6 @@ final class PrimaryHostnameRenamePlanner
      *   manual: list<string>,
      * }
      */
-    /** @return array<string, mixed> */
     public function plan(Site $site, string $newHostname): array
     {
         $old = strtolower(trim((string) optional($site->primaryDomain())->hostname));

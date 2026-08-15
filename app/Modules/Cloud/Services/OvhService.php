@@ -92,7 +92,6 @@ class OvhService
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -154,7 +153,6 @@ class OvhService
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getProject(string $project): array
     {
         $response = $this->request('get', '/cloud/project/'.rawurlencode($project));
@@ -170,7 +168,6 @@ class OvhService
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -189,7 +186,6 @@ class OvhService
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     public function getFlavors(string $project, ?string $region = null): array
     {
         $query = $region !== null && $region !== '' ? ['region' => $region] : [];
@@ -206,7 +202,6 @@ class OvhService
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getImages(string $project, ?string $region = null): array
     {
         $query = $region !== null && $region !== '' ? ['region' => $region] : [];
@@ -275,7 +270,6 @@ class OvhService
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getInstance(string $project, string $id): array
     {
         $response = $this->request('get', '/cloud/project/'.rawurlencode($project).'/instance/'.rawurlencode($id));

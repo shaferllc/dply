@@ -156,7 +156,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  array<string, mixed> $log
+     * @param  list<string>  $log
      */
     private function fetchBranch(
         string $repositoryPath,

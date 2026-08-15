@@ -44,7 +44,6 @@ class SiteEnvRequirementScanner
      *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function scan(Site $site): array
     {
         $server = $site->server;
@@ -80,7 +79,6 @@ class SiteEnvRequirementScanner
      *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function scanLocalPath(string $root): array
     {
         $root = rtrim($root, '/');

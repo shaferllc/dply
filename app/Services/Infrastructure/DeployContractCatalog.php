@@ -33,7 +33,6 @@ final class DeployContractCatalog
      *   run_at: ?string,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|int|string|null>>
      */
@@ -88,7 +87,6 @@ final class DeployContractCatalog
     /**
      * @return list<array<string, bool|int|string|null>>
      */
-    /** @return array<string, mixed> */
     public function counts(Organization $organization): array
     {
         $rows = $this->forOrganization($organization);

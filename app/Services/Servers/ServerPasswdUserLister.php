@@ -17,7 +17,6 @@ class ServerPasswdUserLister
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -34,7 +33,6 @@ class ServerPasswdUserLister
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|list<string>|string>>
      */

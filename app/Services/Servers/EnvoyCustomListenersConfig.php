@@ -21,7 +21,6 @@ class EnvoyCustomListenersConfig
     /**
      * @return list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string>>
      */
@@ -101,7 +100,6 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @return array<string, mixed>
      */
     public static function listenersFromServer(Server $server): array
     {

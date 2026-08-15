@@ -53,7 +53,6 @@ class ApacheModulesConfig
     /**
      * @return array{modules: list<array{name: string, enabled: bool, protected: bool, type: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

@@ -258,7 +258,6 @@ class DigitalOceanAppPlatformService
      * @param  array<string, mixed> $spec
      * @return array{ok: bool, app_cost: ?float, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function proposeApp(array $spec): array
     {
         $response = $this->request('post', '/apps/propose', ['spec' => $spec]);
@@ -288,7 +287,6 @@ class DigitalOceanAppPlatformService
      * @param  array<string, mixed> $spec
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      */
@@ -308,7 +306,6 @@ class DigitalOceanAppPlatformService
      *
      * @return list<mixed>
      */
-    /** @return array<string, mixed> */
     public function getDeployment(string $appId, string $deploymentId): array
     {
         $response = $this->request('get', '/apps/'.$appId.'/deployments/'.$deploymentId);
@@ -342,7 +339,6 @@ class DigitalOceanAppPlatformService
      *
      * @return array{deployment_id: ?string, url: ?string}
      */
-    /** @return array<string, mixed> */
     public function getLatestDeploymentLogs(string $appId, string $type = 'DEPLOY'): array
     {
         $deploymentsResponse = $this->request('get', '/apps/'.$appId.'/deployments?per_page=1');
@@ -382,7 +378,6 @@ class DigitalOceanAppPlatformService
      *
      * @return array{url: ?string, live_url: ?string}
      */
-    /** @return array<string, mixed> */
     public function getRuntimeLogs(string $appId, string $component = 'web'): array
     {
         $path = '/apps/'.$appId.'/components/'.rawurlencode($component).'/logs?type=RUN';
@@ -412,7 +407,6 @@ class DigitalOceanAppPlatformService
      *
      * @return list<array{t: int, v: float}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, float|int>>
      */
@@ -468,7 +462,6 @@ class DigitalOceanAppPlatformService
      *
      * @return list<array<string, float|int>>
      */
-    /** @return array<string, mixed> */
     public function getApp(string $appId): array
     {
         $response = $this->request('get', '/apps/'.$appId);
@@ -480,7 +473,6 @@ class DigitalOceanAppPlatformService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      */
@@ -501,7 +493,6 @@ class DigitalOceanAppPlatformService
      *
      * @return list<mixed>
      */
-    /** @return array<string, mixed> */
     public function deployApp(string $appId, bool $force = false): array
     {
         $response = $this->request('post', '/apps/'.$appId.'/deployments', [
@@ -623,7 +614,6 @@ class DigitalOceanAppPlatformService
      *
      * @return array{0: string, 1: string, 2: string}
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function parseImageRef(string $image): array
     {

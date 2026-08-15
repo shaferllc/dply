@@ -60,7 +60,6 @@ class PreflightSchedulerOnSite
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -195,7 +194,6 @@ BASH;
     /**
      * @return list<array{key: string, status: string, message: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -227,9 +225,7 @@ BASH;
      * @param  array<string, mixed> $results
      * @return list<array<string, string>>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      * @param  array<string, mixed> $results
      */
     public function structuralFailures(array $results, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL): array
@@ -246,9 +242,7 @@ BASH;
      * @param  array<string, mixed> $results
      * @return list
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      * @param  array<string, mixed> $results
      */
     public function advisoryWarnings(array $results): array
@@ -260,7 +254,6 @@ BASH;
     }
 
     /**
-     * @return array<string, mixed>
      */
     public function run(
         Server $server,

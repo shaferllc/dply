@@ -44,7 +44,6 @@ final class SiteErrorReferenceResolver
     /**
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
-    /** @return array<string, mixed> */
     public function resolve(Site $site, string $reference): array
     {
         $reference = trim($reference);

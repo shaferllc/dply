@@ -130,7 +130,6 @@ class OpenLiteSpeedCacheModuleConfig
      *
      * @return array{values: array<string, string>, exists: bool, raw: string}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = array_map(fn (array $meta): string => (string) $meta['default'], self::PARAMS);

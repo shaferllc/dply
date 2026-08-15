@@ -15,7 +15,6 @@ class ServerDatabaseDriftAnalyzer
     /**
      * @return array<string, array{only_in_dply: list<string>, only_on_server: list<string>}>
      */
-    /** @return array<string, mixed> */
     public function analyze(Server $server): array
     {
         $caps = $this->capabilities->forServer($server);

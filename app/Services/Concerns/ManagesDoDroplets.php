@@ -20,7 +20,6 @@ trait ManagesDoDroplets
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getDroplets(?string $tag = null): array
     {
         $query = $tag !== null ? ['tag_name' => $tag] : [];
@@ -42,7 +41,6 @@ trait ManagesDoDroplets
      *
      * @return array{state: 'present'|'gone'|'unknown', detail?: string}
      */
-    /** @return array<string, mixed> */
     public function inspectDropletPresence(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);
@@ -67,7 +65,6 @@ trait ManagesDoDroplets
         return ['state' => 'unknown', 'detail' => $detail];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function getDroplet(int $id): array
     {
@@ -234,7 +231,6 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed> action payload
      */
-    /** @return array<string, mixed> */
     public function powerOffDroplet(int $id): array
     {
         $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_off']);
@@ -248,7 +244,6 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed> action payload
      */
-    /** @return array<string, mixed> */
     public function snapshotDroplet(int $id, string $name): array
     {
         $name = trim($name);
@@ -270,7 +265,6 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getDropletAction(int $dropletId, int $actionId): array
     {
         $response = $this->request('get', '/droplets/'.$dropletId.'/actions/'.$actionId);
@@ -323,7 +317,6 @@ trait ManagesDoDroplets
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getSnapshots(?string $resourceType = 'droplet'): array
     {
         $query = $resourceType !== null && $resourceType !== '' ? ['resource_type' => $resourceType] : [];

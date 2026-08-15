@@ -189,7 +189,6 @@ class AwsAppRunnerService
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function describeService(string $serviceArn): array
     {
         $result = $this->client->describeService(['ServiceArn' => $serviceArn]);
@@ -200,7 +199,6 @@ class AwsAppRunnerService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      */
@@ -220,7 +218,6 @@ class AwsAppRunnerService
      *
      * @return list<mixed>
      */
-    /** @return array<string, mixed> */
     public function startDeployment(string $serviceArn): array
     {
         $result = $this->client->startDeployment(['ServiceArn' => $serviceArn]);
@@ -364,7 +361,6 @@ class AwsAppRunnerService
      *
      * @return list<array{name: string, type: string, value: string, status: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */

@@ -54,7 +54,6 @@ final class SourceControlRepositoryReader
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function branches(Site $site, User $user): array
     {
         return $this->remember($site, 'branches', '', fn () => $this->branchesUncached($site, $user));
@@ -63,7 +62,6 @@ final class SourceControlRepositoryReader
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function tags(Site $site, User $user): array
     {
         return $this->remember($site, 'tags', '', fn () => $this->tagsUncached($site, $user));
@@ -72,7 +70,6 @@ final class SourceControlRepositoryReader
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function tree(Site $site, User $user, string $branch, string $path = ''): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -84,7 +81,6 @@ final class SourceControlRepositoryReader
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function file(Site $site, User $user, string $branch, string $path): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -96,7 +92,6 @@ final class SourceControlRepositoryReader
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function readme(Site $site, User $user, ?string $branch = null): array
     {
         $branch = $branch !== null && $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');

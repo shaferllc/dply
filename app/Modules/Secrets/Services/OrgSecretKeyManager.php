@@ -98,7 +98,6 @@ class OrgSecretKeyManager
      *
      * @return array{key: OrgSecretKey, identity: string} identity = show-once
      */
-    /** @return array<string, mixed> */
     public function promoteToCustomerHeld(string $organizationId): array
     {
         $kp = $this->age->generateKeypair();

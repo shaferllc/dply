@@ -27,7 +27,6 @@ final class VaultBlobRef
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function toMeta(string $writer): array
     {
         return [

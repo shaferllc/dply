@@ -254,7 +254,6 @@ class ParallelTaskExecutor
      * Execute all tasks in parallel.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function run(): array
     {
         $this->startedAt = now()->toISOString();
@@ -298,7 +297,6 @@ class ParallelTaskExecutor
      * Run tasks sequentially (when max_concurrency = 1).
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runSequentially(): array
     {
         $totalTasks = $this->tasks->count();
@@ -319,7 +317,6 @@ class ParallelTaskExecutor
      * Run tasks in parallel with concurrency control.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runInParallel(): array
     {
         $totalTasks = $this->tasks->count();
@@ -423,7 +420,6 @@ class ParallelTaskExecutor
      * Execute a single task.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function executeTask(Task $task, int $index, int $totalTasks): array
     {
         $taskName = $task->getName();
@@ -506,7 +502,6 @@ class ParallelTaskExecutor
      * Process the execution results.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function processExecutionResults(): array
     {
         $totalTasks = $this->tasks->count();
@@ -697,7 +692,6 @@ class ParallelTaskExecutor
      * Get the results.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */

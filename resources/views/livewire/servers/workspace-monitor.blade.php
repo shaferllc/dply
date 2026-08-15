@@ -322,10 +322,6 @@
     <x-slot name="modals">
         @include('livewire.servers.partials.install-monitoring-confirm-modal')
 
-        {{-- Proxied writes (probe / install / thresholds) mutate a live
-             production host, so the first one per session is typed out. --}}
-        @include('components.production-write-confirm-modal')
-
         {{-- Inline channel-create modal. Triggered from the Add subscription
              form's "Create new channel" link; auto-selects the new channel
              on success via the notification-channel-created Livewire event. --}}

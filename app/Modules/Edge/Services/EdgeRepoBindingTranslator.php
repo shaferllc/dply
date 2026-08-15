@@ -37,7 +37,6 @@ class EdgeRepoBindingTranslator
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, (int|string)>>
      */

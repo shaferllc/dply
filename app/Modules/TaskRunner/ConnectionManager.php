@@ -370,7 +370,6 @@ class ConnectionManager
      * Get cache statistics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getCacheStats(): array
     {
         return [

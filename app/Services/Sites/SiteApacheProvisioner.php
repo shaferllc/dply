@@ -120,7 +120,6 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingConfig): array
     {
         $server = $this->ensureServerReady($site);

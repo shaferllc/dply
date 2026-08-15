@@ -35,7 +35,6 @@ class ServerlessGinAdapter
      *
      * @return array{gin: bool, handler: string, function: string, has_router: bool}
      */
-    /** @return array<string, mixed> */
     public function plan(string $workingDirectory): array
     {
         return [
@@ -52,7 +51,6 @@ class ServerlessGinAdapter
      *
      * @return array{gin: bool, handler: string, function: string, has_router: bool, ran: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function inject(string $workingDirectory): array
     {
         $plan = $this->plan($workingDirectory);

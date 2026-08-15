@@ -40,7 +40,6 @@ class HorizonConfigDetector
      *     recommended: array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}
      * }
      */
-    /** @return array<string, mixed> */
     public function detect(Site $site): array
     {
         $server = $site->server;

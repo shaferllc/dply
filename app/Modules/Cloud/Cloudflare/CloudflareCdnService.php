@@ -283,7 +283,6 @@ class CloudflareCdnService
      *
      * @return array{requests_all: int, requests_cached: int, bandwidth_all: int, bandwidth_cached: int, since_minutes: int}
      */
-    /** @return array<string, mixed> */
     public function fetchDashboardAnalytics(string $zoneId, int $sinceMinutes = 1440): array
     {
         // Cloudflare's GraphQL Analytics expects ISO-8601 timestamps; align

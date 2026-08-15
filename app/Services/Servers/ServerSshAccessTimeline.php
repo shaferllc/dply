@@ -30,7 +30,6 @@ final class ServerSshAccessTimeline
      *     you_active_now: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server, ?User $viewer, string $range = '30d', ?ServerSshAccessContext $context = null): array
     {
         $context ??= ServerSshAccessContext::load($server);

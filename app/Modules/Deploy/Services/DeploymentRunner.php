@@ -42,7 +42,6 @@ class DeploymentRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory  test seam
      * @return array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}
      */
-    /** @return array<string, mixed> */
     public function run(SiteDeployment $deployment, string $releaseDir, ?Closure $shellFactory = null): array
     {
         $site = $deployment->site;

@@ -15,7 +15,6 @@ final class DockerDeployEngine implements DeployEngine
     ) {}
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
         $site = $context->site();

@@ -389,7 +389,6 @@ trait RunsTaskRunnerTasks
     /**
      * Get task statistics.
      */
-    /** @return array<string, mixed> */
     public function getTaskStatistics(): array
     {
         $totalTasks = TaskModel::count();

@@ -71,7 +71,6 @@ final class UptimeProbeWorkerResolver
      *
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function options(): array
     {
         $regions = (array) config('site_uptime.probe_regions', []);

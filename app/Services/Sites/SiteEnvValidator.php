@@ -42,7 +42,6 @@ class SiteEnvValidator
      * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string|null>>
      * @param  array<string, mixed> $vars

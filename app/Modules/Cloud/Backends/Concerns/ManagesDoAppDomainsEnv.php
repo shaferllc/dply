@@ -18,7 +18,6 @@ trait ManagesDoAppDomainsEnv
 
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

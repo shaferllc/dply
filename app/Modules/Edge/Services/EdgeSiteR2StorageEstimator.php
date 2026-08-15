@@ -17,7 +17,6 @@ final class EdgeSiteR2StorageEstimator
      * @param  Collection<int, Site>  $sites
      * @return array<string, int> site_id => bytes
      */
-    /** @return array<string, mixed> */
     public function storageBytesBySite(Collection $sites): array
     {
         if ($sites->isEmpty()) {

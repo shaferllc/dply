@@ -189,7 +189,6 @@ class TaskCompleted
      * Get the task data.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();
@@ -209,7 +208,6 @@ class TaskCompleted
      * Get performance metrics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [

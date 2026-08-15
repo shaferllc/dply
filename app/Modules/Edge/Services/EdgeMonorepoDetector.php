@@ -31,7 +31,6 @@ final class EdgeMonorepoDetector
      *     packages: list<array{path: string, label: string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function inspectDirectory(string $checkoutRoot): array
     {
         $root = rtrim($checkoutRoot, '/');
@@ -69,7 +68,6 @@ final class EdgeMonorepoDetector
      *     packages: list<array{path: string, label: string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function inspectUrl(string $repositoryUrl, string $branch = 'main'): array
     {
         $repositoryUrl = trim($repositoryUrl);

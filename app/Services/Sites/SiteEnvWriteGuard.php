@@ -45,7 +45,6 @@ final class SiteEnvWriteGuard
      * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<mixed>
      * @param  array<string, mixed> $vars

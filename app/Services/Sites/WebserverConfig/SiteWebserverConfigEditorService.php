@@ -94,7 +94,6 @@ class SiteWebserverConfigEditorService
     /**
      * @return array{ok: bool, message: string}
      */
-    /** @return array<string, mixed> */
     public function validateLocal(Site $site, string $config): array
     {
         return $this->registry->for($site->webserver())->validateLocal($config);
@@ -103,7 +102,6 @@ class SiteWebserverConfigEditorService
     /**
      * @return array{ok: bool, message: string}
      */
-    /** @return array<string, mixed> */
     public function validateRemote(Site $site, string $config, ?SiteWebserverConfigProfile $profile): array
     {
         return $this->registry->for($site->webserver())->validateRemote($site, $config, $profile);
@@ -250,7 +248,6 @@ class SiteWebserverConfigEditorService
      *
      * @return array{ok: bool, message: ?string, remote_config: ?string}
      */
-    /** @return array<string, mixed> */
     public function hydrateEditorFromServer(Site $site, SiteWebserverConfigProfile $profile): array
     {
         $site->loadMissing('server');
@@ -298,7 +295,6 @@ class SiteWebserverConfigEditorService
     /**
      * @return array{ok: bool, message: ?string, remote_config: ?string}
      */
-    /** @return array<string, mixed> */
     protected function hydrateNginxEditorFromServer(Site $site, SiteWebserverConfigProfile $profile): array
     {
         // One SSH round trip pulls the main vhost and both layer snippets together
@@ -380,7 +376,6 @@ class SiteWebserverConfigEditorService
     /**
      * @return array{ok: bool, message: ?string, remote_config: ?string}
      */
-    /** @return array<string, mixed> */
     protected function hydrateSingleFileOverrideFromServer(Site $site, SiteWebserverConfigProfile $profile, callable $read): array
     {
         $body = $read();

@@ -67,7 +67,6 @@ final class SchedulerCardsBuilder
      *   },
      * }
      */
-    /** @return array<string, mixed> */
     public function build(Server $server, ?Carbon $now = null): array
     {
         $now = $now ?? Carbon::now();

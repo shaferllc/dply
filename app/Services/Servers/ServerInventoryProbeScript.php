@@ -296,7 +296,6 @@ SH;
      * @param  array<string, mixed> $existingMeta
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function parse(string $out, array $existingMeta, int $maxPreviewBytes, int $maxExtBytes): array
     {
         $meta = $existingMeta;

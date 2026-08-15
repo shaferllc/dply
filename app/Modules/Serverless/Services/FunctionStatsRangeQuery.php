@@ -56,7 +56,6 @@ final class FunctionStatsRangeQuery
      *     series: array{invocations: list<array{at:int,min:float,avg:float,max:float}>, error_rate: list<array{at:int,min:float,avg:float,max:float}>, duration: list<array{at:int,min:float,avg:float,max:float}>, cold_rate: list<array{at:int,min:float,avg:float,max:float}>}
      * }
      */
-    /** @return array<string, mixed> */
     public function forSite(Site $site, string $range): array
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();

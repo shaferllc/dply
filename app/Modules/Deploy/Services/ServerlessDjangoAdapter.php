@@ -33,7 +33,6 @@ class ServerlessDjangoAdapter
      *
      * @return array{django: bool, handler: string, function: string, module_file: string, app_var: string}
      */
-    /** @return array<string, mixed> */
     public function plan(string $workingDirectory): array
     {
         $dir = rtrim($workingDirectory, '/');
@@ -74,7 +73,6 @@ class ServerlessDjangoAdapter
      *
      * @return array{django: bool, handler: string, function: string, module_file: string, app_var: string, ran: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function inject(string $workingDirectory): array
     {
         $plan = $this->plan($workingDirectory);

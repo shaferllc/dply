@@ -13,7 +13,6 @@ final class AwsLambdaDeployEngine implements DeployEngine
     ) {}
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
         $result = $this->functionDeployer->deploy($context->site());

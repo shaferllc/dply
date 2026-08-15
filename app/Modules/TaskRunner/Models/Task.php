@@ -666,7 +666,6 @@ class Task extends Model
      * Get the task performance metrics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [
@@ -688,7 +687,6 @@ class Task extends Model
      * Get the task summary.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getSummary(): array
     {
         return [

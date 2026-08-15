@@ -25,9 +25,7 @@ final class DeployPipelineTemplateCatalog
      *     steps: list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      */
     public function templatesForSite(Site $site): array
     {
@@ -71,7 +69,6 @@ final class DeployPipelineTemplateCatalog
     /**
      * @return list<array<string, array|string|null>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string>>
      */

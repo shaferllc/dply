@@ -70,7 +70,6 @@ final class LaravelConsoleExecutor
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -262,7 +261,6 @@ final class LaravelConsoleExecutor
     /**
      * @return array{ok: bool, commands?: list<array{name: string, description?: string}>, raw?: string, error?: string|null}
      */
-    /** @return array<string, mixed> */
     public function listArtisanCommands(Site $site, bool $forceRefresh = false): array
     {
         if (! $this->isLaravelSite($site)) {

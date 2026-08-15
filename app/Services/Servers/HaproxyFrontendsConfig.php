@@ -76,7 +76,6 @@ class HaproxyFrontendsConfig
     /**
      * @return array{frontends: list<array{name: string, binds: list<string>, values: array<string, string>, raw: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

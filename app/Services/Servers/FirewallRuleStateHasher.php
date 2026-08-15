@@ -11,7 +11,6 @@ class FirewallRuleStateHasher
      *
      * @return array{hash: string, count: int}
      */
-    /** @return array<string, mixed> */
     public function hashServerRules(Server $server): array
     {
         $server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')]);

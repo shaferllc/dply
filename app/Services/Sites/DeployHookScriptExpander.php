@@ -17,7 +17,6 @@ final class DeployHookScriptExpander
     /**
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function tokenMap(Site $site): array
     {
         $site->loadMissing('domains');

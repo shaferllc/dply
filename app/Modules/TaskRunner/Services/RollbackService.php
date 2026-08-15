@@ -325,7 +325,6 @@ class RollbackService
      * Run a script with timeout.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runScript(string $script, int $timeout): array
     {
         // This would execute the script and return results
@@ -399,7 +398,6 @@ class RollbackService
      * Generate recovery instructions.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function generateRecoveryInstructions(HasRollback $task): array
     {
         $taskId = $task->getRollbackData()['task_id'] ?? 'unknown';

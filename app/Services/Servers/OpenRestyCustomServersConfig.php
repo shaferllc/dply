@@ -17,7 +17,6 @@ class OpenRestyCustomServersConfig
     /**
      * @return list<array{name: string, server_names: list<string>, upstream: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, list<string>|string>>
      */
@@ -101,7 +100,6 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @return array<string, mixed>
      */
     public static function serversFromServer(Server $server): array
     {

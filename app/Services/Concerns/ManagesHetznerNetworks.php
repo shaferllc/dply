@@ -94,7 +94,6 @@ trait ManagesHetznerNetworks
      *
      * @return array{id:int,name:string,ip_range:string,routes:list<array{destination:string,gateway:string}>}
      */
-    /** @return array<string, mixed> */
     public function getNetwork(int $id): array
     {
         $response = $this->request('get', "/networks/{$id}");
@@ -147,7 +146,6 @@ trait ManagesHetznerNetworks
      *
      * @return array<int, array{id: int, name: string, ip_range: string}>
      */
-    /** @return array<string, mixed> */
     public function listNetworks(): array
     {
         $response = $this->request('get', '/networks');

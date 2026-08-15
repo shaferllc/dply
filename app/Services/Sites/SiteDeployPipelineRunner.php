@@ -31,7 +31,6 @@ class SiteDeployPipelineRunner
     /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function run(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         $build = $this->runBuild($ssh, $site, $workingDirectory);
@@ -51,7 +50,6 @@ class SiteDeployPipelineRunner
      *                                                                   so the caller can persist live progress for the phase timeline.
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_BUILD, $onProgress);
@@ -61,7 +59,6 @@ class SiteDeployPipelineRunner
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runRelease(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RELEASE, $onProgress);
@@ -74,7 +71,6 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RESTART);
@@ -92,7 +88,6 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runManagedRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         if ($site->isCustom() || $site->runtimeKey() === 'static') {
@@ -209,7 +204,6 @@ class SiteDeployPipelineRunner
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase, ?callable $onProgress = null): array
     {
         $site->loadMissing('deploySteps');

@@ -146,7 +146,6 @@ final class AgeEncryptor
      *                                                    `AGE-SECRET-KEY-...` material (with the `# public key:` comment line);
      *                                                    recipient = the `age1...` public string parsed from it.
      */
-    /** @return array<string, mixed> */
     public function generateKeypair(): array
     {
         $result = Process::timeout(60)->run([$this->keygenBin]);

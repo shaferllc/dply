@@ -33,7 +33,6 @@ final class RoadmapGitHistory
      *
      * @return list<array{sha: string, subject: string, body: string, date: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */

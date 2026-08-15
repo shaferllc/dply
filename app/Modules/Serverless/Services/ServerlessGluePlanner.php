@@ -20,7 +20,6 @@ final class ServerlessGluePlanner
     /**
      * @return list<array{key: string, title: string, summary: string, available: bool, unavailable_reason: string|null}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|string|null>>
      */

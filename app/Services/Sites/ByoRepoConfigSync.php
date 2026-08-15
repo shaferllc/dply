@@ -42,7 +42,6 @@ final class ByoRepoConfigSync
      *     warnings: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function syncAfterDeploy(Site $site, SshConnection $ssh, string $remotePath): array
     {
         $empty = ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'server_crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];

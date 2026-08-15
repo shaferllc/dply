@@ -558,7 +558,6 @@ class TestingHostnameProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function configuredDomains(): array
     {
@@ -594,7 +593,6 @@ class TestingHostnameProvisioner
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     public function testingDnsRoutingForSite(Site $site): array
     {
         $site->loadMissing(['server', 'organization', 'dnsProviderCredential']);
@@ -706,7 +704,6 @@ class TestingHostnameProvisioner
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

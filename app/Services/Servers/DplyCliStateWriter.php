@@ -34,7 +34,6 @@ class DplyCliStateWriter
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function build(Server $server): array
     {
         $phpVersion = ServerInstalledServices::phpVersionFor($server);

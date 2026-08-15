@@ -35,7 +35,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function verifyToken(): array
     {
         return $this->decode(
@@ -46,7 +45,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listAccounts(): array
     {
         $payload = $this->decode(
@@ -59,7 +57,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listR2Buckets(): array
     {
         $payload = $this->decode(
@@ -73,7 +70,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createR2Bucket(string $name, ?string $locationHint = null, ?string $jurisdiction = null): array
     {
         // Cloudflare R2 jurisdictions: "default", "eu", "fedramp".
@@ -111,7 +107,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listKvNamespaces(): array
     {
         $payload = $this->decode(
@@ -133,7 +128,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createKvNamespace(string $title): array
     {
         return $this->decode(
@@ -179,7 +173,6 @@ class EdgeCloudflareClient
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed, mixed>>
      */
@@ -196,7 +189,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<mixed, mixed>>
      */
-    /** @return array<string, mixed> */
     public function createDispatchNamespace(string $name): array
     {
         return $this->decode(
@@ -361,7 +353,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listD1Databases(): array
     {
         $payload = $this->decode(
@@ -379,7 +370,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createD1Database(string $name, string $primaryLocationHint = 'wnam'): array
     {
         $body = ['name' => $name];
@@ -397,7 +387,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listQueues(): array
     {
         $payload = $this->decode(
@@ -415,7 +404,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createQueue(string $name): array
     {
         return $this->decode(
@@ -448,7 +436,6 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function patchZoneSetting(string $zoneId, string $settingId, string $value): array
     {
         return $this->decode(
@@ -464,7 +451,6 @@ class EdgeCloudflareClient
      *
      * @return array{ok: bool, zone: string, value: ?string, detail: string}
      */
-    /** @return array<string, mixed> */
     public function ensureImageResizingEnabled(string $zoneName): array
     {
         $zoneName = strtolower(trim($zoneName));
@@ -642,7 +628,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -708,7 +693,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function ensureLogpushJob(string $zoneId, string $destinationConf, string $dataset = 'http_requests'): array
     {
         foreach ($this->listLogpushJobs($zoneId) as $job) {
@@ -738,7 +722,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function listLogpushJobs(string $zoneId): array
     {
         $response = Http::withToken($this->apiToken)->get(self::BASE.'/zones/'.$zoneId.'/logpush/jobs');

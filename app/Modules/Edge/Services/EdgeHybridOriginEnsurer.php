@@ -25,7 +25,6 @@ class EdgeHybridOriginEnsurer
     /**
      * @return list<array{slug: string, updated: bool, healthcheck: array{ok: bool, status: int, message: string}}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, array<string, mixed>|bool|string>>
      */

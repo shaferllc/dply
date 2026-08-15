@@ -44,7 +44,6 @@ class FunctionInvoker
      * @param  array<string, mixed> $owArgs
      * @return array{ok: bool, error: ?string, invocation: ?FunctionInvocation}
      */
-    /** @return array<string, mixed> */
     public function invoke(Site $site, string $source, ?string $task, array $owArgs): array
     {
         $site->loadMissing('server');

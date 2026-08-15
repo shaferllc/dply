@@ -182,7 +182,6 @@ class AwsAppRunnerBackend implements CloudBackend
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
@@ -204,7 +203,6 @@ class AwsAppRunnerBackend implements CloudBackend
         ];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function provisionFromSource(Site $site, ProviderCredential $credential): array
     {
@@ -272,7 +270,6 @@ class AwsAppRunnerBackend implements CloudBackend
         return is_string($arn) && $arn !== '' ? $arn : null;
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
@@ -353,7 +350,6 @@ class AwsAppRunnerBackend implements CloudBackend
         }
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function inspect(Site $site, ProviderCredential $credential): array
     {
@@ -600,7 +596,6 @@ class AwsAppRunnerBackend implements CloudBackend
         );
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {

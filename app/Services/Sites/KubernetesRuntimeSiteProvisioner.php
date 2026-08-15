@@ -36,7 +36,6 @@ final class KubernetesRuntimeSiteProvisioner implements SiteRuntimeProvisioner
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function readyResult(Site $site): array
     {
         $site->loadMissing(['domains', 'previewDomains']);

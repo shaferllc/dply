@@ -61,7 +61,6 @@ class AwsEc2Service
      *
      * @return array{key_name: string, key_material: string}
      */
-    /** @return array<string, mixed> */
     public function createKeyPair(string $keyName): array
     {
         $result = $this->client->createKeyPair([
@@ -224,7 +223,6 @@ class AwsEc2Service
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function describeInstances(string $instanceId): array
     {
         $result = $this->client->describeInstances([
@@ -292,7 +290,6 @@ class AwsEc2Service
      *
      * @return array<int, array{id: string, name: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */

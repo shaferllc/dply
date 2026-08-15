@@ -51,7 +51,6 @@ final class NginxConfigGuard
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

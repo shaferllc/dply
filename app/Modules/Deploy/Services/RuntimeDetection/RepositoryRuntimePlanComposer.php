@@ -122,7 +122,7 @@ final class RepositoryRuntimePlanComposer
 
     /**
      * @param  array<string, mixed> $sources
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function pickRuntime(
         ?DplyManifest $manifest,
@@ -158,7 +158,7 @@ final class RepositoryRuntimePlanComposer
      * @param  T|null  $manifestValue
      * @param  T|null  $detectionValue
      * @param  array<string, mixed> $sources
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      * @return T|null
      */
     private function pickField(

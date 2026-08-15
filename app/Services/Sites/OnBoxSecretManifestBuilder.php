@@ -64,7 +64,6 @@ class OnBoxSecretManifestBuilder
      *
      * @return array{version: int, secrets: array<int, array{env_key: string, directive: string, driver: string, reference: string, config: array<string, mixed>}>}
      */
-    /** @return array<string, mixed> */
     public function buildFor(Site $site): array
     {
         $residencies = $this->onBoxResidencies($site);

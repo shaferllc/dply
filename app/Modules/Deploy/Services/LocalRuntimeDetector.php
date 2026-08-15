@@ -39,7 +39,6 @@ final class LocalRuntimeDetector
      *     }
      * }
      */
-    /** @return array<string, mixed> */
     public function detect(string $workingDirectory, string $slug): array
     {
         $appDetection = $this->serverlessRuntimeDetector->detect($workingDirectory, [

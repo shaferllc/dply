@@ -122,7 +122,6 @@ final class SiteManifestCodeShapeSync
     /**
      * @return array{build: int, release: int, processes: int, runtime_change: ?array{field: string, from: ?string, to: ?string}}
      */
-    /** @return array<string, mixed> */
     public function reconcile(Site $site, DplyManifest $manifest): array
     {
         $pipeline = $this->pipelines->ensureDefaultPipeline($site);
@@ -318,7 +317,6 @@ final class SiteManifestCodeShapeSync
      *
      * @return array{steps: int, processes: int}
      */
-    /** @return array<string, mixed> */
     public function revertToDashboard(Site $site): array
     {
         $steps = SiteDeployStep::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->delete();

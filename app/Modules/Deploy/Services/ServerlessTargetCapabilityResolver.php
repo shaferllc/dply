@@ -27,7 +27,6 @@ final class ServerlessTargetCapabilityResolver
      *     features: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         $site->loadMissing('server');
@@ -51,7 +50,6 @@ final class ServerlessTargetCapabilityResolver
      *     features: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(?Server $server): array
     {
 
@@ -112,7 +110,6 @@ final class ServerlessTargetCapabilityResolver
      *     features: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function forDigitalOceanFunctions(): array
     {
         return [

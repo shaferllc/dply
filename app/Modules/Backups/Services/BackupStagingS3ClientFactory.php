@@ -31,7 +31,6 @@ final class BackupStagingS3ClientFactory
     /**
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
-    /** @return array<string, mixed> */
     public function make(): array
     {
         if (! $this->enabled()) {

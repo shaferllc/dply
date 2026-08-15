@@ -73,7 +73,6 @@ YAML;
      *
      * @return array<int, array{path: string, middleware: string, users_file: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */

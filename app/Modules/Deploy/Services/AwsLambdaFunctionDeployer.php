@@ -20,7 +20,6 @@ final class AwsLambdaFunctionDeployer
     /**
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $site->loadMissing('server.providerCredential', 'domains');

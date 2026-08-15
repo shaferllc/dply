@@ -87,7 +87,6 @@ trait ReadsSupervisorStatus
     /**
      * @return array{ok: bool, bad_lines: array<int, string>, burst_lines: array<int, string>, summary: string}
      */
-    /** @return array<string, mixed> */
     public function analyzeStatusForManagedPrograms(Server $server, string $statusOutput): array
     {
         $programs = $server->supervisorPrograms()->where('is_active', true)->get();
@@ -131,7 +130,6 @@ trait ReadsSupervisorStatus
     /**
      * @return array{messages: array<int, string>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function preflightPathCheck(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -170,7 +168,6 @@ trait ReadsSupervisorStatus
     /**
      * @return array<string, array{state: string, lines: array<int, string>}>
      */
-    /** @return array<string, mixed> */
     public function parseManagedProgramStatuses(Server $server, string $statusOutput): array
     {
         $programs = $server->supervisorPrograms()->get();

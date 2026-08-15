@@ -24,7 +24,6 @@ class ServerSystemUserService
      *
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */
@@ -42,7 +41,6 @@ class ServerSystemUserService
      *
      * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */

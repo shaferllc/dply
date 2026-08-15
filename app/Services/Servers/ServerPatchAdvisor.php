@@ -27,7 +27,6 @@ final class ServerPatchAdvisor
      *     supports_apt: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -227,7 +226,6 @@ final class ServerPatchAdvisor
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|string|null>>
      */

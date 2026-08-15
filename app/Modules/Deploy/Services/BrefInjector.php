@@ -28,7 +28,6 @@ class BrefInjector
      *
      * @return array{php: bool, framework: string, packages: list<string>, handler: string, web: bool}
      */
-    /** @return array<string, mixed> */
     public function plan(string $workingDirectory): array
     {
         $composerPath = rtrim($workingDirectory, '/').'/composer.json';
@@ -76,7 +75,6 @@ class BrefInjector
      *
      * @return array{php: bool, framework: string, packages: list<string>, handler: string, web: bool, ran: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function inject(string $workingDirectory): array
     {
         $plan = $this->plan($workingDirectory);

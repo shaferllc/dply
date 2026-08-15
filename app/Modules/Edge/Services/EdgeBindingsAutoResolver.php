@@ -42,7 +42,6 @@ class EdgeBindingsAutoResolver
      *
      * @return array<string, array<string, string>>
      */
-    /** @return array<string, mixed> */
     public function resolve(Site $site, EdgeDeployment $deployment): array
     {
         $config = is_array($deployment->repo_config) ? $deployment->repo_config : [];

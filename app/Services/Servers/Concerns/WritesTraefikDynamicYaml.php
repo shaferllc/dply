@@ -58,7 +58,6 @@ trait WritesTraefikDynamicYaml
      * @param  list<string>|string  $csv
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     protected function csvList(mixed $csv): array
     {
         if (is_string($csv)) {

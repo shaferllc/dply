@@ -36,7 +36,6 @@ class WebserverConfigValidator
     /**
      * @return array{ok: bool, message: string, engine: string}
      */
-    /** @return array<string, mixed> */
     public function validate(string $engine, string $config): array
     {
         $engine = $engine !== '' ? strtolower($engine) : 'nginx';

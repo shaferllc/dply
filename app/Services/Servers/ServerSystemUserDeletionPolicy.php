@@ -95,7 +95,6 @@ final class ServerSystemUserDeletionPolicy
     /**
      * @return array<string, int> username => number of sites using it as effective user
      */
-    /** @return array<string, mixed> */
     public function siteCountsByUsername(Server $server): array
     {
         $counts = [];
@@ -123,7 +122,6 @@ final class ServerSystemUserDeletionPolicy
      *
      * @return array<string, int> username => number of worker processes running as it
      */
-    /** @return array<string, mixed> */
     public function workerCountsByUsername(Server $server): array
     {
         $counts = [];
@@ -154,7 +152,6 @@ final class ServerSystemUserDeletionPolicy
     /**
      * @return array<string, int> username => number of cron entries that run as it
      */
-    /** @return array<string, mixed> */
     public function cronCountsByUsername(Server $server): array
     {
         $counts = [];

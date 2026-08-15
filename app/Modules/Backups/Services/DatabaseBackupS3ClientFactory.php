@@ -17,7 +17,6 @@ final class DatabaseBackupS3ClientFactory
     /**
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
-    /** @return array<string, mixed> */
     public function forConfiguration(BackupConfiguration $configuration): array
     {
         $config = $configuration->config ?? [];

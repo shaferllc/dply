@@ -174,7 +174,6 @@ class SshConnection implements RemoteShell
      * @param  callable(string):void  $chunkCallback
      * @return array{0: string, 1: ?int}
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, int|string|null>
      */
@@ -245,7 +244,6 @@ class SshConnection implements RemoteShell
      * @param  array<string, mixed> $commands
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      * @param  array<string, mixed> $commands

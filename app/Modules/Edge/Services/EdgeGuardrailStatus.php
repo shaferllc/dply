@@ -62,7 +62,6 @@ final class EdgeGuardrailStatus
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function meta(): array
     {
         return [

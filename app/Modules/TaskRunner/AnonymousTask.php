@@ -117,7 +117,6 @@ class AnonymousTask extends Task
     /**
      * Get the task data.
      */
-    /** @return array<string, mixed> */
     public function getData(): array
     {
         return array_merge(parent::getData(), $this->data);

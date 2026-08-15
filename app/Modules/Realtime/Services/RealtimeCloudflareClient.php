@@ -55,7 +55,6 @@ class RealtimeCloudflareClient
      *
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function listNamespaces(): array
     {
         $this->assertAccountConfigured();

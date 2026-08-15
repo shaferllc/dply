@@ -17,7 +17,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -57,7 +56,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -88,7 +86,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -120,7 +117,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

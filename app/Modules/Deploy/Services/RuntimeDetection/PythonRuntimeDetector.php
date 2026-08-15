@@ -91,8 +91,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectVersion(
         string $root,
@@ -209,8 +209,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectFramework(array $deps, bool $hasManagePy, array &$detectedFiles, array &$reasons): ?string
     {
@@ -243,7 +243,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectBuildCommand(
         bool $hasPyproject,
@@ -287,8 +287,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectDjangoProject(string $root, array &$detectedFiles, array &$reasons): ?string
     {
@@ -311,7 +311,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectStartCommand(?string $framework, string $root, ?string $djangoProject, array &$reasons): ?string
     {
@@ -349,7 +349,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(?string $framework, array $deps, ?string $djangoProject, array &$reasons): array

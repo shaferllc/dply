@@ -82,7 +82,6 @@ trait HandlesResourceMonitoring
     /**
      * Get resource usage history.
      */
-    /** @return array<string, mixed> */
     public function getResourceHistory(): array
     {
         return $this->resourceHistory;
@@ -135,7 +134,6 @@ trait HandlesResourceMonitoring
     /**
      * Get resource limits.
      */
-    /** @return array<string, mixed> */
     public function getResourceLimits(): array
     {
         return array_merge([
@@ -192,7 +190,6 @@ trait HandlesResourceMonitoring
     /**
      * Get resource alerts.
      */
-    /** @return array<string, mixed> */
     public function getResourceAlerts(): array
     {
         $alerts = [];

@@ -26,7 +26,6 @@ final class DigitalOceanFunctionsActionDeployer
     /**
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $site->loadMissing('server', 'domains');
@@ -75,7 +74,6 @@ final class DigitalOceanFunctionsActionDeployer
      *
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
-    /** @return array<string, mixed> */
     public function redeployArtifact(Site $site, string $artifactPath): array
     {
         $site->loadMissing('server', 'domains');

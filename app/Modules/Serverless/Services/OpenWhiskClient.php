@@ -113,7 +113,6 @@ class OpenWhiskClient
      * @param  array<string, mixed> $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
-    /** @return array<string, mixed> */
     public function putTrigger(string $name, array $params = []): array
     {
         $body = $params === [] ? [] : ['parameters' => $this->keyValuePairs($params)];
@@ -135,7 +134,6 @@ class OpenWhiskClient
      * @param  array<string, mixed> $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
-    /** @return array<string, mixed> */
     public function fireTrigger(string $name, array $payload = []): array
     {
         return $this->request('POST', 'triggers/'.rawurlencode($name), [], $payload);
@@ -164,7 +162,6 @@ class OpenWhiskClient
      * @param  array<string, mixed> $payload
      * @return array{ok: bool, error: ?string, data: mixed}
      */
-    /** @return array<string, mixed> */
     public function putRule(string $name, string $trigger, string $action): array
     {
         return $this->request('PUT', 'rules/'.rawurlencode($name), ['overwrite' => 'true'], [
@@ -185,7 +182,6 @@ class OpenWhiskClient
      *
      * @return array{ok: bool, error: ?string, data: mixed}
      */
-    /** @return array<string, mixed> */
     public function setRuleState(string $name, string $state): array
     {
         return $this->request('POST', 'rules/'.rawurlencode($name), [], [

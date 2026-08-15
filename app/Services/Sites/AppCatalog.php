@@ -55,7 +55,6 @@ class AppCatalog
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */

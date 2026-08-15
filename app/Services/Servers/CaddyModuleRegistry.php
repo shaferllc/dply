@@ -15,7 +15,6 @@ class CaddyModuleRegistry
     /**
      * @return array<string, list<array{name: string, docs: string, package: string, repo: string}>>
      */
-    /** @return array<string, mixed> */
     public function moduleIndex(): array
     {
         $ttl = (int) config('caddy_modules.registry_cache_seconds', 86_400);
@@ -50,7 +49,6 @@ class CaddyModuleRegistry
      *     module_ids: list<string>,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, list<string>|string>>
      */
@@ -170,7 +168,6 @@ class CaddyModuleRegistry
      * @param  array<string, mixed> $moduleIds
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      * @param  array<string, mixed> $moduleIds

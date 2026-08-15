@@ -32,7 +32,6 @@ final class EdgePreviewReviewState
      *   approvals: list<array{id: string, user_name: string, note: ?string, created_at: string}>,
      * }
      */
-    /** @return array<string, mixed> */
     public function forPreview(Site $preview): array
     {
         $edge = $preview->edgeMeta();
@@ -98,7 +97,6 @@ final class EdgePreviewReviewState
      * @param  array<string, mixed> $review
      * @return list<array{label: string, value: string, mono?: bool}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, string>>
      * @param  array<string, mixed> $review

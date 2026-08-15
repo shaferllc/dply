@@ -34,7 +34,6 @@ final class DigitalOceanOpenWhiskActionProvisioner implements DeclaresServerless
     ) {}
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $ctx = $this->resolveContext($config);

@@ -71,7 +71,6 @@ final class ServerlessRuntimeDetector
      *     unsupported_for_target: bool
      * }
      */
-    /** @return array<string, mixed> */
     public function detect(string $workingDirectory, array $capabilities): array
     {
         $packageJson = $this->readJson($workingDirectory.'/package.json');

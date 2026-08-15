@@ -61,7 +61,6 @@ class WebserverConfigDriftDetector
      *     unsupported: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function detect(Server $server, bool $forceFresh = false): array
     {
         $cacheKey = 'dply.webserver-drift:'.$server->id;

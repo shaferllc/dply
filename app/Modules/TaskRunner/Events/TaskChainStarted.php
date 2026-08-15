@@ -46,7 +46,6 @@ class TaskChainStarted
      * Get the task names.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskNames(): array
     {
         return array_map(fn ($task) => $task->getName(), $this->tasks);

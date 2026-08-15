@@ -35,7 +35,6 @@ class DigitalOceanFunctionsArtifactBuilder
     /**
      * @return array{artifact_path: string, working_directory: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function build(Site $site): array
     {
         $site->loadMissing('server');

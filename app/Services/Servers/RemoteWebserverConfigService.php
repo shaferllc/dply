@@ -34,7 +34,6 @@ class RemoteWebserverConfigService
      * commands and globs to apply.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<(int|string)>
      */
@@ -50,7 +49,6 @@ class RemoteWebserverConfigService
      *
      * @return list<(int|string)>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string|null>>
      */
@@ -111,7 +109,6 @@ class RemoteWebserverConfigService
      *
      * @return list<array<string, int|string|null>>
      */
-    /** @return array<string, mixed> */
     public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -155,7 +152,6 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
-    /** @return array<string, mixed> */
     public function write(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -256,7 +252,6 @@ BASH;
      *
      * @return array{output: string, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function validateContent(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -378,7 +373,6 @@ BASH;
      * current on-disk config (e.g. after fmt-overwrite or an external edit).
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validate(Server $server, string $engine): array
     {
         $this->assertEngineSupported($engine);
@@ -402,7 +396,6 @@ BASH;
      *
      * @return array<int, array{path: string, mtime: int, size: int}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string>>
      */
@@ -442,7 +435,6 @@ BASH;
      *
      * @return list<array<string, int|string>>
      */
-    /** @return array<string, mixed> */
     public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);

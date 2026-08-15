@@ -30,7 +30,6 @@ final class ByoRepoConfigLoader
      *     warnings: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function parse(string $sourcePath, string $raw): array
     {
         $config = $this->edgeLoader->parse($sourcePath, $raw);
@@ -75,7 +74,7 @@ final class ByoRepoConfigLoader
 
     /**
      * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $warnings
      * @return list<array{schedule: string, command: string, user: ?string}>
      */
     private function parseCronBlock(array $parsed, string $blockKey, string $label, array &$warnings): array
@@ -120,7 +119,7 @@ final class ByoRepoConfigLoader
 
     /**
      * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $warnings
      * @return list<array{phase: string, script: string, timeout: int, sort_order: int}>
      */
     private function parseDeployHooks(array $parsed, array &$warnings): array
@@ -178,7 +177,7 @@ final class ByoRepoConfigLoader
 
     /**
      * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $warnings
      * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
      */
     private function parseEnvDeclarations(array $parsed, array &$warnings): array

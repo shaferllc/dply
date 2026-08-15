@@ -18,7 +18,6 @@ class EdgeRepoConfigLinter
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function lintDirectory(string $checkoutPath): array
     {
         return $this->lint($this->loader->loadFromDirectory($checkoutPath));
@@ -27,7 +26,6 @@ class EdgeRepoConfigLinter
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function lintContent(string $sourcePath, string $raw): array
     {
         return $this->lint($this->loader->parse($sourcePath, $raw));
@@ -36,7 +34,6 @@ class EdgeRepoConfigLinter
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function lint(?EdgeRepoConfig $config): array
     {
         if ($config === null) {

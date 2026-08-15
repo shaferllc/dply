@@ -47,7 +47,6 @@ final class NginxOrphanVhostPruner
      *
      * @return array{orphans: list<array{basename: string, site_id: ?string, server_names: string, in_available: bool, in_enabled: bool}>, kept: int}
      */
-    /** @return array<string, mixed> */
     public function scan(Server $server): array
     {
         return $this->classify($server, $this->connections->forServer($server));
@@ -58,7 +57,6 @@ final class NginxOrphanVhostPruner
      *
      * @return array{removed: list<string>, kept: int, reloaded: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function prune(Server $server, ?ConsoleEmitter $emit = null): array
     {
         $ssh = $this->connections->forServer($server);
@@ -78,7 +76,6 @@ final class NginxOrphanVhostPruner
      * @param  array<string, mixed> $candidateBasenames
      * @return array{removed: list<string>, reloaded: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function pruneShadowing(Server $server, SshConnection $ssh, array $candidateBasenames, ?ConsoleEmitter $emit = null): array
     {
         $candidates = array_values(array_unique(array_filter(array_map(

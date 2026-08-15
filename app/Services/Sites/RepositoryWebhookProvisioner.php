@@ -36,7 +36,6 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string}
      */
-    /** @return array<string, mixed> */
     public function enable(Site $site, GitIdentity $account): array
     {
         if (! $this->canRegisterProviderHook($site)) {

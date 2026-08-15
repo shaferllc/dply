@@ -79,7 +79,6 @@ final class LlmSynthesizer
      *
      * @return array{data: array<string, mixed>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int, raw: string}
      */
-    /** @return array<string, mixed> */
     public function completeJson(string $userPrompt, ?string $systemOverride = null): array
     {
         $result = $this->complete(

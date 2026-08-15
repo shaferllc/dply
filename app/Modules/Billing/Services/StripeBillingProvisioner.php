@@ -94,7 +94,6 @@ class StripeBillingProvisioner
     /**
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function provision(): array
     {
         $result = [];

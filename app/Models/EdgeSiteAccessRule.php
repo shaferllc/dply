@@ -13,9 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property list<string> $allowed_emails
  * @property string $cookie_secret
  * @property string $mode
- * @property string $password_hash
- * @property string $password_salt
- * @property string $password_verifier
+ * @property ?string $password_hash
+ * @property ?string $password_salt
+ * @property ?string $password_verifier
  * @property ?string $site_id
  * @property-read ?Site $site
  * @property \Illuminate\Support\Carbon $created_at

@@ -20,7 +20,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function addSshKey(string $name, string $publicKey): array
     {
         $response = $this->request('post', '/ssh_keys', [
@@ -134,7 +133,6 @@ trait ManagesHetznerInstances
     /**
      * Get instance (server) by ID. Returns decoded JSON server object.
      */
-    /** @return array<string, mixed> */
     public function getInstance(int $id): array
     {
         $response = $this->request('get', "/servers/{$id}");
@@ -196,7 +194,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function powerOffServer(int $id): array
     {
         $response = $this->request('post', "/servers/{$id}/actions/poweroff");
@@ -218,7 +215,6 @@ trait ManagesHetznerInstances
      * @param  array<string, mixed> $labels
      * @return array{action: array<string, mixed>, image_id: int}
      */
-    /** @return array<string, mixed> */
     public function createImageFromServer(int $id, string $description, array $labels = []): array
     {
         $body = [
@@ -248,7 +244,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getImage(int $imageId): array
     {
         $response = $this->request('get', "/images/{$imageId}");
@@ -283,7 +278,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getAction(int $actionId): array
     {
         $response = $this->request('get', "/actions/{$actionId}");
@@ -337,7 +331,6 @@ trait ManagesHetznerInstances
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getLocations(): array
     {
         $response = $this->request('get', '/locations');
@@ -352,7 +345,6 @@ trait ManagesHetznerInstances
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getServerTypes(): array
     {
         $response = $this->request('get', '/server_types');

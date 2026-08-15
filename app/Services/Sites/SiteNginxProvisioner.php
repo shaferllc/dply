@@ -205,7 +205,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -275,9 +274,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * @param  array<string, mixed> $shadowedNames
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      * @param  array<string, mixed> $shadowedNames
      */
     protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
@@ -503,7 +500,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * @param  array<string, mixed> $paths
      * @return array<string, bool>
      */
-    /** @return array<string, mixed> */
     protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array
     {
         $paths = array_values(array_unique(array_filter($paths)));
@@ -588,7 +584,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return array{main: ?string, before: ?string, after: ?string}
      */
-    /** @return array<string, mixed> */
     public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
@@ -715,7 +710,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingMainConfig, SiteWebserverConfigProfile $profile): array
     {
         $server = $this->ensureServerReady($site);

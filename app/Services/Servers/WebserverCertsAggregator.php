@@ -89,7 +89,6 @@ class WebserverCertsAggregator
      *
      * @return list<array{t: int, line: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed, mixed>>
      */
@@ -174,7 +173,6 @@ class WebserverCertsAggregator
      *
      * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function scanAndCache(Server $server): array
     {
         $payload = $this->runScan($server);
@@ -207,7 +205,6 @@ class WebserverCertsAggregator
      *
      * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function aggregate(Server $server, bool $forceFresh = false): array
     {
         if (! $forceFresh) {

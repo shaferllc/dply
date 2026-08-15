@@ -139,7 +139,6 @@ class OpenLiteSpeedExtAppsConfig
      *     unreadable: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

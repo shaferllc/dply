@@ -40,7 +40,6 @@ final class ServerlessActionDiscovery
      *     source: string
      * }>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      * @param  array<string, mixed> $capabilities

@@ -11,7 +11,6 @@ final class MarkdownDocRenderer
     /**
      * @return array{title: string, html: string, headings: list<array{id: string, text: string, level: int}>}
      */
-    /** @return array<string, mixed> */
     public function render(string $slug): array
     {
         [$filename, $title] = $this->resolvePage($slug);
@@ -64,7 +63,6 @@ final class MarkdownDocRenderer
     /**
      * @return list<array{id: string, text: string, level: int}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string>>
      */

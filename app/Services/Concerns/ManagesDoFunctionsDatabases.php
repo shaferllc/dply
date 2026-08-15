@@ -22,7 +22,6 @@ trait ManagesDoFunctionsDatabases
      *
      * @return array{api_host: string, namespace: string, access_key: string, region: string}
      */
-    /** @return array<string, mixed> */
     public function createFunctionsNamespace(string $region, string $label): array
     {
         $response = $this->request('post', '/functions/namespaces', [
@@ -75,7 +74,6 @@ trait ManagesDoFunctionsDatabases
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function functionTriggers(string $namespace): array
     {
         $response = $this->request('get', "/functions/namespaces/{$namespace}/triggers");
@@ -93,7 +91,6 @@ trait ManagesDoFunctionsDatabases
      *
      * @return array<string, mixed> the created trigger
      */
-    /** @return array<string, mixed> */
     public function createScheduledFunctionTrigger(string $namespace, string $name, string $function, string $cron): array
     {
         $response = $this->request('post', "/functions/namespaces/{$namespace}/triggers", [
@@ -127,7 +124,6 @@ trait ManagesDoFunctionsDatabases
      *
      * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
-    /** @return array<string, mixed> */
     public function createDatabaseCluster(string $engine, string $region, string $size, string $name): array
     {
         $response = $this->request('post', '/databases', [
@@ -145,7 +141,6 @@ trait ManagesDoFunctionsDatabases
     /**
      * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
-    /** @return array<string, mixed> */
     public function getDatabaseCluster(string $id): array
     {
         $response = $this->request('get', '/databases/'.$id);
@@ -162,7 +157,6 @@ trait ManagesDoFunctionsDatabases
      *
      * @return array{name: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
-    /** @return array<string, mixed> */
     public function createDatabaseConnectionPool(string $clusterId, string $name, string $database, string $user, int $size = 10): array
     {
         $response = $this->request('post', '/databases/'.$clusterId.'/pools', [

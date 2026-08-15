@@ -71,7 +71,6 @@ class OracleComputeService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed>>
      */
@@ -103,7 +102,6 @@ class OracleComputeService
     /**
      * @return list<array<mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -198,7 +196,6 @@ class OracleComputeService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getInstance(string $instanceId): array
     {
         $payload = $this->request(

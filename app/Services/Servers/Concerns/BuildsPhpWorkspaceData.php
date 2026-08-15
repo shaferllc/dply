@@ -28,7 +28,6 @@ trait BuildsPhpWorkspaceData
      *     version_rows: list<array{id: string, label: string, is_supported: bool, is_installed: bool, site_count: int, migration_target_version: ?string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function workspaceData(Server $server): array
     {
         $supportedVersions = $this->supportedVersions($server);
@@ -111,7 +110,6 @@ trait BuildsPhpWorkspaceData
      *     enabled_count: int
      * }
      */
-    /** @return array<string, mixed> */
     public function extensionPanelData(Server $server, string $version): array
     {
         $state = $this->cachedExtensionsFor($server, $version);
@@ -217,7 +215,6 @@ trait BuildsPhpWorkspaceData
      *     extensions: array{summary: string}
      * }
      */
-    /** @return array<string, mixed> */
     public function sitePhpData(Server $server, Site $site): array
     {
         $inventory = $this->cachedInventory($server);
@@ -265,7 +262,6 @@ trait BuildsPhpWorkspaceData
      *
      * @return array{summary: string, enabled: list<string>, count: int}
      */
-    /** @return array<string, mixed> */
     protected function siteExtensionSummary(Server $server, ?string $version): array
     {
         if ($version === null) {
@@ -303,7 +299,6 @@ trait BuildsPhpWorkspaceData
      *     preselected_version: string
      * }
      */
-    /** @return array<string, mixed> */
     public function siteCreationPhpData(Server $server): array
     {
         $inventory = $this->cachedInventory($server);

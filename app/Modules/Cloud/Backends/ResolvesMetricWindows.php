@@ -49,7 +49,6 @@ trait ResolvesMetricWindows
      *
      * @return array{0: int, 1: int}
      */
-    /** @return array<string, mixed> */
     public function windowBounds(string $window): array
     {
         $seconds = self::windowSeconds()[$this->normalizeWindow($window)];

@@ -58,7 +58,6 @@ SH;
      * @return array<string, mixed>
      * @param  array<string, mixed> $existingMeta
      */
-    /** @return array<string, mixed> */
     public function parse(string $output, array $existingMeta = []): array
     {
         $authFailed = 0;
@@ -177,7 +176,6 @@ SH;
      * @param  array<string, mixed> $existingMeta
      * }
      */
-    /** @return array<string, mixed> */
     public function parseJailStatus(string $name, string $raw): array
     {
         $currentlyBanned = $this->matchInt($raw, '/Currently banned:\s*(\d+)/');

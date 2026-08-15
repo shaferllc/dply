@@ -23,7 +23,6 @@ class NginxCustomHostsConfig
     /**
      * @return array{hosts: list<array{slug: string, path: string, server_names: list<string>, listen: list<string>, root: string, upstream: string, ssl: bool}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $available = rtrim((string) config('sites.nginx_sites_available'), '/');

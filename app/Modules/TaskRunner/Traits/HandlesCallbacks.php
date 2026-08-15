@@ -96,7 +96,6 @@ trait HandlesCallbacks
     /**
      * Get the callback data to send with the request.
      */
-    /** @return array<string, mixed> */
     public function getCallbackData(): array
     {
         return [
@@ -138,7 +137,6 @@ trait HandlesCallbacks
     /**
      * Get the callback retry configuration.
      */
-    /** @return array<string, mixed> */
     public function getCallbackRetryConfig(): array
     {
         return [

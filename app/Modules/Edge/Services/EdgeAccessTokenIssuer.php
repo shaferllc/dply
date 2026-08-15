@@ -16,7 +16,6 @@ final class EdgeAccessTokenIssuer
     /**
      * @return array{token: string, expires_at: int}
      */
-    /** @return array<string, mixed> */
     public function issue(Site $site, string $hostname, User $user, EdgeSiteAccessRule $rule): array
     {
         $expiresAt = now()->addHours(24)->getTimestamp();

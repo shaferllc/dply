@@ -77,7 +77,6 @@ class ServerlessCostEstimator
      *
      * @return array{lines: list<array{label: string, amount: float, billed_by: string}>, total: float}
      */
-    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         $config = $site->serverlessConfig();

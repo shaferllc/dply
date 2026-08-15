@@ -17,7 +17,6 @@ class EnvoyCustomVirtualHostsConfig
     /**
      * @return list<array{name: string, domains: list<string>, cluster: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, list<string>|string>>
      */
@@ -101,7 +100,6 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @return array<string, mixed>
      */
     public static function virtualHostsFromServer(Server $server): array
     {

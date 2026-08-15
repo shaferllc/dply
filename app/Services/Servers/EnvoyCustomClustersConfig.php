@@ -42,7 +42,6 @@ class EnvoyCustomClustersConfig
     /**
      * @return list<array{name: string, connect_timeout: string, lb_policy: string, endpoints: list<string>}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, list<string>|string>>
      */
@@ -143,7 +142,6 @@ class EnvoyCustomClustersConfig
     }
 
     /**
-     * @return array<string, mixed>
      */
     public static function clustersFromServer(Server $server): array
     {

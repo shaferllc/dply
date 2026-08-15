@@ -66,7 +66,6 @@ BLOCK,
     /**
      * @return array{modules: list<array{name: string, enabled: bool, protected: bool, on_disk: bool, type: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -164,7 +163,6 @@ BASH;
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

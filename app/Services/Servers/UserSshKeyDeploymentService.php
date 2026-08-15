@@ -44,7 +44,6 @@ class UserSshKeyDeploymentService
      *
      * @return array{ok: bool, message: string}
      */
-    /** @return array<string, mixed> */
     public function deployToServer(UserSshKey $userSshKey, Server $server): array
     {
         if (! Gate::forUser($userSshKey->user)->allows('update', $server)) {
@@ -65,7 +64,6 @@ class UserSshKeyDeploymentService
      * @param  array<string, mixed> $serverIds  Server primary keys (ULIDs)
      * @return array{ok: bool, message: string, errors: array<int, string>}
      */
-    /** @return array<string, mixed> */
     public function deployToServers(User $user, UserSshKey $userSshKey, array $serverIds): array
     {
         if ($userSshKey->user_id !== $user->id) {

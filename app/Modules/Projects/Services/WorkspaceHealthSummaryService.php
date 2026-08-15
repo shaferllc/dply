@@ -24,7 +24,6 @@ class WorkspaceHealthSummaryService
      *     issues: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function summarize(Workspace $workspace): array
     {
         $workspace->loadMissing(['servers', 'sites.deployments']);

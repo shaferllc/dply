@@ -126,7 +126,6 @@ class LinodeService
      * Get instance by ID. Returns decoded JSON.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getInstance(int $id): array
     {
         $response = $this->request('get', "/linode/instances/{$id}");
@@ -197,7 +196,6 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getInstanceDisks(int $id): array
     {
         $response = $this->request('get', "/linode/instances/{$id}/disks");
@@ -236,7 +234,6 @@ class LinodeService
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createImageFromDisk(int $diskId, string $label, string $description = ''): array
     {
         $body = ['disk_id' => $diskId, 'label' => $label];
@@ -262,7 +259,6 @@ class LinodeService
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getImage(string $imageId): array
     {
         // The id contains a slash ("private/12345") that is part of the path —
@@ -287,7 +283,6 @@ class LinodeService
      * @param  callable(array<string, mixed>):void|null  $onTick
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function waitForImage(string $imageId, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
     {
         $image = [];
@@ -327,7 +322,6 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getRegions(): array
     {
         $response = $this->request('get', '/regions');
@@ -342,7 +336,6 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getTypes(): array
     {
         $response = $this->request('get', '/linode/types');
@@ -396,7 +389,6 @@ class LinodeService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed, mixed>>
      */
@@ -458,7 +450,6 @@ class LinodeService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed, mixed>>
      */

@@ -29,7 +29,6 @@ final class SiteResourceBindingResolver
     /**
      * @return list<SiteResourceBinding>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, \App\Support\Deployment\SiteResourceBinding>
      */

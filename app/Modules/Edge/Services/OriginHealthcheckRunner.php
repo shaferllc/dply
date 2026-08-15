@@ -28,7 +28,6 @@ class OriginHealthcheckRunner
     /**
      * @return array{ok: bool, status: int, message: string}
      */
-    /** @return array<string, mixed> */
     public function run(Site $site): array
     {
         $edge = $site->edgeMeta();

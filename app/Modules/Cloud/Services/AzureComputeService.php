@@ -63,7 +63,6 @@ class AzureComputeService
     /**
      * @return list<array{id:string,name:string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -100,7 +99,6 @@ class AzureComputeService
     /**
      * @return list<array<string, string>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, int|string|null>>
      */

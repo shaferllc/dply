@@ -70,7 +70,6 @@ final class ServerMaintenanceWindow
     /**
      * @return array{suspend_count: int, already_suspended: int, skipped: int}
      */
-    /** @return array<string, mixed> */
     public function preview(Server $server): array
     {
         $eligible = $this->eligibleSites($server);
@@ -112,7 +111,6 @@ final class ServerMaintenanceWindow
      *     }>,
      * }
      */
-    /** @return array<string, mixed> */
     public function report(Server $server): array
     {
         $server->loadMissing(['sites.server']);
@@ -312,7 +310,6 @@ final class ServerMaintenanceWindow
     /**
      * @return array{resumed: int, left_suspended: int}
      */
-    /** @return array<string, mixed> */
     public function disable(Server $server, ?User $user = null, bool $autoExpired = false): array
     {
         $state = $this->state($server);

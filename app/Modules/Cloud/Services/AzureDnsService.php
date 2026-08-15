@@ -81,7 +81,6 @@ class AzureDnsService
     /**
      * @return array<string,mixed>
      */
-    /** @return array<string, mixed> */
     public function upsertRecord(string $zoneName, string $type, string $recordName, string $value, int $ttl = 60): array
     {
         $zone = $this->findZone($zoneName);

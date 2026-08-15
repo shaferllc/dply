@@ -241,7 +241,7 @@ final class FullStackArchitecturePlanner
 
     /**
      * @param  array{plan: RepositoryRuntimePlan, plan_array: array<string, mixed>, repo_root: string, label: string}  $target
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      * @return list<FullStackLayer>
      */
     private function layersForNodeTarget(string $repo, string $branch, array $target, array &$reasons): array
@@ -310,7 +310,7 @@ final class FullStackArchitecturePlanner
 
     /**
      * @param  array{plan: RepositoryRuntimePlan, plan_array: array<string, mixed>, repo_root: string, label: string}  $target
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function layerForPhpTarget(string $repo, string $branch, array $target, array &$reasons): FullStackLayer
     {

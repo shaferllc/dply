@@ -15,7 +15,6 @@ final class ServerSecurityDigest
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $snapshot = $this->snapshot($server);

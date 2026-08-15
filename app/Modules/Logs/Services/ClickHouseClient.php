@@ -27,7 +27,6 @@ class ClickHouseClient
      * @param  array<string, mixed> $params  Bound as ClickHouse {name:Type} params.
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function select(string $sql, array $params = []): array
     {
         $boundQuery = [];

@@ -131,7 +131,6 @@ class TaskChainFailed
      * Get the task results.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getResults(): array
     {
         return $this->summary['results'] ?? [];

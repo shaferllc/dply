@@ -28,7 +28,6 @@ final class ServerlessGlueInventory
      *     byo_crons: list<array{id: string, server_id: string, server_name: string, command: string, cron_expression: string, site_name: string|null, href: string|null}>,
      * }
      */
-    /** @return array<string, mixed> */
     public function forOrganization(Organization $organization): array
     {
         $servers = Server::query()

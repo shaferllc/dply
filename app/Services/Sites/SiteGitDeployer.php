@@ -27,7 +27,6 @@ class SiteGitDeployer
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function run(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // Cutover wrapper: maintenance/recreate methods bracket the whole deploy

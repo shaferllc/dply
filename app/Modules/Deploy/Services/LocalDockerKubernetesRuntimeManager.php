@@ -18,7 +18,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{output: string, sha: ?string, status: string, logs: array<int, string>, context: ?string, manifest_yaml: string, workspace_path: string, repository_checkout_path: string, generated_manifest_path: string, deployment_name: string, namespace: string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $workspace = $this->workspace->ensure($site);
@@ -94,7 +93,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function start(Site $site): array
     {
         return $this->scale($site, 1, 'running', 'Local Kubernetes workload started.');
@@ -103,7 +101,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function stop(Site $site): array
     {
         return $this->scale($site, 0, 'stopped', 'Local Kubernetes workload scaled to zero.');
@@ -112,7 +109,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function restart(Site $site): array
     {
         $runtime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
@@ -129,7 +125,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function destroy(Site $site): array
     {
         $runtime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
@@ -150,7 +145,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function status(Site $site): array
     {
         $runtime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
@@ -167,7 +161,6 @@ class LocalDockerKubernetesRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
-    /** @return array<string, mixed> */
     public function logs(Site $site): array
     {
         $runtime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];

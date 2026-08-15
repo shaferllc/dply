@@ -37,7 +37,6 @@ class SiteLoggingConfigPusher
     /**
      * @return array{managed: bool, log: string}
      */
-    /** @return array<string, mixed> */
     public function apply(Site $site, SshConnection $ssh, string $buildDir): array
     {
         $binding = $this->managedBinding($site);

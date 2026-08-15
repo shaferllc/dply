@@ -413,7 +413,6 @@ class VultrService
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getSnapshot(string $id): array
     {
         $response = $this->request('get', '/snapshots/'.$id);
@@ -438,7 +437,6 @@ class VultrService
      * @param  callable(array<string, mixed>):void|null  $onTick  receives each poll's snapshot
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function waitForSnapshot(string $id, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
     {
         $snapshot = [];
@@ -478,7 +476,6 @@ class VultrService
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed>>
      */
@@ -507,7 +504,6 @@ class VultrService
      *
      * @return list<array<mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed>>
      */
@@ -536,7 +532,6 @@ class VultrService
      *
      * @return list<array<mixed>>
      */
-    /** @return array<string, mixed> */
     public function getOsList(): array
     {
         $response = $this->request('get', '/os');
@@ -588,7 +583,6 @@ class VultrService
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<mixed, mixed>>
      */

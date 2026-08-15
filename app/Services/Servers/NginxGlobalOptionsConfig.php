@@ -149,7 +149,6 @@ class NginxGlobalOptionsConfig
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();

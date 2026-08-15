@@ -39,7 +39,6 @@ final class ServerManageToolsReport
      *     hero_tool: ?array<string, mixed>,
      * }
      */
-    /** @return array<string, mixed> */
     public function build(Server $server, array $serviceActions = []): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];

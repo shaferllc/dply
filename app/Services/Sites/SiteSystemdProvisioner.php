@@ -44,7 +44,6 @@ class SiteSystemdProvisioner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory  test seam
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -84,7 +83,6 @@ class SiteSystemdProvisioner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

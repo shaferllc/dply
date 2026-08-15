@@ -81,7 +81,6 @@ trait HandlesRollback
     /**
      * Get the rollback dependencies (tasks that must be rolled back first).
      */
-    /** @return array<string, mixed> */
     public function getRollbackDependencies(): array
     {
         return $this->rollbackDependencies;
@@ -228,7 +227,6 @@ trait HandlesRollback
     /**
      * Get rollback history for this task.
      */
-    /** @return array<string, mixed> */
     public function getRollbackHistory(): array
     {
         return $this->rollbackHistory;
@@ -455,7 +453,6 @@ trait HandlesRollback
     /**
      * Capture current state for checkpoint.
      */
-    /** @return array<string, mixed> */
     protected function captureCurrentState(): array
     {
         return [

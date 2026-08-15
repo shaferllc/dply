@@ -24,7 +24,6 @@ class TraefikProvidersConfig
      *     unreadable: bool
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $defaults = $this->defaults();

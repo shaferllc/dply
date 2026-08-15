@@ -29,7 +29,6 @@ trait ManagesDoSpacesRegistry
      * @param  array<string, mixed> $grants
      * @return array{access_key: string, secret_key: string}
      */
-    /** @return array<string, mixed> */
     public function createSpacesKey(string $name, array $grants = []): array
     {
         if ($grants === []) {
@@ -63,7 +62,6 @@ trait ManagesDoSpacesRegistry
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createContainerRegistry(string $name, string $subscriptionTier = 'starter'): array
     {
         $response = $this->request('post', '/registry', [
@@ -102,7 +100,6 @@ trait ManagesDoSpacesRegistry
      *
      * @return array{auths: array<string, array{auth: string}>}
      */
-    /** @return array<string, mixed> */
     public function getContainerRegistryCredentials(): array
     {
         $response = $this->request('get', '/registry/docker-credentials');

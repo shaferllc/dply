@@ -117,7 +117,6 @@ class OrganizationInsightsMetricsService
      * @param  Collection<int, string>  $serverIds
      * @return list<array{id: string, name: string, open: int, worst: string|null}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */

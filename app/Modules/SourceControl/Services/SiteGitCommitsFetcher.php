@@ -55,7 +55,6 @@ final class SiteGitCommitsFetcher
      *     remote_label: string|null,
      * }
      */
-    /** @return array<string, mixed> */
     public function fetch(Site $site, User $user, int $limit = 30, ?string $branchOverride = null, int $page = 1): array
     {
         $branch = $branchOverride !== null && $branchOverride !== ''

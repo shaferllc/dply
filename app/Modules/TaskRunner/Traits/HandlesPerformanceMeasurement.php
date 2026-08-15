@@ -115,7 +115,6 @@ trait HandlesPerformanceMeasurement
     /**
      * End profiling and get results.
      */
-    /** @return array<string, mixed> */
     public function endProfile(string $profileName): array
     {
         if (! isset($this->profiles[$profileName])) {
@@ -148,7 +147,6 @@ trait HandlesPerformanceMeasurement
     /**
      * Run a benchmark with multiple iterations.
      */
-    /** @return array<string, mixed> */
     public function runBenchmark(string $benchmarkName, callable $callback, int $iterations = 1000): array
     {
         $this->startMeasurement($benchmarkName);
@@ -205,7 +203,6 @@ trait HandlesPerformanceMeasurement
     /**
      * Get all measurements.
      */
-    /** @return array<string, mixed> */
     public function getMeasurements(): array
     {
         return $this->measurements;
@@ -296,7 +293,6 @@ trait HandlesPerformanceMeasurement
     /**
      * Get performance summary.
      */
-    /** @return array<string, mixed> */
     public function getPerformanceSummary(): array
     {
         return [
@@ -326,7 +322,6 @@ trait HandlesPerformanceMeasurement
     /**
      * Get execution time breakdown.
      */
-    /** @return array<string, mixed> */
     public function getExecutionTimeBreakdown(): array
     {
         $totalTime = $this->getExecutionTime();

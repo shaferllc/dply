@@ -25,7 +25,6 @@ class CaddyCustomRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, hosts: list<string>, root: string, upstream: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $enabled = rtrim((string) config('sites.caddy_sites_enabled'), '/');

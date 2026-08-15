@@ -12,7 +12,6 @@ class LocalRuntimeWorkspace
     /**
      * @return array{workspace_path: string, repository_path: string, branch: string, revision: ?string}
      */
-    /** @return array<string, mixed> */
     public function ensure(Site $site): array
     {
         $workspacePath = storage_path('app/local-runtimes/'.$site->getKey());

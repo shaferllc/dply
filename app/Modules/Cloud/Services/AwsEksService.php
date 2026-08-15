@@ -81,7 +81,6 @@ class AwsEksService
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -143,7 +142,6 @@ class AwsEksService
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */

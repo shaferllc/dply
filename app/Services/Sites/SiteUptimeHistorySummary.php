@@ -26,7 +26,6 @@ class SiteUptimeHistorySummary
      *   has_data: bool
      * }
      */
-    /** @return array<string, mixed> */
     public function forMonitor(SiteUptimeMonitor $monitor): array
     {
         $now = now();

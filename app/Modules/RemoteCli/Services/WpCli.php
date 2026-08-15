@@ -25,7 +25,6 @@ class WpCli extends RemoteCli
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     protected function instantCommands(): array
     {

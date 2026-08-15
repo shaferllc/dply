@@ -142,7 +142,6 @@ class OpenLiteSpeedVhostsConfig
     /**
      * @return array{vhosts: list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>, values: array<string, string>, raw: string, unreadable: bool}>, unreadable_httpd: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -198,7 +197,6 @@ class OpenLiteSpeedVhostsConfig
      *
      * @return list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, list<string>|string|null>>
      */

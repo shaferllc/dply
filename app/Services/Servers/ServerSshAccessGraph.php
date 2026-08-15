@@ -31,7 +31,6 @@ final class ServerSshAccessGraph
      *     rows: list<array<string, mixed>>,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server, ?ServerSshAccessContext $context = null): array
     {
         $context ??= ServerSshAccessContext::load($server);

@@ -39,7 +39,6 @@ class ServerlessTriggerProvisioner implements ServerlessTriggerBackend
      *
      * @return array{ok: bool, error: ?string, trigger: ?string}
      */
-    /** @return array<string, mixed> */
     public function provision(FunctionAction $action): array
     {
         $action->loadMissing('site.server');
@@ -95,7 +94,6 @@ class ServerlessTriggerProvisioner implements ServerlessTriggerBackend
      *
      * @return array{ok: bool, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function remove(FunctionAction $action): array
     {
         $action->loadMissing('site.server');

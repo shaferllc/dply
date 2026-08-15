@@ -42,7 +42,6 @@ class CanarySiteDeployer
     /**
      * @return array{output: string, sha: ?string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site, ?SiteDeployment $deployment = null): array
     {
         $backends = $site->backends()

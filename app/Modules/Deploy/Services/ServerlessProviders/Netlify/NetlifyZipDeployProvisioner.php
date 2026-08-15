@@ -20,7 +20,6 @@ final class NetlifyZipDeployProvisioner implements ServerlessFunctionProvisioner
     ) {}
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $ctx = $this->resolveNetlifyContext($config);

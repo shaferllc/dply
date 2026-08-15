@@ -23,7 +23,6 @@ class SiteWebhookSignatureValidator
      *     gitlab_event?: string
      * }
      */
-    /** @return array<string, mixed> */
     public function validateForWebhook(Request $request, Site $site): array
     {
         $secret = $site->webhook_secret;

@@ -25,7 +25,6 @@ class WranglerBindingsExtractor
     /**
      * @return array<string, array<string, string>>
      */
-    /** @return array<string, mixed> */
     public function extract(string $checkoutDir): array
     {
         foreach (['wrangler.jsonc', 'wrangler.json', 'wrangler.toml'] as $file) {

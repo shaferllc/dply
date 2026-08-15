@@ -24,7 +24,6 @@ class TraefikAdminApiResolver
      *
      * @throws \RuntimeException
      */
-    /** @return array<string, mixed> */
     public function resolve(Server $server): array
     {
         if ($server->edgeProxy() !== 'traefik') {
@@ -67,7 +66,6 @@ class TraefikAdminApiResolver
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function loadParsed(Server $server): array
     {
         $ssh = new SshConnection($server);

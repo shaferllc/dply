@@ -131,7 +131,6 @@ class MultiServerTaskFailed
      * Get the successful connections.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getSuccessfulConnections(): array
     {
         return $this->summary['successful_connections'] ?? [];
@@ -179,7 +178,6 @@ class MultiServerTaskFailed
      * Get failure details.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getFailureDetails(): array
     {
         return [

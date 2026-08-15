@@ -24,7 +24,6 @@ final class DocsSearchIndex
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function cached(): array
     {
         if (app()->environment('local')) {
@@ -42,7 +41,6 @@ final class DocsSearchIndex
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, mixed>>
      */

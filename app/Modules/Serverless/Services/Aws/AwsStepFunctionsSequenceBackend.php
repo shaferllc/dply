@@ -50,7 +50,6 @@ class AwsStepFunctionsSequenceBackend implements ServerlessSequenceBackend
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function deploy(FunctionAction $sequence): array
     {
         if (! $sequence->isSequence()) {

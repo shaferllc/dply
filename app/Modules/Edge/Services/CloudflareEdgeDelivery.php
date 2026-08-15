@@ -22,7 +22,6 @@ class CloudflareEdgeDelivery
     /**
      * @return array{live_url: ?string, cf_kv_version: int}
      */
-    /** @return array<string, mixed> */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
         $context = $this->contextResolver->forSite($site);
@@ -54,7 +53,6 @@ class CloudflareEdgeDelivery
     /**
      * @return array{live_url: ?string, cf_kv_version: int}
      */
-    /** @return array<string, mixed> */
     public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {
         $context = $this->contextResolver->forSite($site);
@@ -80,7 +78,6 @@ class CloudflareEdgeDelivery
     /**
      * @return list<array{name: string, type: string, value: string, status: string}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return array<int, array<string, string>>
      */
@@ -109,7 +106,6 @@ class CloudflareEdgeDelivery
     /**
      * @return array<int, array<string, string>>
      */
-    /** @return array<string, mixed> */
     public function inspect(Site $site): array
     {
         $meta = $site->edgeMeta();

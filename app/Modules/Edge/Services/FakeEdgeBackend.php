@@ -21,7 +21,6 @@ class FakeEdgeBackend implements EdgeBackend
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
         $dest = $this->artifactRoot($deployment->storage_prefix);
@@ -31,7 +30,6 @@ class FakeEdgeBackend implements EdgeBackend
         return $this->writeHostMap($deployment, $site);
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {

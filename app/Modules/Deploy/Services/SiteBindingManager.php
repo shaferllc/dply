@@ -86,7 +86,6 @@ class SiteBindingManager
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -100,7 +99,6 @@ class SiteBindingManager
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -281,7 +279,6 @@ class SiteBindingManager
      *
      * @return list<string> every key removed across all bindings
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

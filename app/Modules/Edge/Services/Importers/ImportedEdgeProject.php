@@ -43,7 +43,6 @@ final class ImportedEdgeProject
      *
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function toCreateFormPrefill(): array
     {
         $prefill = array_filter([

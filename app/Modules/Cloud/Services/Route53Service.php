@@ -32,7 +32,6 @@ class Route53Service
     /**
      * @return array{id: string, name: string, value: string, type: string}
      */
-    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         $zoneId = $this->findHostedZoneId($zone);

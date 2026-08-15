@@ -25,7 +25,6 @@ class SiteEnvResourceImporter
      *
      * @return list<array{id: string, type: string, label: string, server: string, same_server: bool}>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, bool|string>>
      */
@@ -76,7 +75,6 @@ class SiteEnvResourceImporter
      *
      * @return list<array<string, bool|string>>
      */
-    /** @return array<string, mixed> */
     public function envFor(Site $site, string $resourceId): array
     {
         $serverIds = $this->accessibleServerIds($site);

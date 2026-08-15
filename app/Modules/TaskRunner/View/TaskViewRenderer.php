@@ -91,7 +91,6 @@ class TaskViewRenderer
      * Prepare data for the view.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function prepareViewData(): array
     {
         $data = array_filter(
@@ -151,7 +150,6 @@ class TaskViewRenderer
      * Get helper functions for the view.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function getHelperFunctions(): array
     {
         return [
@@ -239,7 +237,6 @@ class TaskViewRenderer
      * Get view compilation statistics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getStats(): array
     {
         return [

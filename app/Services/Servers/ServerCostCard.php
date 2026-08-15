@@ -25,7 +25,6 @@ final class ServerCostCard
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $server->loadMissing(['providerCredential', 'sites']);

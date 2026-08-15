@@ -60,7 +60,6 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function installLines(bool $forceReinstall = false): array
     {
@@ -107,7 +106,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function activateForUserLines(string $deployUser): array
     {
@@ -137,7 +135,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function installRuntimeForUserLines(string $deployUser, string $runtime, string $version): array
     {
@@ -191,7 +188,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     public function installRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
@@ -204,7 +200,6 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function uninstallRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
@@ -235,7 +230,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     public function setRuntimeDefaultForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);

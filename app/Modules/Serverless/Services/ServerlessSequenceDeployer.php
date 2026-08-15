@@ -25,7 +25,6 @@ class ServerlessSequenceDeployer implements ServerlessSequenceBackend
      *
      * @return array{ok: bool, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function deploy(FunctionAction $sequence): array
     {
         if (! $sequence->isSequence()) {

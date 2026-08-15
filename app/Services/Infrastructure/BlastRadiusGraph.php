@@ -35,7 +35,6 @@ final class BlastRadiusGraph
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -47,7 +46,6 @@ final class BlastRadiusGraph
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, string>>
      */
@@ -69,7 +67,6 @@ final class BlastRadiusGraph
      *
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<array<string, mixed>>
      */
@@ -101,7 +98,6 @@ final class BlastRadiusGraph
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function counts(): array
     {
         $servers = $sites = $databases = 0;

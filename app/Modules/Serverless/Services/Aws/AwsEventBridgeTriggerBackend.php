@@ -49,7 +49,6 @@ class AwsEventBridgeTriggerBackend implements ServerlessTriggerBackend
     }
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function provision(FunctionAction $action): array
     {
         $cron = $this->cronExpression($action);
@@ -100,7 +99,6 @@ class AwsEventBridgeTriggerBackend implements ServerlessTriggerBackend
         return ['ok' => true, 'error' => null, 'trigger' => $ruleName];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function remove(FunctionAction $action): array
     {

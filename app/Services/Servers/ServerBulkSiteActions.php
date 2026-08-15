@@ -25,7 +25,6 @@ final class ServerBulkSiteActions
     /**
      * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
      */
-    /** @return array<string, mixed> */
     public function preview(Server $server): array
     {
         $deployable = $this->deployableSites($server);
@@ -45,7 +44,6 @@ final class ServerBulkSiteActions
      * @param  array<string, mixed> $siteIds
      * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
      */
-    /** @return array<string, mixed> */
     public function previewSelected(Server $server, array $siteIds): array
     {
         $normalizedIds = $this->normalizeSiteIds($siteIds);
@@ -68,7 +66,6 @@ final class ServerBulkSiteActions
      * @param  array<string, mixed> $siteIds
      * @return array{queued: int}
      */
-    /** @return array<string, mixed> */
     public function redeployAll(Server $server, User $actor): array
     {
         return $this->redeploySelected(
@@ -82,7 +79,6 @@ final class ServerBulkSiteActions
      * @param  array<string, mixed> $siteIds
      * @return array{queued: int}
      */
-    /** @return array<string, mixed> */
     public function redeploySelected(Server $server, array $siteIds, User $actor): array
     {
         $normalizedIds = $this->normalizeSiteIds($siteIds);
