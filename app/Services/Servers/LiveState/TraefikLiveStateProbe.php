@@ -109,47 +109,47 @@ class TraefikLiveStateProbe extends AbstractEngineLiveStateProbe
 set +e
 URL={$url}
 echo '###dply-section:routers###'
-curl -fsS --max-time 5 "$URL/api/http/routers" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/http/routers" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:services###'
-curl -fsS --max-time 5 "$URL/api/http/services" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/http/services" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:middlewares###'
-curl -fsS --max-time 5 "$URL/api/http/middlewares" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/http/middlewares" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:entrypoints###'
-curl -fsS --max-time 5 "$URL/api/entrypoints" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/entrypoints" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:tcp_routers###'
-curl -fsS --max-time 5 "$URL/api/tcp/routers" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/tcp/routers" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:tcp_services###'
-curl -fsS --max-time 5 "$URL/api/tcp/services" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/tcp/services" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:udp_routers###'
-curl -fsS --max-time 5 "$URL/api/udp/routers" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/udp/routers" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:udp_services###'
-curl -fsS --max-time 5 "$URL/api/udp/services" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/udp/services" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:tls_stores###'
-curl -fsS --max-time 5 "$URL/api/tls/stores" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/tls/stores" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:overview###'
-curl -fsS --max-time 5 "$URL/api/overview" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/overview" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:version###'
-curl -fsS --max-time 5 "$URL/api/version" 2>/dev/null
+curl -fsS --max-time 5 "\$URL/api/version" 2>/dev/null
 echo
 echo '###dply-section:end###'
 BASH;

@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
 class TaskRunCommand extends Command
 {
     protected $signature = 'task:run 
-                            {command : Command to run}
+                            {cmd : Command to run}
                             {--name= : Task name (defaults to command)}
                             {--timeout= : Timeout in seconds}
                             {--connection= : Connection to use}
@@ -24,13 +24,16 @@ class TaskRunCommand extends Command
                             {--data=* : Data to pass to view (key=value format)}
                             {--follow : Follow task output in real-time}
                             {--format=table : Output format (table, json)}
-                            {--quiet : Suppress output}';
+                            {--no-output : Suppress output}';
 
     protected $description = 'Run a task or command';
 
     public function handle(): int
     {
-        $command = $this->argument('command');
+        // 'cmd', not 'command': Symfony's Application already defines a
+        // 'command' argument (the command name itself), so declaring it threw
+        // "An argument with name "command" already exists." on every invocation.
+        $command = $this->argument('cmd');
         $name = $this->option('name') ?: $command;
         $timeout = $this->option('timeout');
         $connection = $this->option('connection');
@@ -41,7 +44,10 @@ class TaskRunCommand extends Command
         $data = $this->parseDataOption();
         $follow = $this->option('follow');
         $format = $this->option('format');
-        $quiet = $this->option('quiet');
+        // 'no-output', not 'quiet': --quiet is a reserved Symfony global (and
+        // --silent is Laravel's), so declaring it made every invocation throw
+        // "An option named "quiet" already exists." before handle() ran.
+        $quiet = $this->option('no-output');
 
         try {
             if ($view) {
@@ -209,7 +215,11 @@ class TaskRunCommand extends Command
             $this->newLine();
         }
 
-        $result = TaskRunner::run($task, function (string $type, string $buffer) use ($quiet) {
+        // run() takes only the PendingTask; the follow callback is registered on
+        // the task via onOutput() (run() picks it up through getOnOutput()).
+        // Passing it as a second argument silently discarded it, so --follow
+        // printed nothing.
+        $result = TaskRunner::run($task->onOutput(function (string $type, string $buffer) use ($quiet) {
             if (! $quiet) {
                 if ($type === 'err') {
                     $this->error($buffer);
@@ -217,7 +227,7 @@ class TaskRunCommand extends Command
                     $this->line($buffer);
                 }
             }
-        });
+        }));
 
         if (! $quiet) {
             $this->newLine();

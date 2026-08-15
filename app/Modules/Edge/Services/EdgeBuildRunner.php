@@ -255,8 +255,12 @@ class EdgeBuildRunner
                 // fresh resolve; this pass is validation + visibility only, and
                 // never persists a connection secret into repo_config.
                 $dplyRefs = is_array($merged['dply'] ?? null) ? $merged['dply'] : [];
-                if ($dplyRefs !== [] && $site !== null) {
-                    foreach (app(EdgeDplyResourceResolver::class)->resolve($site, $dplyRefs) as $r) {
+                // $deployment->site, not $site: $site is not assigned until the
+                // build-cache section far below, so this read saw an undefined
+                // variable (null) and the whole block silently never ran.
+                $dplySite = $deployment->site;
+                if ($dplyRefs !== [] && $dplySite !== null) {
+                    foreach (app(EdgeDplyResourceResolver::class)->resolve($dplySite, $dplyRefs) as $r) {
                         $label = match ($r['status']) {
                             'public' => 'bound as secret',
                             'private' => 'via origin',

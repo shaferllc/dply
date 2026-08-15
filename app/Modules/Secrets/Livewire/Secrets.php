@@ -21,6 +21,12 @@ use Livewire\Component;
  * (Vault / AWS Secrets Manager / Doppler) sites can reference. The per-key
  * escrow controls live on each site's Environment tab; this is where the org
  * decides WHO holds the key and WHICH external stores are available.
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade. PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read Collection<int, ExternalSecretStore> $stores
+ * @property-read OrgSecretKey|null $orgKey
  */
 #[Layout('layouts.app')]
 class Secrets extends Component

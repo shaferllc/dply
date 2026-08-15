@@ -351,7 +351,7 @@ NGINX;
 
         $useLayerIncludes = $profile && $profile->mode === SiteWebserverConfigProfile::MODE_LAYERED;
         $mainSource = $profile ? ($profile->main_snippet_body ?? $site->nginx_extra_raw) : $site->nginx_extra_raw;
-        $extra = trim((string) ($mainSource ?? ''));
+        $extra = trim((string) $mainSource);
         $layerPrefix = '';
         if ($useLayerIncludes) {
             $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;

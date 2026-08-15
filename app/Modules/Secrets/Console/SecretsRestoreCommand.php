@@ -18,7 +18,7 @@ class SecretsRestoreCommand extends Command
     protected $signature = 'secrets:restore
         {--scope=platform : platform | org-<id>}
         {--source=platform-env : platform-env | db-dump | ...}
-        {--version=latest : "latest" or a full blob key}
+        {--revision=latest : "latest" or a full blob key}
         {--to=stdout : "stdout" or a filesystem path}
         {--force : overwrite an existing file at --to}
         {--list : list available versions and exit}';
@@ -45,7 +45,10 @@ class SecretsRestoreCommand extends Command
             return self::SUCCESS;
         }
 
-        $versionOpt = (string) $this->option('version');
+        // 'revision', not 'version': --version is a reserved Symfony global, and
+        // declaring it made every invocation of this command throw
+        // "An option named "version" already exists." before handle() ran.
+        $versionOpt = (string) $this->option('revision');
         $ref = $versionOpt === 'latest'
             ? $vault->latest($scope, $source)
             : collect($vault->listVersions($scope, $source))->firstWhere('key', $versionOpt);

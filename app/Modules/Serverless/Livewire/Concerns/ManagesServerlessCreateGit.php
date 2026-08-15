@@ -247,10 +247,13 @@ trait ManagesServerlessCreateGit
             return null;
         }
 
-        if (preg_match('#^https?://github\.com/([^/]+)/([^/.?#]+?)(?:\.git)?(?:[/?#].*)?$#i', $repo, $m) === 1) {
+        // The # inside these character classes must be escaped: it is also the
+        // delimiter, so unescaped it closed the pattern early and preg_match()
+        // returned false on every input — GitHub URLs never parsed at all.
+        if (preg_match('#^https?://github\.com/([^/]+)/([^/.?\#]+?)(?:\.git)?(?:[/?\#].*)?$#i', $repo, $m) === 1) {
             return [$m[1], $m[2]];
         }
-        if (preg_match('#^git@github\.com:([^/]+)/([^/.?#]+?)(?:\.git)?$#i', $repo, $m) === 1) {
+        if (preg_match('#^git@github\.com:([^/]+)/([^/.?\#]+?)(?:\.git)?$#i', $repo, $m) === 1) {
             return [$m[1], $m[2]];
         }
         if (preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repo) === 1) {

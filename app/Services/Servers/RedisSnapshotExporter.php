@@ -8,6 +8,7 @@ use App\Models\BackupConfiguration;
 use App\Models\RedisSnapshot;
 use App\Models\Server;
 use App\Models\ServerCacheService;
+use App\Modules\Backups\Services\DatabaseBackupS3ClientFactory;
 use App\Support\Servers\CacheServiceStats;
 use Illuminate\Support\Str;
 
