@@ -11,8 +11,8 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $command
- * @property array<string, mixed> $env_vars
+ * @property ?string $command
+ * @property ?array<string, mixed> $env_vars
  * @property bool $is_active
  * @property bool $managed_by_manifest
  * @property array<string, mixed>|null $meta
@@ -21,7 +21,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $site_id
  * @property string $type
  * @property string $user
- * @property string $working_directory
+ * @property ?string $working_directory
  * @property-read ?Site $site
  * @property Carbon $created_at
  * @property Carbon $updated_at

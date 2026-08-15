@@ -35,15 +35,15 @@ use Laravel\Cashier\Billable;
  * @property bool $deploy_email_notifications_enabled
  * @property bool $email_server_credentials_enabled
  * @property bool $email_database_credentials_enabled
- * @property array<string, mixed> $server_site_preferences
+ * @property ?array<string, mixed> $server_site_preferences
  * @property ?string $default_site_script_id
  * @property ?Carbon $cron_maintenance_until
  * @property ?string $cron_maintenance_note
- * @property array<string, mixed> $firewall_settings
+ * @property ?array<string, mixed> $firewall_settings
  * @property ?string $edge_data_region
- * @property array<string, mixed> $database_workspace_settings
- * @property array<string, mixed> $insights_preferences
- * @property array<string, mixed> $services_preferences
+ * @property ?array<string, mixed> $database_workspace_settings
+ * @property ?array<string, mixed> $insights_preferences
+ * @property ?array<string, mixed> $services_preferences
  * @property ?string $alert_slack_webhook_url
  * @property array<string, mixed> $alert_extra_emails
  * @property ?string $invoice_email

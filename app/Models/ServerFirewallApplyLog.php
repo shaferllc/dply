@@ -10,10 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property ?string $api_token_id
  * @property string $kind
- * @property string $message
- * @property array<string, mixed> $meta
+ * @property ?string $message
+ * @property ?array<string, mixed> $meta
  * @property string $rule_count
- * @property string $rules_hash
+ * @property ?string $rules_hash
  * @property ?string $server_id
  * @property bool $success
  * @property ?string $user_id

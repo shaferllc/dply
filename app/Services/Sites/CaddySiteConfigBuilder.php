@@ -18,7 +18,12 @@ class CaddySiteConfigBuilder
 {
     public function build(Site $site, ?int $listenPort = null): string
     {
-        if ($site->type === SiteType::Custom) {
+        // Container sites are served by their container backend (App Platform /
+        // App Runner / local Docker), never by this box's webserver — and the
+        // match below has no Container arm, so letting one through threw an
+        // UnhandledMatchError and aborted the whole webserver switch. The
+        // provision query fetches every site on the server, unfiltered.
+        if ($site->type === SiteType::Custom || $site->type === SiteType::Container) {
             return '';
         }
 

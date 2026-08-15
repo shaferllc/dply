@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      enters dply; it is fetched at deploy (by dply or on the box).
  * @property string $ciphertext
  * @property string $key
- * @property ?string $meta
+ * @property ?array<string, mixed> $meta
  * @property string $mode
  * @property string $reference
  * @property ?string $site_id

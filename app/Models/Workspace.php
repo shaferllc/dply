@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * @property string $id
  * @property ?string $description
  * @property string $name
- * @property string $notes
+ * @property ?string $notes
  * @property ?string $organization_id
  * @property string $slug
  * @property ?string $user_id

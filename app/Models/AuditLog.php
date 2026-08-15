@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 /**
  * @property string $id
  * @property string $action
- * @property string $ip_address
- * @property array<string, mixed> $new_values
- * @property array<string, mixed> $old_values
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $new_values
+ * @property ?array<string, mixed> $old_values
  * @property ?string $organization_id
  * @property ?string $subject_id
- * @property string $subject_type
+ * @property ?string $subject_type
  * @property ?string $user_id
  * @property-read ?Organization $organization
  * @property-read ?User $user

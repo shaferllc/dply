@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * @property string $id
- * @property string $label
+ * @property ?string $label
  * @property ?string $monitorable_id
  * @property string $monitorable_type
  * @property string $sort_order

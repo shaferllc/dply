@@ -17,16 +17,16 @@ use Illuminate\Support\Carbon;
  * @property ?string $error_message
  * @property string $event_key
  * @property ?Carbon $first_attempt_at
- * @property string $http_status
+ * @property ?string $http_status
  * @property ?string $organization_id
  * @property array<string, mixed> $payload
- * @property string $response_excerpt
+ * @property ?string $response_excerpt
  * @property ?string $server_id
  * @property bool $signed
  * @property ?string $signed_at
  * @property string $status
- * @property string $summary
- * @property string $url
+ * @property ?string $summary
+ * @property ?string $url
  * @property-read ?Server $server
  * @property-read ?Organization $organization
  * @property \Illuminate\Support\Carbon $created_at

@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $body
+ * @property ?string $body
  * @property string $sort_order
  * @property string $title
- * @property string $url
+ * @property ?string $url
  * @property ?string $workspace_id
  * @property-read ?Workspace $workspace
  * @property \Illuminate\Support\Carbon $created_at

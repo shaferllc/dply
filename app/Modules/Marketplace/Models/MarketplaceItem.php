@@ -11,15 +11,15 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property string $id
  * @property string $category
- * @property array<string, mixed> $frameworks
+ * @property ?array<string, mixed> $frameworks
  * @property bool $is_active
  * @property string $name
  * @property array<string, mixed> $payload
  * @property string $recipe_type
- * @property array<string, mixed> $runtimes
+ * @property ?array<string, mixed> $runtimes
  * @property string $slug
  * @property string $sort_order
- * @property string $summary
+ * @property ?string $summary
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
  */

@@ -182,7 +182,9 @@ trait ManagesCloudCostBackend
     private function backendRegions(string $backend): array
     {
         return match ($backend) {
-            'digitalocean_app_platform' => DigitalOceanAppPlatformBackend::class === '' ? [] : (new DigitalOceanAppPlatformBackend)->regions(),
+            // The old `::class === '' ? [] : …` guard compared a class-string
+            // literal to '', which is always false — it never did anything.
+            'digitalocean_app_platform' => (new DigitalOceanAppPlatformBackend)->regions(),
             'aws_app_runner' => (new AwsAppRunnerBackend)->regions(),
             default => $this->mergedRegions(),
         };

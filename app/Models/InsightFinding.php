@@ -9,15 +9,15 @@ use Illuminate\Support\Carbon;
 /**
  * @property ?Carbon $acknowledged_at
  * @property ?string $acknowledged_by_user_id
- * @property string $body
- * @property array<string, mixed> $correlation
+ * @property ?string $body
+ * @property ?array<string, mixed> $correlation
  * @property string $dedupe_hash
  * @property ?Carbon $detected_at
  * @property ?Carbon $ignored_at
  * @property ?string $ignored_by_user_id
  * @property string $insight_key
  * @property string $kind
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?Carbon $resolved_at
  * @property ?string $server_id
  * @property string $severity

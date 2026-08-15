@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $action
  * @property ?string $organization_id
- * @property array<string, mixed> $properties
+ * @property ?array<string, mixed> $properties
  * @property ?string $server_id
  * @property ?string $supervisor_program_id
  * @property ?string $user_id

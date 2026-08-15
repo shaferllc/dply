@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property ?string $api_token_id
  * @property string $event
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server

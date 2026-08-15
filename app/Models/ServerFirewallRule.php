@@ -9,20 +9,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $action
- * @property string $app_profile
+ * @property ?string $app_profile
  * @property bool $enabled
- * @property string $iface
- * @property string $iface_direction
- * @property string $name
+ * @property ?string $iface
+ * @property ?string $iface_direction
+ * @property ?string $name
  * @property ?int $port
- * @property string $profile
+ * @property ?string $profile
  * @property string $protocol
- * @property string $runbook_url
+ * @property ?string $runbook_url
  * @property ?string $server_id
  * @property ?string $site_id
  * @property string $sort_order
  * @property string $source
- * @property array<string, mixed> $tags
+ * @property ?array<string, mixed> $tags
  * @property-read ?Server $server
  * @property-read ?Site $site
  * @property \Illuminate\Support\Carbon $created_at

@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * @property array<string, mixed> $enabled_map
- * @property array<string, mixed> $parameters
+ * @property ?array<string, mixed> $enabled_map
+ * @property ?array<string, mixed> $parameters
  * @property ?string $settingsable_id
  * @property string $settingsable_type
  * @property \Illuminate\Support\Carbon $created_at

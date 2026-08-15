@@ -16,8 +16,8 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $finished_at
  * @property ?string $import_server_migration_id
  * @property ?string $import_site_migration_id
- * @property string $log_object_key
- * @property array<string, mixed> $result_data
+ * @property ?string $log_object_key
+ * @property ?array<string, mixed> $result_data
  * @property string $sequence
  * @property ?Carbon $started_at
  * @property string $status

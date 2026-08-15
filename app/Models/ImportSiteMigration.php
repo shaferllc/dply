@@ -16,13 +16,13 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $cutover_completed_at
  * @property ?Carbon $cutover_started_at
  * @property string $domain
- * @property string $failure_summary
+ * @property ?string $failure_summary
  * @property ?string $import_server_migration_id
  * @property string $site_type
  * @property string $source
  * @property int $source_site_id
  * @property array<string, mixed> $source_snapshot
- * @property string $ssl_strategy
+ * @property ?string $ssl_strategy
  * @property ?Carbon $staging_completed_at
  * @property string $status
  * @property ?string $target_site_id

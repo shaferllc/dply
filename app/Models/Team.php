@@ -18,8 +18,8 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $name
  * @property ?string $organization_id
- * @property array<string, mixed> $preferences
- * @property string $slug
+ * @property ?array<string, mixed> $preferences
+ * @property ?string $slug
  * @property-read ?Organization $organization
  * @property-read Collection<int, User> $users
  * @property-read Collection<int, Server> $servers

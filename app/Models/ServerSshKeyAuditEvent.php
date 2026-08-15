@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $event
- * @property string $ip_address
- * @property array<string, mixed> $meta
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server

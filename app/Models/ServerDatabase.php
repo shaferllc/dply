@@ -17,8 +17,8 @@ use Illuminate\Support\Str;
  * @property ?string $description
  * @property string $engine
  * @property string $host
- * @property string $mysql_charset
- * @property string $mysql_collation
+ * @property ?string $mysql_charset
+ * @property ?string $mysql_collation
  * @property string $name
  * @property string $password
  * @property bool $remote_access

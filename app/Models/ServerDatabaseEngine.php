@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $remote_access
  * @property ?string $server_id
  * @property string $status
- * @property string $version
+ * @property ?string $version
  * @property-read ?Server $server
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at

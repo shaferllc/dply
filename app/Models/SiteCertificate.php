@@ -9,29 +9,29 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property array<string, mixed> $applied_settings
- * @property string $certificate_path
- * @property string $certificate_pem
- * @property string $chain_path
- * @property string $chain_pem
+ * @property ?array<string, mixed> $applied_settings
+ * @property ?string $certificate_path
+ * @property ?string $certificate_pem
+ * @property ?string $chain_path
+ * @property ?string $chain_pem
  * @property string $challenge_type
- * @property string $credential_reference
- * @property string $csr_pem
- * @property string $dns_provider
+ * @property ?string $credential_reference
+ * @property ?string $csr_pem
+ * @property ?string $dns_provider
  * @property array<string, mixed> $domains_json
  * @property bool $enable_http3
  * @property ?Carbon $expires_at
  * @property bool $force_skip_dns_checks
  * @property ?Carbon $last_installed_at
- * @property string $last_output
+ * @property ?string $last_output
  * @property ?Carbon $last_requested_at
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?string $preview_domain_id
- * @property string $private_key_path
- * @property string $private_key_pem
+ * @property ?string $private_key_path
+ * @property ?string $private_key_pem
  * @property ?string $provider_credential_id
  * @property string $provider_type
- * @property array<string, mixed> $requested_settings
+ * @property ?array<string, mixed> $requested_settings
  * @property string $scope_type
  * @property ?string $site_id
  * @property string $status

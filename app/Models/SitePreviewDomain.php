@@ -16,19 +16,19 @@ use Illuminate\Support\Carbon;
  * @property string $hostname
  * @property bool $https_redirect
  * @property bool $is_primary
- * @property string $label
+ * @property ?string $label
  * @property ?Carbon $last_dns_checked_at
  * @property ?Carbon $last_ssl_checked_at
  * @property bool $managed_by_dply
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?string $provider_record_id
- * @property string $provider_type
- * @property string $record_data
- * @property string $record_name
- * @property string $record_type
+ * @property ?string $provider_type
+ * @property ?string $record_data
+ * @property ?string $record_name
+ * @property ?string $record_type
  * @property ?string $site_id
  * @property string $ssl_status
- * @property string $zone
+ * @property ?string $zone
  * @property-read ?Site $site
  * @property-read Collection<int, SiteCertificate> $certificates
  * @property \Illuminate\Support\Carbon $created_at

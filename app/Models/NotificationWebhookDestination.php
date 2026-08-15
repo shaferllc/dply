@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $driver
  * @property bool $enabled
- * @property array<string, mixed> $events
+ * @property ?array<string, mixed> $events
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $site_id

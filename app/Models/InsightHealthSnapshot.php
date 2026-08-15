@@ -8,7 +8,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property ?Carbon $captured_at
- * @property array<string, mixed> $counts
+ * @property ?array<string, mixed> $counts
  * @property string $score
  * @property ?string $server_id
  * @property-read ?Server $server

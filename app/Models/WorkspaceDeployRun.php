@@ -10,9 +10,9 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?Carbon $finished_at
- * @property string $output
- * @property array<string, mixed> $result_summary
- * @property array<string, mixed> $site_ids
+ * @property ?string $output
+ * @property ?array<string, mixed> $result_summary
+ * @property ?array<string, mixed> $site_ids
  * @property ?Carbon $started_at
  * @property string $status
  * @property ?string $user_id

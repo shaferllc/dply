@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      out of (see the table migration). The connection `config` is APP_KEY-encrypted
  *                      (auto-covered by secrets:reencrypt) — but it is only credentials TO the store,
  *                      not the secrets themselves, which never enter dply.
- * @property string $config
+ * @property array<string, mixed> $config
  * @property string $driver
  * @property string $name
  * @property ?string $organization_id

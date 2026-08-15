@@ -11,16 +11,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $domain
- * @property string $php_version
+ * @property ?string $php_version
  * @property ?string $ploi_server_id
  * @property bool $removed_from_source
- * @property string $repository_branch
- * @property string $repository_url
+ * @property ?string $repository_branch
+ * @property ?string $repository_url
  * @property string $site_type
  * @property int $source_id
- * @property array<string, mixed> $source_snapshot
- * @property string $status
- * @property string $web_directory
+ * @property ?array<string, mixed> $source_snapshot
+ * @property ?string $status
+ * @property ?string $web_directory
  * @property-read ?PloiServer $ploiServer
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at

@@ -68,7 +68,13 @@ class WorkspaceSchedule extends Component
     /** @var list<string> */
     public const SCHEDULE_TABS = ['schedulers', 'overview', 'logs', 'activity'];
 
-    /** @var 'schedulers'|'overview'|'enable' */
+    /**
+     * Mirrors self::SCHEDULE_TABS. The previous union listed 'enable' (not a
+     * tab) and omitted 'logs'/'activity', which made the checks for those two
+     * tabs statically always-false even though the view renders both.
+     *
+     * @var 'schedulers'|'overview'|'logs'|'activity'
+     */
     #[Url(as: 'tab', except: 'schedulers', history: true)]
     public string $schedule_workspace_tab = 'schedulers';
 

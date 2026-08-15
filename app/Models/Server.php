@@ -30,10 +30,10 @@ use phpseclib3\Crypt\PublicKeyLoader;
 /**
  * @property string $id
  * @property ?Carbon $comped_until
- * @property string $health_status
+ * @property ?string $health_status
  * @property ?string $hetzner_network_id
  * @property string $hosting_backend
- * @property string $ip_address
+ * @property ?string $ip_address
  * @property ?Carbon $last_health_check_at
  * @property string $logo_path
  * @property ?array<string, mixed> $meta
@@ -45,18 +45,18 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property ServerProvider $provider
  * @property ?string $provider_credential_id
  * @property ?string $provider_id
- * @property string $region
+ * @property ?string $region
  * @property ?Carbon $scheduled_deletion_at
- * @property string $setup_script_key
- * @property string $setup_status
- * @property string $size
+ * @property ?string $setup_script_key
+ * @property ?string $setup_status
+ * @property ?string $size
  * @property ?string $ssh_operational_private_key
  * @property string $ssh_port
  * @property ?string $ssh_private_key
  * @property ?string $ssh_recovery_private_key
  * @property string $ssh_user
  * @property string $status
- * @property string $supervisor_package_status
+ * @property ?string $supervisor_package_status
  * @property ?string $team_id
  * @property ?string $user_id
  * @property ?string $worker_pool_id

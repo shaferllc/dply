@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property string $id
- * @property string $created_by
+ * @property ?string $created_by
  * @property string $name
  * @property bool $provision_on_new_servers
  * @property string $public_key

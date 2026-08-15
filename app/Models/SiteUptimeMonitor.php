@@ -19,11 +19,11 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed> $config
  * @property string $label
  * @property ?Carbon $last_checked_at
- * @property string $last_error
- * @property string $last_http_status
- * @property string $last_latency_ms
+ * @property ?string $last_error
+ * @property ?string $last_http_status
+ * @property ?string $last_latency_ms
  * @property array<string, mixed> $last_meta
- * @property bool $last_ok
+ * @property ?bool $last_ok
  * @property ?string $last_state
  * @property ?string $path
  * @property string $probe_region

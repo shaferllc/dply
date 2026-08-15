@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $label
+ * @property ?string $label
  * @property array<string, mixed> $rules
  * @property ?string $server_id
  * @property ?string $user_id

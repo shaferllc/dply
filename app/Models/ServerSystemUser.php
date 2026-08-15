@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $last_seen_at
  * @property ?string $server_id
  * @property string $shell
- * @property int $uid
+ * @property ?int $uid
  * @property string $username
  * @property-read ?Server $server
  * @property \Illuminate\Support\Carbon $created_at

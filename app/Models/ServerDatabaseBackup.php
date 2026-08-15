@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property ?string $backup_configuration_id
- * @property string $bytes
- * @property string $disk_path
+ * @property ?string $bytes
+ * @property ?string $disk_path
  * @property ?string $error_message
  * @property string $remote_path
  * @property string $s3_bucket

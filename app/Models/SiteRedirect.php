@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $comment
  * @property string $from_path
  * @property SiteRedirectKind $kind
- * @property array<string, mixed> $response_headers
+ * @property ?array<string, mixed> $response_headers
  * @property ?string $site_id
  * @property string $sort_order
  * @property int $status_code

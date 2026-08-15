@@ -10,11 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $autorestart
+ * @property ?string $autorestart
  * @property string $command
  * @property ?string $description
  * @property string $directory
- * @property array<string, mixed> $env_vars
+ * @property ?array<string, mixed> $env_vars
  * @property string $name
  * @property int $numprocs
  * @property ?string $organization_id
@@ -23,8 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $redirect_stderr
  * @property string $slug
  * @property ?int $startsecs
- * @property string $stderr_logfile
- * @property string $stdout_logfile
+ * @property ?string $stderr_logfile
+ * @property ?string $stdout_logfile
  * @property ?int $stopwaitsecs
  * @property string $user
  * @property-read ?Organization $organization

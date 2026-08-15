@@ -32,7 +32,7 @@ use Throwable;
  *
  * @property string $id
  * @property string $name
- * @property string $action
+ * @property ?string $action
  * @property ?string $script
  * @property ?string $script_content
  * @property ?string $instance

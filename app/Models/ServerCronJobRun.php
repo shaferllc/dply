@@ -11,11 +11,11 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $duration_ms
+ * @property ?string $duration_ms
  * @property ?string $error_message
- * @property string $exit_code
+ * @property ?string $exit_code
  * @property ?Carbon $finished_at
- * @property string $output
+ * @property ?string $output
  * @property string $run_ulid
  * @property ?string $server_cron_job_id
  * @property ?Carbon $started_at

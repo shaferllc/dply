@@ -27,7 +27,7 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property string $name
  * @property string $email
  * @property ?Carbon $email_verified_at
- * @property string $password
+ * @property ?string $password
  * @property ?string $country_code
  * @property ?string $locale
  * @property ?string $timezone
@@ -42,7 +42,7 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property ?Carbon $referral_converted_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property array<string, mixed> $ui_preferences
+ * @property ?array<string, mixed> $ui_preferences
  * @property-read Collection<int, Organization> $organizations
  * @property-read Collection<int, Team> $teams
  * @property-read Collection<int, SocialAccount> $socialAccounts

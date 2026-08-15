@@ -11,10 +11,10 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?string $managed_key_id
- * @property string $managed_key_type
+ * @property ?string $managed_key_type
  * @property string $name
  * @property string $public_key
- * @property Carbon $review_after
+ * @property ?Carbon $review_after
  * @property ?string $server_id
  * @property ?Carbon $synced_at
  * @property string $target_linux_user

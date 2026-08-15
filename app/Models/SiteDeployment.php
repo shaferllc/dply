@@ -13,11 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $status
  * @property ?Carbon $started_at
  * @property ?Carbon $finished_at
- * @property string $exit_code
- * @property string $git_sha
- * @property string $idempotency_key
- * @property string $log_output
- * @property array<string, mixed> $phase_results
+ * @property ?string $exit_code
+ * @property ?string $git_sha
+ * @property ?string $idempotency_key
+ * @property ?string $log_output
+ * @property ?array<string, mixed> $phase_results
  * @property ?string $project_id
  * @property string $release_folder
  * @property ?string $resume_of_deployment_id

@@ -14,11 +14,11 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property int $attempt
  * @property ?Carbon $completed_at
- * @property string $rollback_status
+ * @property ?string $rollback_status
  * @property ?string $server_id
  * @property ?Carbon $started_at
  * @property string $status
- * @property string $summary
+ * @property ?string $summary
  * @property ?string $task_id
  * @property-read ?Server $server
  * @property-read ?Task $task

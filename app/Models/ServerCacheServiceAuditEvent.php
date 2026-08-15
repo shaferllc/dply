@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      action — install / uninstall / restart / stop / start / flush. Rendered
  *                      as a list on the workspace's Advanced tab.
  * @property string $event
- * @property string $ip_address
- * @property array<string, mixed> $meta
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server

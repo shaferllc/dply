@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * @property string $id
  * @property array<string, mixed> $credentials
- * @property string $name
+ * @property ?string $name
  * @property ?string $organization_id
  * @property string $provider
  * @property ?string $user_id

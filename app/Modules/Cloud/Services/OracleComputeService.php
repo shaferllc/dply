@@ -188,7 +188,12 @@ class OracleComputeService
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * The instance object itself, not a list. The previous list<> annotation
+     * hid every field: PollOracleIpJob reads $instance['lifecycleState'], which
+     * therefore always resolved to '' and never matched 'RUNNING', so an Oracle
+     * server was never marked READY.
+     *
+     * @return array<string, mixed>
      */
     public function getInstance(string $instanceId): array
     {

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $folder
- * @property string $git_sha
+ * @property ?string $git_sha
  * @property bool $is_active
  * @property ?string $site_id
  * @property-read ?Site $site

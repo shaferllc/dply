@@ -14,19 +14,19 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?Carbon $completed_at
- * @property string $failure_summary
- * @property list<array<string, mixed>> $manual_review_items
+ * @property ?string $failure_summary
+ * @property ?list<array<string, mixed>> $manual_review_items
  * @property ?string $organization_id
  * @property ?Carbon $paused_nudge_sent_at
  * @property ?string $provider_credential_id
  * @property string $source
  * @property int $source_server_id
- * @property string $ssh_key_fingerprint
- * @property string $ssh_key_private_encrypted
- * @property string $ssh_key_public
+ * @property ?string $ssh_key_fingerprint
+ * @property ?string $ssh_key_private_encrypted
+ * @property ?string $ssh_key_public
  * @property ?Carbon $ssh_key_pushed_at
  * @property ?Carbon $ssh_key_revoked_at
- * @property int $ssh_key_source_id
+ * @property ?int $ssh_key_source_id
  * @property ?Carbon $started_at
  * @property string $status
  * @property ?string $target_server_id

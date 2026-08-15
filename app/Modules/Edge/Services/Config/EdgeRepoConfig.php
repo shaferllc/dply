@@ -75,8 +75,27 @@ final class EdgeRepoConfig
      *     rewrites: list<array{from: string, to: string}>,
      *     headers: list<array{for: string, values: array<string, string>}>,
      *     crons: list<array{schedule: string, handler?: string}>,
+     *     firewall: array<string, mixed>,
+     *     alerts: array<string, mixed>,
+     *     origin: array<string, mixed>,
+     *     images: array<string, mixed>,
+     *     bindings: array<string, mixed>,
+     *     error_pages: array<string, mixed>,
+     *     maintenance: array<string, mixed>,
+     *     tags: array<string, mixed>,
+     *     snippets: array<string, mixed>,
+     *     forms: array<string, mixed>,
+     *     domains: array<string, mixed>,
+     *     previews: array<string, mixed>,
+     *     comment_widget: array<string, mixed>,
+     *     env: array<string, mixed>,
      *     warnings: list<string>
      * }
+     *
+     * The shape previously listed only 8 of the 22 keys this actually returns,
+     * so `bindings`, `error_pages` and `maintenance` were invisible to callers —
+     * EdgeBuildRunner's dply.yaml binding log and its error-page/maintenance
+     * inlining were both statically (and therefore actually) dead.
      */
     public function toArray(): array
     {

@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      record successes and failures; the workspace's Advanced tab renders the
  *                      recent rows alongside the existing per-database audit log.
  * @property string $event
- * @property string $ip_address
- * @property array<string, mixed> $meta
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server

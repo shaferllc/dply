@@ -15,12 +15,12 @@ use Illuminate\Support\Carbon;
  *                      per site. The row drives `ServerOpcacheConfigEditor`, which renders
  *                      `opcache.ini` from the structured fields and ships it to the host.
  * @property bool $enabled
- * @property string $extra_ini_raw
+ * @property ?string $extra_ini_raw
  * @property int $interned_strings_buffer_mb
  * @property string $jit
  * @property int $jit_buffer_size_mb
  * @property ?Carbon $last_applied_at
- * @property string $last_error
+ * @property ?string $last_error
  * @property int $max_accelerated_files
  * @property int $memory_consumption_mb
  * @property string $php_version

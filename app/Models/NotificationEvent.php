@@ -14,25 +14,25 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?string $actor_id
- * @property string $body
- * @property string $category
+ * @property ?string $body
+ * @property ?string $category
  * @property ?Carbon $cleared_at
  * @property ?string $cleared_by_user_id
  * @property string $event_key
- * @property array<string, mixed> $metadata
+ * @property ?array<string, mixed> $metadata
  * @property ?Carbon $occurred_at
  * @property ?string $organization_id
  * @property ?string $resource_id
- * @property string $resource_type
+ * @property ?string $resource_type
  * @property string $severity
  * @property ?string $subject_id
- * @property string $subject_type
+ * @property ?string $subject_type
  * @property bool $supports_email
  * @property bool $supports_in_app
  * @property bool $supports_webhook
  * @property ?string $team_id
  * @property string $title
- * @property string $url
+ * @property ?string $url
  * @property-read ?User $actor
  * @property-read Collection<int, NotificationInboxItem> $inboxItems
  * @property \Illuminate\Support\Carbon $created_at

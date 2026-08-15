@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $error_message
  * @property ?Carbon $finished_at
  * @property ?string $label
- * @property string $output
+ * @property ?string $output
  * @property ?string $server_id
  * @property ?Carbon $started_at
  * @property string $status

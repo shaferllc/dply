@@ -25,18 +25,18 @@ use Illuminate\Support\Carbon;
  *                      The `name` column survives only for legacy data (always `'default'` going forward) and is not
  *                      exposed in the UI — multi-instance support was removed once it became clear most operators
  *                      never used it and the templated systemd-unit machinery was producing more bugs than value.
- * @property string $auth_password
+ * @property ?string $auth_password
  * @property string $cache_prefix
  * @property ?Carbon $cancel_requested_at
  * @property string $engine
  * @property ?string $error_message
- * @property string $install_output
+ * @property ?string $install_output
  * @property string $name
  * @property int $port
  * @property ?string $server_id
  * @property string $status
- * @property string $target_engine
- * @property string $version
+ * @property ?string $target_engine
+ * @property ?string $version
  * @property-read ?Server $server
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
