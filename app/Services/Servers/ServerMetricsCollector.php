@@ -221,7 +221,6 @@ class ServerMetricsCollector
     }
 
     /**
-     * @param  array<string, mixed> $raw
      * First line of output may be DPLY_SCRIPT_SHA=&lt;64 hex|MISSING&gt; when the guest file exists or not.
      */
     protected function parseRemoteScriptShaFromBuffer(string $buffer): ?string

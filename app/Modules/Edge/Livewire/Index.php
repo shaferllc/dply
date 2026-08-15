@@ -311,6 +311,9 @@ class Index extends Component
         TeardownEdgeSiteJob::dispatch((string) $site->id)->delay($scheduledFor);
     }
 
+    /**
+     * @return Builder<Site>
+     */
     private function edgeSitesQueryForCurrentOrganization(): Builder
     {
         $org = auth()->user()?->currentOrganization();
@@ -319,6 +322,9 @@ class Index extends Component
         return $this->edgeSitesQuery($org);
     }
 
+    /**
+     * @return Builder<Site>
+     */
     private function edgeSitesQuery(Organization $organization): Builder
     {
         return Site::query()

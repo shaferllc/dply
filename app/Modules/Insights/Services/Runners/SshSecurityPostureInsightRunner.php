@@ -33,7 +33,7 @@ class SshSecurityPostureInsightRunner implements InsightRunnerInterface
     ) {}
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
      */
     public function run(Server $server, ?Site $site, array $parameters): array
     {

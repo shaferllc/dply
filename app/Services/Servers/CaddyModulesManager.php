@@ -168,7 +168,6 @@ class CaddyModulesManager
 
     /**
      * @param  array<string, mixed> $moduleIds
-     * @param  array<string, mixed> $installedModules
      * @param  array<string, mixed> $installedModuleIds
      */
     public function isPluginCompiled(string $path, array $moduleIds, array $installedModuleIds): bool

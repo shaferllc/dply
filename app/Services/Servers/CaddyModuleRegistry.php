@@ -216,7 +216,6 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @param  array<string, mixed> $moduleIds
      * @return list<string>
      */
     private function catalogEntry(string $path): array

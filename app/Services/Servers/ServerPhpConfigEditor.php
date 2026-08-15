@@ -139,7 +139,7 @@ class ServerPhpConfigEditor
         string $content,
         ?User $user = null,
         ?string $summary = null,
-        ?callable $afterLockAcquired = null,
+        ?\Closure $afterLockAcquired = null,
     ): array {
         $version = $this->normalizeVersionId($version);
         $target = trim($target);

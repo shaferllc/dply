@@ -627,7 +627,11 @@ class TestingHostnameProvisioner
      *
      * Throws when DO fallback is also unavailable.
      *
-     * @return array{provider: 'digitalocean', dns_provider: App\Services\Sites\Dns\DnsProvider, pool: non-empty-array<string, mixed>, credential: null}
+     * The shape covers all three return sites: the first branch returns whichever
+     * of hetzner/cloudflare/digitalocean matched, with its credential; only the
+     * final app-token fallback has a null credential.
+     *
+     * @return array{provider: string, dns_provider: \App\Services\Sites\Dns\DnsProvider, pool: non-empty-array<string, mixed>, credential: ?\App\Models\ProviderCredential}
      */
     private function resolveTestingProviderForSite(Site $site): array
     {

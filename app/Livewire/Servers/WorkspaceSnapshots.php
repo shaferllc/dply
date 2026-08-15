@@ -278,7 +278,11 @@ class WorkspaceSnapshots extends Component
         return $this->server->sites()->orderBy('name')->get();
     }
 
-    /** Base query for this server's site DB snapshots (scoped via the server's sites). */
+    /**
+     * Base query for this server's site DB snapshots (scoped via the server's sites).
+     *
+     * @return Builder<Snapshot>
+     */
     protected function siteSnapshotsQuery(): Builder
     {
         return Snapshot::query()

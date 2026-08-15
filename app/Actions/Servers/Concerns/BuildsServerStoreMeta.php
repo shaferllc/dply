@@ -47,7 +47,6 @@ trait BuildsServerStoreMeta
     }
 
     /**
-     * @param  list<string>  $scriptKeys
      * @return array<string, mixed>
      */
     private function meta(ServerCreateForm $form): array

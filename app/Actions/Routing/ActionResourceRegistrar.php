@@ -24,8 +24,8 @@ class ActionResourceRegistrar extends ResourceRegistrar
         $resource = Str::camel(str_replace('.', '_', $resource));
         $actionName = Str::singular($resource);
 
-        if (! empty(static::$actionResolver[$method])) {
-            $actionClass = call_user_func(static::$actionResolver[$method], $resource);
+        if (! empty(self::$actionResolver[$method])) {
+            $actionClass = call_user_func(self::$actionResolver[$method], $resource);
         }
 
         if (empty($actionClass)) {
@@ -57,6 +57,6 @@ class ActionResourceRegistrar extends ResourceRegistrar
      */
     public static function resolveResourceAction(string $method, Closure $resolver): void
     {
-        static::$actionResolver[$method] = $resolver;
+        self::$actionResolver[$method] = $resolver;
     }
 }

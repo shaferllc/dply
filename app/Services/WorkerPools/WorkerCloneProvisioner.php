@@ -150,7 +150,7 @@ class WorkerCloneProvisioner
     }
 
     /**
-     * @return array<string, mixed><string, mixed>
+     * @return array<string, mixed>
      */
     private function cloneableMeta(Server $source): array
     {

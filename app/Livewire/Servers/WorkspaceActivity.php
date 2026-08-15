@@ -209,6 +209,8 @@ class WorkspaceActivity extends Component
     /**
      * Base query for audit_logs scoped to this server (and its sites),
      * within the active date range. Both feed and trends start from this.
+     *
+     * @return Builder<AuditLog>
      */
     protected function baseQuery(): Builder
     {

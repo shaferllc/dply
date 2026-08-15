@@ -17,8 +17,6 @@ use Livewire\Attributes\On;
  * Pair with {@see CreatesNotificationChannelInline} on the host component.
  *
  * @property Site $site
- *
- * @phpstan-require-trait CreatesNotificationChannelInline
  */
 trait ManagesEdgeAlertsNotifications
 {

@@ -50,7 +50,6 @@ final class EdgeLogpushRecordImporter
     }
 
     /**
-     * @param  array<string, mixed> $records
      * @param  array<string, mixed> $record
      */
     private function importRecord(array $record): bool

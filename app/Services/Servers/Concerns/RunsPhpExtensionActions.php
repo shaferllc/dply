@@ -43,7 +43,7 @@ trait RunsPhpExtensionActions
     }
 
     /**
-     * @param  callable(string $step): void|null  $onProgress
+     * @param  \Closure(string $step): void|null  $onProgress
      * @param  string|null  $consoleActionId  Row for a queued job to drive through its own lifecycle.
      * @return array{status: 'completed'|'queued', message: string, output?: ?string, task_id?: string}
      */
@@ -52,7 +52,7 @@ trait RunsPhpExtensionActions
         string $action,
         string $version,
         string $extension,
-        ?callable $onProgress = null,
+        ?\Closure $onProgress = null,
         ?string $consoleActionId = null,
     ): array {
         $version = $this->normalizeVersionId($version) ?? '';
@@ -95,7 +95,7 @@ trait RunsPhpExtensionActions
      * Inline path — phpenmod/phpdismod over every module the package provides.
      *
      * @param  array<string, mixed>|null  $entry
-     * @param  callable(string $step): void|null  $onProgress
+     * @param  \Closure(string $step): void|null  $onProgress
      * @return array{status: 'completed', message: string, output: ?string}
      */
     protected function runExtensionToggle(
@@ -104,7 +104,7 @@ trait RunsPhpExtensionActions
         string $version,
         string $extension,
         ?array $entry,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
     ): array {
         $enable = $action === 'enable';
         $modules = $entry !== null ? $this->extensionModules($entry) : [$extension];
@@ -164,7 +164,7 @@ trait RunsPhpExtensionActions
      * holding an SSH session open through a source build.
      *
      * @param  array<string, mixed>|null  $entry
-     * @param  callable(string $step): void|null  $onProgress
+     * @param  \Closure(string $step): void|null  $onProgress
      * @return array{status: 'queued', message: string, task_id: string}
      */
     protected function queueExtensionAptAction(
@@ -173,7 +173,7 @@ trait RunsPhpExtensionActions
         string $version,
         string $extension,
         ?array $entry,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
         ?string $consoleActionId = null,
     ): array {
         $allowPecl = (bool) ($entry['pecl'] ?? false);

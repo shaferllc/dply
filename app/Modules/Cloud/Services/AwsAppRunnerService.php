@@ -440,21 +440,18 @@ class AwsAppRunnerService
     }
 
     /**
-     * Stop an in-progress deployment. Returns true when AWS accepted
-     * the stop request.
+     * Stop an in-progress deployment. Always false: App Runner has no
+     * stop/cancel-deployment operation.
+     *
+     * This previously called $this->client->stopDeployment(), which does not
+     * exist in the SDK (the API exposes startDeployment / pauseService /
+     * resumeService only), so every cancel attempt threw BadMethodCallException
+     * out of the AWS client's __call(). Returning false keeps the
+     * "could not cancel" contract callers already handle.
      */
     public function stopDeployment(string $serviceArn, string $operationId): bool
     {
-        if ($operationId === '') {
-            return false;
-        }
-
-        $result = $this->client->stopDeployment([
-            'ServiceArn' => $serviceArn,
-            'OperationId' => $operationId,
-        ]);
-
-        return is_string($result['OperationId'] ?? null) && $result['OperationId'] !== '';
+        return false;
     }
 
     /**

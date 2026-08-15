@@ -443,7 +443,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  array<string, mixed> $mergedIds
+     * @param  list<string>  $mergedIds  ordered step ids; the index drives sort_order
      */
     private function persistStepOrder(array $mergedIds): void
     {

@@ -327,7 +327,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * treated as "nothing to protect" — `nginx -t` below remains the real syntax
      * gate, and this never blocks a deploy in the default warn mode.
      *
-     * @param  array<string, mixed> $shadowedNames
      * @param  Server  $server
      */
     protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit, ?string $current = null): void
@@ -542,7 +541,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * Mirrors {@see OpenLiteSpeedTlsPaths::letsEncryptDirectoryName}'s wildcard
      * branch: certbot stores the shared cert under /etc/letsencrypt/live/<zone>/.
      *
-     * @param  array<string, mixed> $paths
      * @return array{cert: string, key: string}|null
      */
     protected function coveringWildcardCertPair(Site $site): ?array
@@ -566,7 +564,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * Temporarily writes pending main + layer files, runs nginx -t, then restores previous files.
      *
-     * @return array{ok: bool, message: string}
      */
     public function readCurrentMainConfig(Site $site): ?string
     {

@@ -83,7 +83,11 @@ trait ManagesSiteProvisioning
         $org = $this->site->server?->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.ssl.issuance_queued', $this->site, null, [
-                'primary_hostname' => optional($this->site->primaryDomain)->hostname,
+                // primaryDomain() is a plain method returning ?SiteDomain, not a
+                // relation — property access routes through Eloquent's relation
+                // resolution and throws LogicException. Every other call site
+                // (53 of them) invokes it as a method.
+                'primary_hostname' => $this->site->primaryDomain()?->hostname,
             ]);
         }
 

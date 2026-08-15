@@ -211,7 +211,6 @@ class ResourceSuggestionMapper
      * True when $key equals an exact pattern or starts with a prefix pattern.
      * Patterns ending in `_` are treated as prefixes; everything else is exact.
      *
-     * @param  array<string, mixed> $keys
      * @param  array<string, mixed> $patterns
      */
     private function keyMatches(string $key, array $patterns): bool

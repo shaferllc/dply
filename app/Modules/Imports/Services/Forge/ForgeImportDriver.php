@@ -464,7 +464,6 @@ class ForgeImportDriver implements ImportDriver
 
     /**
      * Forge encodes versions as "php82" / "php83"; normalise to "8.2" / "8.3"
-     * @param  array<string, mixed> $row
      * to match Ploi's shape.
      */
     protected function humanisePhpVersion(mixed $value): ?string

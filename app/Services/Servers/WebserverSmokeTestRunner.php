@@ -295,13 +295,16 @@ BASH;
         }
 
         // Fallback: primary domain → first alias.
+        // ->hostname, not ->name: neither SiteDomain nor SiteDomainAlias has a
+        // `name` column, so this fallback resolved to '' and the smoke test lost
+        // its hostname entirely.
         $primary = $site->domains->first();
         if ($primary !== null) {
-            return (string) $primary->name;
+            return (string) $primary->hostname;
         }
         $alias = $site->domainAliases->first();
         if ($alias !== null) {
-            return (string) $alias->name;
+            return (string) $alias->hostname;
         }
 
         return null;

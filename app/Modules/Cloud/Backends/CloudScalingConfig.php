@@ -192,7 +192,6 @@ class CloudScalingConfig
             $out[$key] = $value;
         }
 
-        /** @var array{enabled: bool, http_path: string, initial_delay_seconds: int, period_seconds: int, timeout_seconds: int, success_threshold: int, failure_threshold: int} $out */
         return $out;
     }
 

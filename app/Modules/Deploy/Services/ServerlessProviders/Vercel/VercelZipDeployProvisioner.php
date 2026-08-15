@@ -14,7 +14,7 @@ use ZipArchive;
 final class VercelZipDeployProvisioner implements ServerlessFunctionProvisioner
 {
     /**
-     * @param  array<string, mixed> $ignoredZipPathPrefixes
+     * @param  list<string>  $ignoredZipPathPrefixes
      */
     public function __construct(
         private readonly string $defaultToken,

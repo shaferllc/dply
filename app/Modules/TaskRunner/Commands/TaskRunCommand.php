@@ -76,11 +76,14 @@ class TaskRunCommand extends Command
         $task = AnonymousTask::command($name, $command);
 
         if ($timeout) {
-            $task->timeout($timeout);
+            $task->setTimeout($timeout);
         }
 
         if ($connection) {
-            $task->onConnection($connection);
+            // AnonymousTask has no connection support (only PendingTask defines
+            // onConnection()), so this used to fatal. Say so rather than
+            // silently running against the default connection.
+            $this->warn('--connection is not supported for ad-hoc tasks; running locally.');
         }
 
         if ($follow) {
@@ -113,7 +116,10 @@ class TaskRunCommand extends Command
 
         $task = AnonymousTask::command($name, $command);
         if ($connection) {
-            $task->onConnection($connection);
+            // AnonymousTask has no connection support (only PendingTask defines
+            // onConnection()), so this used to fatal. Say so rather than
+            // silently running against the default connection.
+            $this->warn('--connection is not supported for ad-hoc tasks; running locally.');
         }
 
         $executor->add($task);
@@ -181,11 +187,14 @@ class TaskRunCommand extends Command
         $task = AnonymousTask::view($name, $view, $data);
 
         if ($timeout) {
-            $task->timeout($timeout);
+            $task->setTimeout($timeout);
         }
 
         if ($connection) {
-            $task->onConnection($connection);
+            // AnonymousTask has no connection support (only PendingTask defines
+            // onConnection()), so this used to fatal. Say so rather than
+            // silently running against the default connection.
+            $this->warn('--connection is not supported for ad-hoc tasks; running locally.');
         }
 
         if ($follow) {

@@ -71,7 +71,6 @@ class SecretResidencyResolver
     /**
      * Whether deploying/pushing this site needs the customer to supply an age
      * identity: it has escrowed (Tier 2) secrets AND the org key is customer-held
-     * @param  array<string, mixed> $vars
      * (dply holds no identity, so it cannot decrypt them on its own).
      */
     public function requiresEphemeralIdentity(Site $site): bool

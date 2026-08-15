@@ -260,7 +260,6 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $results
      * @return array<string, mixed>
      */
     public function run(

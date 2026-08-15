@@ -35,7 +35,11 @@ trait SurfacesErrorStream
     #[Url(as: 'cat', except: '')]
     public string $category = '';
 
-    /** The ErrorEvent query scoped to this view's entity (server or site). */
+    /**
+     * The ErrorEvent query scoped to this view's entity (server or site).
+     *
+     * @return Builder<ErrorEvent>
+     */
     abstract protected function scopedErrors(): Builder;
 
     /** Throw if the current user can't act on this view's errors. */

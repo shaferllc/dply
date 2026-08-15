@@ -6,7 +6,6 @@
  *
  * Keys are Node major versions as strings.
  *
- * @var array<string, string>
  */
 return [
     '14' => '2023-04-30',

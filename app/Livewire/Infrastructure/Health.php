@@ -314,7 +314,9 @@ class Health extends Component
             }
             $rows[] = [
                 'site' => $site,
-                'count' => (int) $row->deploy_count,
+                // deploy_count is a selectRaw aggregate alias, not a column, so
+                // it is only reachable as a dynamic attribute.
+                'count' => (int) $row->getAttribute('deploy_count'),
                 'server_id' => $site->server_id,
             ];
         }

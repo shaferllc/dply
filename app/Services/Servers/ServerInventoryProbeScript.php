@@ -626,7 +626,6 @@ SH;
      * — leaves any pre-existing meta intact). Returns an empty per-runtime stub
      * when mise itself isn't present (handlers can render an empty state).
      *
-     * @param  array<string, mixed> $existingMeta
      * @return array<string, array{versions: list<string>, active: ?string}>|null
      */
     private function parseMiseRuntimesBlock(string $out): ?array

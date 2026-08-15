@@ -150,7 +150,10 @@ class WorkspacePhp extends Component
                                 'set_new_site_default' => __('Saving new-site default'),
                                 default => "{$action} php{$version}",
                             };
-                            $emit->step('php', is_string($command) ? $command : (string) $command);
+                            // __() is typed string|array (a translation key can map
+                            // to an array), so a bare (string) cast here is an
+                            // Array-to-string conversion waiting to happen.
+                            $emit->step('php', is_string($command) ? $command : implode(' ', $command));
                         },
                         $migrateSitesBeforeUninstall,
                         auth()->id(),

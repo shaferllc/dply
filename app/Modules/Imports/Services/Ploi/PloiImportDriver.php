@@ -396,7 +396,6 @@ class PloiImportDriver implements ImportDriver
 
     /**
      * @param  mixed  $payload
-     * @param  array<string, mixed> $row
      * @return array<string, mixed>
      */
     protected function extractObject($payload, string $envelopeKey): array

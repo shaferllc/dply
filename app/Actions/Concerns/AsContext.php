@@ -202,7 +202,10 @@ trait AsContext
      * - request_id: The X-Request-ID header (if present)
      * - Any additional data from getContextData()
      *
-     * @return \stdClass{user: \Illuminate\Contracts\Auth\Authenticatable|null, ip: string|null, user_agent: string|null, timestamp: \Illuminate\Support\Carbon, request_id: string|null, ...}
+     * (Shape is described above rather than in the tag: object shapes are not
+     * valid PHPDoc syntax for \stdClass.)
+     *
+     * @return \stdClass
      */
     protected function getContext(): \stdClass
     {

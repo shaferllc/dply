@@ -54,6 +54,9 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property-read Collection<int, ApiToken> $apiTokens
  * @property-read Collection<int, NotificationChannel> $notificationChannels
  * @property-read Collection<int, NotificationInboxItem> $notificationInboxItems
+ * @property ?string $referred_by_user_id  Real column (users.referred_by_user_id);
+ *           it lives only in database/schema/pgsql-schema.sql, which Larastan
+ *           does not read, so it has to be declared here.
  * @property-read ?User $referrer
  * @property-read Collection<int, User> $referredUsers
  * @property-read Collection<int, ReferralReward> $referralRewardsGranted

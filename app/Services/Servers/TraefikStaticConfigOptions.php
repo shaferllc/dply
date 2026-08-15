@@ -555,7 +555,6 @@ YAML;
     /**
      * Walk a dot-path inside the parsed array.
      *
-     * @param  array<string, mixed> $parsed
      * @param  array<string, mixed> $tree
      */
     private function getByPath(array $tree, string $path): mixed

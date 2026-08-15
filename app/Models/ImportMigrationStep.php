@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $attempts
+ * @property int $attempts  smallint in the schema, and incremented with ++
  * @property ?string $error_message
  * @property ?Carbon $finished_at
  * @property ?string $import_server_migration_id

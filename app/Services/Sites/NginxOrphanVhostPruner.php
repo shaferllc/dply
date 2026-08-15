@@ -102,7 +102,6 @@ final class NginxOrphanVhostPruner
     /**
      * Read every dply-* vhost off the box and split into orphans vs kept.
      *
-     * @param  array<string, mixed> $candidateBasenames
      * @return array{orphans: list<array{basename: string, site_id: ?string, server_names: string, in_available: bool, in_enabled: bool}>, kept: int}
      */
     private function classify(Server $server, SshConnection $ssh): array

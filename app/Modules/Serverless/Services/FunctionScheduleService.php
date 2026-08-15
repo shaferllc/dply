@@ -94,7 +94,6 @@ class FunctionScheduleService
      * Resolve the host's DO credential + Functions namespace, run the
      * callback, and normalize the outcome. Never throws.
      *
-     * @param  array<string, mixed> $callback
      * @param  array<string, mixed> $emptyExtra  shape returned alongside an error
      * @return array<string, mixed>
      */

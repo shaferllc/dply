@@ -371,7 +371,6 @@ class ServerProviderCostEstimator
      * @template TResult
      *
      * @param  callable(): TResult  $fetcher
-     * @param  array<string, mixed>  $base
      * @return TResult
      */
     protected function cachedCatalog(Server $server, string $tag, callable $fetcher): mixed

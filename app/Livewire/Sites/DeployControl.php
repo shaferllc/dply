@@ -37,7 +37,7 @@ use Livewire\Component;
  * Livewire #[Computed] methods are read as properties in PHP and Blade;
  * PHPStan cannot see that magic, so the contract is stated here.
  *
- * @property-read \App\Support\Sites\DeployStatus|null $status
+ * @property-read \App\Services\Sites\DeployStatus|null $status
  * @property-read list<array<string, mixed>> $syncRows
  */
 class DeployControl extends Component

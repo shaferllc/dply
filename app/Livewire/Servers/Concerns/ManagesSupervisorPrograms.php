@@ -558,6 +558,9 @@ trait ManagesSupervisorPrograms
         }
     }
 
+    /**
+     * @return Builder<SupervisorProgram>
+     */
     protected function supervisorProgramQuery(): Builder
     {
         $query = SupervisorProgram::query()->where('server_id', $this->server->id);

@@ -258,8 +258,6 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed> $domains
-     * @param  array<string, mixed> $remoteCertificate
      * @param  array<string, mixed> $files
      */
     protected function publishValidationFiles(Server $server, Site $site, array $files): void

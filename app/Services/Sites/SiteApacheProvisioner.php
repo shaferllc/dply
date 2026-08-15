@@ -106,7 +106,6 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
     }
 
     /**
-     * @return array{ok: bool, message: string}
      */
     public function readCurrentSiteConfig(Site $site): ?string
     {

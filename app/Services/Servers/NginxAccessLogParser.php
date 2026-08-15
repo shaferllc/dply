@@ -163,7 +163,6 @@ class NginxAccessLogParser
     }
 
     /**
-     * @param  array<string, mixed> $rows
      * Bucket an HTTP status into a class key used for colour-coding.
      */
     public function statusClass(?int $status): string

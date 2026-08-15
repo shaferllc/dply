@@ -114,7 +114,6 @@ class UserSshKeyDeploymentService
     }
 
     /**
-     * @param  array<string, mixed> $serverIds
      * After the account key changes, sync linked server rows.
      */
     public function syncLinkedServerRows(UserSshKey $userSshKey): void

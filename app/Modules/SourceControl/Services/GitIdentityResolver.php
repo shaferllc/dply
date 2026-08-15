@@ -123,7 +123,10 @@ class GitIdentityResolver
             if ($identity === null || $identity->provider() !== $provider || $identity->accessToken() === '') {
                 return;
             }
-            $key = get_class($identity).':'.$identity->getKey();
+            // id(), not getKey(): getKey() is an Eloquent method the GitIdentity
+            // contract does not declare. id() is the contract's own accessor for
+            // the same value (the model's ULID).
+            $key = get_class($identity).':'.$identity->id();
             if (isset($seen[$key])) {
                 return;
             }

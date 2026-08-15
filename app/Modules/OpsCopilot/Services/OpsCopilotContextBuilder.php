@@ -27,7 +27,7 @@ final class OpsCopilotContextBuilder
     /**
      * Sites with a recent failed BYO deploy or failed Edge build.
      *
-     * @return Illuminate\Support\Collection<int, array{id: string, name: string, product: string, failed_at: mixed}>
+     * @return \Illuminate\Support\Collection<int, array{id: string, name: string, product: string, failed_at: mixed}>
      */
     public function candidateSites(Organization $organization): Collection
     {
@@ -117,10 +117,13 @@ final class OpsCopilotContextBuilder
             ],
             'failure' => $failure,
             'repo_config' => $repoConfig,
+            // Column names, not invented ones: `sites` has post_deploy_command
+            // and document_root — deploy_command / web_directory do not exist,
+            // so both of these were always null in the triage context.
             'deploy_settings' => [
                 'build_command' => $site->build_command,
-                'deploy_command' => $site->deploy_command,
-                'web_directory' => $site->web_directory,
+                'deploy_command' => $site->post_deploy_command,
+                'web_directory' => $site->document_root,
             ],
             'intelligence_alerts' => $alerts->map(fn (DeployIntelligenceAlert $alert): array => [
                 'id' => (string) $alert->id,

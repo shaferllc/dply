@@ -84,7 +84,6 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $patterns
      */
     public static function outputLooksLikeAptLockFailure(string $output, ?int $exitCode = null): bool
     {

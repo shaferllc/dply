@@ -107,7 +107,7 @@ BASH;
             return [];
         }
 
-        $daysToExpiry = (int) floor(now()->diffInRealSeconds($notAfter, false) / 86400);
+        $daysToExpiry = (int) floor(now()->diffInSeconds($notAfter, false) / 86400);
 
         // Already expired: critical with a distinct title; ≤critical days: critical;
         // ≤warn days: warning. Outside the warn window: emit nothing (let the

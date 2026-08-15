@@ -247,7 +247,10 @@ class Show extends Component
         // Stripe Checkout lives on a different origin (checkout.stripe.com),
         // so Livewire's default wire:navigate redirect fails silently — pass
         // navigate: false to force a full-page window.location swap.
-        return $this->redirect($checkout->url, navigate: false);
+        // asStripeCheckoutSession() rather than $checkout->url: Checkout::__get()
+        // just forwards to the underlying session, and the typed accessor says
+        // so explicitly.
+        return $this->redirect((string) $checkout->asStripeCheckoutSession()->url, navigate: false);
     }
 
     /**
@@ -325,7 +328,10 @@ class Show extends Component
             return $this->billingRedirect('billing_error', __('Could not cancel the subscription. Please try again or contact support.'));
         }
 
-        $endsAt = $subscription->fresh()?->ends_at;
+        // getAttribute(): ends_at is a Cashier column (cast to datetime in
+        // the package), but Cashier's migrations live in the vendor dir, so
+        // Larastan cannot see the column from database/migrations.
+        $endsAt = $subscription->fresh()?->getAttribute('ends_at');
 
         return $this->billingRedirect('billing_status', $endsAt
             ? __('Subscription canceled. You keep full access until :date.', ['date' => $endsAt->toFormattedDateString()])
@@ -378,7 +384,7 @@ class Show extends Component
 
     public function getSubscriptionEndsAtProperty(): ?CarbonInterface
     {
-        return $this->subscription?->ends_at;
+        return $this->subscription?->getAttribute('ends_at');
     }
 
     public function getOnDplyTrialProperty(): bool

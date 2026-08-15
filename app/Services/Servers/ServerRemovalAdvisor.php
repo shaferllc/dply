@@ -54,8 +54,10 @@ final class ServerRemovalAdvisor
             'authorized_keys' => (int) $server->authorized_keys_count,
             'recipes' => (int) $server->recipes_count,
             'running_deployments' => $runningDeployments,
-            'provider_label' => true ? $provider->label() : (string) $provider,
-            'provider_value' => true ? $provider->value : (string) $provider,
+            // Were `true ? … : (string) $provider` — the dead else-branch cast a
+            // backed enum to string, which is a fatal, and never ran.
+            'provider_label' => $provider->label(),
+            'provider_value' => $provider->value,
             'will_destroy_cloud' => self::willDestroyCloudResource($server),
             'organization_name' => $server->organization?->name,
         ];

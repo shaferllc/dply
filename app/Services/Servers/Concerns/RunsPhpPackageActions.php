@@ -19,14 +19,14 @@ trait RunsPhpPackageActions
 
 
     /**
-     * @param  callable(string $step, string $action, string $version): void|null  $onProgress
+     * @param  \Closure(string $step, string $action, string $version): void|null  $onProgress
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
     public function applyPackageAction(
         Server $server,
         string $action,
         string $version,
-        ?callable $onProgress = null,
+        ?\Closure $onProgress = null,
         bool $migrateSitesBeforeUninstall = false,
         ?string $actingUserId = null,
     ): array {
@@ -192,7 +192,7 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
         ?string $actingUserId,
     ): void {
         $migrator = app(ServerPhpSiteRuntimeMigrator::class);
@@ -221,7 +221,7 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
         ?string $actingUserId,
     ): array {
         $migrator = app(ServerPhpSiteRuntimeMigrator::class);
@@ -326,7 +326,7 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
     ): array {
         $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
         $fallback = app(ServerPhpSiteRuntimeMigrator::class)->resolveMigrationTargetVersion($installedIds, $version);

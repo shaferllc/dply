@@ -121,7 +121,6 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
     }
 
     /**
-     * @return array{ok: bool, message: string}
      */
     public function readCurrentSiteConfig(Site $site): ?string
     {

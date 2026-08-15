@@ -382,7 +382,7 @@ final class ServerDeployPolicyGuard
 
     /**
      * @param  array<string, mixed> $policy
-     * @return list<array{id: string, site_name: string, finished_at: Carbon\Carbon|null, message: string, site_url: string}>
+     * @return list<array{id: string, site_name: string, finished_at: Carbon|null, message: string, site_url: string}>
      */
     private function recentPolicySkips(Server $server, array $policy): array
     {

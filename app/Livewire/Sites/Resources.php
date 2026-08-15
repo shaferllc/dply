@@ -36,8 +36,8 @@ use Livewire\Component;
  * Livewire #[Computed] methods are read as properties in PHP and Blade;
  * PHPStan cannot see that magic, so the contract is stated here.
  *
- * @property-read \Illuminate\Support\Collection<int, \App\Models\CloudDatabase> $attachedDatabases
- * @property-read \Illuminate\Support\Collection<int, \App\Models\CloudWorker> $workers
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CloudDatabase> $attachedDatabases
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CloudWorker> $workers
  */
 #[Layout('layouts.app')]
 class Resources extends Component

@@ -66,7 +66,7 @@ use Illuminate\Support\Str;
  * @property ?string $deploy_script_id
  * @property string $deploy_strategy
  * @property string $deploy_method
- * @property string $releases_to_keep
+ * @property int $releases_to_keep  smallint in the schema
  * @property string $nginx_extra_raw
  * @property bool $engine_http_cache_enabled
  * @property ?string $octane_port

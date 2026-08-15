@@ -146,7 +146,10 @@ class ClaimWarmServer
                 'ssh_user' => $pool->ssh_user,
                 'ssh_port' => $pool->ssh_port,
                 'ssh_private_key' => $pool->ssh_private_key,
-                'ssh_public_key' => $pool->ssh_public_key,
+                // No ssh_public_key line: `servers` has no such column (only
+                // ssh_private_key / ssh_recovery_private_key /
+                // ssh_operational_private_key). forceFill() would have made it a
+                // dirty attribute and the UPDATE would fail on the missing column.
                 'hetzner_network_id' => $pool->hetzner_network_id,
                 // Personalization re-runs setup as the customer; hold READY until
                 // it completes so the journey shows the (fast) finishing pass.

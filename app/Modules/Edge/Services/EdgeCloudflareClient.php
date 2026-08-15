@@ -1041,7 +1041,6 @@ class EdgeCloudflareClient
     }
 
     /**
-     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     private function decode(Response $response): array

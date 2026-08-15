@@ -68,7 +68,6 @@ class SiteEnvValidator
 
     /**
      * @param  \Closure(string): ?string  $get
-     * @param  array<string, mixed> $vars
      * @return list<array<string, string|null>>
      */
     private function checkApp(\Closure $get, bool $isProd): array

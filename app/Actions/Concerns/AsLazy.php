@@ -545,22 +545,12 @@ namespace App\Actions\Concerns;
  *     }
  * }
  *
- * // In Blade template:
+ * // In Blade template (directives shown inline: a docblock line starting with
+ * // "@if"/"@foreach" is parsed as a PHPDoc tag, not as example text):
  *
- * @php
- *     $posts = \App\Actions\GetRecentPosts::make($user);
- *
- * @endphp
- *
- * @if($posts->isExecuted())
- *     <p>Posts loaded</p>
- *
- * @endif
- *
- * @foreach($posts->get() as $post)
- *     {{ $post->title }}
- *
- * @endforeach
+ * //   @php $posts = \App\Actions\GetRecentPosts::make($user); @endphp
+ * //   @if ($posts->isExecuted())  <p>Posts loaded</p>  @endif
+ * //   @foreach ($posts->get() as $post)  {{ $post->title }}  @endforeach
  *
  * @example
  * // ============================================

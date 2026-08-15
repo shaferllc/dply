@@ -31,7 +31,7 @@ final class SiteResourceBindingResolver
      */
     /** @return array<string, mixed> */
     /**
-     * @return array<int, App\Support\Deployment\SiteResourceBinding>
+     * @return array<int, \App\Support\Deployment\SiteResourceBinding>
      */
     public function forSite(Site $site): array
     {

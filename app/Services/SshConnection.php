@@ -261,7 +261,6 @@ class SshConnection implements RemoteShell
     }
 
     /**
-     * @param  array<string, mixed> $commands
      * Disconnect.
      */
     public function disconnect(): void

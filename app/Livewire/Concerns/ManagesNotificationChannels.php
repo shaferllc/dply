@@ -169,10 +169,10 @@ trait ManagesNotificationChannels
     /** {@see ResolvesSlackWorkspaces} — Slack installs hang off the same owner as the channels. */
     protected function channelIntegrationOwner(): User|Organization|Team
     {
-        /** @var User|Organization|Team $owner */
-        $owner = $this->owner();
-
-        return $owner;
+        // No @var here: owner() is already typed, and each host component
+        // narrows it further (Organization / Team / User), so re-declaring the
+        // union widened it against the native type.
+        return $this->owner();
     }
 
     /**

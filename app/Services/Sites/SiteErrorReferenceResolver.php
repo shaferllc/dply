@@ -98,7 +98,6 @@ final class SiteErrorReferenceResolver
     }
 
     /**
-     * @param  array<string, mixed> $miss
      * @param  array<string, mixed> $sourceMap
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */

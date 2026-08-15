@@ -45,7 +45,7 @@ class ActionIDEHelper
                 'namespace' => $reflection->getNamespaceName(),
                 'parameters' => array_map(fn ($p) => [
                     'name' => $p->getName(),
-                    'type' => $p->getType()?->getName(),
+                    'type' => ($t = $p->getType()) instanceof \ReflectionNamedType ? $t->getName() : null,
                     'optional' => $p->isOptional(),
                 ], $parameters),
             ];

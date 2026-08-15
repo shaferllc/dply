@@ -95,8 +95,10 @@ class OAuthDecorator
         if (method_exists($user, 'token')) {
             $token = $user->token();
 
+            // method_exists() is enough for PHPStan to narrow $token here; the
+            // previous `object{scopes(): array}` @var was not valid PHPDoc
+            // (object shapes cannot declare methods).
             if ($token && method_exists($token, 'scopes')) {
-                /** @var object{scopes(): array} $token */
                 return $token->scopes();
             }
         }

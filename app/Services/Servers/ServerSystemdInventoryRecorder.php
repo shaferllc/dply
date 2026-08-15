@@ -85,7 +85,6 @@ final class ServerSystemdInventoryRecorder
     }
 
     /**
-     * @param  list<array<string, mixed>>  $newUnits
      */
     public function persistInventoryFromRawOutput(Server $server, string $raw): void
     {

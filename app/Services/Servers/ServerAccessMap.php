@@ -229,7 +229,6 @@ final class ServerAccessMap
     }
 
     /**
-     * @param  array<string, mixed> $reportRows
      * @return array{has_data: bool, height: int, columns: array{sources: string, accounts: string, workloads: string}, sources: list<array<string, mixed>>, accounts: list<array<string, mixed>>, workloads: list<array<string, mixed>>, edges: list<array<string, mixed>>}
      */
     private function empty(): array

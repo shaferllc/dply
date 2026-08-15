@@ -31,7 +31,7 @@ class EnvDriftRule implements IntelligenceRule
 
     /** @return array<string, mixed> */
     /**
-     * @return list<App\Services\DeployIntelligence\AlertFinding>
+     * @return list<\App\Services\DeployIntelligence\AlertFinding>
      */
     public function evaluate(Organization $organization): array
     {

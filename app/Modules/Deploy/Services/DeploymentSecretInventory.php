@@ -19,7 +19,7 @@ final class DeploymentSecretInventory
      */
     /** @return array<string, mixed> */
     /**
-     * @return list<App\Support\Deployment\DeploymentSecret>
+     * @return list<\App\Support\Deployment\DeploymentSecret>
      */
     public function forSite(Site $site): array
     {
@@ -110,7 +110,7 @@ final class DeploymentSecretInventory
     }
 
     /**
-     * @return list<App\Support\Deployment\DeploymentSecret>
+     * @return list<\App\Support\Deployment\DeploymentSecret>
      */
     /** @return array<string, mixed> */
     public function environmentMapForSite(Site $site): array

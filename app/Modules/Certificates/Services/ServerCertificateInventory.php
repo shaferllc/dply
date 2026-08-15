@@ -337,8 +337,6 @@ final class ServerCertificateInventory
      * scan row back to an inventory item by domain.
      *
      * @param  array<string, mixed> $row
-     * @param  array<string, mixed> $items
-     * @param  array<string, mixed> $liveCerts
      * @return list<string>
      */
     private function liveCertDomains(array $row): array

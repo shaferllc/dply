@@ -24,7 +24,7 @@ class PackageSecurityUpdatesInsightRunner implements InsightRunnerInterface
     ) {}
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
      */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
@@ -102,7 +102,7 @@ BASH;
     }
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

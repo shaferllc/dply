@@ -213,7 +213,6 @@ final class ServerManageToolsReport
     }
 
     /**
-     * @param  array<string, mixed> $serviceActions
      * @param  array<string, mixed> $def
      */
     private function toolVisible(array $def, bool $phpAvailable, bool $redisRelevant, Server $server): bool

@@ -102,7 +102,6 @@ final class DocsManifest
     /**
      * Published docs grouped by category, both categories and docs in display order.
      *
-     * @return array<int, string>
      */
     public function byCategory(): Collection
     {

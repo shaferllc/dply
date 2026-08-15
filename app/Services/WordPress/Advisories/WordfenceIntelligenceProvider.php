@@ -35,7 +35,7 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
 
     /** @return array<string, mixed> */
     /**
-     * @return list<App\Services\WordPress\Advisories\Advisory>
+     * @return list<\App\Services\WordPress\Advisories\Advisory>
      */
     public function forPlugin(string $slug, string $installedVersion): array
     {
@@ -45,7 +45,7 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
     /** @return list<App\Services\WordPress\Advisories\Advisory>
     /** @return list<App\Services\WordPress\Advisories\Advisory>
     /**
-     * @return list<App\Services\WordPress\Advisories\Advisory>
+     * @return list<\App\Services\WordPress\Advisories\Advisory>
      */
     public function forTheme(string $slug, string $installedVersion): array
     {
@@ -55,7 +55,7 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
     /** @return list<App\Services\WordPress\Advisories\Advisory>
     /** @return list<App\Services\WordPress\Advisories\Advisory>
     /**
-     * @return list<App\Services\WordPress\Advisories\Advisory>
+     * @return list<\App\Services\WordPress\Advisories\Advisory>
      */
     public function forCore(string $installedVersion): array
     {
@@ -63,7 +63,7 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
     }
 
     /**
-     * @return list<App\Services\WordPress\Advisories\Advisory>
+     * @return list<\App\Services\WordPress\Advisories\Advisory>
      */
     private function lookup(string $kind, string $slug, string $version): array
     {

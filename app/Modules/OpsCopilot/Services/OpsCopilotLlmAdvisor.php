@@ -48,7 +48,6 @@ final class OpsCopilotLlmAdvisor
     }
 
     /**
-     * @param  array<string, mixed>  $context
      * @return list<OpsCopilotSuggestion>
      */
     public function suggestionsFromRun(?AiAdvisorRun $run): array

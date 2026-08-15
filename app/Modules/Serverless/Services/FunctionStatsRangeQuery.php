@@ -167,8 +167,7 @@ final class FunctionStatsRangeQuery
     /**
      * Nearest-rank percentile of an integer list (0 when empty).
      *
-     * @return array<string, mixed>
-     * @param  array<string, mixed> $values
+     * @param  list<int>  $values
      */
     private function percentile(array $values, int $p): int
     {
