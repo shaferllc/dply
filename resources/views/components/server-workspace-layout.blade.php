@@ -32,8 +32,17 @@
 @endphp
 
 {{-- Livewire full-page views need a single root; the banner is a sibling of the
-     shell so it spans edge-to-edge like it does on the site pages. --}}
-<div class="contents">
+     shell so it spans edge-to-edge like it does on the site pages.
+
+     NOT `class="contents"`. Every workspace lazy-load skeleton renders through
+     this component, and Livewire's #[Lazy] stamps `x-intersect` onto the
+     placeholder's ROOT element (SupportLazyLoading::generatePlaceholderHtml).
+     `display: contents` generates no principal box, so IntersectionObserver
+     never fires, __lazyLoad is never called, and the skeleton sits there
+     forever. A plain block wrapper is layout-neutral here — the shell centres
+     itself and the banner is full-bleed either way — and matches what
+     sites/show and sites/settings already do. --}}
+<div>
 @if ($productionConnection)
     <x-production-data-banner
         :connection="$productionConnection"
