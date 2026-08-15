@@ -164,7 +164,6 @@ class HorizonConfigDetector
 
     /**
      * @param  array{cpu_cores: int, ram_mb: int}  $host
-     * @return array{source: string, detected_at: string, environment: ?string, host: array{cpu_cores: int, ram_mb: int}, queues: list<array{name: string, sources: list<string>, job_count: int}>, recommended: array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}}
      */
     private function buildScanResult(string $scanBlock, array $host): array
     {

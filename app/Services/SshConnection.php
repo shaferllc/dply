@@ -174,9 +174,6 @@ class SshConnection implements RemoteShell
      * @param  callable(string):void  $chunkCallback
      * @return array{0: string, 1: ?int}
      */
-    /**
-     * @return array<int, int|string|null>
-     */
     public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
     {
         $out = $this->execWithCallback($command, $chunkCallback, $timeoutSeconds);

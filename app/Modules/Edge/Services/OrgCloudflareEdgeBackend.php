@@ -35,7 +35,6 @@ class OrgCloudflareEdgeBackend implements EdgeBackend
         $this->delivery->unpublish($site);
     }
 
-    /** @return array<string, mixed> */
     public function attachDomain(Site $site, string $hostname): array
     {
         return $this->delivery->attachDomain($site, $hostname);

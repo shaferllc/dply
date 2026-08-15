@@ -17,9 +17,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function listMysqlDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -56,9 +53,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function listPostgresDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -83,9 +77,6 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
-    /**
-     * @return list<string>
-     */
     /**
      * @return list<string>
      */
@@ -114,9 +105,6 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
-    /**
-     * @return list<string>
-     */
     /**
      * @return list<string>
      */

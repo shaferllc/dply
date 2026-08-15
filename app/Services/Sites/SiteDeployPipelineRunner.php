@@ -209,6 +209,7 @@ class SiteDeployPipelineRunner
         $site->loadMissing('deploySteps');
         $cwd = escapeshellarg($workingDirectory);
         $log = '';
+        /** @var list<array<string, mixed>> $steps */
         $steps = [];
         $ok = true;
 

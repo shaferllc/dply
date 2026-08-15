@@ -60,9 +60,6 @@ class RemediationCatalog
      *
      * @return list<class-string>
      */
-    /**
-     * @return list<string>
-     */
     public function handlerClasses(): array
     {
         $classes = [];

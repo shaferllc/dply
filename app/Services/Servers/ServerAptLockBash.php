@@ -83,8 +83,6 @@ BASH;
         return self::managePreamble()."\n".$script;
     }
 
-    /**
-     */
     public static function outputLooksLikeAptLockFailure(string $output, ?int $exitCode = null): bool
     {
         if ($exitCode === 100) {

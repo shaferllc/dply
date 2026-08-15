@@ -54,9 +54,6 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -77,9 +74,6 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
-    /**
-     * @return list<array<string, array<string, mixed>|int|string|null>>
-     */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}");

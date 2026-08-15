@@ -70,9 +70,6 @@ final class LaravelConsoleExecutor
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function customCommands(Site $site): array
     {
         $meta = is_array($site->meta) ? $site->meta : [];

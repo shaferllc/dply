@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 trait ManagesFirewallWorkspaceAdvanced
 {
-    /** @var 'rules'|'templates'|'activity' */
+    /** @var 'rules'|'templates'|'activity'|'notifications' */
     public string $firewall_workspace_tab = 'rules';
 
     public bool $firewall_ack_ssh_risk = false;

@@ -46,7 +46,7 @@ trait ManagesServerNoteComments
     /**
      * Comments for the expanded threads only, grouped by note ID.
      *
-     * @return Collection<string, Collection<int, ServerNoteComment>>
+     * @return Collection<(int|string), \Illuminate\Database\Eloquent\Collection<int, ServerNoteComment>>
      */
     #[Computed]
     public function serverNoteComments(): Collection
@@ -63,7 +63,11 @@ trait ManagesServerNoteComments
             ->with(['creator:id,name', 'editor:id,name'])
             ->orderBy('created_at')
             ->get()
-            ->groupBy('server_note_id');
+            ->groupBy('server_note_id')
+            // toBase(): groupBy() returns `static`, so on an Eloquent collection the
+            // outer wrapper would be an Eloquent\Collection whose values are
+            // collections, not Models — which its own generic forbids.
+            ->toBase();
     }
 
     /**

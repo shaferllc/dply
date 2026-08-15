@@ -18,14 +18,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $name
  * @property int $numprocs
  * @property ?string $organization_id
- * @property string $priority
+ * @property ?int $priority
  * @property string $program_type
  * @property bool $redirect_stderr
  * @property string $slug
- * @property string $startsecs
+ * @property ?int $startsecs
  * @property string $stderr_logfile
  * @property string $stdout_logfile
- * @property string $stopwaitsecs
+ * @property ?int $stopwaitsecs
  * @property string $user
  * @property-read ?Organization $organization
  * @property \Illuminate\Support\Carbon $created_at

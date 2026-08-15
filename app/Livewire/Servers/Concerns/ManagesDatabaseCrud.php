@@ -59,7 +59,12 @@ trait ManagesDatabaseCrud
 
     public ?string $new_mysql_collation = null;
 
-    /** @var array{name: string, engine: string, username: string, password: string, host: string, password_generated: bool, username_generated: bool}|null */
+    /**
+     * `password` is unset (and `password_hidden` set) once the operator
+     * dismisses the one-time reveal, so both keys are optional.
+     *
+     * @var array{name: string, engine: string, username: string, password?: string, host: string, password_generated: bool, username_generated: bool, password_hidden?: bool}|null
+     */
     public ?array $generated_database_credentials = null;
 
     public function openEngineDatabaseCreate(string $engine): void

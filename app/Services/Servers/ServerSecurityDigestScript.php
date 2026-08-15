@@ -173,7 +173,6 @@ SH;
      *   currently_failed: ?int,
      *   total_failed: ?int,
      *   banned_ips: list<string>,
-     * @param  array<string, mixed> $existingMeta
      * }
      */
     public function parseJailStatus(string $name, string $raw): array

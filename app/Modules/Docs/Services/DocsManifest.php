@@ -119,9 +119,6 @@ final class DocsManifest
      *
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function orderedList(): array
     {
         return $this->published()
@@ -138,7 +135,6 @@ final class DocsManifest
     /**
      * Previous/next docs around the given slug, in global reading order.
      *
-     * @return array<int, array<string, mixed>>
      */
     public function prevNext(string $slug): array
     {

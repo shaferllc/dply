@@ -105,8 +105,6 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         return $out;
     }
 
-    /**
-     */
     public function readCurrentSiteConfig(Site $site): ?string
     {
         $server = $this->ensureServerReady($site);

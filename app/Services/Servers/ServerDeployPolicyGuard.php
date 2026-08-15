@@ -301,7 +301,6 @@ final class ServerDeployPolicyGuard
     }
 
     /**
-     * @param  array<string, mixed> $input
      * @return array<string, mixed>
      */
     public function defaultPolicy(): array
@@ -316,9 +315,6 @@ final class ServerDeployPolicyGuard
 
     /**
      * @return list<array{days: list<string>, start: string, end: string}>
-     */
-    /**
-     * @return list<array<string, list<string>|string>>
      */
     public function weekendFreezePreset(): array
     {
@@ -375,7 +371,6 @@ final class ServerDeployPolicyGuard
 
     /**
      * @param  array<string, mixed> $policy
-     * @return list<array{id: string, site_name: string, finished_at: Carbon|null, message: string, site_url: string}>
      */
     private function recentPolicySkips(Server $server, array $policy): array
     {

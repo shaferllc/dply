@@ -114,7 +114,6 @@ trait ManagesSiteRedirects
      * inline edit form gets the same per-field error UX as the add form.
      *
      * @param  array<int, array{name?: string|null, value?: string|null}>  $rows
-     * @return array<string, string>|null Normalized headers, or null if all rows were blank.
      */
     protected function validateAndNormalizeRedirectHeaders(array $rows, string $errorKeyPrefix): ?array
     {

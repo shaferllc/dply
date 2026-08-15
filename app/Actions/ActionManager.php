@@ -331,8 +331,12 @@ class ActionManager
             debug_backtrace($backtraceOptions, $ownNumberOfFrames + $this->backtraceLimit),
             $ownNumberOfFrames
         );
-        foreach ($frames as $frame) {
-            $frame = new BacktraceFrame($frame);
+        // Loop over $rawFrame, not $frame: $frame is the ?BacktraceFrame by-ref
+        // out-parameter, and `foreach ($frames as $frame)` assigned the caller's
+        // variable a raw debug_backtrace() array on every iteration before the
+        // conversion below replaced it.
+        foreach ($frames as $rawFrame) {
+            $frame = new BacktraceFrame($rawFrame);
 
             /** @var DesignPattern $designPattern */
             foreach ($designPatterns as $designPattern) {

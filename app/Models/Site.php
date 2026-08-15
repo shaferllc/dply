@@ -54,20 +54,20 @@ use Illuminate\Support\Str;
  * @property ?Carbon $ssl_installed_at
  * @property ?Carbon $last_deploy_at
  * @property ?Carbon $suspended_at
- * @property string $suspended_reason
+ * @property ?string $suspended_reason
  * @property ?Carbon $scheduled_deletion_at
  * @property string $git_repository_url
  * @property string $git_branch
  * @property string $git_deploy_key_private
  * @property string $git_deploy_key_public
  * @property string $webhook_secret
- * @property array<string, mixed> $webhook_allowed_ips
+ * @property ?list<string> $webhook_allowed_ips
  * @property string $post_deploy_command
  * @property ?string $deploy_script_id
  * @property string $deploy_strategy
  * @property string $deploy_method
  * @property int $releases_to_keep  smallint in the schema
- * @property string $nginx_extra_raw
+ * @property ?string $nginx_extra_raw
  * @property bool $engine_http_cache_enabled
  * @property ?string $octane_port
  * @property bool $laravel_scheduler

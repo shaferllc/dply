@@ -32,9 +32,6 @@ class ServerAuthorizedKeysDiffPreview
         return $this;
     }
 
-    /**
-     * @return non-empty-array<string, array{remote: array<string, mixed>, desired: list<string>, added: list<string>, removed: list<mixed>, kept: list<mixed>}>
-     */
     public function diffPerUser(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {

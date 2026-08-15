@@ -52,12 +52,6 @@ class AppCatalog
         'drupal' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
     ];
 
-    /**
-     * @return array<string, mixed>
-     */
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function forServer(Server $server): array
     {
         if (! $server->isVmHost()) {
@@ -92,7 +86,6 @@ class AppCatalog
      * Normalized families (mysql/mariadb/postgres/sqlite) of every engine
      * installed on the server.
      *
-     * @return array<int, array<string, mixed>>
      */
     private function installedDatabaseFamilies(Server $server): array
     {

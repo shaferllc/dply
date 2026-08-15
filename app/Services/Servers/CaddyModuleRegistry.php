@@ -49,9 +49,6 @@ class CaddyModuleRegistry
      *     module_ids: list<string>,
      * }>
      */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function communityPackages(): array
     {
         $byPackage = [];
@@ -99,7 +96,6 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @return list<array<string, list<string>|string>>
      *     path: string,
      *     repo: string,
      *     label: string,

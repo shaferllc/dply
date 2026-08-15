@@ -11,18 +11,18 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $bytes_egress
- * @property string $cache_hits
+ * @property int $bytes_egress
+ * @property int $cache_hits
  * @property string $duration_ms_p95
- * @property string $duration_ms_total
+ * @property int $duration_ms_total
  * @property Carbon $hour_start
  * @property ?string $organization_id
- * @property string $requests
+ * @property int $requests
  * @property ?string $site_id
  * @property string $source
- * @property string $status_2xx
- * @property string $status_4xx
- * @property string $status_5xx
+ * @property int $status_2xx
+ * @property int $status_4xx
+ * @property int $status_5xx
  * @property-read ?Site $site
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at

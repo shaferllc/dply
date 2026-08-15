@@ -128,7 +128,7 @@ class SlowBuildRule implements IntelligenceRule
     }
 
     /**
-     * @param  array<string, mixed> $sortedAsc
+     * @param  list<float|int>  $sortedAsc
      */
     private function median(array $sortedAsc): float
     {

@@ -29,9 +29,6 @@ final class LlmSynthesisResult
         public readonly array $metadata = [],
     ) {}
 
-    /**
-     * @return array{narrative: string, suggestions: list<ParsedSuggestion>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int|null}
-     */
     public function toArray(): array
     {
         return [

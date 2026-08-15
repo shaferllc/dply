@@ -20,12 +20,12 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property ?array<string, mixed> $env_vars
  * @property ?string $autorestart
- * @property ?string $priority
+ * @property ?int $priority
  * @property bool $redirect_stderr
- * @property ?string $startsecs
+ * @property ?int $startsecs
  * @property ?string $stderr_logfile
  * @property ?string $stdout_logfile
- * @property ?string $stopwaitsecs
+ * @property ?int $stopwaitsecs
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property-read Server $server

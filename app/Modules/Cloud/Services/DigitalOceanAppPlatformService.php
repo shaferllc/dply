@@ -284,11 +284,7 @@ class DigitalOceanAppPlatformService
      * List recent deployments for an app. Returns at most $limit
      * deployments newest-first.
      *
-     * @param  array<string, mixed> $spec
      * @return list<array<string, mixed>>
-     */
-    /**
-     * @return list<mixed>
      */
     public function listDeployments(string $appId, int $limit = 10): array
     {
@@ -304,7 +300,9 @@ class DigitalOceanAppPlatformService
      * created/started/finished timestamps. Used by the dply deploy
      * detail page to show the full rollout story.
      *
-     * @return list<mixed>
+     * The DO `deployment` object keyed by field, not a list.
+     *
+     * @return array<string, mixed>
      */
     public function getDeployment(string $appId, string $deploymentId): array
     {
@@ -407,9 +405,6 @@ class DigitalOceanAppPlatformService
      *
      * @return list<array{t: int, v: float}>
      */
-    /**
-     * @return list<array<string, float|int>>
-     */
     public function getAppMetric(string $appId, string $metric, int $start, int $end, string $component = 'web'): array
     {
         $query = http_build_query([
@@ -460,7 +455,11 @@ class DigitalOceanAppPlatformService
     /**
      * Inspect a single app — used by status polling.
      *
-     * @return list<array<string, float|int>>
+     * The DO `app` object, not a list: callers read $app['spec']['services'].
+     * The previous list<array<string, float|int>> annotation made every one of
+     * those offsets invisible.
+     *
+     * @return array<string, mixed>
      */
     public function getApp(string $appId): array
     {
@@ -472,9 +471,6 @@ class DigitalOceanAppPlatformService
 
     /**
      * @return list<array<string, mixed>>
-     */
-    /**
-     * @return list<mixed>
      */
     public function listApps(): array
     {
@@ -491,7 +487,6 @@ class DigitalOceanAppPlatformService
      * stays the same; this just causes the platform to re-pull
      * the latest image tag and roll out a new revision.
      *
-     * @return list<mixed>
      */
     public function deployApp(string $appId, bool $force = false): array
     {

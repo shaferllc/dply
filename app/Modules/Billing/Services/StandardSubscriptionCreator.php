@@ -39,9 +39,6 @@ class StandardSubscriptionCreator
      *
      * @throws RuntimeException when a paid plan's Stripe price is not configured.
      */
-    /**
-     * @return list<array<string, int<1, max>|string>>
-     */
     public function buildPriceList(DesiredBillingState $desired, string $interval = self::INTERVAL_MONTH): array
     {
         $items = [];

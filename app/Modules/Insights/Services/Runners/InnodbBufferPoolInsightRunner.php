@@ -149,9 +149,6 @@ BASH;
         return number_format($n, 1, '.', '');
     }
 
-    /**
-     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
-     */
     private function parseKeyValues(string $buffer): array
     {
         $out = [];

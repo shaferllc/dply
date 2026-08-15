@@ -52,7 +52,11 @@ class ScanServerReleaseHygieneJob implements ShouldQueue
             $scanner->scanAndNotify(
                 $server,
                 $actor,
-                fn (string $chunk): mixed => ServerReleaseHygieneScanStatus::append($this->serverId, $chunk),
+                function (string $chunk): mixed {
+                    ServerReleaseHygieneScanStatus::append($this->serverId, $chunk);
+
+                    return null;
+                },
             );
             ServerReleaseHygieneScanStatus::markResult($this->serverId, true, null);
         } catch (\Throwable $e) {

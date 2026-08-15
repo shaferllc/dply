@@ -120,8 +120,6 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         return $out;
     }
 
-    /**
-     */
     public function readCurrentSiteConfig(Site $site): ?string
     {
         $server = $this->ensureServerReady($site);

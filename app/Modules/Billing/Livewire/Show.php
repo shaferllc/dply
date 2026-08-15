@@ -486,7 +486,6 @@ class Show extends Component
      * Servers excluded from billing with a human-readable reason — surfaces
      * the "why isn't this server on my bill?" question right in the table.
      *
-     * @return Collection<int, array{server: Server, reason: string}>
      */
     public function getExcludedServersProperty(): Collection
     {

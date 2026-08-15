@@ -29,9 +29,6 @@ final class SiteResourceBindingResolver
     /**
      * @return list<SiteResourceBinding>
      */
-    /**
-     * @return array<int, \App\Support\Deployment\SiteResourceBinding>
-     */
     public function forSite(Site $site): array
     {
         $key = (string) $site->id;

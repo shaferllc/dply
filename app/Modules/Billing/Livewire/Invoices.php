@@ -103,7 +103,11 @@ class Invoices extends Component
 
         $tz = auth()->user()?->timezone ?? config('app.timezone', 'UTC');
 
-        return $this->invoiceRowsCache = $invoices->map(function (Invoice $invoice) use ($tz) {
+        // The closure's array<string, mixed> return keeps the mapped Collection
+        // assignable to $invoiceRowsCache — Collection's TValue is invariant, so
+        // an inferred array{...} shape would not fit Collection<int, array<string, mixed>>.
+        /** @var Collection<int, array<string, mixed>> $rows */
+        $rows = $invoices->map(function (Invoice $invoice) use ($tz): array {
             $stripe = $invoice->asStripeInvoice();
             $pdfUrl = $stripe->invoice_pdf ?? $stripe->hosted_invoice_url;
 
@@ -119,6 +123,8 @@ class Invoices extends Component
                 'is_pdf' => ! empty($stripe->invoice_pdf),
             ];
         });
+
+        return $this->invoiceRowsCache = $rows;
     }
 
     protected function describeInvoice(Invoice $invoice): string

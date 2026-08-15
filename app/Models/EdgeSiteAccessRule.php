@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property list<string> $allowed_emails
+ * @property ?list<string> $allowed_emails
  * @property string $cookie_secret
  * @property string $mode
  * @property ?string $password_hash

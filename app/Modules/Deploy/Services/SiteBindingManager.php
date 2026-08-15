@@ -86,9 +86,6 @@ class SiteBindingManager
      *
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function reachableServerIdsForSite(Site $site): array
     {
         $server = $site->server;
@@ -96,12 +93,6 @@ class SiteBindingManager
         return $server === null ? [] : $this->reachableServerIds($server);
     }
 
-    /**
-     * @return list<string>
-     */
-    /**
-     * @return list<array<string, string>>
-     */
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
@@ -278,9 +269,6 @@ class SiteBindingManager
      * synced content is written.
      *
      * @return list<string> every key removed across all bindings
-     */
-    /**
-     * @return list<string>
      */
     public function reAdoptAll(Site $site): array
     {

@@ -45,9 +45,18 @@ class Hub extends Component
     public array $organizationServerSite = [];
 
     /**
+     * Replaced in mount() by defaultInsightsState()/insightsStateFromOrg(); the
+     * literal here just has to satisfy the declared shape.
+     *
      * @var array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
      */
-    public array $organizationInsights = [];
+    public array $organizationInsights = [
+        'digest_non_critical' => false,
+        'digest_frequency' => 'daily',
+        'quiet_hours_enabled' => false,
+        'quiet_hours_start' => 22,
+        'quiet_hours_end' => 7,
+    ];
 
     /** @var array<string, mixed> */
     public array $teamServerSite = [];

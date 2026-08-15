@@ -322,7 +322,7 @@ class WorkspaceDaemons extends Component
             ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB)])
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'server_id'])
-            ->flatMap(fn (Site $site) => $site->processes->map(fn ($p) => [
+            ->flatMap(fn (Site $site) => $site->processes->map(fn (SiteProcess $p): array => [
                 'site_id' => (string) $site->id,
                 'site_name' => $site->name,
                 'name' => $p->name,

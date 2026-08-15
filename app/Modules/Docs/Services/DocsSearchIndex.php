@@ -41,9 +41,6 @@ final class DocsSearchIndex
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function build(): array
     {
         return $this->manifest->published()

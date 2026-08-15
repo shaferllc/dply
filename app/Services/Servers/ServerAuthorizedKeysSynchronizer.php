@@ -162,11 +162,7 @@ class ServerAuthorizedKeysSynchronizer
      * file), plus the SSH login user (so an empty panel clears the deploy account).
      *
      * @param  Collection<string, Collection<int, ServerAuthorizedKey>>  $groups
-     * @param  array<string, mixed> $targets
      * @return list<string>
-     */
-    /**
-     * @return list<mixed>
      */
     protected function resolveSyncTargets(Server $server, Collection $groups): array
     {
@@ -263,9 +259,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     protected function desiredAuthorizedKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
     {
         $lines = [];
@@ -305,9 +298,6 @@ class ServerAuthorizedKeysSynchronizer
      * Records the desired fingerprints for this target so the next run knows what it may remove.
      *
      * @param  Collection<int, ServerAuthorizedKey>  $rows
-     * @return list<string>
-     */
-    /**
      * @return list<string>
      */
     protected function reconciledKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array

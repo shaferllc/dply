@@ -155,7 +155,6 @@ trait ManagesDoFunctionsDatabases
      * start; a pool multiplexes those onto a small set of backend
      * connections so the cluster's connection limit is not exhausted.
      *
-     * @return array{name: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     public function createDatabaseConnectionPool(string $clusterId, string $name, string $database, string $user, int $size = 10): array
     {

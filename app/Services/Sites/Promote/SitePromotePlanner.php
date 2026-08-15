@@ -14,8 +14,6 @@ final class SitePromotePlanner
     /**
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
-    /**
-     */
     public function previewSteps(Site $source): array
     {
         $productionHostname = (string) ($source->primaryDomain()->hostname ?? '');
@@ -43,8 +41,6 @@ final class SitePromotePlanner
 
     /**
      * @return array<int, array<string, array|string|null>>
-     */
-    /**
      */
     public function cutoverSteps(Site $destination, ?Site $source = null): array
     {
@@ -122,9 +118,6 @@ final class SitePromotePlanner
         return $steps;
     }
 
-    /**
-     * @return array<int, array<string, array|string|null>>
-     */
     public function summary(Site $destination, ?Site $source = null): array
     {
         $promote = is_array($destination->meta['promote'] ?? null) ? $destination->meta['promote'] : [];

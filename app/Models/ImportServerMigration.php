@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property ?Carbon $completed_at
  * @property string $failure_summary
- * @property array<string, mixed> $manual_review_items
+ * @property list<array<string, mixed>> $manual_review_items
  * @property ?string $organization_id
  * @property ?Carbon $paused_nudge_sent_at
  * @property ?string $provider_credential_id

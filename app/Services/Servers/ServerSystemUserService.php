@@ -24,9 +24,6 @@ class ServerSystemUserService
      *
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
-    /**
-     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
-     */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
         $details = $lister->listPasswdDetails($server);
@@ -39,9 +36,6 @@ class ServerSystemUserService
      * DB-backed read of the last persisted snapshot. Used by the workspace
      * page on mount so the table is populated without a fresh SSH probe.
      *
-     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
-     */
-    /**
      * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */
     public function storedSystemUsersWithMetadata(Server $server): array

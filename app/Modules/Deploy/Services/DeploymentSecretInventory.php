@@ -17,9 +17,6 @@ final class DeploymentSecretInventory
     /**
      * @return list<DeploymentSecret>
      */
-    /**
-     * @return list<\App\Support\Deployment\DeploymentSecret>
-     */
     public function forSite(Site $site): array
     {
         $site->loadMissing(['workspace.variables']);
@@ -108,9 +105,6 @@ final class DeploymentSecretInventory
         return $inventory;
     }
 
-    /**
-     * @return list<\App\Support\Deployment\DeploymentSecret>
-     */
     public function environmentMapForSite(Site $site): array
     {
         $environment = [];

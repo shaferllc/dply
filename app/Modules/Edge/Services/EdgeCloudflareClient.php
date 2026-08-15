@@ -42,9 +42,6 @@ class EdgeCloudflareClient
         );
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function listAccounts(): array
     {
         $payload = $this->decode(
@@ -173,9 +170,6 @@ class EdgeCloudflareClient
      *
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function listDispatchNamespaces(): array
     {
         $payload = $this->decode(
@@ -186,9 +180,6 @@ class EdgeCloudflareClient
         return array_values(array_filter($payload, 'is_array'));
     }
 
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function createDispatchNamespace(string $name): array
     {
         return $this->decode(
@@ -628,9 +619,6 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function queryAnalyticsEngineSql(string $sql): array
     {
         if (! $this->canQueryAnalyticsEngine()) {
@@ -690,9 +678,6 @@ class EdgeCloudflareClient
         return $mapped;
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function ensureLogpushJob(string $zoneId, string $destinationConf, string $dataset = 'http_requests'): array
     {
         foreach ($this->listLogpushJobs($zoneId) as $job) {

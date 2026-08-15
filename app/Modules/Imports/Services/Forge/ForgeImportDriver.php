@@ -59,9 +59,6 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, 'validate connection');
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function listServers(): array
     {
         $response = $this->client->get('/servers');
@@ -75,9 +72,6 @@ class ForgeImportDriver implements ImportDriver
         ));
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -361,7 +355,6 @@ class ForgeImportDriver implements ImportDriver
 
     /**
      * @param  array<string, mixed> $row
-     * @return list<array<string, array<string, mixed>|int|string>>
      *     id: int,
      *     name: string,
      *     ip_address: ?string,

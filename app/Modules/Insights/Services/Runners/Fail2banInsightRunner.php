@@ -111,7 +111,9 @@ BASH;
     }
 
     /**
-     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
+     * Parsed `key=value` lines from the probe buffer — not candidates.
+     *
+     * @return array<string, string>
      */
     private function parseKeyValues(string $buffer): array
     {

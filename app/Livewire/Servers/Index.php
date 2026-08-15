@@ -327,9 +327,6 @@ class Index extends Component
         return $targets;
     }
 
-    /**
-     * @return Collection<string, Collection<int, Server>>
-     */
     protected function groupedServers(Collection $servers): Collection
     {
         return $servers

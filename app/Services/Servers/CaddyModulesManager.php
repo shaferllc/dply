@@ -22,7 +22,7 @@ class CaddyModulesManager
     /**
      * @return array{
      *     modules: list<array{id: string, namespace: string, kind: string}>,
-     *     plugins: list<array{path: string, version: string, label: string}>,
+     *     plugins: list<array{path: string, version: string, label: string, description: string, repo: string, docs_url: string, module_ids: list<string>, compiled: bool}>,
      *     caddy_version: ?string,
      *     custom_binary: bool,
      *     unreadable: bool,
@@ -74,9 +74,6 @@ class CaddyModulesManager
 
     /**
      * @return list<array{path: string, version: string, label: string}>
-     */
-    /**
-     * @return list<array<string, string>>
      */
     public function manifestPlugins(Server $server): array
     {
@@ -341,9 +338,6 @@ BASH;
     /**
      * @return list<array{id: string, namespace: string, kind: string}>
      */
-    /**
-     * @return list<array<string, string>>
-     */
     public function parseModuleIds(string $output): array
     {
         $rows = [];
@@ -407,7 +401,10 @@ BASH;
     /**
      * @param  array<string, mixed> $manifestPlugins
      * @param  array<string, mixed> $installedModules
-     * @return list<mixed>
+     * The catalog is keyed by module path (array_filter preserves keys), so
+     * this is a map, not a list.
+     *
+     * @return array<string, array{label: string, description: string}>
      */
     public function availableCatalog(array $manifestPlugins, array $installedModules): array
     {
@@ -469,15 +466,12 @@ BASH;
     }
 
     /**
-     * @return list<mixed>
      *     path: string,
      *     repo: string,
      *     label: string,
      *     description: string,
      *     module_ids: list<string>,
      *     docs_url: string,
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
      * }
      */
     public function packageInfoForInstall(string $path): array

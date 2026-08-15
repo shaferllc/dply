@@ -42,8 +42,6 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
         return $this->lookup('plugin', $slug, $installedVersion);
     }
 
-    /** @return list<App\Services\WordPress\Advisories\Advisory>
-    /** @return list<App\Services\WordPress\Advisories\Advisory>
     /**
      * @return list<\App\Services\WordPress\Advisories\Advisory>
      */
@@ -52,8 +50,6 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
         return $this->lookup('theme', $slug, $installedVersion);
     }
 
-    /** @return list<App\Services\WordPress\Advisories\Advisory>
-    /** @return list<App\Services\WordPress\Advisories\Advisory>
     /**
      * @return list<\App\Services\WordPress\Advisories\Advisory>
      */

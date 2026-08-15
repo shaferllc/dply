@@ -392,7 +392,6 @@ class Workers extends Component
      * The site's recent `queue` ticks, newest-first, in the legacy
      * tick-history array shape the view consumes.
      *
-     * @return Collection<int, array<string, mixed>>
      */
     private function tickHistory(): Collection
     {

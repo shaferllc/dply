@@ -21,9 +21,6 @@ class EnvoyCustomListenersConfig
     /**
      * @return list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>
      */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -99,8 +96,6 @@ class EnvoyCustomListenersConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     */
     public static function listenersFromServer(Server $server): array
     {
         return app(self::class)->read($server);

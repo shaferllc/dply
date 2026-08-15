@@ -22,9 +22,6 @@ class OpenRestyCustomUpstreamsConfig
     /**
      * @return list<array{name: string, servers: list<string>}>
      */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -100,8 +97,6 @@ class OpenRestyCustomUpstreamsConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     */
     public static function upstreamsFromServer(Server $server): array
     {
         return app(self::class)->read($server);

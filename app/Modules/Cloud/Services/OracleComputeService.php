@@ -71,9 +71,6 @@ class OracleComputeService
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<array<mixed>>
-     */
     public function listAvailabilityDomains(): array
     {
         $payload = $this->request(
@@ -101,9 +98,6 @@ class OracleComputeService
 
     /**
      * @return list<array<mixed>>
-     */
-    /**
-     * @return list<array<string, mixed>>
      */
     public function listShapes(?string $availabilityDomain = null): array
     {

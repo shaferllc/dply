@@ -140,9 +140,6 @@ BASH;
         ];
     }
 
-    /**
-     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
-     */
     private function parseKeyValues(string $buffer): array
     {
         $out = [];

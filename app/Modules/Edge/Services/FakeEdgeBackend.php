@@ -98,11 +98,6 @@ class FakeEdgeBackend implements EdgeBackend
         app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
     }
 
-    /** @return array<int, array<string, string>>
-    /** @return array<int, array<string, string>>
-    /**
-     * @return array<int, array<string, string>>
-     */
     public function inspect(Site $site): array
     {
         $meta = $site->edgeMeta();

@@ -63,7 +63,6 @@ final class ServerBulkSiteActions
     }
 
     /**
-     * @param  array<string, mixed> $siteIds
      * @return array{queued: int}
      */
     public function redeployAll(Server $server, User $actor): array

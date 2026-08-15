@@ -51,9 +51,6 @@ final class NginxConfigGuard
      *
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function foreignDirectives(?string $current, string $incoming): array
     {
         $current = trim((string) $current);

@@ -611,9 +611,6 @@ CFG;
         ]);
     }
 
-    /**
-     * @return array{root:string,app:string,releases:string,current:string,shared:string,logs:string,tmp:string,bin:string}
-     */
     private function deployLayout(Server $server): array
     {
         return (new ServerDeployLayoutBuilder)->build($server);

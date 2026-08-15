@@ -49,8 +49,6 @@ class ResourceSuggestionMapper
      *     note: ?string,
      * }>
      */
-    /**
-     */
     public function map(): array
     {
         return [

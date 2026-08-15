@@ -136,9 +136,6 @@ class ServerConfigFileCatalog
     /**
      * @return list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}>
      */
-    /**
-     * @return list<mixed>
-     */
     public function flatFiles(Server $server, ?string $scope = null, ?string $search = null): array
     {
         $flat = [];
@@ -203,9 +200,6 @@ class ServerConfigFileCatalog
     /**
      * @return list<mixed>
      */
-    /**
-     * @return list<array<string, string|null>>
-     */
     public function autocompleteForPath(string $path): array
     {
         $type = $this->fileTypeForPath($path);
@@ -237,9 +231,6 @@ class ServerConfigFileCatalog
         return $out;
     }
 
-    /**
-     * @return list<array<string, string|null>>
-     */
     private function collectDiscoveryProbes(Server $server, ?string $scope): array
     {
         $catalog = (array) config('server_manage.config_file_catalog', []);

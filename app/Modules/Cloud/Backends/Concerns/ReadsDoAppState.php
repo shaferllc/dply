@@ -60,7 +60,6 @@ trait ReadsDoAppState
         return DigitalOceanAppPlatformService::getRegions();
     }
 
-    /** @return array<string, mixed> */
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

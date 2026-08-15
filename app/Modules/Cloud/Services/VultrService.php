@@ -476,9 +476,6 @@ class VultrService
      *
      * @return array<int, array<string, mixed>>
      */
-    /**
-     * @return list<array<mixed>>
-     */
     public function getRegions(): array
     {
         $response = $this->request('get', '/regions');
@@ -502,9 +499,6 @@ class VultrService
     /**
      * List plans. Normalizes to list (API may return object keyed by id).
      *
-     * @return list<array<mixed>>
-     */
-    /**
      * @return list<array<mixed>>
      */
     public function getPlans(): array
@@ -583,9 +577,6 @@ class VultrService
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function getDomainRecords(string $domainName): array
     {
         $all = [];
@@ -615,9 +606,6 @@ class VultrService
         return $all;
     }
 
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function findDomainRecord(string $domainName, string $type, string $name, ?string $data = null): ?array
     {
         $type = strtoupper(trim($type));

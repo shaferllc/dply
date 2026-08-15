@@ -133,7 +133,6 @@ class NetlifyImporter implements EdgeImporter
 
     /**
      * @param  array<string, mixed> $site
-     * @return list<array<string, string|null>>
      */
     private function fetchEnvVars(array $site): array
     {

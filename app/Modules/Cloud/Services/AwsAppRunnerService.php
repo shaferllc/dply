@@ -199,9 +199,6 @@ class AwsAppRunnerService
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<mixed>
-     */
     public function listServices(): array
     {
         $result = $this->client->listServices();
@@ -216,7 +213,6 @@ class AwsAppRunnerService
      * "v1.2.3" → "v1.2.4" requires updateService first; "latest"
      * just re-pulls).
      *
-     * @return list<mixed>
      */
     public function startDeployment(string $serviceArn): array
     {
@@ -360,9 +356,6 @@ class AwsAppRunnerService
      * registrar so AWS can verify ownership and issue the cert.
      *
      * @return list<array{name: string, type: string, value: string, status: string}>
-     */
-    /**
-     * @return list<array<string, string>>
      */
     public function associateCustomDomain(string $serviceArn, string $hostname): array
     {

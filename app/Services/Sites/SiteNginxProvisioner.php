@@ -205,9 +205,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     protected function shadowedServerNames(string $out, string $config, Server $server, SshConnection $ssh, string $ourBasename): array
     {
         if (! preg_match_all('/conflicting server name "([^"]+)"/i', $out, $m)) {

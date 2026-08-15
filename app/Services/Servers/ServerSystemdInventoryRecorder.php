@@ -22,9 +22,6 @@ final class ServerSystemdInventoryRecorder
     /**
      * @return list<array{unit: string, label: string, active: string, sub: string, ts: string, version: string, unit_file_state: string, main_pid: string, custom: bool, can_manage: bool}>
      */
-    /**
-     * @return list<array<string, bool|string>>
-     */
     public function parseRows(Server $server, string $raw): array
     {
         $allowed = array_flip($this->catalog->allowedUnitsForServer($server));
@@ -83,8 +80,6 @@ final class ServerSystemdInventoryRecorder
         return $rows;
     }
 
-    /**
-     */
     public function persistInventoryFromRawOutput(Server $server, string $raw): void
     {
         $newRows = $this->parseRows($server, $raw);

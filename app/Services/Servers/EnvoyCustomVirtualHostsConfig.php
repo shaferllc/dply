@@ -17,9 +17,6 @@ class EnvoyCustomVirtualHostsConfig
     /**
      * @return list<array{name: string, domains: list<string>, cluster: string}>
      */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -99,8 +96,6 @@ class EnvoyCustomVirtualHostsConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     */
     public static function virtualHostsFromServer(Server $server): array
     {
         return app(self::class)->read($server);

@@ -290,9 +290,6 @@ class AwsEc2Service
      *
      * @return array<int, array{id: string, name: string}>
      */
-    /**
-     * @return list<array<string, string>>
-     */
     public function getRegions(): array
     {
         $result = $this->client->describeRegions([

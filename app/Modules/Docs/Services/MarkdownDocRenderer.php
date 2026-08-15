@@ -63,9 +63,6 @@ final class MarkdownDocRenderer
     /**
      * @return list<array{id: string, text: string, level: int}>
      */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function headingsFromHtml(string $html): array
     {
         if ($html === '') {
@@ -230,9 +227,6 @@ final class MarkdownDocRenderer
         return $this->buildSpecCardList($document, $headers, $rows);
     }
 
-    /**
-     * @return list<array<string, int|string>>
-     */
     private function tableHeaderCells(\DOMDocument $document, \DOMElement $table): array
     {
         $headers = [];
@@ -368,7 +362,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function isMatrixComparison(array $headers, array $rows): bool
@@ -395,7 +389,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildMatrixComparison(\DOMDocument $document, array $headers, array $rows): \DOMElement
@@ -446,7 +440,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function isTransposedComparison(array $headers, array $rows): bool
@@ -498,7 +492,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildTransposedComparison(\DOMDocument $document, array $headers, array $rows): \DOMElement
@@ -541,7 +535,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildSpecCardList(\DOMDocument $document, array $headers, array $rows): \DOMElement

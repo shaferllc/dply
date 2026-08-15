@@ -197,9 +197,6 @@ class OpenLiteSpeedVhostsConfig
      *
      * @return list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>}>
      */
-    /**
-     * @return list<array<string, list<string>|string|null>>
-     */
     public function parseHttpdIndex(string $httpd): array
     {
         $entries = [];

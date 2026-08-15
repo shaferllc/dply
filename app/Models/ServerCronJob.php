@@ -24,8 +24,8 @@ use Illuminate\Support\Carbon;
  * @property string $env_prefix
  * @property bool $is_synced
  * @property ?Carbon $last_run_at
- * @property string $last_run_output
- * @property string $last_sync_error
+ * @property ?string $last_run_output
+ * @property ?string $last_sync_error
  * @property bool $last_synced_enabled
  * @property string $maintenance_tag
  * @property string $managed_block

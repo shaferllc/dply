@@ -20,7 +20,6 @@ final class UnifiedPreviewCatalog
     ) {}
 
     /**
-     * @return list<array{
      *     hostname: string,
      *     site_id: string,
      *     site_name: string,
@@ -30,9 +29,6 @@ final class UnifiedPreviewCatalog
      *     href: string|null,
      *     parent_name: string|null,
      * }>
-     */
-    /**
-     * @return list<array<string, string|null>>
      */
     public function forOrganization(Organization $organization): array
     {
@@ -116,9 +112,6 @@ final class UnifiedPreviewCatalog
         return $rows;
     }
 
-    /**
-     * @return list<array<string, string|null>>
-     */
     private function row(
         string $hostname,
         Site $site,

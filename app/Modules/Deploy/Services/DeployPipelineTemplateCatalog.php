@@ -25,8 +25,6 @@ final class DeployPipelineTemplateCatalog
      *     steps: list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>,
      * }>
      */
-    /**
-     */
     public function templatesForSite(Site $site): array
     {
         $templates = [];
@@ -66,12 +64,6 @@ final class DeployPipelineTemplateCatalog
         return $templates;
     }
 
-    /**
-     * @return list<array<string, array|string|null>>
-     */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function stepsForTemplateKey(string $key): array
     {
         $meta = config("site_deploy_pipeline_templates.templates.{$key}");
@@ -142,7 +134,6 @@ final class DeployPipelineTemplateCatalog
 
     /**
      * @param  array<string, mixed> $steps
-     * @return list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>
      */
     private function stripSortOrder(array $steps): array
     {

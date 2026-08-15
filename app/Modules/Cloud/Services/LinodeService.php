@@ -389,9 +389,6 @@ class LinodeService
     /**
      * @return list<array<string, mixed>>
      */
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function getDomains(): array
     {
         $all = [];
@@ -416,9 +413,6 @@ class LinodeService
         return $all;
     }
 
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function findDomainRecord(int $domainId, string $type, string $name, string $zoneName, ?string $target = null): ?array
     {
         $type = strtoupper(trim($type));
@@ -449,9 +443,6 @@ class LinodeService
 
     /**
      * @return list<array<string, mixed>>
-     */
-    /**
-     * @return list<array<mixed, mixed>>
      */
     public function getDomainRecords(int $domainId): array
     {

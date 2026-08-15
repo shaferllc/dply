@@ -583,9 +583,6 @@ final class BillingAnalytics
             ->values();
     }
 
-    /**
-     * @return Collection<int, array{server: Server, reason: string}>
-     */
     private function excludedServers(Organization $organization): Collection
     {
         $minAge = max(0, (int) config('subscription.standard.min_billable_age_days', 1));

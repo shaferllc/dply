@@ -91,9 +91,6 @@ final class DeployContractPolicy
         return (bool) config('deploy_contract.require_replay_when_enabled', true);
     }
 
-    /**
-     * @return array{requires: list<string>, min_replay_pass_rate: ?float, require_replay: ?bool}
-     */
     public function toArray(): array
     {
         return [

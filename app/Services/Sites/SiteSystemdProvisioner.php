@@ -44,9 +44,6 @@ class SiteSystemdProvisioner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory  test seam
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function provision(Site $site, ?Closure $shellFactory = null): array
     {
         $server = $site->server;
@@ -81,9 +78,6 @@ class SiteSystemdProvisioner
      * exist (systemctl returns non-zero but we don't propagate).
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<string>
-     */
-    /**
      * @return list<string>
      */
     public function teardown(Site $site, ?Closure $shellFactory = null): array

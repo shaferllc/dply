@@ -612,7 +612,7 @@ YAML;
 
     /**
      * @param  array<string, mixed> $tree
-     * @param  array<string, mixed> $segments
+     * @param  list<string>  $segments
      */
     private function recursiveUnset(array &$tree, array $segments): void
     {

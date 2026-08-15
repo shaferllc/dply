@@ -131,7 +131,6 @@ class OpenWhiskClient
      * Fire a trigger once with an optional JSON payload.
      *
      * @param  array<string, mixed> $payload
-     * @param  array<string, mixed> $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     public function fireTrigger(string $name, array $payload = []): array
@@ -159,7 +158,6 @@ class OpenWhiskClient
     /**
      * Create or update a rule binding a trigger to an action.
      *
-     * @param  array<string, mixed> $payload
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     public function putRule(string $name, string $trigger, string $action): array

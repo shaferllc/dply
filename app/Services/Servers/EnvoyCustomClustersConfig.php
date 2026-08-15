@@ -42,9 +42,6 @@ class EnvoyCustomClustersConfig
     /**
      * @return list<array{name: string, connect_timeout: string, lb_policy: string, endpoints: list<string>}>
      */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -141,8 +138,6 @@ class EnvoyCustomClustersConfig
         $this->save($server, $clusters, $emitter);
     }
 
-    /**
-     */
     public static function clustersFromServer(Server $server): array
     {
         return app(self::class)->read($server);

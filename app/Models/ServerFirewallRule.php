@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $iface
  * @property string $iface_direction
  * @property string $name
- * @property string $port
+ * @property ?int $port
  * @property string $profile
  * @property string $protocol
  * @property string $runbook_url

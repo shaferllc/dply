@@ -78,9 +78,6 @@ class CloudflareEdgeDelivery
     /**
      * @return list<array{name: string, type: string, value: string, status: string}>
      */
-    /**
-     * @return array<int, array<string, string>>
-     */
     public function attachDomain(Site $site, string $hostname): array
     {
         $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
@@ -103,9 +100,6 @@ class CloudflareEdgeDelivery
         app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
     }
 
-    /**
-     * @return array<int, array<string, string>>
-     */
     public function inspect(Site $site): array
     {
         $meta = $site->edgeMeta();

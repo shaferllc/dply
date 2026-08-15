@@ -163,9 +163,6 @@ BASH;
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function parseRegisteredModuleNames(string $config): array
     {
         if ($config === '') {

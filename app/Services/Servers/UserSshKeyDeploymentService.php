@@ -62,7 +62,6 @@ class UserSshKeyDeploymentService
 
     /**
      * @param  array<string, mixed> $serverIds  Server primary keys (ULIDs)
-     * @return array{ok: bool, message: string, errors: array<int, string>}
      */
     public function deployToServers(User $user, UserSshKey $userSshKey, array $serverIds): array
     {

@@ -43,10 +43,6 @@ class NginxAccessLogParser
      * 'parsed' => true and the structured fields; unparseable rows carry
      * 'parsed' => false and the original line under 'raw'.
      *
-     * @return array<int, array<string, mixed>>
-     */
-    /**
-     * @return list<array<string, mixed>>
      */
     public function parse(string $raw): array
     {
@@ -66,7 +62,6 @@ class NginxAccessLogParser
     /**
      * Parse a single line. Never throws — falls back to a raw row.
      *
-     * @return list<array<string, mixed>>
      */
     public function parseLine(string $line): array
     {

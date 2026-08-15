@@ -259,7 +259,6 @@ trait ServerCreateActions
 
     /**
      * @param  list<array{id: string, label: string, linked: bool}>  $cards
-     * @return list<array{
      *     id: string,
      *     label: string,
      *     linked: bool,

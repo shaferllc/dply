@@ -103,11 +103,6 @@ class Parity extends Component
     }
 
     /**
-     * @param  Collection<int, ForgeServer>  $forgeServers  keyed by source_id
-     * @param  Collection<int, PloiServer>  $ploiServers  keyed by source_id
-     * @return array<string, mixed>
-     */
-    /**
      * @return array<string, mixed>
      */
     private function buildEdgeRow(Site $site): array
@@ -237,9 +232,6 @@ class Parity extends Component
         ];
     }
 
-    /**
-     * @return Collection<int, ForgeSite|PloiSite>
-     */
     private function sourceSites(ForgeServer|PloiServer|null $server): Collection
     {
         if ($server === null) {

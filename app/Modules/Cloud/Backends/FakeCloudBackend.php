@@ -150,8 +150,6 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
-    /** @return array<int, array<string, string>>
-    /** @return array<int, array<string, string>>
     /**
      * @return array<int, array<string, string>>
      */
@@ -170,11 +168,6 @@ class FakeCloudBackend implements CloudBackend
         // No-op.
     }
 
-    /** @return array<int, array<string, string>>
-    /** @return array<int, array<string, string>>
-    /**
-     * @return array<int, array<string, string>>
-     */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         return [
@@ -184,8 +177,6 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
-    /** @return array<int, array<string, string>>
-    /** @return array<int, array<string, string>>
     /**
      * @return list<array<string, string>>
      */

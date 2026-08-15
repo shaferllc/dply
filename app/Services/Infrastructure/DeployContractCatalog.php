@@ -33,9 +33,6 @@ final class DeployContractCatalog
      *   run_at: ?string,
      * }>
      */
-    /**
-     * @return list<array<string, bool|int|string|null>>
-     */
     public function forOrganization(Organization $organization): array
     {
         if (! Feature::active('global.deploy_contract')) {
@@ -84,9 +81,6 @@ final class DeployContractCatalog
         return $rows;
     }
 
-    /**
-     * @return list<array<string, bool|int|string|null>>
-     */
     public function counts(Organization $organization): array
     {
         $rows = $this->forOrganization($organization);

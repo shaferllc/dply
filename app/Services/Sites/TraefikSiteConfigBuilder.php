@@ -73,9 +73,6 @@ YAML;
      *
      * @return array<int, array{path: string, middleware: string, users_file: string}>
      */
-    /**
-     * @return list<array<string, string>>
-     */
     protected function traefikBasicAuthGroups(Site $site, string $basename): array
     {
         if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {

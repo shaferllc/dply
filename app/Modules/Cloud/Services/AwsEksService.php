@@ -81,9 +81,6 @@ class AwsEksService
      *
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function listClusterNames(): array
     {
         $names = [];
@@ -140,9 +137,6 @@ class AwsEksService
      * write `desiredSize` "running" entries when nodegroup is ACTIVE, empty
      * otherwise. UI fiction that matches the AWS console's resolution.
      *
-     * @return list<array<string, mixed>>
-     */
-    /**
      * @return list<array<string, mixed>>
      */
     public function listAndDescribeNodegroups(string $clusterName): array

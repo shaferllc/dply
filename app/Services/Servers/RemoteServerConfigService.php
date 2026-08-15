@@ -236,9 +236,6 @@ BASH;
     /**
      * @return array<int, array{path: string, mtime: int, size: int}>
      */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function listBackups(Server $server, string $path): array
     {
         $this->assertPathAllowed($path);
@@ -269,9 +266,6 @@ BASH;
         return $rows;
     }
 
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function restoreBackup(Server $server, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertPathAllowed($targetPath);

@@ -61,7 +61,6 @@ final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
 
     /**
      * @param  array<string, mixed> $config
-     * @return non-empty-array<string, mixed>
      */
     private function s3AllowBucketsForConfig(array $config): array
     {

@@ -8,13 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $clickhouse_admin_password
+ * @property ?string $clickhouse_admin_password
  * @property string $clickhouse_admin_username
- * @property string $mongodb_admin_password
+ * @property ?string $mongodb_admin_password
  * @property string $mongodb_admin_username
- * @property string $mysql_root_password
+ * @property ?string $mysql_root_password
  * @property string $mysql_root_username
- * @property string $postgres_password
+ * @property ?string $postgres_password
  * @property string $postgres_superuser
  * @property bool $postgres_use_sudo
  * @property ?string $server_id

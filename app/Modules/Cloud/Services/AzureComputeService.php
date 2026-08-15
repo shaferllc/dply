@@ -63,9 +63,6 @@ class AzureComputeService
     /**
      * @return list<array{id:string,name:string}>
      */
-    /**
-     * @return list<array<string, string>>
-     */
     public function listLocations(): array
     {
         $response = $this->request('GET', '/locations', query: [
@@ -96,12 +93,6 @@ class AzureComputeService
         return $locations !== [] ? $locations : self::defaultLocations();
     }
 
-    /**
-     * @return list<array<string, string>>
-     */
-    /**
-     * @return list<array<string, int|string|null>>
-     */
     public function listVmSizes(string $location): array
     {
         $location = trim($location);

@@ -17,12 +17,6 @@ final class ServerlessGluePlanner
         private readonly ServerlessGlueInventory $inventory,
     ) {}
 
-    /**
-     * @return list<array{key: string, title: string, summary: string, available: bool, unavailable_reason: string|null}>
-     */
-    /**
-     * @return list<array<string, bool|string|null>>
-     */
     public function catalog(Organization $organization): array
     {
         $snapshot = $this->inventory->forOrganization($organization);
@@ -72,7 +66,6 @@ final class ServerlessGluePlanner
 
     /**
      * @param  array<string, mixed> $snapshot
-     * @return list<array<string, bool|string|null>>
      */
     private function availability(string $key, array $snapshot): array
     {

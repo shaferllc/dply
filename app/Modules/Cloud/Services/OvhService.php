@@ -92,9 +92,6 @@ class OvhService
      *
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function getProjects(): array
     {
         $response = $this->request('get', '/cloud/project');
@@ -166,9 +163,6 @@ class OvhService
     /**
      * List regions available to a project.
      *
-     * @return list<string>
-     */
-    /**
      * @return list<string>
      */
     public function getRegions(string $project): array

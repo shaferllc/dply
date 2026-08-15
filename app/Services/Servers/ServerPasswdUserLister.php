@@ -17,9 +17,6 @@ class ServerPasswdUserLister
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     public function listUsernames(Server $server, int $maxLines = 500, int $timeoutSeconds = 20): array
     {
         $details = $this->listPasswdDetails($server, $maxLines, $timeoutSeconds);
@@ -31,10 +28,6 @@ class ServerPasswdUserLister
      * Single-round-trip probe: /etc/passwd entries (UID >= 1000, no `nobody`) plus group memberships.
      * Returns one row per user with uid, home, shell and the list of groups (primary + supplementary).
      *
-     * @return list<string>
-     */
-    /**
-     * @return list<array<string, int|list<string>|string>>
      */
     public function listPasswdDetails(Server $server, int $maxLines = 500, int $timeoutSeconds = 20): array
     {

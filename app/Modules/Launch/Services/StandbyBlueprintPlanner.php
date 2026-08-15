@@ -19,9 +19,6 @@ final class StandbyBlueprintPlanner
     /**
      * @return list<array{key: string, title: string, summary: string, available: bool, unavailable_reason: string|null}>
      */
-    /**
-     * @return list<array<string, bool|string|null>>
-     */
     public function catalog(Organization $organization): array
     {
         $inventory = $this->inventory($organization);
@@ -80,7 +77,6 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @return list<array<string, bool|string|null>>
      *     hybrid_edges: list<array<string, mixed>>,
      *     byo_servers: list<array<string, mixed>>,
      *     byo_sites: list<array<string, mixed>>,

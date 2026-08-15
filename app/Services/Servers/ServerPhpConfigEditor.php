@@ -343,9 +343,6 @@ class ServerPhpConfigEditor
     /**
      * @return list<string>
      */
-    /**
-     * @return list<string>
-     */
     protected function installedVersionIds(Server $server): array
     {
         $inventory = app(ServerPhpManager::class)->cachedInventory($server);
@@ -386,7 +383,7 @@ class ServerPhpConfigEditor
     }
 
     /**
-     * @param  array{path: string, target: string, version: string, validator: string}  $target
+     * @param  array{path: string, target: string, version: string, validator: string, label: string}  $target
      */
     protected function buildValidationScript(Server $server, array $target, string $content): string
     {

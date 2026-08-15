@@ -60,7 +60,11 @@ trait RunsSharedHostAttributionScan
                 $ssh = new SshConnection($this->server, $loginUser);
                 $out = trim($ssh->execWithCallback(
                     $wrapped,
-                    fn (string $chunk): mixed => $this->remoteSshStreamAppendStdout($chunk),
+                    function (string $chunk): mixed {
+                        $this->remoteSshStreamAppendStdout($chunk);
+
+                        return null;
+                    },
                     $timeout,
                 ));
                 $ssh->disconnect();

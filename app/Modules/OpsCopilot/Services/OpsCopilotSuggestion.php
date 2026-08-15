@@ -35,9 +35,6 @@ final class OpsCopilotSuggestion
         public readonly array $actions = [],
     ) {}
 
-    /**
-     * @return SuggestionArray
-     */
     public function toArray(): array
     {
         return [

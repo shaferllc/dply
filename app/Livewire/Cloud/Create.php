@@ -106,7 +106,7 @@ class Create extends Component
     public array $linkedSourceControlAccounts = [];
 
     /**
-     * @var list<array{url: string, name: string, branch: string}>
+     * @var list<array{label: string, url: string, branch: string}>
      */
     public array $availableRepositories = [];
 

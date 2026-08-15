@@ -396,8 +396,6 @@ BASH;
         return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
-    /**
-     */
     public function postgresRun(Server $server, string $sql, int $timeout = 120): array
     {
         $cred = $this->adminCredential($server);

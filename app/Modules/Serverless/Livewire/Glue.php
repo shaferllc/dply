@@ -153,10 +153,14 @@ class Glue extends Component
                 ->orderBy('name')
                 ->get(['id', 'name', 'server_id']);
 
-        $codeActionsForServer = collect($snapshot['code_actions'])
-            ->when($this->sequenceServerId !== '', fn ($rows) => $rows->where('server_id', $this->sequenceServerId))
-            ->values()
-            ->all();
+        // Plain conditional rather than ->when(): the callback form makes the
+        // Collection's value generic unresolvable here (PHPStan reports the
+        // expected and actual types as identical), and this reads better anyway.
+        $codeActions = collect($snapshot['code_actions']);
+        if ($this->sequenceServerId !== '') {
+            $codeActions = $codeActions->where('server_id', $this->sequenceServerId);
+        }
+        $codeActionsForServer = $codeActions->values()->all();
 
         return view('livewire.serverless.glue', [
             'catalog' => $planner->catalog($org),

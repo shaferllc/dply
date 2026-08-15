@@ -35,7 +35,12 @@ class WebserverTemplates extends Component
     /** Optional content rendered AFTER the server block (HTTP→HTTPS redirects, sibling servers). */
     public string $content_after = '';
 
-    public ?int $editingId = null;
+    /**
+     * ?string, not ?int: webserver_templates.id is character(26) (a ULID), so
+     * assigning $template->id to an int-typed property threw a TypeError the
+     * moment anyone opened a template for editing.
+     */
+    public ?string $editingId = null;
 
     public ?string $testMessage = null;
 

@@ -45,9 +45,6 @@ class SourceControlRepositoryBrowser
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    /**
-     * @return list<array<string, string>>
-     */
     public function repositoriesForAccount(GitIdentity $account): array
     {
         return match ($account->provider()) {

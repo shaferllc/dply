@@ -591,7 +591,6 @@ class TestingHostnameProvisioner
      * in the app-level DigitalOcean token fallback so callers always get a
      * usable token when one is available.
      *
-     * @return array<int, string>
      */
     public function testingDnsRoutingForSite(Site $site): array
     {
@@ -629,7 +628,6 @@ class TestingHostnameProvisioner
      * of hetzner/cloudflare/digitalocean matched, with its credential; only the
      * final app-token fallback has a null credential.
      *
-     * @return array{provider: string, dns_provider: \App\Services\Sites\Dns\DnsProvider, pool: non-empty-array<string, mixed>, credential: ?\App\Models\ProviderCredential}
      */
     private function resolveTestingProviderForSite(Site $site): array
     {
@@ -702,9 +700,6 @@ class TestingHostnameProvisioner
      * folding in the legacy services.digitalocean.testing_domains list
      * so existing setups keep working without env changes.
      *
-     * @return list<string>
-     */
-    /**
      * @return list<string>
      */
     public function configuredDomainsForProvider(string $provider): array

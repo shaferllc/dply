@@ -32,10 +32,6 @@ class RemoteWebserverConfigService
     /**
      * Engines this service knows about. Used to gate which validate/reload
      * commands and globs to apply.
-     * @return array<string, mixed>
-     */
-    /**
-     * @return list<(int|string)>
      */
     public function supportedEngines(): array
     {
@@ -47,10 +43,6 @@ class RemoteWebserverConfigService
      * paths that already exist on the server. The main config is always first
      * (if it exists); the rest come from the engine's globs.
      *
-     * @return list<(int|string)>
-     */
-    /**
-     * @return list<array<string, int|string|null>>
      */
     public function listFiles(Server $server, string $engine): array
     {
@@ -107,7 +99,6 @@ class RemoteWebserverConfigService
      * preview size; callers should surface a clear notice when they hit the
      * cap so the operator doesn't silently lose trailing content.
      *
-     * @return list<array<string, int|string|null>>
      */
     public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
@@ -396,9 +387,6 @@ BASH;
      *
      * @return array<int, array{path: string, mtime: int, size: int}>
      */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function listBackups(Server $server, string $engine, string $path): array
     {
         $this->assertEngineSupported($engine);
@@ -433,7 +421,6 @@ BASH;
      * `write()`, this also snapshots the current live file before clobbering
      * it, so a bad restore can be undone by restoring the very last backup.
      *
-     * @return list<array<string, int|string>>
      */
     public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {

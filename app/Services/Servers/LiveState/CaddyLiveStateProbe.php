@@ -447,7 +447,7 @@ BASH;
 
     /**
      * @param  array<string, mixed> $node
-     * @param  array<string, mixed> $found
+     * @param  list<mixed>  $found
      */
     private function walkConfigForPhpUpstreams(array $node, array &$found): void
     {

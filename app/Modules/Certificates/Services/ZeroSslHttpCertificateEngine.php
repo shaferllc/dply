@@ -159,7 +159,6 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
 
     /**
      * @param  array<string, mixed> $domains
-     * @return array<int, string>
      */
     protected function createRemoteCertificate(string $accessKey, array $domains, string $csrPem): array
     {
@@ -178,7 +177,6 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed> $domains
      * @return array<string, mixed>
      */
     protected function waitForIssuedCertificate(string $accessKey, string $certificateId): array
@@ -288,7 +286,6 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed> $data
      * @return array<string, mixed>
      */
     protected function getJson(string $url, string $accessKey): array

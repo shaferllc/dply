@@ -89,9 +89,6 @@ class WebserverCertsAggregator
      *
      * @return list<array{t: int, line: string}>
      */
-    /**
-     * @return list<array<mixed, mixed>>
-     */
     public function progress(Server $server): array
     {
         $raw = Cache::get(self::progressKey((string) $server->id));
@@ -134,7 +131,6 @@ class WebserverCertsAggregator
      * This is the read side the Livewire surfaces poll; the SSH work happens in
      * {@see ScanServerLiveCertsJob} via {@see scanAndCache()}.
      *
-     * @return list<array<mixed, mixed>>
      */
     public function cached(Server $server): ?array
     {
@@ -203,7 +199,6 @@ class WebserverCertsAggregator
      * request/Livewire surfaces use {@see cached()} + {@see dispatchScan()} so
      * the 20s SSH probe never runs in the page request.
      *
-     * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     public function aggregate(Server $server, bool $forceFresh = false): array
     {

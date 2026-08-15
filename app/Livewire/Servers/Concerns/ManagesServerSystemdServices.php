@@ -45,7 +45,12 @@ trait ManagesServerSystemdServices
     public ?bool $systemdQueueInventoryAfterRemoteTask = null;
 
     /**
-     * @var list<array{unit: string, label: string, active: string, sub: string, ts: string, version: string, custom: bool, can_manage: bool}>
+     * Built by ManagesSystemdInventory::refresh…(): label/active/sub can be null
+     * for a unit systemd has never reported on, version is an int, and the row
+     * carries the boot/mutation flags the table renders. The previous shape
+     * listed eight non-null keys and matched none of it.
+     *
+     * @var list<array<string, mixed>>
      */
     public array $systemdInventory = [];
 

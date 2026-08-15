@@ -690,10 +690,6 @@ class ParallelTaskExecutor
 
     /**
      * Get the results.
-     * @return array<string, mixed>
-     */
-    /**
-     * @return array<int, array<string, mixed>>
      */
     public function getResults(): array
     {
