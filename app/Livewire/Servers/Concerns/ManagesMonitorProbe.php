@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\RunServerMonitoringProbeJob;
-use App\Models\Server;
-use Illuminate\Support\Carbon;
+use App\Services\Servers\ServerMonitoringProbeQueuer;
 use Livewire\Attributes\On;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * The pending-flag bookkeeping itself lives in
+ * {@see \App\Services\Servers\ServerMonitoringProbeQueuer} so the REST surface
+ * queues the identical probe.
  */
 trait ManagesMonitorProbe
 {
-
+    use ManagesMonitorProductionMirror;
 
     #[On('monitoring-probe-requested')]
     public function onMonitoringProbeRequested(): void
@@ -26,50 +28,47 @@ trait ManagesMonitorProbe
 
     /**
      * Queues an SSH probe (python3 check) — does not block the request on SSH.
+     *
+     * On a production-data mirror there is no local SSH key, so the probe is
+     * asked of the control plane that owns the host instead of being dispatched
+     * here (where it could only fail).
      */
     public function queueMonitoringProbe(): void
     {
         $this->authorize('view', $this->server);
+
+        if ($this->isProductionMirrorServer()) {
+            $this->proxyMonitoringProbeToProduction();
+
+            return;
+        }
+
         if (! $this->serverOpsReady()) {
             return;
         }
 
         $server = $this->server->fresh();
-        $meta = $server->meta ?? [];
-
-        $this->releaseStaleProbePending($server, $meta);
-
-        $server = $this->server->fresh();
-        $meta = $server->meta ?? [];
-
-        if (! empty($meta['monitoring_probe_pending'])) {
-            return;
+        if (app(ServerMonitoringProbeQueuer::class)->queue($server)) {
+            $this->wasProbePending = true;
         }
-
-        $meta['monitoring_probe_pending'] = true;
-        $meta['monitoring_probe_pending_at'] = now()->toIso8601String();
-        $server->update(['meta' => $meta]);
         $this->server = $server->fresh();
-        $this->wasProbePending = true;
-
-        $pending = RunServerMonitoringProbeJob::dispatch($this->server->id);
-        $queue = config('server_metrics.probe.queue');
-        if (is_string($queue) && $queue !== '') {
-            $pending->onQueue($queue);
-        }
     }
 
     public function syncMonitoringProbeStatus(): void
     {
         $this->authorize('view', $this->server);
         $this->server->refresh();
-        $meta = $this->server->meta ?? [];
-        $this->releaseStaleProbePending($this->server, $meta);
 
-        $this->server->refresh();
-        $meta = $this->server->meta ?? [];
+        if ($this->isProductionMirrorServer()) {
+            // The flag lives on the remote; pull its current value instead of
+            // ageing out a local one that nothing here ever sets.
+            $this->refreshProductionMirrorMonitoring(force: true);
+        } else {
+            app(ServerMonitoringProbeQueuer::class)->releaseStalePending($this->server);
+            $this->server->refresh();
+        }
 
-        $pending = $this->probePendingFromMeta($meta);
+        $pending = $this->probePendingFromMeta($this->server->meta ?? []);
         if ($this->wasProbePending && ! $pending) {
             $this->toastSuccess(__('Monitoring status updated.'));
         }
@@ -82,36 +81,5 @@ trait ManagesMonitorProbe
     protected function probePendingFromMeta(array $meta): bool
     {
         return ! empty($meta['monitoring_probe_pending']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $meta
-     */
-    protected function releaseStaleProbePending(Server $server, array &$meta): void
-    {
-        if (empty($meta['monitoring_probe_pending']) || empty($meta['monitoring_probe_pending_at'])) {
-            return;
-        }
-
-        try {
-            $at = Carbon::parse((string) $meta['monitoring_probe_pending_at']);
-        } catch (\Throwable) {
-            unset($meta['monitoring_probe_pending'], $meta['monitoring_probe_pending_at']);
-            $server->update(['meta' => $meta]);
-            $this->server = $server->fresh();
-
-            return;
-        }
-
-        // A probe finishes in seconds; anything older than the stale window means
-        // the job was lost/killed before clearing the flag (e.g. a deploy
-        // restarted Horizon mid-probe). Release it so the next poll re-dispatches
-        // instead of spinning "still running" for many minutes.
-        $staleSeconds = (int) config('server_metrics.probe.stale_pending_seconds', 120);
-        if ($at->lt(now()->subSeconds($staleSeconds))) {
-            unset($meta['monitoring_probe_pending'], $meta['monitoring_probe_pending_at']);
-            $server->update(['meta' => $meta]);
-            $this->server = $server->fresh();
-        }
     }
 }

@@ -39,6 +39,21 @@
             :note="__('Live usage, history, alert routing, and agent diagnostics.')"
         >
             <x-slot:actions>
+                @if ($isProductionMirror)
+                    {{-- This page is reading (and writing) a host owned by
+                         another control plane — say so before anyone reads the
+                         numbers as local. --}}
+                    <a
+                        href="{{ rtrim($productionMirrorBaseUrl ?? '', '/') }}/servers/{{ $server->id }}/monitor"
+                        target="_blank"
+                        rel="noopener"
+                        class="inline-flex h-6 items-center gap-1 rounded-full bg-amber-50 px-2 text-xs font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                        title="{{ __('Mirrored from production. Actions on this page run against the production host.') }}"
+                    >
+                        <x-heroicon-o-cloud class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Production mirror') }}
+                    </a>
+                @endif
                 @if ($opsReady && $pyOk)
                     <span @class(['inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold ring-1', $statusChipClasses])>
                         <x-dynamic-component :component="$statusChipIcon" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -321,6 +336,10 @@
 
     <x-slot name="modals">
         @include('livewire.servers.partials.install-monitoring-confirm-modal')
+
+        {{-- Proxied writes (probe / install / thresholds) mutate a live
+             production host, so the first one per session is typed out. --}}
+        @include('components.production-write-confirm-modal')
 
         {{-- Inline channel-create modal. Triggered from the Add subscription
              form's "Create new channel" link; auto-selects the new channel

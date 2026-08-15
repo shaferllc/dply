@@ -150,12 +150,24 @@ class WorkspaceDatabases extends Component
         $this->engine_subtab = in_array($subtab, self::ENGINE_SUBTABS, true) ? $subtab : 'overview';
     }
 
-    /** S3-compatible providers — the only destinations the database exporter can upload to. */
-    public const S3_BACKUP_PROVIDERS = [
-        BackupConfiguration::PROVIDER_AWS_S3,
-        BackupConfiguration::PROVIDER_CUSTOM_S3,
-        BackupConfiguration::PROVIDER_DIGITALOCEAN_SPACES,
-    ];
+    /**
+     * Destinations a database backup can be sent to. Three transports back
+     * these and the exporter already dispatches across all three
+     * ({@see \App\Modules\Backups\Services\DatabaseBackupExporter::exportToDestination}):
+     *
+     *   S3 / Spaces      — presigned PUT
+     *   SFTP / FTP / Rclone — client binary on the server (FileTransportCommandFactory)
+     *   Dropbox / Google Drive — bearer-token HTTPS API (CloudApiCommandFactory)
+     *
+     * Download works for each too: presignable destinations redirect, the rest
+     * are staged back to the server and streamed (`downloadTarget`).
+     *
+     * This list was S3-only long after the other two transports landed, so the
+     * picker hid destinations the engine could already write to. Derived from
+     * the model rather than restated, so a new provider is offered here the
+     * moment it is supported.
+     */
+    public const S3_BACKUP_PROVIDERS = BackupConfiguration::AVAILABLE_PROVIDERS;
 
     /**
      * Merged Databases card skeleton (hide-hero) so lazy load matches the page

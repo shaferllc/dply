@@ -69,12 +69,12 @@
     ];
 @endphp
 
-<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+<div class="grid gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
     @foreach ($summaryTiles as $tile)
         <a
             href="{{ $tile['href'] }}"
             wire:navigate
-            class="block rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md"
+            class="block bg-white px-3 py-2 transition-colors hover:bg-brand-sand/[0.15] sm:px-4"
         >
             <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['label'] }}</p>
             <p class="mt-0.5 flex items-baseline gap-1.5">

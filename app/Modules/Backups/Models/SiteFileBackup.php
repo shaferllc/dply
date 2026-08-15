@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Modules\Backups\Models;
+use App\Models\BackupConfiguration;
 use App\Models\User;
 use App\Models\Site;
 
@@ -16,12 +17,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $user_id
  * @property string $status
  * @property string $storage_kind
+ * @property ?string $backup_configuration_id
  * @property ?string $disk_path
  * @property ?string $remote_path
+ * @property ?string $destination_path
  * @property ?int $bytes
  * @property ?string $error_message
  * @property-read Site $site
  * @property-read ?User $user
+ * @property-read ?BackupConfiguration $backupConfiguration
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
  */
@@ -42,6 +46,12 @@ class SiteFileBackup extends Model
     /** Legacy: archive streamed to the control-plane local disk (same-box only). */
     public const STORAGE_KIND_CONTROL_PLANE = 'control_plane';
 
+    /**
+     * Archive shipped off the server to a backup destination (S3/Spaces,
+     * SFTP/FTP/Rclone, Dropbox/Drive). `destination_path` holds the handle.
+     */
+    public const STORAGE_KIND_DESTINATION = 'destination';
+
     protected $table = 'site_file_backups';
 
     protected $fillable = [
@@ -49,8 +59,10 @@ class SiteFileBackup extends Model
         'user_id',
         'status',
         'storage_kind',
+        'backup_configuration_id',
         'disk_path',
         'remote_path',
+        'destination_path',
         'bytes',
         'error_message',
     ];
@@ -67,6 +79,12 @@ class SiteFileBackup extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<BackupConfiguration, $this> */
+    public function backupConfiguration(): BelongsTo
+    {
+        return $this->belongsTo(BackupConfiguration::class);
+    }
+
     /**
      * Effective storage kind. Rows written before the remote-server change have
      * no storage_kind but a disk_path — they're control-plane (local disk).
@@ -77,6 +95,10 @@ class SiteFileBackup extends Model
             return (string) $this->storage_kind;
         }
 
+        if (filled($this->destination_path)) {
+            return self::STORAGE_KIND_DESTINATION;
+        }
+
         return filled($this->remote_path)
             ? self::STORAGE_KIND_REMOTE_SERVER
             : self::STORAGE_KIND_CONTROL_PLANE;
@@ -85,6 +107,6 @@ class SiteFileBackup extends Model
     public function isDownloadable(): bool
     {
         return $this->status === self::STATUS_COMPLETED
-            && (filled($this->remote_path) || filled($this->disk_path));
+            && (filled($this->remote_path) || filled($this->disk_path) || filled($this->destination_path));
     }
 }

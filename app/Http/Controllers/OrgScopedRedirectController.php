@@ -26,7 +26,7 @@ use Illuminate\Http\RedirectResponse;
  *
  * Lives in the shell rather than the Realtime module because legacy URLs are a
  * routing concern of the organizations group, and shell → module is the
- * permitted direction (deptrac.yaml).
+ * permitted direction.
  *
  * See docs/adr/managed-services-tier.md, decision 8.
  */

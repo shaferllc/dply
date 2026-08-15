@@ -158,6 +158,71 @@ class ProductionApiClient
     }
 
     /**
+     * A server's metrics-agent state plus its recent samples. Backs the local
+     * Metrics workspace for a mirrored host — see
+     * {@see \App\Http\Controllers\Api\ServerMonitoringController::show()}.
+     *
+     * @return array{monitoring?: array<string, mixed>, thresholds?: array<string, float>|null, guest_push?: array<string, mixed>, snapshots?: list<array{captured_at?: ?string, payload?: array<string, mixed>}>}
+     */
+    public function serverMetrics(string $serverId, int $limit = 1000): array
+    {
+        $payload = $this->getJson('/servers/'.$serverId.'/metrics', ['limit' => $limit]);
+
+        /** @var array{monitoring?: array<string, mixed>, thresholds?: array<string, float>|null, guest_push?: array<string, mixed>, snapshots?: list<array{captured_at?: ?string, payload?: array<string, mixed>}>} */
+        return is_array($payload['data'] ?? null) ? $payload['data'] : [];
+    }
+
+    /**
+     * Ask the owning control plane to run its SSH probe against the host.
+     *
+     * @return array<string, mixed>
+     */
+    public function queueServerMonitoringProbe(string $serverId): array
+    {
+        $response = $this->authedClient()->post('/servers/'.$serverId.'/metrics/probe');
+        $this->throwUnlessSuccessful($response, 'monitoring probe', [200, 202]);
+
+        /** @var array{data?: array<string, mixed>} $payload */
+        $payload = $response->json() ?? [];
+
+        return $payload['data'] ?? [];
+    }
+
+    /**
+     * Ask the owning control plane to install the metrics agent on the host.
+     *
+     * @return array<string, mixed>
+     */
+    public function installServerMonitoring(string $serverId): array
+    {
+        $response = $this->authedClient()->post('/servers/'.$serverId.'/metrics/install');
+        $this->throwUnlessSuccessful($response, 'monitoring install', [200, 202]);
+
+        /** @var array{data?: array<string, mixed>} $payload */
+        $payload = $response->json() ?? [];
+
+        return $payload['data'] ?? [];
+    }
+
+    /**
+     * @return array<string, float>|null
+     */
+    public function updateServerMonitoringThresholds(string $serverId, float $cpu, float $mem, float $load): ?array
+    {
+        $response = $this->authedClient()->patch('/servers/'.$serverId.'/metrics/thresholds', [
+            'cpu' => $cpu,
+            'mem' => $mem,
+            'load' => $load,
+        ]);
+        $this->throwUnlessSuccessful($response, 'monitoring thresholds');
+
+        /** @var array{data?: array{thresholds?: array<string, float>|null}} $payload */
+        $payload = $response->json() ?? [];
+
+        return $payload['data']['thresholds'] ?? null;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function projects(): array

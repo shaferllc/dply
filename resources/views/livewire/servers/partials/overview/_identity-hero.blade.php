@@ -26,7 +26,7 @@
     // white cells that tint on hover. Not the separate rounded chips this file
     // had — general-tab.blade.php literally describes its grid as mirroring
     // "the server hero facts card", so the two had drifted apart.
-    $factCell = 'bg-white px-4 py-2.5 transition-colors hover:bg-brand-sand/[0.15] sm:px-5';
+    $factCell = 'bg-white px-3 py-2 transition-colors hover:bg-brand-sand/[0.15] sm:px-4';
     $factLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
     $factValue = 'mt-1 truncate text-sm font-medium text-brand-ink';
 
@@ -47,7 +47,10 @@
 
 {{-- Hero: server identity + facts. --}}
 <section class="dply-card overflow-hidden p-0">
+    {{-- Dense head: the reachability line is reference, not something to read
+         now, so it rides beside the name instead of taking its own row. --}}
     <x-workspace-panel-head
+        dense
         icon="heroicon-o-server-stack"
         :title="$server->name"
         :note="$healthSummary['last_checked_at']
@@ -81,7 +84,7 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    <div class="px-5 py-4 sm:px-6">
+    <div class="px-3 py-3 sm:px-4">
         <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($heroFacts as $fact)
                 <div @class([$factCell, 'group flex items-center justify-between gap-3' => $fact['copy'] ?? false])>
@@ -179,18 +182,19 @@
          so the overview opens with a single header card instead of two. --}}
     @unless ($isDedicatedServiceRoleHost)
         <x-workspace-panel-head
+            dense
             icon="heroicon-o-squares-2x2"
             :title="__('Workspace summary')"
             :note="__('Each tile drops you onto its full workspace page.')"
             class="border-y border-brand-ink/10"
         />
-        <div class="px-5 py-3 sm:px-6">
+        <div class="px-3 py-2.5 sm:px-4">
             @include('livewire.servers.partials.overview._summary-tiles-grid')
         </div>
     @endunless
 
     {{-- Merged: live system load (CPU / memory / disk) lives in the header card too. --}}
-    <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
+    <div class="border-t border-brand-ink/10 px-3 py-2.5 sm:px-4">
         @include('livewire.servers.partials.overview._live-metrics-body')
     </div>
 </section>

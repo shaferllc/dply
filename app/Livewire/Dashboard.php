@@ -27,20 +27,20 @@ class Dashboard extends Component
         $servers = (clone $serverQuery)->withCount('sites')->take(5)->get();
         $serverCount = (clone $serverQuery)->count();
         $org = $user->currentOrganization();
-        $fleetInsights = $insightsMetrics->fleetSummary($org);
+        $orgInsights = $insightsMetrics->organizationSummary($org);
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
 
-        $fleetAlert = $org ? $this->computeFleetAlert($org) : null;
+        $healthAlert = $org ? $this->computeHealthAlert($org) : null;
 
         return view('livewire.dashboard', [
             'organization' => $org,
             'servers' => $servers,
             'serverCount' => $serverCount,
-            'fleetInsights' => $fleetInsights,
+            'orgInsights' => $orgInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
-            'fleetAlert' => $fleetAlert,
+            'healthAlert' => $healthAlert,
         ]);
     }
 
@@ -55,7 +55,7 @@ class Dashboard extends Component
      *     drift_servers: int
      * }|null
      */
-    private function computeFleetAlert(Organization $organization): ?array
+    private function computeHealthAlert(Organization $organization): ?array
     {
         $serverIds = $organization->serverIds();
         if ($serverIds->isEmpty()) {

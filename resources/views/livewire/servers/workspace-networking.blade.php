@@ -9,7 +9,12 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @php
-        $allServers = $peerServers->prepend($server);
+        // concat, not prepend: Collection::prepend mutates in place, so reusing
+        // it at several call sites would stack duplicate rows.
+        $allServers = collect([$server])->concat($peerServers);
+        // Attach/create-network flow operates on candidates (org-wide, including
+        // hosts with no private IP yet) — not on the map's reachable peers.
+        $attachCandidates = collect([$server])->concat($networkCandidates);
         $showRoutesTab = $networkId > 0 && $server->provider->value === 'hetzner';
         $hasAccessControls = $databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty() || $cacheServices->isNotEmpty();
     @endphp
@@ -68,12 +73,16 @@
         />
 
         <section class="border-b border-brand-ink/10">
-            @php $hasHetznerWithoutNetwork = $allServers->contains(fn ($s) => $s->provider->value === 'hetzner' && ! $s->private_ip_address); @endphp
+            @php $hasHetznerWithoutNetwork = $attachCandidates->contains(fn ($s) => $s->provider->value === 'hetzner' && ! $s->private_ip_address); @endphp
             <x-workspace-panel-head
                 dense
                 icon="heroicon-o-share"
                 :title="__('Server network map')"
-                :note="__('Servers on the same private network as this one. Use these private IPs in connection strings so traffic stays off the public internet.')"
+                :note="match (true) {
+                    $onPrivateNetwork => __('Servers on the same private network as this one. Use these private IPs in connection strings so traffic stays off the public internet.'),
+                    $hasPrivateAddress => __('This server has a private address, but which network it belongs to is not known here, so the list below is not narrowed to its peers.'),
+                    default => __('This server is not on a private network yet, so it has no peers to reach privately. Attach it to a network to see them here.'),
+                }"
                 :count="trans_choice('{1} :count server|[2,*] :count servers', $allServers->count(), ['count' => $allServers->count()])"
                 class="border-b border-brand-ink/10"
             >
@@ -838,7 +847,7 @@
                     <p class="mb-2 text-sm font-medium text-brand-ink">{{ __('Attach these servers') }}</p>
                     @error('new_network_server_ids') <p class="mb-2 text-xs text-rose-700">{{ $message }}</p> @enderror
                     <div class="space-y-2">
-                        @foreach ($allServers->where('provider.value', 'hetzner') as $s)
+                        @foreach ($attachCandidates->where('provider.value', 'hetzner') as $s)
                             <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 hover:bg-brand-sand/20">
                                 <input
                                     type="checkbox"
@@ -885,7 +894,7 @@
     </x-modal>
 
     {{-- Attach-to-existing-network modals (one per Hetzner server without private IP) --}}
-    @foreach ($allServers->where('provider.value', 'hetzner')->where('private_ip_address', null) as $s)
+    @foreach ($attachCandidates->where('provider.value', 'hetzner')->where('private_ip_address', null) as $s)
         <x-modal name="attach-network-modal-{{ $s->id }}" max-width="sm" focusable>
             <div class="bg-white">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">

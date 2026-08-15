@@ -1,12 +1,28 @@
 {{--
-    Lazy-load skeleton for Overview. Mirrors the identity-hero card
-    (hide-hero + single merged header with facts / summary tiles / metrics)
-    instead of the generic split hero + three pulsing cards.
+    Lazy-load skeleton for Overview. Mirrors _identity-hero exactly: dense panel
+    head, the hairline fact grid, then the role-dependent bands. Keep the two in
+    step — this file previously mirrored the old split hero (big icon badge +
+    "SERVER" eyebrow + bordered spec table) that _identity-hero replaced, so the
+    page visibly jumped from a tall skeleton to a compact card on load.
+
+    Role matters: a dedicated cache/database host renders no Workspace summary
+    band at all (see the @unless in _identity-hero), so neither does its skeleton.
 --}}
 @php
-    $ssh = method_exists($server, 'getSshConnectionString')
-        ? $server->getSshConnectionString()
-        : trim((string) (($server->ssh_user ?: 'root').'@'.($server->ip_address ?: '')));
+    // Same derivation as workspace-overview.blade.php / WorkspaceOverview::render.
+    $serverRole = (string) ($server->meta['server_role'] ?? '');
+    $isDedicatedServiceRoleHost = in_array($serverRole, ['redis', 'valkey', 'database'], true);
+
+    // Mirrors the $heroFacts list: Provider / Region / Size / Status / IP,
+    // plus Private IP when set, plus SSH.
+    $factLabels = [__('Provider'), __('Region'), __('Size'), __('Status'), __('IP')];
+    if ($server->private_ip_address) {
+        $factLabels[] = __('Private IP');
+    }
+    $factLabels[] = __('SSH');
+
+    $factCell = 'bg-white px-3 py-2 sm:px-4';
+    $factLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
 @endphp
 
 <x-server-workspace-layout
@@ -18,75 +34,61 @@
     <div class="space-y-4" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading overview…') }}</span>
 
-        <section class="dply-card overflow-hidden" aria-hidden="true">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md" tone="brand">
-                            <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Server') }}</p>
-                            <h1 class="mt-1 truncate text-xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h1>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
-                                <span class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
-                                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-gold"></span>
-                                    {{ __('Loading…') }}
-                                </span>
-                                <span class="inline-flex items-center gap-1 font-mono">
-                                    <span class="text-2xs uppercase tracking-[0.16em] text-brand-mist">SSH</span>
-                                    <span class="break-all text-brand-ink">{{ $ssh }}</span>
-                                </span>
-                            </div>
-                            <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                                @foreach (range(1, 4) as $chip)
-                                    <span class="inline-flex h-6 w-16 animate-pulse rounded-md bg-brand-ink/10"></span>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-5">
-                    <dl class="divide-y divide-brand-ink/10 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        <div class="grid grid-cols-3 divide-x divide-brand-ink/10">
-                            @foreach ([__('Provider'), __('Region'), __('Size')] as $label)
-                                <div class="min-w-0 px-3 py-2 sm:px-4">
-                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
-                                    <dd class="mt-1.5 h-4 w-16 animate-pulse rounded bg-brand-ink/10"></dd>
-                                </div>
-                            @endforeach
-                        </div>
-                        @foreach ([__('Status'), __('IP')] as $label)
-                            <div class="flex items-baseline justify-between gap-4 px-3 py-2 sm:px-4">
-                                <dt class="shrink-0 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
-                                <dd class="h-4 w-24 animate-pulse rounded bg-brand-ink/10"></dd>
-                            </div>
-                        @endforeach
-                    </dl>
+        <section class="dply-card overflow-hidden p-0" aria-hidden="true">
+            {{-- Dense head: real icon + name (both known before load), pulsing
+                 stand-ins for the note and the two action pills. --}}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                <h2 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                    <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    {{ $server->name }}
+                </h2>
+                <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                <span class="h-3 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></span>
+                <div class="ml-auto flex shrink-0 items-center gap-1.5">
+                    <span class="h-6 w-32 animate-pulse rounded-lg bg-brand-ink/10"></span>
+                    <span class="h-6 w-20 animate-pulse rounded-lg bg-brand-ink/10"></span>
                 </div>
             </div>
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 p-6 sm:p-8">
-                <div class="mb-3 flex items-center gap-2">
-                    <x-heroicon-o-squares-2x2 class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workspace summary') }}</p>
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                    @foreach (range(1, 5) as $tile)
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <div class="h-2.5 w-14 animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="mt-1.5 h-3 w-28 animate-pulse rounded bg-brand-ink/10"></div>
+            <div class="px-3 py-3 sm:px-4">
+                <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($factLabels as $label)
+                        <div class="{{ $factCell }}">
+                            <dt class="{{ $factLabel }}">{{ $label }}</dt>
+                            <dd class="mt-1 h-5 w-24 animate-pulse rounded bg-brand-ink/10"></dd>
                         </div>
                     @endforeach
-                </div>
+                </dl>
             </div>
 
-            <div class="border-t border-brand-ink/10 p-6 sm:p-8">
-                <div class="mb-3 flex items-center justify-between gap-2">
+            @unless ($isDedicatedServiceRoleHost)
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-y border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                    <h2 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                        <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Workspace summary') }}
+                    </h2>
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                    <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('Each tile drops you onto its full workspace page.') }}</p>
+                </div>
+                <div class="px-3 py-2.5 sm:px-4">
+                    {{-- Joined hairline cells, matching _summary-tiles-grid. --}}
+                    <div class="grid gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                        @foreach (range(1, 5) as $tile)
+                            <div class="bg-white px-3 py-2 sm:px-4">
+                                <div class="h-2.5 w-14 animate-pulse rounded bg-brand-ink/10"></div>
+                                <div class="mt-1.5 h-4 w-20 animate-pulse rounded bg-brand-ink/10"></div>
+                                <div class="mt-1 h-3 w-24 animate-pulse rounded bg-brand-ink/10"></div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endunless
+
+            {{-- Live system load band, same slot as _live-metrics-body. --}}
+            <div class="border-t border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="mb-2 flex items-center justify-between gap-2">
                     <div class="h-2.5 w-24 animate-pulse rounded bg-brand-ink/10"></div>
-                    <div class="h-2.5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
+                    <div class="h-6 w-28 animate-pulse rounded-lg bg-brand-ink/10"></div>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-3">
                     @foreach (range(1, 3) as $metric)
@@ -100,13 +102,24 @@
             </div>
         </section>
 
-        <section class="dply-card overflow-hidden p-6 sm:p-8" aria-hidden="true">
-            <div class="h-3 w-28 animate-pulse rounded bg-brand-ink/10"></div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach (range(1, 6) as $cell)
-                    <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-3">
-                        <div class="h-2.5 w-16 animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="mt-2 h-4 w-20 animate-pulse rounded bg-brand-ink/10"></div>
+        {{-- Below the hero the page is a stack of conditional cards (checklist,
+             SSH reminder, role tile pack, shortcuts). One card-shaped block
+             stands in for whichever lands, rather than a fixed six-cell grid
+             that matched nothing. --}}
+        <section class="dply-card overflow-hidden p-0" aria-hidden="true">
+            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                <span class="h-4 w-4 shrink-0 animate-pulse rounded bg-brand-ink/10"></span>
+                <span class="h-3 w-44 animate-pulse rounded bg-brand-ink/10"></span>
+            </div>
+            <div class="space-y-2 px-3 py-3 sm:px-4">
+                @foreach (range(1, 3) as $row)
+                    <div class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
+                        <span class="h-4 w-4 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
+                        <div class="min-w-0 flex-1">
+                            <div class="h-3 w-40 animate-pulse rounded bg-brand-ink/10"></div>
+                            <div class="mt-1.5 h-2.5 w-64 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                        </div>
+                        <span class="h-6 w-24 shrink-0 animate-pulse rounded-lg bg-brand-ink/10"></span>
                     </div>
                 @endforeach
             </div>

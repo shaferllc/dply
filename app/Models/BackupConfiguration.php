@@ -70,20 +70,27 @@ class BackupConfiguration extends Model
      * the control plane ({@see \App\Modules\Backups\Services\CloudApiTokenResolver})
      * and spent by a script on the server ({@see \App\Modules\Backups\Services\CloudApiCommandFactory}).
      *
-     * @return list<string>
+     * Exposed as a constant as well so callers that need this list at
+     * compile time (e.g. a class constant in a Livewire component) can derive
+     * from it instead of restating it and drifting.
+     *
+     * @var list<string>
      */
+    public const AVAILABLE_PROVIDERS = [
+        self::PROVIDER_AWS_S3,
+        self::PROVIDER_CUSTOM_S3,
+        self::PROVIDER_DIGITALOCEAN_SPACES,
+        self::PROVIDER_SFTP,
+        self::PROVIDER_FTP,
+        self::PROVIDER_RCLONE,
+        self::PROVIDER_DROPBOX,
+        self::PROVIDER_GOOGLE_DRIVE,
+    ];
+
+    /** @return list<string> */
     public static function availableProviders(): array
     {
-        return [
-            self::PROVIDER_AWS_S3,
-            self::PROVIDER_CUSTOM_S3,
-            self::PROVIDER_DIGITALOCEAN_SPACES,
-            self::PROVIDER_SFTP,
-            self::PROVIDER_FTP,
-            self::PROVIDER_RCLONE,
-            self::PROVIDER_DROPBOX,
-            self::PROVIDER_GOOGLE_DRIVE,
-        ];
+        return self::AVAILABLE_PROVIDERS;
     }
 
     public static function isProviderAvailable(string $provider): bool

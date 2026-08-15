@@ -39,15 +39,24 @@ app/
 
 **Modules must never depend on the presentation shell** (`app/Livewire/*`
 concrete components, `app/Http/Controllers/*`). The arrow points UI → engine →
-kernel, never the reverse. This is enforced by **Deptrac** (`deptrac.yaml`):
+kernel, never the reverse. Enforced by `tests/Unit/ModuleBoundaryTest.php`:
 
 ```
-composer deptrac              # check (CI-ready; exit 1 on a new violation)
-composer deptrac:baseline     # regenerate baseline after an intentional change
+php artisan test tests/Unit/ModuleBoundaryTest.php   # ~6s, runs in `composer test`
 ```
 
-Existing known-debt violations are recorded in `deptrac-baseline.yaml` — a *new*
-Module→shell dependency fails the build.
+It parses every file under `app/Modules` with nikic/php-parser and fails on any
+resolved reference into the shell. Generic `app/Livewire/Concerns/*`,
+`app/Livewire/Forms/*` and the base `Controller` count as kernel, so modules may
+use them. Imports referenced only from a `{@see}` docblock are ignored — no
+runtime coupling (this matches what Deptrac counted).
+
+Known-debt exemptions live in the test's `BASELINE` const; a *new* Module→shell
+dependency fails the build. Pay one off and delete its line — a companion test
+fails on stale entries so exemptions can't outlive the debt.
+
+(Replaces Deptrac, removed 2026-08-15 — `deptrac.yaml` had been deleted in an
+unrelated WIP commit three days earlier, so the boundary was silently unchecked.)
 
 ## Module map
 
@@ -76,7 +85,7 @@ Module→shell dependency fails the build.
 | **Projects** | `Workspace` grouping container UI. |
 | **Scaffold** | Repo scaffolding pipeline. |
 | **SourceControl** | Git provider OAuth/integration (GitHub/GitLab/Bitbucket). |
-| **OpsCopilot** | Fleet/infra deploy-failure triage. |
+| **OpsCopilot** | Org-wide infra deploy-failure triage (`/infrastructure/copilot`). |
 | **Remediations** | Guided remediation jobs/services. |
 | **RemoteCli** | Remote CLI execution. |
 | **ConfigRevisions** | Config-file revision history. |
@@ -106,7 +115,7 @@ Module→shell dependency fails the build.
 composer dev            # serve + queue + logs + reverb (local)
 composer test           # config:clear + artisan test (Pest/PHPUnit)
 composer analyse        # phpstan
-composer deptrac        # module-boundary check
+composer test           # includes the module-boundary check (tests/Unit/ModuleBoundaryTest.php)
 ```
 
 ## Critical do-nots (see memory / AGENTS.md for the rest)

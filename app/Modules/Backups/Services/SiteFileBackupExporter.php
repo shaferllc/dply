@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Backups\Services;
 
+use App\Models\BackupConfiguration;
+use App\Models\Site;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 
 use App\Modules\Backups\Models\SiteFileBackup;
@@ -23,6 +25,7 @@ final class SiteFileBackupExporter
 {
     public function __construct(
         private readonly ServerDatabaseRemoteExec $remoteExec,
+        private readonly BackupArtifactUploader $uploader,
     ) {}
 
     /**
@@ -77,6 +80,47 @@ final class SiteFileBackupExporter
             throw new \RuntimeException(__('Archive exceeded the configured maximum size.'));
         }
 
+        // Ship it off the box when a destination is set. An archive that only
+        // exists on its own server is no use in the case that most often needs
+        // it — losing that server.
+        $backup->loadMissing('backupConfiguration');
+        $configuration = $backup->backupConfiguration;
+
+        if ($configuration !== null) {
+            $emit->step('files', __('Archived :size — uploading to :label …', [
+                'size' => Number::fileSize($bytes),
+                'label' => BackupConfiguration::labelForProvider($configuration->provider),
+            ]));
+
+            try {
+                $handle = $this->uploader->upload(
+                    server: $server,
+                    configuration: $configuration,
+                    sourcePath: $remotePath,
+                    key: $this->objectKey($backup, $site),
+                    correlationId: (string) $backup->id,
+                    contentType: 'application/gzip',
+                    emit: $emit,
+                );
+            } finally {
+                // The local tar is scratch once it's bound for a destination —
+                // removed on failure too, so a failed upload can't silently fill
+                // the server's disk with archives nobody will collect.
+                $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($remotePath), 60);
+            }
+
+            $backup->update([
+                'status' => SiteFileBackup::STATUS_COMPLETED,
+                'storage_kind' => SiteFileBackup::STORAGE_KIND_DESTINATION,
+                'remote_path' => null,
+                'disk_path' => null,
+                'destination_path' => $handle,
+                'bytes' => $bytes,
+            ]);
+
+            return;
+        }
+
         $emit->step('files', __('Archived :size — pruning old backups on the server …', ['size' => Number::fileSize($bytes)]));
 
         $this->remoteExec->pruneRemoteBackupTree(
@@ -89,9 +133,27 @@ final class SiteFileBackupExporter
             'status' => SiteFileBackup::STATUS_COMPLETED,
             'storage_kind' => SiteFileBackup::STORAGE_KIND_REMOTE_SERVER,
             'remote_path' => $remotePath,
+            'destination_path' => null,
             'disk_path' => null,
             'bytes' => $bytes,
         ]);
+    }
+
+    /**
+     * Destination-relative key. Dated folders keep a shared bucket browsable and
+     * make lifecycle rules easy to write; the site slug keeps sites from
+     * colliding when several back up to the same destination.
+     */
+    private function objectKey(SiteFileBackup $backup, Site $site): string
+    {
+        $slug = Str::slug((string) $site->name) ?: 'site';
+
+        return sprintf(
+            'site-files/%s/%s/%s.tar.gz',
+            $slug,
+            ($backup->created_at ?? now())->format('Y/m/d'),
+            $backup->id,
+        );
     }
 
     /**
@@ -100,6 +162,21 @@ final class SiteFileBackupExporter
      */
     public function deleteArtifact(SiteFileBackup $backup): void
     {
+        if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_DESTINATION && filled($backup->destination_path)) {
+            $backup->loadMissing(['site.server', 'backupConfiguration']);
+            $server = $backup->site->server;
+            $configuration = $backup->backupConfiguration;
+
+            // The upload transports run from the server, so removing the object
+            // needs one too. Without a server we simply drop the row and leave
+            // the object to the destination's lifecycle rules.
+            if ($server !== null && $configuration !== null) {
+                $this->uploader->delete($server, $configuration, (string) $backup->destination_path, (string) $backup->id);
+            }
+
+            return;
+        }
+
         if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER && filled($backup->remote_path)) {
             $backup->loadMissing('site.server');
             $server = $backup->site->server;

@@ -26,6 +26,7 @@ final class BackupDownloadStager
         private readonly BackupStagingS3ClientFactory $staging,
         private readonly ServerDatabaseRemoteExec $remoteExec,
         private readonly DatabaseBackupExporter $dbExporter,
+        private readonly BackupArtifactUploader $artifacts,
     ) {}
 
     /**
@@ -145,6 +146,41 @@ final class BackupDownloadStager
         }
 
         $contentType = 'application/gzip';
+
+        // Archive lives on a destination: pull it back onto the site's server
+        // first, then reuse the existing server-upload path. Two hops, but none
+        // of these transports can be presigned for a browser to fetch directly,
+        // and S3-compatible destinations are handled the same way here rather
+        // than special-casing a redirect into a staging flow that expects a file.
+        if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_DESTINATION) {
+            $backup->loadMissing(['site.server', 'backupConfiguration']);
+            $server = $this->requireServer($backup->site->server, __('The site server is unavailable.'));
+            $configuration = $backup->backupConfiguration;
+
+            if ($configuration === null) {
+                $this->fail($row, __('This backup’s destination record is missing.'));
+
+                return;
+            }
+
+            $localPath = '/tmp/dply-site-fetch-'.$backup->id.'.tar.gz';
+
+            try {
+                $this->artifacts->stageOnServer(
+                    $server,
+                    $configuration,
+                    (string) $backup->destination_path,
+                    $localPath,
+                    (string) $backup->id,
+                );
+
+                $this->uploadFromServer($row, $server, $localPath, 'site-files', 'tar.gz', $contentType);
+            } finally {
+                $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($localPath), 60);
+            }
+
+            return;
+        }
 
         if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER) {
             $this->uploadFromServer(

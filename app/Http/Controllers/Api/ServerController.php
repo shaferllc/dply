@@ -31,6 +31,9 @@ class ServerController extends Controller
                 'sites',
                 'databaseEngines',
                 'cacheServices',
+                // Names only — the assembler exposes them so a consumer can
+                // reproduce the Databases count/list without a second call.
+                'serverDatabases:id,server_id,name',
             ])
             ->withCount('sites')
             ->orderBy('name')

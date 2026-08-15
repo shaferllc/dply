@@ -19,7 +19,7 @@ class OrganizationInsightsMetricsService
      *   worst_servers: list<array{id: string, name: string, open: int, worst: string|null}>
      * }|null
      */
-    public function fleetSummary(?Organization $org): ?array
+    public function organizationSummary(?Organization $org): ?array
     {
         if (! $org instanceof Organization) {
             return null;

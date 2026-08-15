@@ -242,7 +242,7 @@
             dense
             icon="heroicon-o-server-stack"
             :title="__('Where database backups are kept')"
-            :note="__('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup destinations.')"
+            :note="__('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or any org backup destination from Settings → Backup destinations.')"
             class="border-b border-brand-ink/10"
         />
         <form wire:submit="saveDatabaseBackupSettings" class="space-y-3 px-4 py-3.5 sm:px-5">
@@ -251,7 +251,7 @@
                     <label class="block text-sm font-medium text-brand-ink">{{ __('Default storage') }}</label>
                     <select wire:model.live="db_backup_default_kind" class="{{ $input }} mt-1">
                         <option value="remote_server">{{ __('On this server') }}</option>
-                        <option value="destination">{{ __('S3-compatible destination') }}</option>
+                        <option value="destination">{{ __('Backup destination') }}</option>
                     </select>
                 </div>
                 @if ($db_backup_default_kind === 'destination')
@@ -267,7 +267,7 @@
                             <div class="mt-1 rounded-lg border border-dashed border-brand-ink/20 bg-brand-sand/20 px-3 py-3 text-sm text-brand-moss">
                                 {{ __('No destinations yet.') }}
                                 <button type="button" wire:click="openDestinationModal" class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Add one') }}</button>
-                                {{ __('— paste S3 credentials, or create a new bucket on DigitalOcean Spaces / Hetzner.') }}
+                                {{ __('— S3-compatible storage, SFTP/FTP, Rclone, Dropbox, or Google Drive.') }}
                             </div>
                         @else
                             <select wire:model="db_backup_configuration_id" class="{{ $input }} mt-1">

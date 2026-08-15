@@ -49,3 +49,4 @@ frankenphp
 frankenphp-worker.php
 
 storage/blaze/traces/
+storage/framework/lookout/

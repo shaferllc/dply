@@ -11,6 +11,8 @@ use Livewire\Component;
  */
 trait ConfirmsServerMonitoringInstall
 {
+    use ManagesMonitorProductionMirror;
+
     public bool $showInstallMonitoringModal = false;
 
     /** step1 | redeploy | services */
@@ -30,6 +32,15 @@ trait ConfirmsServerMonitoringInstall
     public function confirmInstallMonitoring(): void
     {
         $this->closeInstallMonitoringModal();
+
+        // A mirrored host has no local SSH key: the install has to be run by the
+        // control plane that owns it, or not at all.
+        if ($this->isProductionMirrorServer()) {
+            $this->proxyMonitoringInstallToProduction();
+
+            return;
+        }
+
         $this->runInstallAction('install_monitoring_prerequisites');
     }
 }

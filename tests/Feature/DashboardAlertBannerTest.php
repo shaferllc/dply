@@ -32,7 +32,7 @@ test('banner hidden when fleet is clean', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertDontSee('Fleet needs attention');
+        ->assertDontSee('Infrastructure needs attention');
 });
 test('banner shows when failed latest deploy exists', function () {
     [$user, $org] = makeUserOrg();
@@ -50,7 +50,7 @@ test('banner shows when failed latest deploy exists', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertSee('Fleet needs attention')
+        ->assertSee('Infrastructure needs attention')
         ->assertSee('failed latest deploy', false)
         ->assertSee(route('infrastructure.health'), false);
 });
@@ -69,7 +69,7 @@ test('banner shows when long running deploy exists', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertSee('Fleet needs attention')
+        ->assertSee('Infrastructure needs attention')
         ->assertSee('15 minutes', false);
 });
 test('banner shows when engine drift exists', function () {
@@ -86,7 +86,7 @@ test('banner shows when engine drift exists', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertSee('Fleet needs attention')
+        ->assertSee('Infrastructure needs attention')
         ->assertSee('engine drift', false);
 });
 test('banner only counts current org', function () {
@@ -111,7 +111,7 @@ test('banner only counts current org', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertDontSee('Fleet needs attention');
+        ->assertDontSee('Infrastructure needs attention');
 });
 /**
  * @return array{0: User, 1: Organization}

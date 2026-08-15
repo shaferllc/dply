@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ServerController;
 use App\Http\Controllers\Api\ServerFirewallController;
 use App\Http\Controllers\Api\ServerLogShippingController;
+use App\Http\Controllers\Api\ServerMonitoringController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
@@ -166,6 +167,19 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/servers/{server}/system-users/{username}', [ServerSystemUserApiController::class, 'destroy'])
             ->middleware('ability:'.$apiAbilities['servers.system_users.destroy'])
             ->where('username', '[a-zA-Z0-9._-]+');
+
+        // Metrics agent state + samples, and the three operations the Metrics
+        // workspace starts. A consumer control plane (the local production-data
+        // mirror) renders that page from `show` and posts here instead of
+        // dispatching SSH jobs for a host whose key it does not hold.
+        Route::get('/servers/{server}/metrics', [ServerMonitoringController::class, 'show'])
+            ->middleware('ability:'.$apiAbilities['servers.metrics.show']);
+        Route::post('/servers/{server}/metrics/probe', [ServerMonitoringController::class, 'probe'])
+            ->middleware('ability:'.$apiAbilities['servers.metrics.probe']);
+        Route::post('/servers/{server}/metrics/install', [ServerMonitoringController::class, 'install'])
+            ->middleware('ability:'.$apiAbilities['servers.metrics.install']);
+        Route::patch('/servers/{server}/metrics/thresholds', [ServerMonitoringController::class, 'thresholds'])
+            ->middleware('ability:'.$apiAbilities['servers.metrics.thresholds']);
 
         Route::get('/servers/{server}/log-shipping', [ServerLogShippingController::class, 'show'])
             ->middleware('ability:'.$apiAbilities['servers.log_shipping.show']);

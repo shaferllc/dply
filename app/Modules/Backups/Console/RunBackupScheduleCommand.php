@@ -156,6 +156,7 @@ class RunBackupScheduleCommand extends Command
             'site_id' => $schedule->target_id,
             'user_id' => null,
             'status' => SiteFileBackup::STATUS_PENDING,
+            'backup_configuration_id' => $schedule->backup_configuration_id,
         ]);
 
         ExportSiteFileBackupJob::dispatch($backup->id);

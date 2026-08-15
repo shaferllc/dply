@@ -13,7 +13,7 @@
     /** @var list<array{label: string, href?: string, icon?: string}> */
     'breadcrumbs' => [],
     'viewMode' => 'list',
-    /** Local fleet only — Production mirror must leave this false. */
+    /** Local servers only — Production mirror must leave this false. */
     'showOpsLinks' => false,
     /** Deploy / Sync servers — local Livewire or Production API (same buttons). */
     'showDeployActions' => false,
@@ -54,7 +54,7 @@
         :title="__('Servers')"
         :description="$isProductionSurface
             ? __('Live servers from the connected control plane — Manage opens the real workspace with Production data.')
-            : __('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
+            : __('Provision hosts, watch readiness, and drill into each machine from one view.')"
         icon="heroicon-o-server-stack"
     >
         <x-slot:actions>
@@ -118,16 +118,16 @@
                     ];
                 }
             @endphp
-            <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-5 py-3 text-sm sm:px-6" aria-label="{{ __('Fleet ops') }}">
-                <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Fleet ops') }}</span>
-                @foreach ($serversPillTiles as $fleetTile)
+            <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-5 py-3 text-sm sm:px-6" aria-label="{{ __('Operations') }}">
+                <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Operations') }}</span>
+                @foreach ($serversPillTiles as $opsTile)
                     <a
-                        href="{{ $fleetTile['url'] }}"
+                        href="{{ $opsTile['url'] }}"
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
                     >
-                        <x-dynamic-component :component="$fleetTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ $fleetTile['label'] }}
+                        <x-dynamic-component :component="$opsTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ $opsTile['label'] }}
                     </a>
                 @endforeach
             </nav>

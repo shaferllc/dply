@@ -8,7 +8,7 @@ Bold, longer-horizon differentiators from [`DIFFERENTIATION_IDEAS.md`](DIFFERENT
 
 | Idea | Score | Flag / gate | Status |
 |------|-------|-------------|--------|
-| **Blast-radius graph** | 16 | `surface.fleet` | **Shipped (v1)** |
+| **Blast-radius graph** | 16 | _(ungated)_ | **Shipped (v1)** |
 | **Ops Copilot** | 15 | `global.ops_copilot` | **Shipped (v1 heuristics)** |
 | **Multi-cloud standby blueprints** | — | `launch.standby_blueprint` | **Shipped (v1)** |
 | **Edge + BYO unified preview URLs** | — | none (always on) | **Shipped (v1)** |
@@ -16,9 +16,9 @@ Bold, longer-horizon differentiators from [`DIFFERENTIATION_IDEAS.md`](DIFFERENT
 
 ---
 
-## Blast-radius graph (`surface.fleet`)
+## Blast-radius graph (`/infrastructure/blast-radius`)
 
-**Route:** `/fleet/blast-radius` · **Tab:** Fleet → **Blast radius**
+**Route:** `/infrastructure/blast-radius` · **Tab:** Fleet → **Blast radius**
 
 Visual dependency map across the org inventory — answer “what breaks if X fails?”
 
@@ -38,17 +38,17 @@ Visual dependency map across the org inventory — answer “what breaks if X fa
 
 - [`app/Services/Fleet/BlastRadiusGraph.php`](../app/Services/Fleet/BlastRadiusGraph.php) — graph builder + impact query
 - [`app/Livewire/Fleet/BlastRadius.php`](../app/Livewire/Fleet/BlastRadius.php)
-- [`resources/views/livewire/fleet/blast-radius.blade.php`](../resources/views/livewire/fleet/blast-radius.blade.php)
+- [`resources/views/livewire/infrastructure/blast-radius.blade.php`](../resources/views/livewire/infrastructure/blast-radius.blade.php)
 
 ### Enable
 
-Requires Fleet (`FEATURE_SURFACE_FLEET=true`, default on) — same gate as Health / Deploys / Intelligence.
+Ungated — same as Health / Deploys / Intelligence. (The `surface.fleet` flag was removed when the Fleet section was folded into `/infrastructure` on 2026-08-15.)
 
 ---
 
 ## Ops Copilot (`global.ops_copilot`)
 
-**Route:** `/fleet/copilot` · **Tab:** Fleet → **Copilot** (when flag on)
+**Route:** `/infrastructure/copilot` · **Tab:** Fleet → **Copilot** (when flag on)
 
 Cross-engine deploy failure triage — assembles the latest BYO or Edge failure log, repo config snapshot, deploy intelligence alerts, and server saved commands, then emits heuristic fix suggestions.
 
@@ -75,7 +75,7 @@ Cross-engine deploy failure triage — assembles the latest BYO or Edge failure 
 php artisan feature:set global.ops_copilot --on --reason="Ops Copilot dogfood"
 ```
 
-Requires **Fleet** (`surface.fleet`) for the tab shell. Toggle also appears on `/admin` under **Product**.
+Renders in the shared `x-infrastructure-shell` tab strip. Toggle also appears on `/admin` under **Product**.
 
 ---
 
@@ -113,7 +113,7 @@ Also on `/admin` under **Launch**. Links to marketplace runbooks when `surface.m
 
 ## Edge + BYO unified preview URLs (no flag)
 
-**Route:** `/fleet/previews` · **Tab:** Fleet → **Previews**
+**Route:** `/infrastructure/previews` · **Tab:** Fleet → **Previews**
 
 One hostname pattern for managed previews across BYO VM sites and Edge delivery:
 
@@ -131,7 +131,7 @@ BYO provisioning prefers **on-dply.*** apex zones from the shared testing pool w
 - [`app/Livewire/Fleet/Previews.php`](../app/Livewire/Fleet/Previews.php)
 - Wired into [`TestingHostnameProvisioner`](../app/Services/Sites/TestingHostnameProvisioner.php), [`Site::edgeHostname()`](../app/Models/Site.php), [`CreateEdgePreviewSite`](../app/Actions/Edge/CreateEdgePreviewSite.php)
 
-Requires **Fleet** (`surface.fleet`) for the catalog UI.
+Catalog UI lives at `/infrastructure/deploy-contracts`.
 
 ---
 

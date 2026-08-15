@@ -556,25 +556,47 @@ class WorkspaceNetworking extends Component
         $hetznerNetworkId = $this->server->hetzner_network_id;
         $onPrivateNetwork = filled($privateNetworkId) || filled($hetznerNetworkId);
 
-        $peerServers = Server::query()
+        // Two different questions, so two lists. Conflating them is what made
+        // this page claim a host could reach servers it cannot:
+        //
+        //   $networkCandidates — "which servers could I put on a network with?"
+        //                        Feeds the create/attach modal. Org-wide, and
+        //                        deliberately includes hosts with no private IP
+        //                        — an unattached Hetzner box is the whole point
+        //                        of that flow.
+        //   $peerServers       — "what can THIS server reach right now?"
+        //                        Feeds the map. Empty until it is attached.
+        //
+        // The map's copy tells you to paste these IPs into connection strings,
+        // so it must never list a host that isn't on this server's network.
+        $networkCandidates = Server::query()
             ->where('organization_id', $this->server->organization_id)
             ->where('id', '!=', $this->server->id)
             ->where('status', Server::STATUS_READY)
-            ->whereNotIn('provider', ['digitalocean_functions', 'aws_lambda'])
-            // No network yet: keep showing the org so the create/attach flow below
-            // still has candidates to offer. Once attached, the list narrows.
-            ->when($onPrivateNetwork, function ($query) use ($privateNetworkId, $hetznerNetworkId): void {
-                $query->where(function ($q) use ($privateNetworkId, $hetznerNetworkId): void {
-                    if (filled($privateNetworkId)) {
-                        $q->orWhere('private_network_id', $privateNetworkId);
-                    }
-                    if (filled($hetznerNetworkId)) {
-                        $q->orWhere('hetzner_network_id', $hetznerNetworkId);
-                    }
-                });
+            // Synthetic Edge / Cloud / Serverless hosts are not machines on a
+            // network — they exist so a Site has something to hang off. The old
+            // filter keyed on `provider`, which misses them: an Edge host is
+            // provider=digitalocean with host_kind=dply_edge_delivery, so it
+            // sailed through. Key on host_kind, the field that actually says
+            // what this row is (see AGENTS.md on excluding synthetic hosts from
+            // server inventories).
+            ->where(function ($q): void {
+                $q->whereNull('meta->host_kind')
+                    ->orWhere('meta->host_kind', Server::HOST_KIND_VM);
             })
             ->orderBy('name')
             ->get();
+
+        // A peer needs a private address to be reachable at all, and must sit
+        // on the same network. Some synthetic hosts are recorded as
+        // host_kind=vm, so the address check is what actually keeps those out.
+        $peerServers = $onPrivateNetwork
+            ? $networkCandidates
+                ->filter(fn (Server $peer): bool => filled($peer->private_ip_address)
+                    && ((filled($privateNetworkId) && $peer->private_network_id === $privateNetworkId)
+                        || (filled($hetznerNetworkId) && (string) $peer->hetzner_network_id === (string) $hetznerNetworkId)))
+                ->values()
+            : $networkCandidates->take(0);
 
         $peerServerIds = $peerServers->pluck('id')->all();
 
@@ -642,6 +664,18 @@ class WorkspaceNetworking extends Component
 
         return view('livewire.servers.workspace-networking', [
             'peerServers' => $peerServers,
+            // Org-wide attach candidates for the create/attach-network flow —
+            // deliberately NOT the map's list.
+            'networkCandidates' => $networkCandidates,
+            // Drives the map's copy: with no network of its own, the rows below
+            // are attach candidates, not reachable peers, and saying otherwise
+            // sends operators to put unreachable IPs in connection strings.
+            'onPrivateNetwork' => $onPrivateNetwork,
+            // Third state: a host can hold a private address while its network
+            // identity is unknown here — a Production mirror carries the address
+            // but never the network ids. "Not on a private network" would be
+            // wrong for it; so would promising the list is narrowed to peers.
+            'hasPrivateAddress' => filled($this->server->private_ip_address),
             'networkMap' => $networkMap,
             'databaseEnginesByServer' => $databaseEnginesByServer,
             'databasesByServer' => $databasesByServer,

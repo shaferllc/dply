@@ -2,8 +2,8 @@
     $user = auth()->user();
     $displayName = filled($user->name ?? null) ? $user->name : __('there');
     $organizationName = $organization?->name ?? __('Your organization');
-    $openFindings = (int) ($fleetInsights['total_open'] ?? 0);
-    $avgHealthScore = $fleetInsights['avg_health_score'] ?? null;
+    $openFindings = (int) ($orgInsights['total_open'] ?? 0);
+    $avgHealthScore = $orgInsights['avg_health_score'] ?? null;
 
     // Card click-through targets. Servers go to the servers list; findings and
     // health land on the org-wide Infrastructure health view.
@@ -22,7 +22,7 @@
     $platformSurfaces = [
         [
             'title' => __('Servers'),
-            'description' => __('Provision infrastructure, review fleet health, and keep your estate ready to ship.'),
+            'description' => __('Provision infrastructure, review health, and keep your estate ready to ship.'),
             'href' => route('servers.index'),
             'icon' => 'server-stack',
         ],
@@ -80,7 +80,7 @@
     $primaryHref = multi_surface_active() ? route('launches.create') : route('servers.create');
     $primaryLabel = multi_surface_active() ? __('Open launchpad') : __('Add a server');
     $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights');
-    $shellDescription = __('Run infrastructure, track fleet health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
+    $shellDescription = __('Run infrastructure, track health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
     $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors';
 
     $serversStatClass = $serverCount > 0
@@ -159,7 +159,7 @@
                         </dd>
                     </div>
                     <div class="group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40">
-                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View fleet health') }}"></a>
+                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View infrastructure health') }}"></a>
                         <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                             <span class="flex min-w-0 items-center gap-1.5">
                                 <x-heroicon-o-heart class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -177,7 +177,7 @@
                 </dl>
             </x-slot:stats>
 
-            @if ($fleetAlert !== null)
+            @if ($healthAlert !== null)
                 <div class="border-b border-brand-ink/10 bg-rose-50/80 px-5 py-4 sm:px-6" role="alert">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-start gap-3">
@@ -186,22 +186,22 @@
                             </span>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
-                                <h2 class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</h2>
+                                <h2 class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Infrastructure needs attention') }}</h2>
                                 <p class="mt-1 text-xs leading-relaxed text-rose-800">
-                                    @if ($fleetAlert['failed_latest'] > 0)
-                                        {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $fleetAlert['failed_latest'], ['count' => $fleetAlert['failed_latest']]) }}
+                                    @if ($healthAlert['failed_latest'] > 0)
+                                        {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $healthAlert['failed_latest'], ['count' => $healthAlert['failed_latest']]) }}
                                     @endif
-                                    @if ($fleetAlert['long_running'] > 0)
-                                        {{ trans_choice('{1} 1 deploy running over 15 minutes.|[2,*] :count deploys running over 15 minutes.', $fleetAlert['long_running'], ['count' => $fleetAlert['long_running']]) }}
+                                    @if ($healthAlert['long_running'] > 0)
+                                        {{ trans_choice('{1} 1 deploy running over 15 minutes.|[2,*] :count deploys running over 15 minutes.', $healthAlert['long_running'], ['count' => $healthAlert['long_running']]) }}
                                     @endif
-                                    @if ($fleetAlert['drift_servers'] > 0)
-                                        {{ trans_choice('{1} 1 server with engine drift.|[2,*] :count servers with engine drift.', $fleetAlert['drift_servers'], ['count' => $fleetAlert['drift_servers']]) }}
+                                    @if ($healthAlert['drift_servers'] > 0)
+                                        {{ trans_choice('{1} 1 server with engine drift.|[2,*] :count servers with engine drift.', $healthAlert['drift_servers'], ['count' => $healthAlert['drift_servers']]) }}
                                     @endif
                                 </p>
                             </div>
                         </div>
                         <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
-                            {{ __('View fleet health') }}
+                            {{ __('View infrastructure health') }}
                             <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         </a>
                     </div>
@@ -350,7 +350,7 @@
                 </section>
             </div>
 
-            {{-- Fleet insights + Recent servers --}}
+            {{-- Insights rollup + Recent servers --}}
             <div class="{{ $insightsGridClass }}">
                 @if ($hasWorkspaceInsights)
                     <section class="min-w-0 border-b border-brand-ink/10 lg:border-b-0" aria-labelledby="dashboard-insights-heading">
@@ -361,7 +361,7 @@
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
                                 <h2 id="dashboard-insights-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('What needs attention first') }}</h2>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across your fleet plus the noisiest servers.') }}</p>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across every server plus the noisiest ones.') }}</p>
                             </div>
                             <a
                                 href="{{ route('servers.index') }}"
@@ -373,11 +373,11 @@
                             </a>
                         </div>
 
-                        @if ($fleetInsights && ($openFindings > 0 || $avgHealthScore !== null))
+                        @if ($orgInsights && ($openFindings > 0 || $avgHealthScore !== null))
                             @php
-                                $criticalCount = (int) ($fleetInsights['open_by_severity']['critical'] ?? 0);
-                                $warningCount = (int) ($fleetInsights['open_by_severity']['warning'] ?? 0);
-                                $infoCount = (int) ($fleetInsights['open_by_severity']['info'] ?? 0);
+                                $criticalCount = (int) ($orgInsights['open_by_severity']['critical'] ?? 0);
+                                $warningCount = (int) ($orgInsights['open_by_severity']['warning'] ?? 0);
+                                $infoCount = (int) ($orgInsights['open_by_severity']['info'] ?? 0);
                                 $criticalClass = $criticalCount > 0
                                     ? 'rounded-xl border border-red-200 bg-red-50/80 px-3 py-2'
                                     : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
@@ -409,9 +409,9 @@
                                 </div>
                             </div>
 
-                            @if (! empty($fleetInsights['worst_servers']))
+                            @if (! empty($orgInsights['worst_servers']))
                                 <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
-                                    @foreach ($fleetInsights['worst_servers'] as $row)
+                                    @foreach ($orgInsights['worst_servers'] as $row)
                                         <li>
                                             <a
                                                 href="{{ route('servers.insights', $row['id']) }}"

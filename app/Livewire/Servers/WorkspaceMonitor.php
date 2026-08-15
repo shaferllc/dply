@@ -173,6 +173,15 @@ class WorkspaceMonitor extends Component
     {
         $this->server->refresh();
 
+        // A mirrored host's agent state and samples live on the control plane
+        // that owns it. Pull them in before anything reads them — cached by
+        // ProductionDataMirror, so this page's polling costs one upstream
+        // request per TTL, not one per poll.
+        $isProductionMirror = $this->isProductionMirrorServer();
+        if ($isProductionMirror) {
+            $this->refreshProductionMirrorMonitoring();
+        }
+
         $allowedTabs = ['status', 'history', 'notifications', 'diagnostics'];
         if (! in_array($this->monitor_workspace_tab, $allowedTabs, true)) {
             $this->monitor_workspace_tab = 'status';
@@ -263,8 +272,13 @@ class WorkspaceMonitor extends Component
             ? app(ServerMetricsGuestPushVerifier::class)->summary($this->server)
             : null;
 
+        // Both self-heal branches below SSH into the host. On a mirror the flags
+        // they read describe a machine this control plane has no key for, so
+        // acting on them would fire a doomed job at a live production box on
+        // every render. The owning control plane runs its own heal.
         if (
-            $guestPushVerification !== null
+            ! $isProductionMirror
+            && $guestPushVerification !== null
             && ! $guestPushVerification['script_current']
             && $sshReachable
             && $pythonInstalled
@@ -285,7 +299,8 @@ class WorkspaceMonitor extends Component
         // "${...}" placeholder), redeploy the env file. Idempotent —
         // the job is ShouldBeUnique on serverId.
         if (
-            $guestPush->isEnabled()
+            ! $isProductionMirror
+            && $guestPush->isEnabled()
             && $sshReachable
             && $pythonInstalled
             && ! empty($this->server->ip_address)
@@ -396,7 +411,16 @@ class WorkspaceMonitor extends Component
             'metricsRangeOptions' => array_keys(ServerMetricsRangeQuery::RANGES),
             'storedSnapshotCount' => $storedSnapshotCount,
             'showMetricsPanels' => $pythonInstalled || $storedSnapshotCount > 0,
-            'opsReady' => $this->serverOpsReady(),
+            // A mirror is provisioned — this control plane just doesn't hold the
+            // key. Reporting it as un-provisioned would hide a live host's
+            // metrics behind a "waiting on provisioning" wall; the actions that
+            // would need the key are proxied instead (see
+            // ManagesMonitorProductionMirror).
+            'opsReady' => $this->serverOpsReady() || $isProductionMirror,
+            'isProductionMirror' => $isProductionMirror,
+            'productionMirrorBaseUrl' => $isProductionMirror
+                ? (string) data_get($this->server->meta, 'production_base_url')
+                : null,
             'isDeployer' => $this->currentUserIsDeployer(),
             'monitorLastGuestSampleAt' => $guestPushVerification['last_guest_sample_at'] ?? null,
             'probePending' => $probePending,

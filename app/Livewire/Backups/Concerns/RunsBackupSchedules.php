@@ -102,6 +102,10 @@ trait RunsBackupSchedules
             'site_id' => $site->id,
             'user_id' => auth()->id(),
             'status' => SiteFileBackup::STATUS_PENDING,
+            // The schedule has always carried a destination; the site-files path
+            // just never passed it on, so every scheduled archive stayed on the
+            // server it was made on.
+            'backup_configuration_id' => $schedule->backup_configuration_id,
         ]);
 
         ExportSiteFileBackupJob::dispatch($backup->id);

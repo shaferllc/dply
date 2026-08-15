@@ -5,12 +5,11 @@ namespace App\Livewire\Servers\Concerns;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\Server;
-use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Servers\ServerManageScriptQueuer;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -183,46 +182,17 @@ trait RunsServerPackageInstalls
     ): void {
         $this->servicesRemoteTaskId = null;
 
-        $id = (string) Str::uuid();
-        $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);
-
-        Cache::put(ServerManageRemoteSshJob::cacheKey($id), [
-            'status' => 'queued',
-            'output' => '',
-            'error' => null,
-            'flash_success' => null,
-            'queued_at' => time(),
-        ], now()->addSeconds(max(120, $ttl)));
-
-        if (config('server_manage.supersede_duplicate_remote_tasks', true)) {
-            Cache::put(
-                ServerManageRemoteSshJob::activeRequestCacheKey($server->id, $taskName),
-                $id,
-                now()->addSeconds(max(120, $ttl)),
-            );
-        }
-
-        // Persist a recent-activity row so install progress survives a
-        // page reload — the cache-only state vanishes if the operator
-        // navigates away. The job updates this row through its lifecycle
-        // (queued → running → finished/failed) via updateLog().
-        $label = $this->guessInstallActionLabel($taskName) ?? $streamTitle;
-        $logRow = ServerManageAction::create([
-            'server_id' => $server->id,
-            'user_id' => auth()->id(),
-            'task_name' => $taskName,
-            'label' => $label,
-            'status' => ServerManageAction::STATUS_QUEUED,
-        ]);
-
-        ServerManageRemoteSshJob::dispatch(
-            $server->id,
-            $id,
+        // Cache seeding, the activity row and the dispatch live in the queuer so
+        // the REST surface (Api\ServerMonitoringController) queues the identical
+        // task; only the stream/banner wiring below is Livewire's business.
+        $id = app(ServerManageScriptQueuer::class)->queue(
+            $server,
             $taskName,
             $inlineBash,
-            $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
+            $timeoutSeconds,
             $flashSuccess,
-            $logRow->id,
+            $this->guessInstallActionLabel($taskName) ?? $streamTitle,
+            auth()->id(),
         );
 
         $this->servicesRemoteTaskId = $id;
@@ -243,13 +213,7 @@ trait RunsServerPackageInstalls
      */
     protected function guessInstallActionLabel(string $taskName): ?string
     {
-        if (! preg_match('/^services-install:(.+)$/', $taskName, $m)) {
-            return null;
-        }
-        $key = $m[1];
-        $def = config('server_services.install_actions', [])[$key] ?? null;
-
-        return is_array($def) && isset($def['label']) ? (string) $def['label'] : null;
+        return app(ServerManageScriptQueuer::class)->guessInstallActionLabel($taskName);
     }
 
     protected function manageSshConnectionLabel(Server $server): string

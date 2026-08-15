@@ -27,52 +27,59 @@
             ? trans_choice('{1} :count paused schedule|[2,*] :count paused schedules', $databaseTileData['paused_schedules'], ['count' => $databaseTileData['paused_schedules']])
             : __('Database backup cron on this host');
     @endphp
-    <section class="dply-card overflow-hidden">
-        {{-- Compact header, matching the onboarding checklist card above it: one
-             row, no description paragraph. What the description said ("each tile
-             drops you onto the full Database workspace") is already obvious from
-             the tiles being links, so it was costing a line of vertical space to
-             restate the affordance. --}}
-        <div class="flex items-center gap-3 px-6 py-4 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <h3 class="min-w-0 flex-1 text-base font-semibold text-brand-ink">{{ __(':engine workspace', ['engine' => $engineLabel]) }}</h3>
-            <a href="{{ $databasesUrl }}" wire:navigate class="hidden shrink-0 items-center gap-1 text-xs font-semibold text-brand-sage transition hover:text-brand-ink sm:inline-flex">
-                {{ __('Open Database') }}
-                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            </a>
-        </div>
+    @php
+        // Joined hairline tiles, same construction as the identity hero's fact
+        // grid: one rounded container, tint showing through 1px gaps, white
+        // cells that tint on hover. Replaces four floating rounded-2xl cards
+        // with their own borders and shadows.
+        $packCell = 'block bg-white px-3 py-2 transition-colors hover:bg-brand-sand/[0.15] sm:px-4';
+        $packLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
+        $packValue = 'mt-1 truncate text-sm font-semibold text-brand-ink';
+        $packMeta = 'mt-0.5 truncate text-xs text-brand-moss';
+    @endphp
+    <section class="dply-card overflow-hidden p-0">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-circle-stack"
+            :title="__(':engine workspace', ['engine' => $engineLabel])"
+            class="border-b border-brand-ink/10"
+        >
+            <x-slot:actions>
+                <a href="{{ $databasesUrl }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage transition hover:text-brand-ink">
+                    {{ __('Open Database') }}
+                    <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </a>
+            </x-slot:actions>
+        </x-workspace-panel-head>
+
         {{-- Four columns, not three: with four tiles a 3-col grid orphaned
              "Backups" onto a row of its own. --}}
-        <div class="grid gap-3 px-6 pb-5 sm:grid-cols-2 sm:px-7 lg:grid-cols-4">
-            <a href="{{ $databasesUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</p>
-                <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $engineHeadline }}</p>
-                {{-- The hover-reveal "Open Database" hint that used to sit here was
-                     opacity-0, not hidden, so it still took a line and left this
-                     tile visibly taller than its three siblings. The header link
-                     now says it once, always. --}}
-                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $engineMeta }}</p>
-            </a>
+        <div class="px-3 py-3 sm:px-4">
+            <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+                <a href="{{ $databasesUrl }}" wire:navigate class="{{ $packCell }}">
+                    <dt class="{{ $packLabel }}">{{ __('Engine') }}</dt>
+                    <dd class="{{ $packValue }}">{{ $engineHeadline }}</dd>
+                    <dd class="{{ $packMeta }}">{{ $engineMeta }}</dd>
+                </a>
 
-            <a href="{{ $databasesUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Databases') }}</p>
-                <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ number_format((int) $databaseTileData['database_count']) }}</p>
-                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ __('User databases on this host') }}</p>
-            </a>
+                <a href="{{ $databasesUrl }}" wire:navigate class="{{ $packCell }}">
+                    <dt class="{{ $packLabel }}">{{ __('Databases') }}</dt>
+                    <dd class="mt-1 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ number_format((int) $databaseTileData['database_count']) }}</dd>
+                    <dd class="{{ $packMeta }}">{{ __('User databases on this host') }}</dd>
+                </a>
 
-            <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Health') }}</p>
-                <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $healthValue }}</p>
-                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $healthMeta }}</p>
-            </a>
+                <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="{{ $packCell }}">
+                    <dt class="{{ $packLabel }}">{{ __('Health') }}</dt>
+                    <dd class="{{ $packValue }}">{{ $healthValue }}</dd>
+                    <dd class="{{ $packMeta }}">{{ $healthMeta }}</dd>
+                </a>
 
-            <a href="{{ $backupsUrl }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
-                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Backups') }}</p>
-                <p class="mt-1 truncate text-base font-semibold text-brand-ink">{{ $backupHeadline }}</p>
-                <p class="mt-0.5 truncate text-xs text-brand-moss">{{ $backupMeta }}</p>
-            </a>
+                <a href="{{ $backupsUrl }}" wire:navigate class="{{ $packCell }}">
+                    <dt class="{{ $packLabel }}">{{ __('Backups') }}</dt>
+                    <dd class="{{ $packValue }}">{{ $backupHeadline }}</dd>
+                    <dd class="{{ $packMeta }}">{{ $backupMeta }}</dd>
+                </a>
+            </dl>
         </div>
     </section>
 @endif

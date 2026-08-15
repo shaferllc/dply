@@ -78,6 +78,15 @@ final class ServerIndexAssembler
             }
         }
 
+        // Names only. Same relationLoaded guard as sites/services so callers
+        // that don't eager-load simply omit the key rather than N+1.
+        $databases = [];
+        if ($server->relationLoaded('serverDatabases')) {
+            foreach ($server->serverDatabases as $database) {
+                $databases[] = ['name' => (string) $database->name];
+            }
+        }
+
         $relatedPayload = [];
         foreach ($related as $peer) {
             $peerServer = $peer['server'];
@@ -114,6 +123,26 @@ final class ServerIndexAssembler
             'workspace_name' => $server->workspace?->name,
             'group_label' => $groupLabel,
             'tags' => ServerTags::forServer($server),
+            // Role + installed stack travel with the fleet row so a consumer of
+            // this payload can reproduce the workspace faithfully — the role
+            // picks the sidebar profile (config/server_workspace.role_nav_keys),
+            // and the stack is what the Databases/Runtime tiles read. Without
+            // them a mirrored database host renders as a generic app server.
+            'server_role' => is_array($server->meta) && is_string($server->meta['server_role'] ?? null)
+                ? $server->meta['server_role']
+                : null,
+            'installed_stack' => InstalledStack::fromMeta($server)->toArray(),
+            // Reachability verdict already ships as health_status; the timestamp
+            // is what renders "Last checked 2 days ago" next to it.
+            'health_checked_at' => $server->last_health_check_at?->toIso8601String(),
+            'databases' => $databases,
+            // The private address is what the network map labels a host with,
+            // and what belongs in a connection string. Without it a consumer of
+            // this payload can only show the public IP. Deliberately no network
+            // ids: private_network_id is a local FK and hetzner_network_id is
+            // account-scoped, so copying either across a boundary would invent
+            // peer relationships that don't exist.
+            'private_ip_address' => $server->private_ip_address,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),
             'created_at' => $server->created_at?->toIso8601String(),
             'uptime_days' => $server->created_at !== null
