@@ -53,8 +53,7 @@ final class ServerSystemUserNotificationDispatcher
         $verb = match ($kind) {
             'created' => __('created'),
             'updated' => __('updated'),
-            'removed' => __('removed'),
-            default => __('updated'),
+            default => __('removed'),
         };
 
         $title = $count === 1

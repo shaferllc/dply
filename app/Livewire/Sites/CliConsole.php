@@ -185,16 +185,6 @@ class CliConsole extends Component
         return $plaintext;
     }
 
-    private function looksLikeWriteCommand(string $args): bool
-    {
-        $normalized = strtolower(trim($args));
-
-        return (bool) preg_match(
-            '/^(site\s+deploy|deploy\b|site\s+env\s+(set|rm|push)|edge\s+(deploy|promote|rollback|purge|env\s+(set|rm|push)))\b/',
-            $normalized,
-        );
-    }
-
     /**
      * @return list<string>|null argv prefix to invoke the CLI (`node …/dply.mjs` or a binary)
      */

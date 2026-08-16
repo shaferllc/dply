@@ -204,7 +204,7 @@ final class QuickDownloadStreamer
             throw new \RuntimeException(__('File archives are only available for SSH-ready VM sites.'));
         }
 
-        $slug = $site->slug !== null && $site->slug !== '' ? $site->slug : 'site';
+        $slug = $site->slug !== '' ? $site->slug : 'site';
         $stamp = now()->format('Ymd-His');
 
         return match ($artifact) {
@@ -219,8 +219,7 @@ final class QuickDownloadStreamer
             'files' => $this->prepareSiteFilesArchive($site, $server, $slug.'-files-'.$stamp.'.tar.gz', withExcludes: true),
             'home' => $this->prepareSiteHomeArchive($site, $server, $slug.'-home-'.$stamp.'.tar.gz'),
             'logs' => $this->prepareSiteLogsArchive($site, $server, $slug.'-logs-'.$stamp.'.tar.gz'),
-            'bundle' => $this->prepareSiteBundle($site, $server, $slug.'-bundle-'.$stamp.'.tar.gz'),
-            default => throw new \RuntimeException(__('Unknown quick-download artifact.')),
+            default => $this->prepareSiteBundle($site, $server, $slug.'-bundle-'.$stamp.'.tar.gz'),
         };
     }
 

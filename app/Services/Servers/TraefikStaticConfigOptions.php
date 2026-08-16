@@ -904,6 +904,7 @@ YAML;
         return false;
     }
 
+    /** @phpstan-impure */
     private function execPrivileged(Server $server, SshConnection $ssh, string $command, int $timeout): string
     {
         return $ssh->exec($this->privilegedCommand($server, $command), $timeout);

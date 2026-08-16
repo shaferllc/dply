@@ -129,12 +129,13 @@ class Index extends Component
 
         $item = MarketplaceItem::query()->active()->findOrFail($this->deployModalItemId);
 
-        $orgId = $user->currentOrganization()?->id;
-        if (! $orgId) {
+        $org = $user->currentOrganization();
+        if (! $org) {
             session()->flash('error', __('Select an organization first.'));
 
             return;
         }
+        $orgId = $org->id;
 
         $server = Server::query()
             ->where('organization_id', $orgId)
@@ -145,14 +146,12 @@ class Index extends Component
 
         $importService->importDeployCommand($user, $item, $server);
 
-        if ($org = $user->currentOrganization()) {
-            audit_log($org, $user, 'marketplace.deploy_command_imported', $item, null, [
-                'item_id' => (string) $item->id,
-                'item_name' => $item->name,
-                'server_id' => (string) $server->id,
-                'server_name' => $server->name,
-            ]);
-        }
+        audit_log($org, $user, 'marketplace.deploy_command_imported', $item, null, [
+            'item_id' => (string) $item->id,
+            'item_name' => $item->name,
+            'server_id' => (string) $server->id,
+            'server_name' => $server->name,
+        ]);
 
         $this->closeServerImportModal();
         $this->toastSuccess(__('Deploy command imported to :server.', ['server' => $server->name]));
@@ -169,12 +168,13 @@ class Index extends Component
 
         $item = MarketplaceItem::query()->active()->findOrFail($this->serverRecipeModalItemId);
 
-        $orgId = $user->currentOrganization()?->id;
-        if (! $orgId) {
+        $org = $user->currentOrganization();
+        if (! $org) {
             session()->flash('error', __('Select an organization first.'));
 
             return;
         }
+        $orgId = $org->id;
 
         $server = Server::query()
             ->where('organization_id', $orgId)
@@ -185,14 +185,12 @@ class Index extends Component
 
         $importService->importServerRecipe($user, $item, $server);
 
-        if ($org = $user->currentOrganization()) {
-            audit_log($org, $user, 'marketplace.server_recipe_imported', $item, null, [
-                'item_id' => (string) $item->id,
-                'item_name' => $item->name,
-                'server_id' => (string) $server->id,
-                'server_name' => $server->name,
-            ]);
-        }
+        audit_log($org, $user, 'marketplace.server_recipe_imported', $item, null, [
+            'item_id' => (string) $item->id,
+            'item_name' => $item->name,
+            'server_id' => (string) $server->id,
+            'server_name' => $server->name,
+        ]);
 
         $this->closeServerImportModal();
         $this->toastSuccess(__('Saved command imported to :server.', ['server' => $server->name]));
@@ -209,12 +207,13 @@ class Index extends Component
 
         $item = MarketplaceItem::query()->active()->findOrFail($this->runbookModalItemId);
 
-        $orgId = $user->currentOrganization()?->id;
-        if (! $orgId) {
+        $org = $user->currentOrganization();
+        if (! $org) {
             session()->flash('error', __('Select an organization first.'));
 
             return;
         }
+        $orgId = $org->id;
 
         $workspace = Workspace::query()
             ->where('organization_id', $orgId)
@@ -225,15 +224,13 @@ class Index extends Component
 
         $runbook = $importService->importWorkspaceRunbook($user, $item, $workspace);
 
-        if ($org = $user->currentOrganization()) {
-            audit_log($org, $user, 'marketplace.workspace_runbook_imported', $item, null, [
-                'item_id' => (string) $item->id,
-                'item_name' => $item->name,
-                'workspace_id' => (string) $workspace->id,
-                'workspace_name' => $workspace->name,
-                'runbook_id' => (string) $runbook->id,
-            ]);
-        }
+        audit_log($org, $user, 'marketplace.workspace_runbook_imported', $item, null, [
+            'item_id' => (string) $item->id,
+            'item_name' => $item->name,
+            'workspace_id' => (string) $workspace->id,
+            'workspace_name' => $workspace->name,
+            'runbook_id' => (string) $runbook->id,
+        ]);
 
         $this->closeServerImportModal();
         $this->toastSuccess(__('Runbook imported to :project.', ['project' => $workspace->name]));

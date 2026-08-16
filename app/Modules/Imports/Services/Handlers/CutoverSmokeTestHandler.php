@@ -80,7 +80,7 @@ class CutoverSmokeTestHandler implements StepHandler
                     ->get('https://'.$domain.'/');
                 $lastStatus = $response->status();
                 $headerValue = $response->header($headerName);
-                if ($headerValue !== null && $headerValue !== '') {
+                if ($headerValue !== '') {
                     $sawHeader = true;
                     break;
                 }

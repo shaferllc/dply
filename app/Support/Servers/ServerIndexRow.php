@@ -123,7 +123,7 @@ final readonly class ServerIndexRow
         $setupStatus = array_key_exists('setup_status', $row) && $row['setup_status'] !== null && $row['setup_status'] !== ''
             ? (string) $row['setup_status']
             : ($status === Server::STATUS_READY ? Server::SETUP_STATUS_DONE : '');
-        $healthStatus = isset($row['health_status']) && $row['health_status'] !== null && $row['health_status'] !== ''
+        $healthStatus = isset($row['health_status']) && $row['health_status'] !== ''
             ? (string) $row['health_status']
             : null;
         $id = (string) ($row['id'] ?? '');

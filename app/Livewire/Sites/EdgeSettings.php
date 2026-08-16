@@ -120,4 +120,10 @@ class EdgeSettings extends Component
             auth()->user(),
         ));
     }
+
+    protected function currentEdgeSection(): ?string
+    {
+        return $this->section;
+    }
+
 }

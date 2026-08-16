@@ -18,8 +18,6 @@ class OpenRestyStaticConfigOptions
 {
     use PrivilegedRemoteFileWrites;
 
-    private const REMOTE_PATH = '/etc/openresty/nginx.conf';
-
     /**
      * @var array<string, array{type: string, default: string, label: string, help: string, group: string}>
      */

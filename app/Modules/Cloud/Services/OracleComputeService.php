@@ -113,11 +113,9 @@ class OracleComputeService
             );
 
             $shapes = [];
-            if (true) {
-                foreach ($payload as $shape) {
-                    if (is_array($shape)) {
-                        $shapes[] = $shape;
-                    }
+            foreach ($payload as $shape) {
+                if (is_array($shape)) {
+                    $shapes[] = $shape;
                 }
             }
 

@@ -129,10 +129,6 @@ class Repository extends Component
             return view('livewire.sites.partials._panel-skeleton');
         }
 
-        if (! isset($this->server, $this->site)) {
-            return view('livewire.servers.partials.workspace-placeholder-empty');
-        }
-
         $tabs = [
             ['id' => 'overview', 'label' => __('Overview'), 'icon' => 'heroicon-o-home'],
             ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-clock'],

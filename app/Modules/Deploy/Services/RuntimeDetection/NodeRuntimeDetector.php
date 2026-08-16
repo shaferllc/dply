@@ -52,7 +52,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
         $processes = $this->detectProcesses($scripts, $deps, $reasons);
         $outputDirectory = $this->detectOutputDirectory($framework, $reasons);
 
-        $confidence = $framework !== null && $framework !== 'node' ? 'high' : 'medium';
+        $confidence = $framework !== 'node' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'node',
@@ -119,7 +119,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
      * @param  list<string> $deps
      * @param  list<string>  $reasons
      */
-    private function detectFramework(array $deps, array &$reasons): ?string
+    private function detectFramework(array $deps, array &$reasons): string
     {
         $frameworks = [
             // Keel before hono-adjacent stacks — apps declare both.

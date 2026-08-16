@@ -758,7 +758,7 @@ trait ManagesDatabaseBindings
                 $env[$p.'TIMEZONE'] = (string) $options['timezone'];
             }
 
-            return array_filter($env, fn ($v) => $v !== null && $v !== '');
+            return array_filter($env, fn ($v) => $v !== '');
         }
 
         $host = $this->effectiveDatabaseHost($db, $site);

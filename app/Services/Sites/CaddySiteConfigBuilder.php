@@ -142,7 +142,7 @@ CADDY,
     reverse_proxy 127.0.0.1:{$site->app_port}
 }
 CADDY,
-            SiteType::Custom => '',
+            SiteType::Custom, SiteType::Container => '',
         };
     }
 
@@ -348,7 +348,7 @@ CADDY;
     }
 
     /**
-     * @param  Collection<int, string>  $hostnames
+     * @param  Collection<int, covariant string>  $hostnames
      */
     protected function vmDockerReverseProxyBlock(Site $site, ?int $listenPort, Collection $hostnames): string
     {

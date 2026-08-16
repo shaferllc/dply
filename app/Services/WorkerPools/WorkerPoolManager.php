@@ -180,7 +180,7 @@ class WorkerPoolManager
             'size' => (string) $size,
             'provider' => $provider,
             'provider_credential_id' => (string) $credentialId,
-        ], fn ($v) => $v !== null && $v !== ''));
+        ], fn ($v) => $v !== ''));
 
         $pool->forceFill([
             'desired_count' => $pool->desired_count + 1,

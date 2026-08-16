@@ -253,22 +253,4 @@ class MiseInstallScriptBuilder
             default => $runtime,
         };
     }
-
-    /**
-     * Force mise to fetch prebuilt release binaries instead of compiling from
-     * source. Extracted so installRuntimeForUserLines and its install-only
-     * sibling agree without duplication.
-     */
-    private function preferBinaryEnv(): string
-    {
-        try {
-            $preferBinary = (bool) config('server_provision.mise_prefer_binary', true);
-        } catch (\Throwable) {
-            $preferBinary = true;
-        }
-
-        return $preferBinary
-            ? 'MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 '
-            : '';
-    }
 }

@@ -29,9 +29,6 @@ use Throwable;
  */
 class ServerlessTriggerProvisioner implements ServerlessTriggerBackend
 {
-    /** The built-in OpenWhisk alarms feed action. */
-    private const ALARM_FEED = '/whisk.system/alarms/alarm';
-
     /**
      * Create (or update) the scheduled trigger for an action. When the
      * action has no enabled cron schedule this tears any existing trigger

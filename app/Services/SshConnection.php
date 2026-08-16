@@ -97,6 +97,12 @@ class SshConnection implements RemoteShell
 
     /**
      * Run a command on the server.
+     *
+     * Impure: it advances the SSH channel and rewrites the exit status that
+     * {@see lastExecExitCode()} reports, so callers must re-read it after
+     * every call.
+     *
+     * @phpstan-impure
      */
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
@@ -137,6 +143,8 @@ class SshConnection implements RemoteShell
      * Run a command and invoke the callback for each output chunk (phpseclib channel packets).
      *
      * @param  callable(string):void  $chunkCallback
+     *
+     * @phpstan-impure
      */
     public function execWithCallback(string $command, callable $chunkCallback, int $timeoutSeconds = 120): string
     {
@@ -173,6 +181,8 @@ class SshConnection implements RemoteShell
      *
      * @param  callable(string):void  $chunkCallback
      * @return array{0: string, 1: ?int}
+     *
+     * @phpstan-impure
      */
     public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
     {

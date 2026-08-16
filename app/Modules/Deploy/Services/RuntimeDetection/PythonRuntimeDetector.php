@@ -71,10 +71,10 @@ final class PythonRuntimeDetector implements RuntimeDetector
         $buildCommand = $this->detectBuildCommand($hasPyproject, $usesPoetry, $hasRequirements, $hasPipfile, $hasSetupPy, $reasons);
         $djangoProject = $framework === 'django' ? $this->detectDjangoProject($root, $detectedFiles, $reasons) : null;
         $startCommand = $this->detectStartCommand($framework, $root, $djangoProject, $reasons);
-        $appPort = $framework !== null ? 8000 : null;
+        $appPort = 8000;
         $processes = $this->detectProcesses($framework, $deps, $djangoProject, $reasons);
 
-        $confidence = $framework !== null && $framework !== 'python' ? 'high' : 'medium';
+        $confidence = $framework !== 'python' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'python',
@@ -212,7 +212,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      */
-    private function detectFramework(array $deps, bool $hasManagePy, array &$detectedFiles, array &$reasons): ?string
+    private function detectFramework(array $deps, bool $hasManagePy, array &$detectedFiles, array &$reasons): string
     {
         if (in_array('django', $deps, true)) {
             $reasons[] = 'Detected django from declared dependencies.';

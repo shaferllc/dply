@@ -97,7 +97,7 @@ class NotificationWebhookDestinationRouter
     private function sendOne(NotificationWebhookDestination $destination, NotificationEvent $event, string $hookEvent): void
     {
         $url = $destination->webhook_url;
-        if ($url === null || $url === '') {
+        if ($url === '') {
             return;
         }
 

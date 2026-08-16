@@ -25,7 +25,6 @@ use App\Modules\Deploy\Services\Concerns\ManagesSessionBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesSmsBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesStorageBindings;
 use App\Modules\Deploy\Services\Concerns\ResolvesReachableResources;
-use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
@@ -67,7 +66,6 @@ class SiteBindingManager
     use ResolvesReachableResources;
 
     public function __construct(
-        private readonly ServerDatabaseProvisioner $databaseProvisioner,
         private readonly ObjectStorageBucketProvisioner $bucketProvisioner,
     ) {}
 

@@ -158,7 +158,7 @@ trait ManagesSiteCreateStore
                     },
                 'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
                     ? 'orbstack'
-                    : ($this->server->provider?->value ?? 'byo'),
+                    : ($this->server->provider->value),
                 'mode' => 'docker',
                 'status' => 'pending',
                 'logs' => [],
@@ -171,7 +171,7 @@ trait ManagesSiteCreateStore
             $meta['runtime_target'] = [
                 'family' => 'byo_vm_docker',
                 'platform' => 'byo',
-                'provider' => $this->server->provider?->value ?? 'byo',
+                'provider' => $this->server->provider->value,
                 'mode' => 'docker',
                 'status' => 'pending',
                 'logs' => [],
@@ -199,7 +199,7 @@ trait ManagesSiteCreateStore
                     },
                 'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
                     ? 'orbstack'
-                    : ($this->server->provider?->value ?? 'byo'),
+                    : ($this->server->provider->value),
                 'mode' => 'kubernetes',
                 'status' => 'pending',
                 'logs' => [],

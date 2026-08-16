@@ -130,7 +130,7 @@ trait ManagesSiteDomainsRouting
             'comment' => trim($this->new_domain_comment) ?: null,
         ]);
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.domain.added', $this->site, null, [
                 'domain_id' => (string) $newDomain->id,
@@ -195,7 +195,7 @@ trait ManagesSiteDomainsRouting
                 'comment' => trim($this->editing_domain_comment) ?: null,
             ])->save();
 
-            $org = $this->site->server?->organization;
+            $org = $this->site->server->organization;
             if ($org) {
                 audit_log($org, auth()->user(), 'site.domain.updated', $this->site, [
                     'hostname' => $oldHostname,
@@ -462,7 +462,7 @@ trait ManagesSiteDomainsRouting
         ];
         $domain->delete();
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.domain.removed', $this->site, $snapshot, null);
         }
@@ -537,7 +537,7 @@ trait ManagesSiteDomainsRouting
             (string) $this->site->id,
         );
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.wildcard.reissue_requested', $this->site, null, [
                 'zone' => $zone,
@@ -545,16 +545,12 @@ trait ManagesSiteDomainsRouting
             ]);
         }
 
-        if ($run !== null) {
-            $this->dispatch('dply-console-action-focus');
-            $this->watchConsoleAction(
-                $run,
-                __('Wildcard *.:zone issued.', ['zone' => $zone]),
-                __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
-            );
-        } else {
-            $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
-        }
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Wildcard *.:zone issued.', ['zone' => $zone]),
+            __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
+        );
     }
 
     /**

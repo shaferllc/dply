@@ -64,14 +64,14 @@ class InsightFindingRecorder
 
         $finding->loadMissing('server.organization');
         $server = $finding->server;
-        $org = $server?->organization;
+        $org = $server->organization;
 
         $finding->forceFill([
             'status' => InsightFinding::STATUS_RESOLVED,
             'resolved_at' => now(),
         ])->save();
 
-        if ($org !== null && $server !== null) {
+        if ($org !== null) {
             $this->notifications->notifyIfSubscribed($server, $finding->fresh(), false, 'resolved');
         }
     }

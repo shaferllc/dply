@@ -346,14 +346,29 @@ final class EdgeRepoCloner
         throw new RuntimeException('Git clone failed after '.self::NETWORK_RETRIES.' attempts: '.$lastError);
     }
 
+    /**
+     * Re-stats the path instead of reusing an earlier `is_dir()` result. Each
+     * removal attempt below changes the filesystem, and the `rm -rf` and docker
+     * passes run outside PHP, so PHP's stat cache would otherwise report the
+     * directory as still present.
+     *
+     * @phpstan-impure
+     */
+    private function checkoutExists(string $checkout): bool
+    {
+        clearstatcache(true, $checkout);
+
+        return is_dir($checkout);
+    }
+
     private function ensureEmptyCheckout(string $checkout): void
     {
-        if (! is_dir($checkout)) {
+        if (! $this->checkoutExists($checkout)) {
             return;
         }
 
         File::deleteDirectory($checkout);
-        if (! is_dir($checkout)) {
+        if (! $this->checkoutExists($checkout)) {
             return;
         }
 
@@ -361,7 +376,7 @@ final class EdgeRepoCloner
         // recursive delete (and host rm as www-data) then can't clear the
         // tree and the next clone dies with "destination path already exists".
         Process::timeout(120)->run(['rm', '-rf', '--', $checkout]);
-        if (! is_dir($checkout)) {
+        if (! $this->checkoutExists($checkout)) {
             return;
         }
 
@@ -373,7 +388,7 @@ final class EdgeRepoCloner
             'alpine:3.20',
             'rm', '-rf', '--', '/wipe/'.$base,
         ]);
-        if (is_dir($checkout)) {
+        if ($this->checkoutExists($checkout)) {
             throw new RuntimeException(
                 'Could not clear checkout directory '.$checkout
                 .($dockerRm->errorOutput() !== '' ? ': '.$dockerRm->errorOutput() : '')

@@ -164,9 +164,10 @@ final class SiteErrorReferenceResolver
         $source = null;
         $buffer = [];
 
-        $flush = function () use (&$entries, &$buffer, &$file, &$source): void {
-            $lines = $buffer;
-            $buffer = [];
+        // Takes the block it should parse as arguments rather than capturing
+        // them by reference — the by-ref form hid every mutation from static
+        // analysis, which then read the whole body as unreachable.
+        $flush = function (?string $source, ?string $file, array $lines) use (&$entries): void {
             if ($source === null || $lines === []) {
                 return;
             }
@@ -186,7 +187,8 @@ final class SiteErrorReferenceResolver
 
         foreach ($trace as $line) {
             if (preg_match('/^──\s*(.+?)\s*──$/', trim($line), $m)) {
-                $flush();
+                $flush($source, $file, $buffer);
+                $buffer = [];
                 $file = $m[1];
                 $source = $sourceMap[$file] ?? 'laravel';
 
@@ -194,7 +196,7 @@ final class SiteErrorReferenceResolver
             }
             $buffer[] = $line;
         }
-        $flush();
+        $flush($source, $file, $buffer);
 
         return array_slice($entries, 0, self::TRACE_LINE_CAP);
     }

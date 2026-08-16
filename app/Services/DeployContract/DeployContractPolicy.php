@@ -38,7 +38,7 @@ final class DeployContractPolicy
         }
 
         $requires = [];
-        if (isset($contract['requires']) && is_array($contract['requires'])) {
+        if (isset($contract['requires'])) {
             foreach ($contract['requires'] as $key) {
                 if ($key) {
                     $requires[] = $key;
@@ -47,7 +47,7 @@ final class DeployContractPolicy
         }
 
         $promote = is_array($contract['promote'] ?? null) ? $contract['promote'] : [];
-        if ($requires === [] && isset($promote['requires']) && is_array($promote['requires'])) {
+        if ($requires === [] && isset($promote['requires'])) {
             foreach ($promote['requires'] as $key) {
                 if ($key !== '') {
                     $requires[] = $key;

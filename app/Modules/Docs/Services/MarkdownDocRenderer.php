@@ -175,9 +175,7 @@ final class MarkdownDocRenderer
         $tables = [];
 
         foreach ($document->getElementsByTagName('table') as $table) {
-            if ($table instanceof \DOMElement) {
-                $tables[] = $table;
-            }
+            $tables[] = $table;
         }
 
         foreach ($tables as $table) {
@@ -226,9 +224,7 @@ final class MarkdownDocRenderer
         foreach ($table->getElementsByTagName('thead') as $thead) {
             foreach ($thead->getElementsByTagName('tr') as $tr) {
                 foreach ($tr->getElementsByTagName('th') as $th) {
-                    if ($th instanceof \DOMElement) {
-                        $headers[] = $this->cellInnerHtml($document, $th);
-                    }
+                    $headers[] = $this->cellInnerHtml($document, $th);
                 }
             }
         }
@@ -241,9 +237,7 @@ final class MarkdownDocRenderer
             $firstRowHeaders = [];
 
             foreach ($tr->getElementsByTagName('th') as $th) {
-                if ($th instanceof \DOMElement) {
-                    $firstRowHeaders[] = $this->cellInnerHtml($document, $th);
-                }
+                $firstRowHeaders[] = $this->cellInnerHtml($document, $th);
             }
 
             if ($firstRowHeaders !== []) {

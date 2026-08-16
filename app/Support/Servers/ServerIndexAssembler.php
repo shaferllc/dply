@@ -37,7 +37,7 @@ final class ServerIndexAssembler
             'cpu' => isset($payload['cpu_pct']) && is_numeric($payload['cpu_pct']) ? (float) $payload['cpu_pct'] : null,
             'ram' => isset($payload['mem_pct']) && is_numeric($payload['mem_pct']) ? (float) $payload['mem_pct'] : null,
             'disk' => isset($payload['disk_pct']) && is_numeric($payload['disk_pct']) ? (float) $payload['disk_pct'] : null,
-            'captured_at' => $snapshot?->captured_at?->toIso8601String(),
+            'captured_at' => $snapshot->captured_at?->toIso8601String(),
         ] : null;
 
         $groupLabel = __('Personal');
@@ -194,7 +194,7 @@ final class ServerIndexAssembler
             'status' => (string) $site->status,
             'status_label' => $site->statusLabel(),
             'ssl_status' => (string) $site->ssl_status,
-            'type_label' => $site->type?->label(),
+            'type_label' => $site->type->label(),
             'runtime_chip' => $runtimeChip,
             'logo_url' => $site->logoUrl(),
             'git_repository_url' => filled($site->git_repository_url) ? (string) $site->git_repository_url : null,

@@ -46,7 +46,7 @@ final class GoRuntimeDetector implements RuntimeDetector
         $reasons[] = "Suggested build: `{$buildCommand}`.";
         $reasons[] = "Suggested start: `{$startCommand}`.";
 
-        $confidence = $framework !== null && $framework !== 'go' ? 'high' : 'medium';
+        $confidence = $framework !== 'go' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'go',
@@ -128,7 +128,7 @@ final class GoRuntimeDetector implements RuntimeDetector
      * @param  list<string> $imports
      * @param  list<string>  $reasons
      */
-    private function detectFramework(array $imports, array &$reasons): ?string
+    private function detectFramework(array $imports, array &$reasons): string
     {
         $frameworks = [
             'gin' => '/^github\.com\/gin-gonic\/gin(\/|$)/',

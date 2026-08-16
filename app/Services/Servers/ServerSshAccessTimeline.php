@@ -131,8 +131,8 @@ final class ServerSshAccessTimeline
                 'label' => $nameByKeyId[$keyId] ?? __('Removed key'),
                 'source' => 'historical',
                 'is_you' => false,
-                'start' => true ? $startedAt : Carbon::parse($startedAt),
-                'end' => true ? $endedAt : Carbon::parse($endedAt),
+                'start' => $startedAt,
+                'end' => $endedAt,
             ];
         }
 

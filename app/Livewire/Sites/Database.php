@@ -544,7 +544,7 @@ class Database extends Component
         if (! $db instanceof ServerDatabase) {
             return;
         }
-        if (! in_array($db->engine, self::EXTRA_USER_ENGINES, true) || $db->username === null || $db->username === '') {
+        if (! in_array($db->engine, self::EXTRA_USER_ENGINES, true) || $db->username === '') {
             $this->toastError(__('Password rotation is supported for MySQL, MariaDB, and PostgreSQL databases.'));
 
             return;

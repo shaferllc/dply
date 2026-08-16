@@ -204,10 +204,6 @@ class DeploymentsList extends Component
      */
     public function placeholder(): View
     {
-        if (! isset($this->server, $this->site)) {
-            return view('livewire.servers.partials.workspace-placeholder-empty');
-        }
-
         // Same definitions + gates the real render uses, so the tab row doesn't
         // shift when the component finishes loading.
         $visible = $this->tabVisibility();
@@ -272,11 +268,7 @@ class DeploymentsList extends Component
         if ($this->tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys($site)) {
             $this->tab = self::TAB_DEPLOY;
         }
-        if ($this->tab !== self::TAB_SETTINGS) {
-            $this->settingsSection = '';
-        } elseif (! in_array($this->settingsSection, self::SETTINGS_SECTIONS, true)) {
-            $this->settingsSection = '';
-        }
+        $this->settingsSection = '';
 
         $coordinator = app(SiteDeployCoordinator::class);
 
@@ -375,9 +367,7 @@ class DeploymentsList extends Component
             return;
         }
         $this->tab = $tab;
-        if ($tab !== self::TAB_SETTINGS) {
-            $this->settingsSection = '';
-        }
+        $this->settingsSection = '';
         if ($tab === self::TAB_HISTORY) {
             $this->resetPage();
         }

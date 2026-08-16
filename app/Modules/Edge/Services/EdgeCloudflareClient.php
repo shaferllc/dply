@@ -1009,7 +1009,10 @@ class EdgeCloudflareClient
     }
 
     /**
-     * @return array<string, mixed>
+     * Cloudflare returns a numeric list in `result` for list endpoints and a
+     * map for single-object ones, so the key type is deliberately open.
+     *
+     * @return array<array-key, mixed>
      */
     private function decode(Response $response): array
     {

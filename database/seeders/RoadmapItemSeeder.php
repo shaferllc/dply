@@ -468,10 +468,9 @@ class RoadmapItemSeeder extends Seeder
             RoadmapItem::query()->where('title', $title)->update([
                 'target_release_id' => $trains[$slug],
                 'target_quarter' => match ($slug) {
-                    '2026-05', '2026-06', '2026-07' => '2026-Q2',
+                    '2026-06', '2026-07' => '2026-Q2',
                     '2026-09' => '2026-Q3',
-                    '2026-12' => '2026-Q4',
-                    default => null,
+                    default => '2026-Q4',
                 },
             ]);
         }

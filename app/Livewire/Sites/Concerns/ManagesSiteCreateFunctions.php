@@ -137,10 +137,10 @@ trait ManagesSiteCreateFunctions
             );
 
             if (! $this->functionsOverridesTouched) {
-                $this->form->functions_runtime = (string) ($this->functionsDetection['runtime'] ?? $this->form->functions_runtime);
-                $this->form->functions_entrypoint = (string) ($this->functionsDetection['entrypoint'] ?? $this->form->functions_entrypoint);
-                $this->form->functions_build_command = (string) ($this->functionsDetection['build_command'] ?? $this->form->functions_build_command);
-                $this->form->functions_artifact_output_path = (string) ($this->functionsDetection['artifact_output_path'] ?? $this->form->functions_artifact_output_path);
+                $this->form->functions_runtime = (string) $this->functionsDetection['runtime'];
+                $this->form->functions_entrypoint = (string) $this->functionsDetection['entrypoint'];
+                $this->form->functions_build_command = (string) $this->functionsDetection['build_command'];
+                $this->form->functions_artifact_output_path = (string) $this->functionsDetection['artifact_output_path'];
             }
         } catch (\Throwable $e) {
             $this->functionsDetection = [
@@ -157,7 +157,7 @@ trait ManagesSiteCreateFunctions
                 'unsupported_for_target' => false,
             ];
         } finally {
-            if (is_array($checkout) && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
+            if (is_array($checkout)) {
                 app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
             }
         }

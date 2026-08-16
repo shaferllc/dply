@@ -62,7 +62,7 @@ class ServerlessProjectManifestWriter
                 array_filter([
                     'name' => $package,
                     'functions' => array_values($functions),
-                ], static fn (mixed $value): bool => $value !== [] && $value !== null),
+                ], static fn (mixed $value): bool => $value !== []),
             ],
         ];
     }
@@ -91,7 +91,7 @@ class ServerlessProjectManifestWriter
             'limits' => $limits,
             'parameters' => $this->parameterReferences($configuration),
             'annotations' => $this->annotations($configuration),
-        ], static fn (mixed $value): bool => $value !== '' && $value !== [] && $value !== null);
+        ], static fn (mixed $value): bool => $value !== '' && $value !== []);
     }
 
     /**
@@ -114,7 +114,7 @@ class ServerlessProjectManifestWriter
             ],
             'parameters' => $this->parameterReferences($configuration),
             'annotations' => $this->annotations($configuration),
-        ], static fn (mixed $value): bool => $value !== '' && $value !== [] && $value !== null);
+        ], static fn (mixed $value): bool => $value !== '' && $value !== []);
     }
 
     /** The manifest's tri-state `web:` value. */

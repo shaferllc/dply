@@ -104,7 +104,7 @@ class ServerProviderSpecSync
             ServerProvider::Aws => $this->fromAws($server, $credential),
             default => throw new \RuntimeException(sprintf(
                 'Spec re-sync is not supported for the %s provider yet.',
-                $server->provider?->value ?? 'unknown',
+                $server->provider->value,
             )),
         };
     }

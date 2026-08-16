@@ -355,35 +355,6 @@ class TestingHostnameProvisioner
         $tenant->setAttribute('meta', $meta);
     }
 
-    /**
-     * @return array{0: string, 1: string}
-     */
-    private function resolveHostnameAndZone(Site $site): array
-    {
-        $site->loadMissing(['previewDomains']);
-        $customZone = $this->normalizedSiteDnsZone($site);
-        $existingHostname = strtolower(trim($site->testingHostname()));
-
-        if ($customZone !== null) {
-            if ($existingHostname !== '' && str_ends_with($existingHostname, '.'.$customZone)) {
-                return [$existingHostname, $customZone];
-            }
-
-            return [$this->buildHostname($site, $customZone), $customZone];
-        }
-
-        if ($existingHostname !== '') {
-            $existingZone = $this->configuredZoneForHostname($existingHostname);
-            if ($existingZone !== null) {
-                return [$existingHostname, $existingZone];
-            }
-        }
-
-        $zone = $this->chooseZone($site);
-
-        return [$this->buildHostname($site, $zone), $zone];
-    }
-
     private function normalizedSiteDnsZone(Site $site): ?string
     {
         $z = strtolower(trim((string) ($site->dns_zone ?? '')));
@@ -737,38 +708,6 @@ class TestingHostnameProvisioner
             'random' => $ordered[array_rand($ordered)],
             default => $ordered[$this->deterministicIndex($site, count($ordered))],
         };
-    }
-
-    /**
-     * Pick a Dply-managed testing zone other than the one that just failed.
-     * Used when a custom dns_zone errors out (e.g. not delegated yet) so
-     * the operator still ends up with a reachable testing URL.
-     */
-    private function chooseFallbackTestingZone(Site $site, string $primaryZone): ?string
-    {
-        $domains = array_values(array_filter($this->configuredDomains(), fn (string $z): bool => $z !== $primaryZone));
-        if ($domains === []) {
-            return null;
-        }
-        $ordered = app(UnifiedPreviewHostname::class)->orderedTestingZones($domains);
-
-        return $ordered[$this->deterministicIndex($site, count($ordered))];
-    }
-
-    /**
-     * Default-token DigitalOcean DNS provider for fallback record creation
-     * when the operator's chosen DNS provider can't fulfil the upsert.
-     * Returns null when no app-level token is configured — in that case we
-     * let the original exception propagate so the caller still surfaces it.
-     */
-    private function fallbackDigitalOceanProvider(): ?DnsProvider
-    {
-        $token = trim((string) config('services.digitalocean.token'));
-        if ($token === '') {
-            return null;
-        }
-
-        return SiteDnsProviderFactory::forDigitalOceanAppConfigToken($token);
     }
 
     private function configuredZoneForHostname(string $hostname): ?string

@@ -25,8 +25,6 @@ class OpenLiteSpeedModulesConfig
 {
     private const REMOTE_PATH = '/usr/local/lsws/conf/httpd_config.conf';
 
-    private const MODULES_DIR = '/usr/local/lsws/modules';
-
     /**
      * Managed elsewhere — the Cache sub-tab owns the full `module cache`
      * stanza. Disable from here would break dply LSCache wiring.

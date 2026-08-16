@@ -141,7 +141,7 @@ APACHE,
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
-            SiteType::Custom => '',
+            SiteType::Custom, SiteType::Container => '',
         };
 
         if ($config === '') {

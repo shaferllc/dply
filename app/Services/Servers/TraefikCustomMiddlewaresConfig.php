@@ -132,8 +132,7 @@ class TraefikCustomMiddlewaresConfig
             'stripPrefix' => $this->stripPrefixBlock((string) ($fields['prefix'] ?? '/')),
             'redirectScheme' => $this->redirectSchemeBlock((string) ($fields['scheme'] ?? 'https')),
             'headers' => $this->headersBlock((string) ($fields['header_key'] ?? ''), (string) ($fields['header_value'] ?? '')),
-            'basicAuth' => $this->basicAuthBlock((string) ($fields['users'] ?? '')),
-            default => throw new \InvalidArgumentException('Unsupported middleware type.'),
+            default => $this->basicAuthBlock((string) ($fields['users'] ?? '')),
         };
 
         return <<<YAML

@@ -143,8 +143,7 @@ final class SiteQuickDeployCommitPoller
         return match ($provider) {
             'github' => $this->tipGithub($identity, $ref, $branch),
             'gitlab' => $this->tipGitlab($identity, $ref, $branch),
-            'bitbucket' => $this->tipBitbucket($identity, $ref, $branch),
-            default => ['sha' => null, 'error' => __('Unsupported Git provider'), 'http_status' => null],
+            default => $this->tipBitbucket($identity, $ref, $branch),
         };
     }
 

@@ -86,7 +86,7 @@ class Create extends Component
         }
 
         // Shared Git picker — connected accounts first, else paste a URL.
-        $this->linkedSourceControlAccounts = $user ? $repositoryBrowser->accountsForUser($user) : [];
+        $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser($user);
         if ($this->linkedSourceControlAccounts !== []) {
             $this->repo_source = 'provider';
             $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];

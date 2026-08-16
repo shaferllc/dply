@@ -467,22 +467,6 @@ class DigitalOceanFunctionsArtifactBuilder
         return $base.'-'.now()->format('YmdHis').'.zip';
     }
 
-    /**
-     * @param  array<string, mixed>  $command
-     */
-    private function run(array $command, string $workingDirectory): string
-    {
-        $process = new Process($command, $workingDirectory);
-        $process->setTimeout(300);
-        $process->run();
-
-        if (! $process->isSuccessful()) {
-            throw new \RuntimeException($this->plain($process->getErrorOutput()."\n".$process->getOutput()));
-        }
-
-        return $this->plain($process->getOutput());
-    }
-
     private function runShell(string $command, string $workingDirectory): string
     {
         // Control-plane workers often lack Composer on PATH. Wrap the command

@@ -43,8 +43,6 @@ final class ServerProvisionCommandBuilder
 
     private const VERIFY_PREFIX = '[dply-verify] ';
 
-    private const ROLLBACK_PREFIX = '[dply-rollback] ';
-
     /**
      * In-progress server, populated for the duration of a single build()
      * call so role helpers can read meta without threading it through

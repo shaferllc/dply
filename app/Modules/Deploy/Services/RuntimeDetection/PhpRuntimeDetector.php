@@ -59,7 +59,7 @@ final class PhpRuntimeDetector implements RuntimeDetector
 
         $processes = $this->detectProcesses($packages, $root, $framework, $detectedFiles, $reasons);
 
-        $confidence = $framework !== null && $framework !== 'php' ? 'high' : 'medium';
+        $confidence = $framework !== 'php' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'php',
@@ -122,7 +122,7 @@ final class PhpRuntimeDetector implements RuntimeDetector
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      */
-    private function detectFramework(array $packages, string $root, array &$detectedFiles, array &$reasons): ?string
+    private function detectFramework(array $packages, string $root, array &$detectedFiles, array &$reasons): string
     {
         if (in_array('laravel/framework', $packages, true)) {
             $reasons[] = 'Detected laravel from `composer.json` require `laravel/framework`.';

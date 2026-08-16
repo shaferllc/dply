@@ -37,12 +37,8 @@ trait ManagesEdgeRedeploy
 
         // Land on Deploys so the build journey + history are visible (BYO opens
         // the Deploy Console; Edge progress lives on this section).
-        if (
-            property_exists($this, 'section')
-            && is_string($this->section ?? null)
-            && $this->section !== 'edge-deploys'
-            && isset($this->server)
-        ) {
+        $section = $this->currentEdgeSection();
+        if ($section !== null && $section !== 'edge-deploys') {
             $this->redirect(route('sites.show', [
                 'server' => $this->server,
                 'site' => $this->site,
@@ -50,4 +46,15 @@ trait ManagesEdgeRedeploy
             ]), navigate: true);
         }
     }
+
+    /**
+     * The workspace section the host component is rendering. Only the full Edge
+     * settings page tracks one; the embedded panels do not, and they never
+     * redirect after a queued deploy.
+     */
+    protected function currentEdgeSection(): ?string
+    {
+        return null;
+    }
+
 }

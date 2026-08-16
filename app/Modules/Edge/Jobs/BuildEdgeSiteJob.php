@@ -82,7 +82,7 @@ class BuildEdgeSiteJob implements ShouldQueue
         }
 
         $site->refresh();
-        if (! Site::query()->whereKey($site->id)->exists()) {
+        if (! $this->siteStillExists($site)) {
             return;
         }
         $site->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
@@ -122,7 +122,7 @@ class BuildEdgeSiteJob implements ShouldQueue
 
             // Cancel mid-Docker: leave artifacts for cleanup, do not publish.
             $deployment->refresh();
-            if ($deployment->wasCancelledByOperator() || ! Site::query()->whereKey($site->id)->exists()) {
+            if ($deployment->wasCancelledByOperator() || ! $this->siteStillExists($site)) {
                 if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
                     File::deleteDirectory($workRoot);
                 }
@@ -157,7 +157,7 @@ class BuildEdgeSiteJob implements ShouldQueue
             }
             $deployment->update($updates);
 
-            if (! Site::query()->whereKey($site->id)->exists()) {
+            if (! $this->siteStillExists($site)) {
                 // Same containment rule as PublishEdgeDeploymentJob: only ever
                 // recurse inside the configured build root. A hardcoded temp-dir
                 // check stops matching the moment work_root moves.
@@ -199,7 +199,7 @@ class BuildEdgeSiteJob implements ShouldQueue
                 : null;
 
             $deployment->refresh();
-            if ($deployment->wasCancelledByOperator() || ! Site::query()->whereKey($site->id)->exists()) {
+            if ($deployment->wasCancelledByOperator() || ! $this->siteStillExists($site)) {
                 if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
                     File::deleteDirectory($workRoot);
                 }
@@ -319,5 +319,16 @@ class BuildEdgeSiteJob implements ShouldQueue
             // Notification publish is best-effort — it must never mask the
             // build error we were called to record.
         }
+    }
+
+    /**
+     * The site can be deleted while a build is in flight, so each checkpoint
+     * must re-query rather than reuse an earlier result.
+     *
+     * @phpstan-impure
+     */
+    private function siteStillExists(Site $site): bool
+    {
+        return Site::query()->whereKey($site->getKey())->exists();
     }
 }

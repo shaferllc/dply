@@ -102,7 +102,7 @@ class Secrets extends Component
             'organization_id' => $this->organization->id,
             'driver' => $this->store_driver,
             'name' => $this->store_name,
-            'config' => array_filter($this->store_form, fn ($v): bool => $v !== null && $v !== ''),
+            'config' => array_filter($this->store_form, fn ($v): bool => $v !== ''),
             'resolution' => $this->store_resolution,
         ]);
 
