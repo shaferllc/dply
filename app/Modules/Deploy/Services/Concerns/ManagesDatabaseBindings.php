@@ -507,7 +507,7 @@ trait ManagesDatabaseBindings
             'target_type' => 'cloud_database',
             'target_id' => (string) $database->id,
             'injected_env' => [],
-            'config' => array_filter([
+            'config' => [
                 'engine' => $engine,
                 'connection' => '',
                 'database_name' => $name,
@@ -515,7 +515,7 @@ trait ManagesDatabaseBindings
                 'managed' => true,
                 'region' => $region,
                 'size' => $size,
-            ], fn ($v) => $v !== null),
+            ],
             'last_error' => null,
         ], true, '');
 

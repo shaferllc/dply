@@ -420,8 +420,7 @@ final class ServerCostCard
 
         $peak = max($cpuPct ?? 0.0, $memPct ?? 0.0);
         $low = ($cpuPct === null || $cpuPct <= $lowUtil)
-            && ($memPct === null || $memPct <= $lowUtil)
-            && ($cpuPct !== null || $memPct !== null);
+            && ($memPct === null || $memPct <= $lowUtil);
 
         if ($peak >= $hotUtil) {
             return [

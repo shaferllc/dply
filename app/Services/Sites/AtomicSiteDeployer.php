@@ -349,7 +349,7 @@ class AtomicSiteDeployer
                 throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
             }
 
-            $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
+            $log .= sprintf("[dply] BUILD done → %d step(s), ok=true\n", count($build['steps']));
         } else {
             $log .= sprintf("\n[dply] BUILD → skipped (resume from %s); reusing the build already staged in %s\n", $resume->startFromPhase, $newRelease);
         }

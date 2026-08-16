@@ -112,7 +112,7 @@ class OrganizationInsightsMetricsService
     }
 
     /**
-     * @param  Collection<string, array{open: int, worst: string|null}>  $perServer
+     * @param  Collection<string, covariant array{open: int, worst: string|null}>  $perServer
      * @param  Collection<int, string>  $serverIds
      * @return list<array{id: string, name: string, open: int, worst: string|null}>
      */

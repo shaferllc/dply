@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $description
  * @property string $name
  * @property ?string $organization_id
- * @property array<string, mixed> $rules
+ * @property list<array<string, mixed>> $rules
  * @property ?string $server_id
  * @property-read ?Organization $organization
  * @property-read ?Server $server

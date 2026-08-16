@@ -54,7 +54,7 @@ class ServerPasswdUserLister
     }
 
     /**
-     * @return list<array<string, int|list<string>|string>>
+     * @return list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>
      */
     private function parsePasswdAndGroups(string $out): array
     {

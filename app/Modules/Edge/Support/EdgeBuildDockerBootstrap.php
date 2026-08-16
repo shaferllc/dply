@@ -27,6 +27,7 @@ final class EdgeBuildDockerBootstrap
         return 'www-data';
     }
 
+    /** @phpstan-impure */
     public static function daemonReachable(): bool
     {
         return Process::timeout(10)

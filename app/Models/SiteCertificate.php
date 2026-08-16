@@ -18,7 +18,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $credential_reference
  * @property ?string $csr_pem
  * @property ?string $dns_provider
- * @property array<string, mixed> $domains_json
+ * @property list<string> $domains_json
  * @property bool $enable_http3
  * @property ?Carbon $expires_at
  * @property bool $force_skip_dns_checks
@@ -152,7 +152,7 @@ class SiteCertificate extends Model
     public function domainHostnames(): array
     {
         return collect($this->domains_json)
-            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->filter(fn (string $hostname): bool => trim($hostname) !== '')
             ->map(fn (string $hostname): string => strtolower(trim($hostname)))
             ->unique()
             ->values()

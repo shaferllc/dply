@@ -150,7 +150,7 @@ class EdgeBindingsAutoResolver
         return is_string($created['id'] ?? null) ? (string) $created['id'] : null;
     }
 
-    private function lookupOrCreateR2(EdgeCloudflareClient $client, string $name, Site $site): ?string
+    private function lookupOrCreateR2(EdgeCloudflareClient $client, string $name, Site $site): string
     {
         if ($client->r2BucketExists($name)) {
             return $name;
@@ -178,7 +178,7 @@ class EdgeBindingsAutoResolver
         return is_string($created['uuid'] ?? null) ? (string) $created['uuid'] : null;
     }
 
-    private function lookupOrCreateQueue(EdgeCloudflareClient $client, string $name): ?string
+    private function lookupOrCreateQueue(EdgeCloudflareClient $client, string $name): string
     {
         foreach ($client->listQueues() as $q) {
             if (($q['queue_name'] ?? null) === $name) {

@@ -401,11 +401,11 @@ trait ResolvesPhpInventory
         $installed = $this->normalizeVersionList($inventory['installed_versions']);
         $default = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
 
-        return trim(implode("\n", array_filter([
+        return trim(implode("\n", [
             'Supported environment: '.($inventory['supported'] ? 'yes' : 'no'),
             'Installed versions: '.($installed !== [] ? implode(', ', $installed) : 'none reported'),
             'Detected CLI default: '.($default ?? 'none reported'),
-        ])));
+        ]));
     }
 
     /**

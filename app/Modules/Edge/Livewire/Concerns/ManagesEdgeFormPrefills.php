@@ -119,9 +119,7 @@ trait ManagesEdgeFormPrefills
         $this->form->runtime_mode = $mode;
         $this->prefillingFromDetection = false;
 
-        if ($mode === 'hybrid') {
-            $this->applyHybridOriginSuggestion();
-        }
+        $this->applyHybridOriginSuggestion();
     }
 
     private function defaultNameFromRepo(): string

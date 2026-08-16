@@ -60,7 +60,7 @@ class EdgeRepoBindingTranslator
         // env.KV — per-site default. Skipped when declared overrides it
         // or when the platform reserves the name (defensive).
         $defaultKvId = $site instanceof Site ? $this->defaultBindings->ensure($site)['kv'] : null;
-        if (is_string($defaultKvId) && ! in_array('KV', $declaredNames, true) && ! in_array('KV', self::RESERVED_NAMES, true)) {
+        if (is_string($defaultKvId) && ! in_array('KV', $declaredNames, true)) {
             $out[] = ['name' => 'KV', 'type' => 'kv_namespace', 'namespace_id' => $defaultKvId];
         }
 
@@ -106,6 +106,7 @@ class EdgeRepoBindingTranslator
                     'r2' => ['name' => $row['name'], 'type' => 'r2_bucket', 'bucket_name' => $row['value']],
                     'd1' => ['name' => $row['name'], 'type' => 'd1', 'id' => $row['value']],
                     'queue' => ['name' => $row['name'], 'type' => 'queue', 'queue_name' => $row['value']],
+                    default => throw new \InvalidArgumentException("Unsupported binding kind: {$row['kind']}"),
                 };
             }
         }

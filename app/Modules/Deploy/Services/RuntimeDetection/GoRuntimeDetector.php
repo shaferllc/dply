@@ -108,7 +108,7 @@ final class GoRuntimeDetector implements RuntimeDetector
                     continue;
                 }
                 $parts = preg_split('/\s+/', $line);
-                if (is_array($parts) && isset($parts[0]) && $parts[0] !== '') {
+                if (is_array($parts) && $parts[0] !== '') {
                     $imports[] = $parts[0];
                 }
             }

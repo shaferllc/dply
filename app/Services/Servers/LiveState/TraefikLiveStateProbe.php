@@ -300,7 +300,7 @@ BASH;
 
         // Traefik returns a map keyed by entry-point name, not a JSON array.
         $items = isset($entrypoints[0]) ? $entrypoints : array_map(
-            static fn (string $name, mixed $ep): array => array_merge($ep, ['name' => $name]),
+            static fn (int|string $name, mixed $ep): array => array_merge($ep, ['name' => $name]),
             array_keys($entrypoints),
             array_values($entrypoints),
         );
@@ -430,7 +430,7 @@ BASH;
     /**
      * /api/tls/stores — default certificate stores and stored certs.
      *
-     * @param  array<string, mixed> $stores
+     * @param  array<array-key, mixed> $stores
      * @return list<array<string, mixed>>
      */
     private function buildTlsUnits(array $stores): array

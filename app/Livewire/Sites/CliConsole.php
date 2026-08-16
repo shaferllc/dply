@@ -66,16 +66,6 @@ class CliConsole extends Component
         }
 
         $auth = $this->apiAuth();
-        if ($auth === null) {
-            $this->history[] = [
-                'cmd' => $raw,
-                'out' => '',
-                'exit' => null,
-                'error' => 'Could not mint a short-lived API token for this console.',
-            ];
-
-            return;
-        }
 
         preg_match_all('/\'[^\']*\'|"[^"]*"|\S+/', $args, $matches);
         $argv = array_map(static fn (string $t): string => trim($t, '\'"'), $matches[0]);
@@ -124,7 +114,7 @@ class CliConsole extends Component
     {
         return view('livewire.sites.cli-console', [
             'cliReady' => $this->cliInvocation() !== null,
-            'apiHost' => $this->apiAuth()['base_url'] ?? config('app.url'),
+            'apiHost' => $this->apiAuth()['base_url'],
             'presetCommands' => $this->presetCommands(),
         ]);
     }
@@ -147,9 +137,9 @@ class CliConsole extends Component
     }
 
     /**
-     * @return array{token: string, base_url: string}|null
+     * @return array{token: string, base_url: string}
      */
-    private function apiAuth(): ?array
+    private function apiAuth(): array
     {
         return [
             'token' => $this->sessionToken(),

@@ -32,8 +32,8 @@ final class KubernetesDeployEngine implements DeployEngine
                 'last_apply_output' => $result['output'],
                 'last_revision_id' => $result['sha'],
                 'workspace_path' => $result['workspace_path'],
-                'repository_checkout_path' => $result['repository_checkout_path'] ?? ($kubernetesRuntime['repository_checkout_path'] ?? null),
-                'generated_manifest_path' => $result['generated_manifest_path'] ?? ($kubernetesRuntime['generated_manifest_path'] ?? null),
+                'repository_checkout_path' => $result['repository_checkout_path'],
+                'generated_manifest_path' => $result['generated_manifest_path'],
                 'applied_at' => now()->toIso8601String(),
                 'last_deployed_at' => now()->toIso8601String(),
             ]);

@@ -251,7 +251,7 @@ final class FullStackArchitecturePlanner
         $label = $target['label'];
         $preset = EdgeFrameworkPresetRegistry::byDetectionPlan($planArray);
         $isSsr = EdgeSsrDetection::planLooksLikeSsr($planArray);
-        $runtimeMode = $isSsr ? 'hybrid' : ($preset?->runtimeMode ?? 'static');
+        $runtimeMode = $isSsr ? 'hybrid' : $preset->runtimeMode;
 
         $reasons[] = "{$label}: Node app detected".($planArray['framework'] ? ' ('.$planArray['framework'].')' : '').'.';
 

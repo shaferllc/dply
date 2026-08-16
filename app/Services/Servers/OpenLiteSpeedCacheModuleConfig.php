@@ -128,7 +128,7 @@ class OpenLiteSpeedCacheModuleConfig
      * array keyed by the PARAMS keys above. Missing directives use the
      * declared defaults so the UI always renders a populated form.
      *
-     * @return array{values: array<string, string>, exists: bool, raw: string}
+     * @return array{values: array<string, string>, exists: bool, raw: string, unreadable: bool}
      */
     public function read(Server $server): array
     {

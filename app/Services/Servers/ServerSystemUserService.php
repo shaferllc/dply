@@ -46,7 +46,7 @@ class ServerSystemUserService
                 'uid' => $u->uid,
                 'home' => (string) $u->home,
                 'shell' => (string) $u->shell,
-                'groups' => (array_values($u->groups)),
+                'groups' => $u->groups,
             ])
             ->all();
 
@@ -54,7 +54,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed>  $details
+     * @param  list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>  $details
      */
     private function persistSystemUsers(Server $server, array $details): void
     {
@@ -63,7 +63,7 @@ class ServerSystemUserService
 
         DB::transaction(function () use ($server, $details, $now, &$seen): void {
             foreach ($details as $d) {
-                $username = (string) ($d['username'] ?? '');
+                $username = $d['username'];
                 if ($username === '') {
                     continue;
                 }
@@ -72,10 +72,10 @@ class ServerSystemUserService
                 ServerSystemUser::query()->updateOrCreate(
                     ['server_id' => $server->id, 'username' => $username],
                     [
-                        'uid' => $d['uid'] ?? null,
-                        'home' => (string) ($d['home'] ?? ''),
-                        'shell' => (string) ($d['shell'] ?? ''),
-                        'groups' => array_values($d['groups'] ?? []),
+                        'uid' => $d['uid'],
+                        'home' => $d['home'],
+                        'shell' => $d['shell'],
+                        'groups' => $d['groups'],
                         'last_seen_at' => $now,
                     ],
                 );
@@ -90,7 +90,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<int, array<string, int|list<mixed>|string|null>>  $details
+     * @param  list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>  $details
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
@@ -101,25 +101,26 @@ class ServerSystemUserService
 
         $rows = [];
         foreach ($details as $d) {
-            $key = strtolower(trim($d['username']));
+            $username = $d['username'];
+            $key = strtolower(trim($username));
             $sites = $sitesByUser[$key] ?? [];
             $siteCount = count($sites);
             $workerCount = $workerCounts[$key] ?? 0;
             $cronCount = $cronCounts[$key] ?? 0;
-            $protected = $this->deletionPolicy->isProtected($server, $d['username']);
+            $protected = $this->deletionPolicy->isProtected($server, $username);
             $inUse = $siteCount > 0 || $workerCount > 0 || $cronCount > 0;
 
             $rows[] = [
-                'username' => $d['username'],
+                'username' => $username,
                 'site_count' => $siteCount,
                 'worker_count' => $workerCount,
                 'cron_count' => $cronCount,
                 'is_protected' => $protected,
                 'is_orphan' => ! $protected && ! $inUse,
-                'uid' => $d['uid'] ?? null,
-                'home' => (string) ($d['home'] ?? ''),
-                'shell' => (string) ($d['shell'] ?? ''),
-                'groups' => array_values($d['groups'] ?? []),
+                'uid' => $d['uid'],
+                'home' => $d['home'],
+                'shell' => $d['shell'],
+                'groups' => $d['groups'],
                 'sites' => $sites,
             ];
         }

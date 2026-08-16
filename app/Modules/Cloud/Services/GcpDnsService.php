@@ -262,8 +262,7 @@ class GcpDnsService
 
         $message = $response->json('error.message')
             ?? $response->json('error.errors.0.message')
-            ?? $response->body()
-            ?? $response->reason();
+            ?? $response->body();
         throw new \RuntimeException(sprintf('GCP Cloud DNS API failed to %s: %s', $action, trim((string) $message)));
     }
 }

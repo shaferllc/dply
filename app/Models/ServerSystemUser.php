@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
  *                      Last-observed /etc/passwd snapshot for a server's regular Linux accounts.
  *                      One row per (server, username). Written by the system-users sync; read by
  *                      the workspace page so the table survives navigation without a fresh probe.
- * @property array<string, mixed> $groups
+ * @property list<string> $groups
  * @property string $home
  * @property ?Carbon $last_seen_at
  * @property ?string $server_id

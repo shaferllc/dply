@@ -43,7 +43,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
             return null;
         }
 
-        if ($framework === null && $hasIndexHtml) {
+        if ($hasIndexHtml) {
             $detectedFiles[] = 'index.html';
             $reasons[] = 'Found `index.html` at the repo root — treating as a plain static site.';
         }

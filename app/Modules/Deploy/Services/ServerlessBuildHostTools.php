@@ -209,7 +209,7 @@ final class ServerlessBuildHostTools
 
         if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
             $info = @posix_getpwuid(posix_geteuid());
-            if (is_array($info) && ! empty($info['dir']) && is_string($info['dir'])) {
+            if (is_array($info) && ! empty($info['dir'])) {
                 return rtrim($info['dir'], DIRECTORY_SEPARATOR);
             }
         }
@@ -286,12 +286,12 @@ final class ServerlessBuildHostTools
 
     public function findPhp(): string
     {
-        $candidates = array_filter([
+        $candidates = [
             PHP_BINARY,
             '/usr/bin/php',
             '/usr/local/bin/php',
             '/opt/homebrew/bin/php',
-        ]);
+        ];
 
         foreach ($candidates as $candidate) {
             if (is_file($candidate)) {

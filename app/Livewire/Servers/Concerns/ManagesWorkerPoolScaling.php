@@ -196,7 +196,7 @@ trait ManagesWorkerPoolScaling
             'horizon:snapshot' => __('Snapshotting Horizon metrics'),
             'horizon:status' => __('Checking Horizon status'),
             'check' => __('Checking worker backend'),
-        ][$action] ?? __('Updating workers');
+        ][$action];
         $this->toastSuccess(__(':verb on :name — watch the console banner below for output.', ['verb' => $verb, 'name' => $member->name]));
     }
 

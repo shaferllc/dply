@@ -198,7 +198,7 @@ BASH;
         if (str_starts_with($name, 'log') || str_contains($name, 'status')) {
             return 'observability';
         }
-        if (str_contains($name, 'rewrite') || str_contains($name, 'headers') || str_contains($name, 'expires') || str_contains($name, 'macro')) {
+        if (str_contains($name, 'rewrite') || str_contains($name, 'headers') || str_contains($name, 'macro')) {
             return 'core';
         }
 

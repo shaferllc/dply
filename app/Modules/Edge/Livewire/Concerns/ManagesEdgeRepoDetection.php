@@ -603,7 +603,7 @@ trait ManagesEdgeRepoDetection
             $this->monorepoMarkers = $result['markers'];
 
             if ($this->monorepoDetected && ! $this->repoRootTouched && count($this->monorepoPackages) === 1) {
-                $this->form->repo_root = (string) ($this->monorepoPackages[0]['path'] ?? '');
+                $this->form->repo_root = (string) $this->monorepoPackages[0]['path'];
             }
         } catch (\Throwable) {
             $this->monorepoDetected = false;

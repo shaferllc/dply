@@ -371,17 +371,15 @@ trait RunsPhpPackageActions
             $newSitePersist = $fallback;
         }
 
-        if ($cliPersist !== null || $newSitePersist !== null) {
-            $this->persistRefreshedInventoryMeta(
+        $this->persistRefreshedInventoryMeta(
+            $server->fresh() ?? $server,
+            $this->refreshedInventoryMeta(
                 $server->fresh() ?? $server,
-                $this->refreshedInventoryMeta(
-                    $server->fresh() ?? $server,
-                    $preflightInventory,
-                    $cliPersist,
-                    $newSitePersist,
-                ),
-            );
-        }
+                $preflightInventory,
+                $cliPersist,
+                $newSitePersist,
+            ),
+        );
 
         return $preflightInventory;
     }

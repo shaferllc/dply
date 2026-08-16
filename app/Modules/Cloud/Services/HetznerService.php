@@ -87,7 +87,7 @@ class HetznerService
             return;
         }
 
-        $message = $response->json('error.message') ?? $response->body() ?? $response->reason();
+        $message = $response->json('error.message') ?? $response->body();
         throw new \RuntimeException("Hetzner API failed to {$action}: {$message}");
     }
 }

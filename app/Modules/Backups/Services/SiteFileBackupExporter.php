@@ -45,7 +45,7 @@ final class SiteFileBackupExporter
         $site = $backup->site;
         $server = $site->server;
 
-        if ($site === null || $server === null) {
+        if ($server === null) {
             throw new \RuntimeException(__('Site or server is missing for this backup.'));
         }
 

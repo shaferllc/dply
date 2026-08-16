@@ -88,7 +88,7 @@ final class EdgePreviewReviewState
                 'id' => (string) $row->id,
                 'user_name' => (string) ($row->user?->name ?: $row->user?->email ?: __('Reviewer')),
                 'note' => is_string($row->note) && $row->note !== '' ? $row->note : null,
-                'created_at' => $row->created_at->toDateTimeString() ?? '',
+                'created_at' => $row->created_at->toDateTimeString(),
             ])->values()->all(),
         ];
     }

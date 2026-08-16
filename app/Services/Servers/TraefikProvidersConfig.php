@@ -174,11 +174,11 @@ BASH;
 
             return;
         }
-        $providers['docker'] = array_filter([
+        $providers['docker'] = [
             'endpoint' => trim((string) ($values['docker_endpoint'] ?? 'unix:///var/run/docker.sock')) ?: 'unix:///var/run/docker.sock',
             'exposedByDefault' => $this->bool($values['docker_exposedByDefault'] ?? '0'),
             'watch' => true,
-        ], static fn ($v) => $v !== null && $v !== '');
+        ];
     }
 
     /**

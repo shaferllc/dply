@@ -367,6 +367,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
             'haproxy' => $this->writeHaproxyConfig($server, $ssh, $sites, $listenPort),
             'envoy' => $this->writeEnvoyConfig($server, $ssh, $sites, $listenPort),
             'openresty' => $this->writeOpenRestyConfig($server, $ssh, $sites, $listenPort),
+            default => throw new \InvalidArgumentException("Unsupported edge proxy: {$edgeProxy}"),
         };
     }
 

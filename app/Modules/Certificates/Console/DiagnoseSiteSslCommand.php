@@ -63,7 +63,7 @@ class DiagnoseSiteSslCommand extends Command
             $server->name ?? '—',
             $server->ip_address ?? 'no IP',
         ));
-        $this->line(sprintf('<info>Webserver</info> %s', $site->webserver() ?? '—'));
+        $this->line(sprintf('<info>Webserver</info> %s', $site->webserver()));
         $this->newLine();
 
         $this->diagnoseTestingWildcard($site, $routing);

@@ -8,10 +8,6 @@ parameters:
     databaseMigrationsPath:
         - database/migrations
 
-    # The baseline is large; tolerate minor count drift between runs rather than
-    # failing CI when an unrelated change shifts an inferred type.
-    reportUnmatchedIgnoredErrors: false
-
     paths:
         - app
         - config
@@ -56,6 +52,7 @@ parameters:
         - app/Modules/TaskRunner/Examples/*
         - app/Modules/TaskRunner/config/*
 
-    # Existing violations are captured in phpstan-baseline.neon so the suite is
-    # green today; new code is held to level 5. Regenerate the baseline
-    # with: composer analyse:baseline
+    # phpstan-baseline.neon is empty and must stay that way: the whole codebase
+    # is clean at level 5, so a new violation fails `composer analyse` instead of
+    # being absorbed. `composer analyse:baseline` exists to inspect what a change
+    # would add — don't commit a populated baseline to get a build green.

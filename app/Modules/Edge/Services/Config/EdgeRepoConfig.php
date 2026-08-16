@@ -85,7 +85,7 @@ final class EdgeRepoConfig
      *     tags: array<string, mixed>,
      *     snippets: array<string, mixed>,
      *     forms: array<string, mixed>,
-     *     domains: array<string, mixed>,
+     *     domains: list<string>,
      *     previews: array<string, mixed>,
      *     comment_widget: array<string, mixed>,
      *     env: array<string, mixed>,

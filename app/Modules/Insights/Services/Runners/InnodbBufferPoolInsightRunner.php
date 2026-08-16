@@ -99,7 +99,7 @@ BASH;
         }
 
         $memTotalBytes = $memTotalKb * 1024;
-        $ramSharePct = $memTotalBytes > 0 ? ($poolBytes / $memTotalBytes) * 100.0 : 0.0;
+        $ramSharePct = ($poolBytes / $memTotalBytes) * 100.0;
         $workingSetPct = $pagesTotal > 0 ? ($pagesData / $pagesTotal) * 100.0 : 0.0;
 
         $minRamShare = (float) ($parameters['min_ram_share_pct'] ?? 25);

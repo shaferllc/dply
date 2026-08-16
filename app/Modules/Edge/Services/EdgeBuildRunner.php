@@ -676,7 +676,7 @@ class EdgeBuildRunner
         $parts = explode("\x1f", trim($result->output()), 3);
 
         return [
-            'subject' => isset($parts[0]) && $parts[0] !== '' ? mb_substr($parts[0], 0, 200) : null,
+            'subject' => $parts[0] !== '' ? mb_substr($parts[0], 0, 200) : null,
             'author' => isset($parts[1]) && $parts[1] !== '' ? mb_substr($parts[1], 0, 120) : null,
             'committed_at' => $parts[2] ?? null,
         ];

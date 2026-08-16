@@ -57,13 +57,13 @@ class StaleBackupsInsightRunner implements InsightRunnerInterface
                 // Never-succeeded schedule. Only flag if the schedule itself
                 // is older than the cutoff (so a brand-new schedule isn't
                 // immediately yellow on the dashboard).
-                if (! $schedule->created_at || $schedule->created_at->lt($cutoff)) {
+                if ($schedule->created_at->lt($cutoff)) {
                     $stale[] = [
                         'schedule_id' => (string) $schedule->id,
                         'target' => $schedule->targetLabel(),
                         'target_type' => $schedule->target_type,
                         'last_success_at' => null,
-                        'severity' => $schedule->created_at && $schedule->created_at->lt($criticalCutoff)
+                        'severity' => $schedule->created_at->lt($criticalCutoff)
                             ? InsightFinding::SEVERITY_CRITICAL
                             : InsightFinding::SEVERITY_WARNING,
                     ];

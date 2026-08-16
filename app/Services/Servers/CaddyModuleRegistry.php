@@ -163,7 +163,7 @@ class CaddyModuleRegistry
 
         foreach ($moduleIds as $moduleId) {
             $moduleId = trim($moduleId);
-            if ($moduleId === '' || ! isset($index[$moduleId]) || ! is_array($index[$moduleId])) {
+            if ($moduleId === '' || ! isset($index[$moduleId])) {
                 continue;
             }
 

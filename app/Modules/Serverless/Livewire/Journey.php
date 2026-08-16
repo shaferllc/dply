@@ -455,7 +455,7 @@ class Journey extends Component
         $weights = ['created' => 15, 'namespace' => 25, 'deploy' => 45, 'live' => 15];
         $percent = 0;
         foreach ($stages as $st) {
-            $weight = $weights[$st['key']] ?? 0;
+            $weight = $weights[$st['key']];
             if ($st['state'] === 'done') {
                 $percent += $weight;
             } elseif ($st['key'] === 'deploy' && $st['state'] === 'active' && $deploySteps !== []) {

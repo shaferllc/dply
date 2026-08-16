@@ -6,7 +6,6 @@ namespace App\Modules\SourceControl\Services;
 
 use App\Modules\SourceControl\Contracts\GitIdentity;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -53,7 +52,7 @@ final class DefaultBranchResolver
 
         try {
             $process->run();
-        } catch (ProcessTimedOutException|Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('DefaultBranchResolver: ls-remote threw', [
                 'url' => $repositoryUrl,
                 'authed' => $account !== null,

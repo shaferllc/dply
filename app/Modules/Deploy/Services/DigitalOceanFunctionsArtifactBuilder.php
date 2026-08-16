@@ -53,7 +53,7 @@ class DigitalOceanFunctionsArtifactBuilder
             (string) ($site->git_branch ?: 'main'),
             (string) $resolvedConfig['repository_subdirectory'],
             $site->user_id,
-            isset($resolvedConfig['source_control_account_id']) && is_string($resolvedConfig['source_control_account_id'])
+            isset($resolvedConfig['source_control_account_id'])
                 ? $resolvedConfig['source_control_account_id']
                 : null,
             $site->gitRefKind(),

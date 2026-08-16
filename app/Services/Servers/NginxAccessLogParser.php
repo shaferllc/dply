@@ -81,7 +81,7 @@ class NginxAccessLogParser
             'method' => $method,
             'path' => $path,
             'protocol' => $protocol,
-            'status' => isset($m['status']) ? (int) $m['status'] : null,
+            'status' => (int) $m['status'],
             'bytes' => $this->parseBytes($m['bytes']),
             'referer' => $this->dashToNull($m['referer'] ?? null),
             'user_agent' => $this->dashToNull($m['agent'] ?? null),

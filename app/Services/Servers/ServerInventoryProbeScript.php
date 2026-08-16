@@ -507,7 +507,7 @@ SH;
             ];
         }
         $gitIdentity = $this->extractKvBlock($out, 'GIT_IDENTITY');
-        if ($gitIdentity !== [] && isset($tools['git'])) {
+        if ($gitIdentity !== []) {
             $name = trim((string) ($gitIdentity['user_name'] ?? ''));
             $email = trim((string) ($gitIdentity['user_email'] ?? ''));
             if ($name !== '') {
