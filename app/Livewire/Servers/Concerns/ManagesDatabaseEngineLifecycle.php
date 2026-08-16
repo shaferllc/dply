@@ -47,6 +47,7 @@ trait ManagesDatabaseEngineLifecycle
     public string $remote_access_allowed_from = '0.0.0.0/0';
 
     /** Keyed by database ID — the CIDR input value for each row's networking form. */
+    /** @var array<string, string> */
     public array $db_networking_allowed_from = [];
 
     /** @var array<string, mixed>|null */

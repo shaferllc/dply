@@ -82,7 +82,7 @@ trait ManagesSiteNotificationsTab
         $this->loadSiteNotificationPreferences();
 
         if ($changed['changed'] > 0) {
-            $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+            $auditOrg = $this->site->server->organization ?? auth()->user()?->currentOrganization();
             if ($auditOrg) {
                 audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
                     'added' => $changed['added'],

@@ -590,7 +590,7 @@ trait ManagesDatabaseBindings
             $region = (string) ($vendor['regions'][0]['value'] ?? '');
         }
 
-        if (($vendor['account_required'] ?? false) && trim((string) ($params['vendor_account'] ?? '')) === '') {
+        if ($vendor['account_required'] && trim((string) ($params['vendor_account'] ?? '')) === '') {
             throw new InvalidArgumentException(__('Enter the :label for :vendor.', [
                 'label' => $vendor['account_label'] ?? __('account'),
                 'vendor' => $vendor['label'],

@@ -56,20 +56,6 @@ class ResourceDecorator extends JsonResource
      */
     public static function collection($resource): AnonymousResourceCollection
     {
-        // Use parent collection method if available
-        if (method_exists(parent::class, 'collection')) {
-            return parent::collection($resource);
-        }
-
-        // Otherwise, map each resource through the decorator
-        $actionClass = static::class;
-        $actionInstance = app($actionClass);
-
-        $items = [];
-        foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
-            $items[] = new $actionClass($actionInstance, $item);
-        }
-
-        return new AnonymousResourceCollection($items, static::class);
+        return parent::collection($resource);
     }
 }

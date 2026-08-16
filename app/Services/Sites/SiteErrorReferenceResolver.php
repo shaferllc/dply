@@ -153,7 +153,7 @@ final class SiteErrorReferenceResolver
      * FPM logs, nginx/apache for the webserver error log). Lines that don't parse
      * are simply dropped from `entries` — they remain verbatim in `trace`.
      *
-     * @param  array<string, mixed> $trace
+     * @param  list<string> $trace
      * @param  array<string, mixed> $sourceMap
      * @return list<array<string, mixed>>
      */

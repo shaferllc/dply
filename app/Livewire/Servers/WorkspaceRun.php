@@ -603,13 +603,13 @@ class WorkspaceRun extends Component
         $marketplaceFiltered = array_values(array_filter(
             $marketplace,
             fn (array $row) => $matchesSearch($row)
-                && ($tag === '' || in_array($tag, $row['tags'] ?? [], true))
+                && ($tag === '' || in_array($tag, $row['tags'], true))
         ));
         $orgFiltered = array_values(array_filter($orgScripts, $matchesSearch));
 
         $tagCounts = [];
         foreach ($marketplace as $row) {
-            foreach ($row['tags'] ?? [] as $t) {
+            foreach ($row['tags'] as $t) {
                 $tagCounts[$t] = ($tagCounts[$t] ?? 0) + 1;
             }
         }

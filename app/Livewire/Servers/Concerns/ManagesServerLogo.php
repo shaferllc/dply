@@ -6,6 +6,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\Features\SupportFileUploads\WithFileUploads;
 
 /**
@@ -23,7 +24,7 @@ trait ManagesServerLogo
 {
     use WithFileUploads;
 
-    public $server_logo_upload = null;
+    public TemporaryUploadedFile|null $server_logo_upload = null;
 
     /** Fires when a file is chosen — validate, store, and set it immediately. */
     public function updatedServerLogoUpload(): void

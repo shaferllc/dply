@@ -42,8 +42,8 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, self> $dependentJobs
  * @property-read ?OrganizationCronJobTemplate $appliedTemplate
  * @property-read Collection<int, ServerCronJobRun> $runs
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerCronJob extends Model
 {

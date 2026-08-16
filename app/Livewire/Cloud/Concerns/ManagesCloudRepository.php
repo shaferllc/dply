@@ -15,8 +15,6 @@ use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
  */
 trait ManagesCloudRepository
 {
-
-
     public function updatedRepoSource(string $value): void
     {
         // Switching back to manual entry clears the dropdown selection
@@ -52,7 +50,7 @@ trait ManagesCloudRepository
         // clone fail outright (e.g., master/12.x repos getting branch=main).
         $live = $this->resolveDefaultBranchForCurrentSelection($cloneUrl);
         $this->branch = $live
-            ?? (is_string($match['branch'] ?? null) && $match['branch'] !== '' ? (string) $match['branch'] : 'main');
+            ?? ($match['branch'] !== '' ? $match['branch'] : 'main');
 
         // Picking a repo from a connected account is a deliberate choice —
         // detect immediately so the user sees the runtime preview without a

@@ -294,7 +294,7 @@ class WebserverCertsAggregator
      * A "[read/total] name · Nd" progress frame naming the cert just read, with
      * its days-until-expiry when we got one — so each frame is informative.
      *
-     * @param  array<string, mixed> $chunk
+     * @param  list<string> $chunk
      * @param  list<array<string, mixed>>  $rows
      */
     private function frameLine(int $read, int $total, array $chunk, array $rows): string
@@ -345,7 +345,7 @@ BASH;
      * `path|subject|issuer|notAfter` line each (the format {@see parseScanOutput}
      * consumes). Unreadable/non-cert files are skipped silently.
      *
-     * @param  array<string, mixed> $files
+     * @param  list<string> $files
      */
     private function buildReadScript(array $files): string
     {

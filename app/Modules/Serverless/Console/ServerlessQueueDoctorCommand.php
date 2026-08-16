@@ -85,7 +85,7 @@ class ServerlessQueueDoctorCommand extends Command
         $config = $pump->config($site);
         $serverless = $site->serverlessConfig();
         $parsed = (new DotEnvFileParser)->parse((string) $site->env_file_content);
-        $env = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+        $env = $parsed['variables'];
 
         $deployed = trim((string) ($serverless['action_url'] ?? '')) !== '';
 

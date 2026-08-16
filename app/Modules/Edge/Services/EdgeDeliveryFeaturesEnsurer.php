@@ -98,9 +98,9 @@ class EdgeDeliveryFeaturesEnsurer
         foreach (array_keys($zones) as $zoneName) {
             $result = $client->ensureImageResizingEnabled($zoneName);
             $results[] = [
-                'ok' => (bool) ($result['ok'] ?? false),
-                'zone' => (string) ($result['zone'] ?? $zoneName),
-                'detail' => (string) ($result['detail'] ?? ''),
+                'ok' => (bool) $result['ok'],
+                'zone' => (string) $result['zone'],
+                'detail' => (string) $result['detail'],
             ];
         }
 
@@ -124,7 +124,7 @@ class EdgeDeliveryFeaturesEnsurer
                 }
 
                 $hostname = $site->edgeHostname();
-                if (! is_string($hostname) || $hostname === '') {
+                if ($hostname === '') {
                     return;
                 }
 

@@ -135,7 +135,7 @@ final class SitePromotePlanner
             'production_hostname' => is_string($promote['source_production_hostname'] ?? null)
                 ? (string) $promote['source_production_hostname']
                 : null,
-            'preview_hostname' => ($preview) && $preview !== '' ? $preview : null,
+            'preview_hostname' => $preview ? $preview : null,
             'destination_server_name' => $destination->server !== null ? (string) $destination->server->name : null,
         ];
     }

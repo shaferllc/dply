@@ -73,7 +73,7 @@ final class NginxOrphanVhostPruner
      * (reusing the already-open connection), then reload. Returns the basenames
      * actually removed so the caller can decide whether the conflict cleared.
      *
-     * @param  array<string, mixed> $candidateBasenames
+     * @param  list<string> $candidateBasenames
      * @return array{removed: list<string>, reloaded: bool, output: string}
      */
     public function pruneShadowing(Server $server, SshConnection $ssh, array $candidateBasenames, ?ConsoleEmitter $emit = null): array
@@ -173,7 +173,7 @@ BASH;
             if ($row['managed'] && $tokens !== [] && ! $hasLiveOwner) {
                 $orphans[] = [
                     'basename' => $row['basename'],
-                    'site_id' => $tokens[0] ?? null,
+                    'site_id' => $tokens[0],
                     'server_names' => $row['server_names'],
                     'in_available' => $row['in_available'],
                     'in_enabled' => $row['in_enabled'],
@@ -189,7 +189,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $basenames
+     * @param  list<string> $basenames
      * @return array{removed: list<string>, kept: int, reloaded: bool, output: string}
      */
     private function removeBasenames(Server $server, SshConnection $ssh, array $basenames, int $kept, ?ConsoleEmitter $emit): array

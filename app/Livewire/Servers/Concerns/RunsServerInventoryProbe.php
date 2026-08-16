@@ -162,9 +162,7 @@ trait RunsServerInventoryProbe
             }
 
             if ($consoleRow !== null) {
-                if ($emitter !== null) {
-                    $emitter->success(__('Inventory parsed and persisted.'), 'dply');
-                }
+                $emitter->success(__('Inventory parsed and persisted.'), 'dply');
                 $this->finalizeInventoryProbeConsoleAction($consoleRow, success: true);
             }
 

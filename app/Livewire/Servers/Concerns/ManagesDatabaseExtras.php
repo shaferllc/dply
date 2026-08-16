@@ -88,7 +88,7 @@ trait ManagesDatabaseExtras
         }
 
         $caps = $capabilitiesService->forServer($this->server);
-        if (! ($caps['postgres'] ?? false)) {
+        if (! $caps['postgres']) {
             return;
         }
 
@@ -211,7 +211,7 @@ trait ManagesDatabaseExtras
 
         $this->dispatchDatabaseNotification('user_removed', [
             __('User: :user', ['user' => $user]),
-            __('Database: :name', ['name' => $db?->name ?? $dbId]),
+            __('Database: :name', ['name' => $db->name ?? $dbId]),
         ], ['server_database_id' => $dbId, 'username' => $user]);
 
         $this->toastSuccess(__('Dropped the MySQL user on the server and removed it from Dply.'));

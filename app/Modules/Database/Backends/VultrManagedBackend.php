@@ -90,7 +90,7 @@ class VultrManagedBackend implements DatabaseBackend
         $engineSlug = self::ENGINE_SLUGS[$database->engine] ?? 'pg';
         $version = $database->version !== ''
             ? $database->version
-            : (self::DEFAULT_VERSION[$engineSlug] ?? '16');
+            : self::DEFAULT_VERSION[$engineSlug];
 
         $cluster = $this->service($database)->createDatabaseCluster(
             $engineSlug,
@@ -112,11 +112,11 @@ class VultrManagedBackend implements DatabaseBackend
         }
 
         $cluster = $service->getDatabaseCluster((string) $database->backend_id);
-        $connection = is_array($cluster['connection'] ?? null) ? $cluster['connection'] : [];
+        $connection = $cluster['connection'];
 
         // Normalize Vultr's `running` to the shared `online` ready-state so the
         // provisioning job's status check stays backend-agnostic.
-        $status = (string) ($cluster['status'] ?? '');
+        $status = (string) $cluster['status'];
 
         return [
             'status' => $status === 'running' ? 'online' : $status,

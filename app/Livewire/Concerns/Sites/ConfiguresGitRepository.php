@@ -129,7 +129,7 @@ trait ConfiguresGitRepository
     public function updatedRepositorySelection(string $value): void
     {
         foreach ($this->availableRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
+            if ($repository['url'] !== $value) {
                 continue;
             }
             $this->git_repository_url = (string) $repository['url'];

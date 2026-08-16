@@ -310,7 +310,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  array<string, mixed> $orderedStepIds
+     * @param  list<string> $orderedStepIds
      */
     public function reorderSteps(SiteDeployPipeline $pipeline, array $orderedStepIds): void
     {
@@ -323,7 +323,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  array<string, mixed> $orderedBuildStepIds
+     * @param  list<string> $orderedBuildStepIds
      */
     public function reorderBuildSteps(SiteDeployPipeline $pipeline, array $orderedBuildStepIds): void
     {
@@ -334,7 +334,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  array<string, mixed> $orderedReleaseStepIds
+     * @param  list<string> $orderedReleaseStepIds
      */
     public function reorderReleaseSteps(SiteDeployPipeline $pipeline, array $orderedReleaseStepIds): void
     {
@@ -427,8 +427,8 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  array<string, mixed> $expectedIds
-     * @param  array<string, mixed> $orderedSubset
+     * @param  list<string> $expectedIds
+     * @param  list<string> $orderedSubset
      */
     private function validateOrderedSubset(array $expectedIds, array $orderedSubset): void
     {

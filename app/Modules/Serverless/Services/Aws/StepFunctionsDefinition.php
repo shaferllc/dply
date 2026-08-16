@@ -21,7 +21,7 @@ use InvalidArgumentException;
 final class StepFunctionsDefinition
 {
     /**
-     * @param  array<string, mixed> $functionNames  ordered component function names
+     * @param  list<string> $functionNames  ordered component function names
      *
      * @throws InvalidArgumentException
      */

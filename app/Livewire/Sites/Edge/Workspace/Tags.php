@@ -123,8 +123,8 @@ class Tags extends Component
         // Replace the empty default placeholder row so the first click doesn't
         // leave a useless blank "analytics" entry behind.
         $onlyBlankPlaceholder = count($this->tools) === 1
-            && trim((string) ($this->tools[0]['src'] ?? '')) === ''
-            && in_array(trim((string) ($this->tools[0]['name'] ?? '')), ['', 'analytics', 'tag'], true);
+            && trim((string) $this->tools[0]['src']) === ''
+            && in_array(trim((string) $this->tools[0]['name']), ['', 'analytics', 'tag'], true);
 
         if ($onlyBlankPlaceholder) {
             $this->tools = [$row];
@@ -167,7 +167,7 @@ class Tags extends Component
                 'consent_required' => $this->consent_required,
                 'tools' => array_values(array_filter(
                     $this->tools,
-                    static fn (array $t): bool => trim((string) ($t['src'] ?? '')) !== '',
+                    static fn (array $t): bool => trim((string) $t['src']) !== '',
                 )),
             ],
         ]);

@@ -5,6 +5,8 @@ namespace App\Livewire\Notifications;
 use App\Models\NotificationInboxItem;
 use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Livewire\Component;
 
 /**
@@ -21,7 +23,11 @@ class Bell extends Component
     /** Severities that count as "alerts" for the Alerts-only quick filter. */
     private const ALERT_SEVERITIES = ['warning', 'critical', 'error', 'danger'];
 
-    /** Selected event categories (multi-select; empty = all categories). @var array<int, string> */
+    /**
+     * Selected event categories (multi-select; empty = all categories).
+     *
+     * @var list<string>
+     */
     public array $categoryFilters = [];
 
     /** Filter the unread list to warning/critical/error/danger only. */
@@ -71,7 +77,7 @@ class Bell extends Component
     }
 
     /** Mark-read-on-click, then navigate to the item's deep link. */
-    public function openItem(string $itemId)
+    public function openItem(string $itemId): ?RedirectResponse
     {
         if (! $this->ready()) {
             return null;
@@ -109,7 +115,10 @@ class Bell extends Component
         return auth()->check() && NotificationTablesReady::all();
     }
 
-    private function base()
+    /**
+     * @return Builder<NotificationInboxItem>
+     */
+    private function base(): Builder
     {
         return NotificationInboxItem::query()->where('user_id', auth()->id());
     }

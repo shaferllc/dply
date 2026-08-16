@@ -267,13 +267,14 @@ class StepWhere extends Component
             && ($catalog['credentials'] instanceof Collection)
             && $catalog['credentials']->contains('id', $this->form->provider_credential_id);
 
-        $allowed = collect(
+        $allowed = collect($this->provisionOptionList(
             FilterServerProvisionOptionsForCreateForm::run(
                 $this->form->type,
                 $hasLinkedCredential,
                 $role,
-            )['server_roles'] ?? []
-        )->pluck('id')->all();
+            ),
+            'server_roles',
+        ))->pluck('id')->all();
 
         if ($allowed !== [] && ! in_array($role, $allowed, true)) {
             return;
@@ -483,7 +484,7 @@ class StepWhere extends Component
 
         return array_values(array_filter(
             $cards,
-            fn (array $card): bool => in_array($card['id'] ?? '', ['digitalocean', 'aws'], true),
+            fn (array $card): bool => in_array($card['id'], ['digitalocean', 'aws'], true),
         ));
     }
 
@@ -492,7 +493,9 @@ class StepWhere extends Component
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
         $catalog = $context['catalog'];
-        $regionLabels = collect(is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [])
+        /** @var list<array<string, mixed>> $regions */
+        $regions = is_array($catalog['regions'] ?? null) ? array_values(array_filter($catalog['regions'], 'is_array')) : [];
+        $regionLabels = collect($regions)
             ->mapWithKeys(fn (array $region): array => [(string) ($region['value'] ?? '') => (string) ($region['label'] ?? '')])
             ->filter(fn (string $label, string $value): bool => $value !== '')
             ->all();
@@ -519,7 +522,7 @@ class StepWhere extends Component
 
         return view('livewire.servers.create.step-where', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'reachedStep' => $this->currentDraft()?->step ?? 2,
+            'reachedStep' => ($draft = $this->currentDraft()) !== null ? $draft->step : 2,
             'catalog' => $catalog,
             'preflight' => $context['preflight'],
             'provisionOptions' => $context['provisionOptions'],
@@ -527,7 +530,7 @@ class StepWhere extends Component
             'hasLinkedCredential' => $context['hasLinkedCredential'],
             'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
-            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+            'selectedServerRole' => collect($this->provisionOptionList($context['provisionOptions'], 'server_roles'))
                 ->firstWhere('id', $this->form->server_role),
             'roleSizingTip' => $this->roleSizingTip($this->form->server_role),
             'existingProviderServers' => $existingProviderServers,

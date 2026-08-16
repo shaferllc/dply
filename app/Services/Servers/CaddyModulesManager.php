@@ -118,7 +118,7 @@ class CaddyModulesManager
      */
     /**
      * @return list<array<string, mixed>>
-     * @param  array<string, mixed> $installedModules
+     * @param  list<array<string, string>> $installedModules
      */
     public function enrichedManifestPlugins(Server $server, array $installedModules = []): array
     {
@@ -161,8 +161,8 @@ class CaddyModulesManager
     }
 
     /**
-     * @param  array<string, mixed> $moduleIds
-     * @param  array<string, mixed> $installedModuleIds
+     * @param  list $moduleIds
+     * @param  list<string> $installedModuleIds
      */
     public function isPluginCompiled(string $path, array $moduleIds, array $installedModuleIds): bool
     {
@@ -374,8 +374,8 @@ BASH;
      */
     /**
      * @return list<mixed>
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
+     * @param  list<array<string, string>> $installedModules
+     * @param  list<array<string, bool|list<string>|string>> $manifestPlugins
      */
     public function satisfiedPluginPaths(array $manifestPlugins, array $installedModules): array
     {
@@ -399,8 +399,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $manifestPlugins
-     * @param  array<string, mixed> $installedModules
+     * @param  list<array<string, bool|list<string>|string>> $manifestPlugins
+     * @param  list<array<string, string>> $installedModules
      * The catalog is keyed by module path (array_filter preserves keys), so
      * this is a map, not a list.
      *
@@ -431,8 +431,8 @@ BASH;
      */
     /**
      * @return list<mixed>
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
+     * @param  list<array<string, string>> $installedModules
+     * @param  list<array<string, bool|list<string>|string>> $manifestPlugins
      */
     public function browsePackages(array $manifestPlugins, array $installedModules, string $search = ''): array
     {
@@ -524,7 +524,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $plugins
+     * @param  list<array<string, string>> $plugins
      */
     private function persistManifest(Server $server, array $plugins, ?bool $customBinary = null): Server
     {
@@ -556,7 +556,7 @@ BASH;
             return $parts[0].'.'.$parts[1];
         }
 
-        return $parts[0] ?? 'other';
+        return $parts[0];
     }
 
     private function kindFor(string $id): string

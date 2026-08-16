@@ -114,7 +114,7 @@ class Caching extends Component
         }
 
         $organization = auth()->user()->currentOrganization();
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::for($organization)->active($flag)) {
             abort(404);
         }

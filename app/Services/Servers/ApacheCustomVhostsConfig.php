@@ -65,7 +65,7 @@ class ApacheCustomVhostsConfig
             );
         }
 
-        usort($vhosts, fn (array $a, array $b): int => strcmp((string) ($a['slug'] ?? ''), (string) ($b['slug'] ?? '')));
+        usort($vhosts, fn (array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
 
         return ['vhosts' => $vhosts, 'unreadable' => false];
     }
@@ -81,7 +81,7 @@ class ApacheCustomVhostsConfig
         $path = $this->pathForSlug($slug);
 
         foreach ($this->read($server)['vhosts'] as $vhost) {
-            if (($vhost['slug'] ?? '') === $slug) {
+            if ($vhost['slug'] === $slug) {
                 throw new \RuntimeException("A custom vhost `{$slug}` already exists.");
             }
         }
@@ -102,7 +102,7 @@ class ApacheCustomVhostsConfig
 
         $exists = false;
         foreach ($this->read($server)['vhosts'] as $vhost) {
-            if (($vhost['slug'] ?? '') === $slug) {
+            if ($vhost['slug'] === $slug) {
                 $exists = true;
                 break;
             }
@@ -146,9 +146,9 @@ class ApacheCustomVhostsConfig
      */
     public function render(string $slug, array $fields): string
     {
-        $serverName = trim((string) ($fields['server_name'] ?? ''));
+        $serverName = trim((string) $fields['server_name']);
         $aliases = $this->normalizeList($fields['server_aliases'] ?? []);
-        $documentRoot = rtrim(trim((string) ($fields['document_root'] ?? '')), '/');
+        $documentRoot = rtrim(trim((string) $fields['document_root']), '/');
         $phpSocket = trim((string) ($fields['php_socket'] ?? ''));
 
         if ($serverName === '') {
@@ -209,8 +209,8 @@ class ApacheCustomVhostsConfig
         $emit->step('apache-custom-vhosts', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'apache', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'])) {
-            throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'apachectl configtest rejected the new file.')));
+        if (! $result['validate_ok']) {
+            throw new \RuntimeException(trim((string) $result['validate_output']));
         }
 
         $ssh = new SshConnection($server);

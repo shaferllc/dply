@@ -100,7 +100,7 @@ final class NginxConfigGuard
     /**
      * Human-readable summary line for the deploy console / exception message.
      *
-     * @param  array<string, mixed> $foreign
+     * @param  list<string> $foreign
      */
     public function summarize(array $foreign): string
     {

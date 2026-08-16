@@ -64,7 +64,7 @@ trait DeletesBindingResources
             }
             $db?->delete();
 
-            if (($cfg['placement'] ?? '') === 'docker_vm' && $dbVmServerId !== '') {
+            if ($cfg['placement'] === 'docker_vm' && $dbVmServerId !== '') {
                 $vmServer = Server::query()->find($dbVmServerId);
                 if ($vmServer instanceof Server) {
                     app(DeleteServerAction::class)->execute(

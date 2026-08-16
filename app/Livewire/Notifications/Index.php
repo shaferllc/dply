@@ -7,6 +7,8 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\NotificationInboxItem;
 use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -25,7 +27,11 @@ class Index extends Component
     /** Event severity to narrow to ('' = all). */
     public string $severityFilter = '';
 
-    /** Selected item ids for bulk actions. @var array<int, string> */
+    /**
+     * Selected item ids for bulk actions.
+     *
+     * @var list<string>
+     */
     public array $selected = [];
 
     public function updatedFilter(): void
@@ -44,7 +50,10 @@ class Index extends Component
     }
 
     /** Scope every query to the current user's inbox. */
-    private function base()
+    /**
+     * @return Builder<NotificationInboxItem>
+     */
+    private function base(): Builder
     {
         return NotificationInboxItem::query()->where('user_id', auth()->id());
     }
@@ -68,7 +77,7 @@ class Index extends Component
     }
 
     /** Mark-read-on-click, then navigate to the item's deep link. */
-    public function openItem(string $itemId)
+    public function openItem(string $itemId): ?RedirectResponse
     {
         if (! $this->notificationTablesReady()) {
             return null;

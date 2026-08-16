@@ -255,7 +255,7 @@ class WebserverConfigValidator
     /**
      * Walk the candidates and return the first one resolvable on PATH.
      * `command -v` is portable across the shells we care about.
-     * @param  array<string, mixed> $candidates
+     * @param  array<int, string> $candidates
      */
     private function firstAvailableBinary(array $candidates): ?string
     {

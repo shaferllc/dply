@@ -69,14 +69,14 @@ class NginxAccessLogParser
             return $this->rawRow($line);
         }
 
-        [$method, $path, $protocol] = $this->splitRequest($m['request'] ?? '');
+        [$method, $path, $protocol] = $this->splitRequest($m['request']);
 
         return [
             'parsed' => true,
             'raw' => $line,
             'ip' => $this->dashToNull($m['ip']),
             'user' => $this->dashToNull($m['user']),
-            'time' => $this->parseTime($m['time'] ?? ''),
+            'time' => $this->parseTime($m['time']),
             'time_raw' => $m['time'],
             'method' => $method,
             'path' => $path,

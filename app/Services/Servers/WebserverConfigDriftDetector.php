@@ -196,9 +196,6 @@ class WebserverConfigDriftDetector
      */
     private function pathFor(string $engine, Site $site): ?string
     {
-        if (! method_exists($site, 'webserverConfigBasename')) {
-            return null;
-        }
         $basename = (string) $site->webserverConfigBasename();
         if ($basename === '') {
             return null;
@@ -231,7 +228,7 @@ class WebserverConfigDriftDetector
      * Pull on-disk content for every supplied path in one SSH call. Uses
      * a marker scheme so we can split per-file from the combined output.
      *
-     * @param  array<string, mixed> $paths
+     * @param  list<string> $paths
      * @return array<string, string> path → contents
      */
     private function fetchOnDiskContents(Server $server, array $paths): array

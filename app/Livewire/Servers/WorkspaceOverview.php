@@ -374,8 +374,8 @@ class WorkspaceOverview extends Component
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
             && isset($latestMetricSnapshot->payload['cpu_pct']);
-        $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
-            + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
+        $hasBackupSchedule = $backgroundSummary['active_schedules']
+            + $backgroundSummary['paused_schedules'] > 0;
         // An "installed" cache engine is one that's past the install pipeline
         // (running or stopped). Pending/installing/uninstalling/failed rows
         // are mid-flight and don't satisfy the onboarding step yet.
@@ -424,8 +424,9 @@ class WorkspaceOverview extends Component
             $engineRow = $engineRows
                 ->sortByDesc(fn (ServerDatabaseEngine $row) => $row->status === ServerDatabaseEngine::STATUS_RUNNING ? 1 : 0)
                 ->first();
-            $engineKey = $engineRow?->engine
-                ?? (is_string($installedStack->database) && $installedStack->database !== 'none'
+            $engineKey = $engineRow !== null
+                ? $engineRow->engine
+                : (is_string($installedStack->database) && $installedStack->database !== 'none'
                     ? strtolower((string) preg_replace('/\d+$/', '', $installedStack->database))
                     : null);
             $engineLabel = $engineKey !== null
@@ -434,7 +435,7 @@ class WorkspaceOverview extends Component
             $databaseTileData = [
                 'engine' => $engineKey,
                 'engine_label' => $engineLabel,
-                'version' => $engineRow?->version ?? $installedStack->databaseVersion,
+                'version' => $engineRow !== null ? $engineRow->version : $installedStack->databaseVersion,
                 'status' => $engineRow?->status,
                 'database_count' => $databaseSummary['count'],
                 'active_schedules' => $backgroundSummary['active_schedules'],
@@ -477,7 +478,7 @@ class WorkspaceOverview extends Component
                 'cta_route' => route('servers.caches', $this->server),
             ];
         } elseif ($isDatabaseRoleHost) {
-            $engineLabel = $databaseTileData['engine_label'] ?? __('Database engine');
+            $engineLabel = $databaseTileData['engine_label'];
             $onboardingSteps[] = [
                 'key' => 'first_database_engine',
                 'label' => __('Install :engine', ['engine' => $engineLabel]),
@@ -507,7 +508,7 @@ class WorkspaceOverview extends Component
                 'key' => 'first_worker',
                 'label' => __('Start a queue worker'),
                 'help' => __('Run your queue workers and scheduled jobs from the Workers tab.'),
-                'done' => ($backgroundSummary['active_workers'] ?? 0) > 0,
+                'done' => $backgroundSummary['active_workers'] > 0,
                 'cta_label' => __('Open Workers'),
                 'cta_route' => route('servers.workers', $this->server),
             ];
@@ -541,7 +542,7 @@ class WorkspaceOverview extends Component
                 'key' => 'notifications',
                 'label' => __('Hook up notifications'),
                 'help' => __('Get pinged on Slack / email when something this server runs misbehaves.'),
-                'done' => ($notificationSummary['channel_count'] ?? 0) > 0,
+                'done' => $notificationSummary['channel_count'] > 0,
                 'cta_label' => __('Manage'),
                 'cta_route' => $notificationSummary['manage_url'],
             ];
@@ -549,7 +550,7 @@ class WorkspaceOverview extends Component
 
         $onboardingTotal = count($onboardingSteps);
         $onboardingDone = collect($onboardingSteps)->where('done', true)->count();
-        $onboardingComplete = $onboardingTotal > 0 && $onboardingDone === $onboardingTotal;
+        $onboardingComplete = $onboardingDone === $onboardingTotal;
 
         // K8s cluster gone / unreachable. PollDoksClusterStatusJob (and the EKS
         // counterpart) flip the server to STATUS_ERROR and stash a human

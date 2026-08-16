@@ -233,7 +233,7 @@ class CliConsole extends Component
         }
 
         foreach (['/usr/local/bin/node', '/opt/homebrew/bin/node', (string) getenv('HOME').'/.local/bin/node'] as $candidate) {
-            if ($candidate !== '' && is_file($candidate)) {
+            if (is_file($candidate)) {
                 return $candidate;
             }
         }

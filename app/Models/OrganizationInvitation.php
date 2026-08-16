@@ -20,8 +20,8 @@ use Illuminate\Support\Str;
  * @property-read ?Organization $organization
  * @property-read ?Team $team
  * @property-read ?User $inviter
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class OrganizationInvitation extends Model
 {

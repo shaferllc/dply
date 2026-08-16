@@ -45,9 +45,6 @@ final class ResolveKubernetesClusters
 
         $out = [];
         foreach ($clusters as $cluster) {
-            if (! is_array($cluster)) {
-                continue;
-            }
             $id = (string) ($cluster['id'] ?? '');
             $name = (string) ($cluster['name'] ?? '');
             $region = (string) ($cluster['region'] ?? '');

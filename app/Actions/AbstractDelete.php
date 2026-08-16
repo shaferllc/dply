@@ -814,13 +814,11 @@ abstract class AbstractDelete
      */
     protected function storeReversalData($resource, array $additionalData = []): void
     {
-        if (method_exists($this, 'setReversalData')) {
-            $this->setReversalData(array_merge([
-                'resource_id' => $resource->id ?? null,
-                'resource_type' => get_class($resource),
-                'resource_state' => $this->getResourceState($resource),
-            ], $additionalData));
-        }
+        $this->setReversalData(array_merge([
+            'resource_id' => $resource->id ?? null,
+            'resource_type' => get_class($resource),
+            'resource_state' => $this->getResourceState($resource),
+        ], $additionalData));
     }
 
     /**

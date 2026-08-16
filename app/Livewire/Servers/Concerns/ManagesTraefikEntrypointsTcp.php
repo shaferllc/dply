@@ -59,8 +59,8 @@ trait ManagesTraefikEntrypointsTcp
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $name = (string) ($this->traefik_entrypoints_new['name'] ?? '');
-        $address = (string) ($this->traefik_entrypoints_new['address'] ?? '');
+        $name = (string) $this->traefik_entrypoints_new['name'];
+        $address = (string) $this->traefik_entrypoints_new['address'];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik entry point: :name', ['name' => $name]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
@@ -82,7 +82,7 @@ trait ManagesTraefikEntrypointsTcp
         if ($this->currentUserIsDeployer() || ! isset($this->traefik_entrypoints_form[$name])) {
             return;
         }
-        $address = (string) ($this->traefik_entrypoints_form[$name]['address'] ?? '');
+        $address = (string) $this->traefik_entrypoints_form[$name]['address'];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik entry point: :name', ['name' => $name]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
@@ -124,11 +124,11 @@ trait ManagesTraefikEntrypointsTcp
             $result = app(TraefikTcpRoutesConfig::class)->read($this->server);
             $form = [];
             foreach ($result['routes'] as $route) {
-                $slug = (string) ($route['slug'] ?? '');
+                $slug = (string) $route['slug'];
                 $form[$slug] = [
-                    'rule' => (string) ($route['rule'] ?? ''),
-                    'entry_points' => implode(' ', $route['entry_points'] ?? []),
-                    'server_address' => (string) ($route['server_address'] ?? ''),
+                    'rule' => (string) $route['rule'],
+                    'entry_points' => implode(' ', $route['entry_points']),
+                    'server_address' => (string) $route['server_address'],
                 ];
             }
             $this->traefik_tcp_routes_form = $form;
@@ -156,11 +156,11 @@ trait ManagesTraefikEntrypointsTcp
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $slug = (string) ($this->traefik_tcp_routes_new['slug'] ?? '');
+        $slug = (string) $this->traefik_tcp_routes_new['slug'];
         $fields = [
-            'rule' => (string) ($this->traefik_tcp_routes_new['rule'] ?? ''),
-            'entry_points' => (string) ($this->traefik_tcp_routes_new['entry_points'] ?? ''),
-            'server_address' => (string) ($this->traefik_tcp_routes_new['server_address'] ?? ''),
+            'rule' => (string) $this->traefik_tcp_routes_new['rule'],
+            'entry_points' => (string) $this->traefik_tcp_routes_new['entry_points'],
+            'server_address' => (string) $this->traefik_tcp_routes_new['server_address'],
         ];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik TCP route: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
@@ -184,7 +184,7 @@ trait ManagesTraefikEntrypointsTcp
             return;
         }
         $row = $this->traefik_tcp_routes_form[$slug];
-        $fields = ['rule' => (string) ($row['rule'] ?? ''), 'entry_points' => (string) ($row['entry_points'] ?? ''), 'server_address' => (string) ($row['server_address'] ?? '')];
+        $fields = ['rule' => (string) $row['rule'], 'entry_points' => (string) $row['entry_points'], 'server_address' => (string) $row['server_address']];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik TCP route: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {

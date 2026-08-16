@@ -553,7 +553,7 @@ class WebserverConfig extends Component
             ['token' => '{{PHP_FPM_SOCKET}}', 'label' => __('PHP-FPM socket'), 'example' => 'unix///run/php/php'.$phpVersion.'-fpm.sock'],
             ['token' => '{{APP_HOST}}', 'label' => __('Upstream app host'), 'example' => '127.0.0.1'],
             ['token' => '{{APP_PORT}}', 'label' => __('Upstream app port'), 'example' => (string) ($this->site->app_port ?: $this->site->internal_port ?: '3000')],
-            ['token' => '{{SERVER_IP}}', 'label' => __('Server IP'), 'example' => (string) ($this->site->server?->ip_address ?? '')],
+            ['token' => '{{SERVER_IP}}', 'label' => __('Server IP'), 'example' => (string) ($this->site->server->ip_address ?? '')],
         ];
 
         return view('livewire.sites.webserver-config', [

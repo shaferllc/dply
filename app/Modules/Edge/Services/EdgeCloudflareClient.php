@@ -256,7 +256,7 @@ class EdgeCloudflareClient
         $metadata = array_merge(
             [
                 'main_module' => $entryModulePath,
-                'bindings' => array_values($bindings),
+                'bindings' => $bindings,
             ],
             array_intersect_key($metaExtras, array_flip(['compatibility_date', 'compatibility_flags', 'tags'])),
         );
@@ -316,7 +316,7 @@ class EdgeCloudflareClient
      * dispatch script (P10b / Phase 4c). Pass an empty array to
      * clear all schedules.
      *
-     * @param  array<string, mixed>  $schedules  Cron expressions ("0 * * * *")
+     * @param  list<string>  $schedules  Cron expressions ("0 * * * *")
      */
     public function setDispatchScriptSchedules(string $namespace, string $scriptName, array $schedules): void
     {
@@ -509,7 +509,7 @@ class EdgeCloudflareClient
      * Uses Cloudflare GraphQL httpRequestsAdaptiveGroups. Requires Analytics
      * read on the API token and a resolvable zone for worker_zone_name.
      *
-     * @param  array<string, mixed>  $hostnames
+     * @param  list<string>  $hostnames
      * @return Collection<string, EdgeUsageTotals>
      */
     public function fetchHttpUsageByHostnames(

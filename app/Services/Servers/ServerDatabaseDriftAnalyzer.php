@@ -26,7 +26,7 @@ class ServerDatabaseDriftAnalyzer
         $localClickhouse = $server->serverDatabases->where('engine', 'clickhouse')->pluck('name')->sort()->values()->all();
 
         $remoteMysql = [];
-        if (($caps['mysql']) || ($caps['mariadb'])) {
+        if ($caps['mysql'] || $caps['mariadb']) {
             try {
                 $remoteMysql = $this->provisioner->listMysqlDatabaseNames($server);
             } catch (\Throwable) {
@@ -64,23 +64,23 @@ class ServerDatabaseDriftAnalyzer
         $empty = ['only_in_dply' => [], 'only_on_server' => []];
 
         return [
-            'mysql' => ($caps['mysql']) ? [
+            'mysql' => $caps['mysql'] ? [
                 'only_in_dply' => array_values(array_diff($localMysql, $remoteMysql)),
                 'only_on_server' => array_values(array_diff($remoteMysql, $localMysql)),
             ] : $empty,
-            'mariadb' => ($caps['mariadb']) ? [
+            'mariadb' => $caps['mariadb'] ? [
                 'only_in_dply' => array_values(array_diff($localMariadb, $remoteMysql)),
                 'only_on_server' => array_values(array_diff($remoteMysql, $localMariadb)),
             ] : $empty,
-            'postgres' => ($caps['postgres']) ? [
+            'postgres' => $caps['postgres'] ? [
                 'only_in_dply' => array_values(array_diff($localPg, $remotePg)),
                 'only_on_server' => array_values(array_diff($remotePg, $localPg)),
             ] : $empty,
-            'mongodb' => ($caps['mongodb']) ? [
+            'mongodb' => $caps['mongodb'] ? [
                 'only_in_dply' => array_values(array_diff($localMongo, $remoteMongo)),
                 'only_on_server' => array_values(array_diff($remoteMongo, $localMongo)),
             ] : $empty,
-            'clickhouse' => ($caps['clickhouse']) ? [
+            'clickhouse' => $caps['clickhouse'] ? [
                 'only_in_dply' => array_values(array_diff($localClickhouse, $remoteClickhouse)),
                 'only_on_server' => array_values(array_diff($remoteClickhouse, $localClickhouse)),
             ] : $empty,

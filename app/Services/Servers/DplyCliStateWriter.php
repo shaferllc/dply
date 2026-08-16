@@ -126,7 +126,7 @@ class DplyCliStateWriter
                 'webserver_unit' => isset($tags['nginx']) ? 'nginx' : (isset($tags['apache']) ? 'apache2' : (isset($tags['caddy']) ? 'caddy' : null)),
                 'db_unit' => isset($tags['mysql']) ? 'mysql' : (isset($tags['postgres']) ? 'postgresql' : null),
                 'cache_unit' => isset($tags['redis']) ? 'redis-server' : (isset($tags['memcached']) ? 'memcached' : null),
-                'units' => array_values($units),
+                'units' => $units,
                 'log_paths' => $logPaths,
             ],
             'sites' => $sites,

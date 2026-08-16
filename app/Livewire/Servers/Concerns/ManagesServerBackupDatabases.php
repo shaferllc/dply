@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\BackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
-use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Modules\Backups\Services\SiteFileBackupExporter;
+use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseBackupSettings;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Support\Collection;
@@ -26,8 +26,6 @@ use Illuminate\Support\Collection;
  */
 trait ManagesServerBackupDatabases
 {
-
-
     public function saveDatabaseBackupSettings(): void
     {
         $this->authorize('update', $this->server);
@@ -165,7 +163,7 @@ trait ManagesServerBackupDatabases
         $caps = $capabilities->forServer($this->server);
         $targets = [];
 
-        if (($caps['mysql'] ?? false) || ($caps['mariadb'] ?? false)) {
+        if ($caps['mysql'] || $caps['mariadb']) {
             try {
                 foreach ($provisioner->listMysqlDatabaseNames($this->server) as $name) {
                     $targets[] = ['engine' => 'mysql', 'name' => $name];
@@ -175,7 +173,7 @@ trait ManagesServerBackupDatabases
             }
         }
 
-        if ($caps['postgres'] ?? false) {
+        if ($caps['postgres']) {
             try {
                 foreach ($provisioner->listPostgresDatabaseNames($this->server) as $name) {
                     $targets[] = ['engine' => 'postgres', 'name' => $name];

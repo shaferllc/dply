@@ -501,7 +501,7 @@ class SiteProvisioner
             'hostname' => $result['hostname'],
             'url' => $result['url'],
             'error' => $result['error'],
-            'checks' => $result['checks'] ?? [],
+            'checks' => $result['checks'],
         ]);
 
         $this->updateProvisioning($site, [
@@ -665,7 +665,7 @@ class SiteProvisioner
         }
 
         foreach ($reachability['checks'] ?? [] as $check) {
-            if (($check['hostname']) === $previewHostname && ($check['ok'])) {
+            if ($check['hostname'] === $previewHostname && $check['ok']) {
                 return true;
             }
         }

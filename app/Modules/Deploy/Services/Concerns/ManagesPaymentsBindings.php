@@ -87,7 +87,7 @@ trait ManagesPaymentsBindings
                 throw new InvalidArgumentException(__('That saved payments credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return match ($provider) {

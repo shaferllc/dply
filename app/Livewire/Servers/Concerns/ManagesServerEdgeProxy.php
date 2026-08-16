@@ -46,14 +46,14 @@ trait ManagesServerEdgeProxy
         }
 
         if (EdgeProxyWorkspaceViewData::isComingSoonEdgeProxy($target)) {
-            $label = $catalog[$target]['label'] ?? $target;
+            $label = $catalog[$target]['label'];
             $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
 
             return;
         }
 
         if (! in_array($target, EdgeProxyWorkspaceViewData::installableEdgeProxies(), true)) {
-            $label = $catalog[$target]['label'] ?? $target;
+            $label = $catalog[$target]['label'];
             $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
 
             return;
@@ -67,7 +67,7 @@ trait ManagesServerEdgeProxy
 
         $currentEdge = $this->server->edgeProxy();
         $isSwitch = $currentEdge !== null && $currentEdge !== $target;
-        $targetLabel = $catalog[$target]['label'] ?? $target;
+        $targetLabel = $catalog[$target]['label'];
 
         $this->seedQueuedEdgeProxyAction(
             label: $isSwitch

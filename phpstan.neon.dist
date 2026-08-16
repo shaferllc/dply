@@ -3,7 +3,7 @@ includes:
     - phpstan-baseline.neon
 
 parameters:
-    level: 4
+    level: 5
     parseModelCastsMethod: true
     databaseMigrationsPath:
         - database/migrations
@@ -40,10 +40,14 @@ parameters:
         # silently stopped matching — which is why a full run aborted with
         # "Result is incomplete" and reported 0 errors.
         #
-        # Still excluded: DebounceDecorator dispatches App\Jobs\ExecuteDebouncedAction,
-        # a class that exists nowhere. It is the last survivor of the unregistered
-        # ActionServiceProvider layer and should be deleted with the rest.
-        - app/Actions/Decorators/DebounceDecorator.php
+        # Optional Action concerns — opt-in markers, not composed into AsAction.
+        - app/Actions/Concerns/AsABTestable.php
+        - app/Actions/Concerns/AsFeatureFlagged.php
+        - app/Actions/Concerns/WithAttributes.php
+
+        # Edge action facade — workspace sections compose the leaf traits
+        # directly; nothing uses this bundle today.
+        - app/Livewire/Concerns/ManagesEdgeSite.php
 
         # Demo/example scripts that extend base classes which don't exist in the
         # codebase (BaseTask, EnhancedTask, Dply\Tasks\BaseTask) — non-runnable
@@ -53,5 +57,5 @@ parameters:
         - app/Modules/TaskRunner/config/*
 
     # Existing violations are captured in phpstan-baseline.neon so the suite is
-    # green today; new code is held to the level above. Regenerate the baseline
+    # green today; new code is held to level 5. Regenerate the baseline
     # with: composer analyse:baseline

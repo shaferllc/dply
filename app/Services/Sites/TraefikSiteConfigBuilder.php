@@ -111,8 +111,8 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $groups
-     * @param  array<string, mixed> $formGateGroups
+     * @param  array<int, array<string, string>> $groups
+     * @param  array<int, array<string, string>> $formGateGroups
      */
     private function renderMiddlewaresYaml(array $groups, array $formGateGroups, int $backendPort): string
     {
@@ -139,7 +139,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $prefixGroups
+     * @param  list<array<string, string>> $prefixGroups
      */
     private function renderPrefixRoutersYaml(array $prefixGroups, string $basename, string $hostRule): string
     {

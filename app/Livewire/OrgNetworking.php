@@ -52,8 +52,10 @@ class OrgNetworking extends Component
 
     public string $haproxy_server_id = '';
 
+    /** @var list<string> */
     public array $lb_target_server_ids = [];
 
+    /** @var list<array{protocol: string, listen_port: string, destination_port: string}> */
     public array $lb_services = [
         ['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80'],
     ];
@@ -65,11 +67,14 @@ class OrgNetworking extends Component
 
     public string $net_credential_id = '';
 
+    /** @var list<string> */
     public array $net_server_ids = [];
 
     // ── Route form (keyed by network ID) ─────────────────────────────────────
+    /** @var array<string, string> */
     public array $route_destination = [];
 
+    /** @var array<string, string> */
     public array $route_gateway_server = [];
 
     public function setTab(string $tab): void
@@ -85,7 +90,6 @@ class OrgNetworking extends Component
     public function removeLbServiceRow(int $index): void
     {
         array_splice($this->lb_services, $index, 1);
-        $this->lb_services = array_values($this->lb_services);
     }
 
     /** @return array<string,mixed> */
@@ -327,7 +331,11 @@ class OrgNetworking extends Component
         $this->toastSuccess(__('Network deleted.'));
     }
 
-    /** Per-network server picker model (networkId => serverId to attach). */
+    /**
+     * Per-network server picker model (networkId => serverId to attach).
+     *
+     * @var array<string, string>
+     */
     public array $attach_server_id = [];
 
     /**
@@ -460,7 +468,7 @@ class OrgNetworking extends Component
             if ($id && $network->providerCredential) {
                 try {
                     $data = (new HetznerService($network->providerCredential))->getNetwork($id);
-                    $routesByNetwork[$network->id] = $data['routes'] ?? [];
+                    $routesByNetwork[$network->id] = $data['routes'];
                     // Backfill ip_range if we didn't have it.
                     if (! $network->ip_range && filled($data['ip_range'])) {
                         $network->update(['ip_range' => $data['ip_range'], 'name' => $data['name']]);

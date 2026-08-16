@@ -103,9 +103,6 @@ class FirewallRuleTemplateApplicator
         }
 
         $rules = $template->rules;
-        if (! is_array($rules)) {
-            throw new \InvalidArgumentException('Invalid template rules payload.');
-        }
 
         return $this->createRulesFromDefinitions($server, $rules, $user, [
             'template_id' => $template->id,
@@ -114,7 +111,7 @@ class FirewallRuleTemplateApplicator
     }
 
     /**
-     * @param  array<string, mixed> $definitions
+     * @param  list<array<string, bool|int|string>> $definitions
      * @param  array<string, mixed> $auditMeta
      */
     private function createRulesFromDefinitions(Server $server, array $definitions, ?User $user, array $auditMeta, ?ApiToken $apiToken = null): int
@@ -123,9 +120,6 @@ class FirewallRuleTemplateApplicator
         $baseOrder = (int) ($server->firewallRules()->max('sort_order') ?? 0);
 
         foreach ($definitions as $i => $row) {
-            if (! is_array($row)) {
-                continue;
-            }
             $proto = strtolower((string) ($row['protocol'] ?? 'tcp'));
             $port = $row['port'] ?? null;
             if (in_array($proto, ['icmp', 'ipv6-icmp'], true)) {
@@ -187,7 +181,7 @@ class FirewallRuleTemplateApplicator
                 'app_profile' => $appProfile,
                 'iface' => $iface,
                 'iface_direction' => $ifaceDirection,
-                'tags' => is_array($tags) && $tags !== [] ? array_values($tags) : null,
+                'tags' => is_array($tags) && $tags !== [] ? $tags : null,
                 'runbook_url' => isset($row['runbook_url']) && is_string($row['runbook_url']) ? $row['runbook_url'] : null,
                 'port' => $port,
                 'protocol' => (string) ($row['protocol'] ?? 'tcp'),

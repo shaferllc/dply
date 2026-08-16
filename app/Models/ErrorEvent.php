@@ -24,14 +24,14 @@ use Illuminate\Support\Facades\Cache;
  *                      ConsoleActions and SiteDeployments. Append-only; triage is a shared
  *                      {@see $dismissed_at}.
  * @property string $category
- * @property string $detail
+ * @property string|null $detail
  * @property ?Carbon $dismissed_at
  * @property ?string $dismissed_by
  * @property ?string $link_url
  * @property ?Carbon $occurred_at
  * @property ?string $organization_id
- * @property string $reference
- * @property string $remediation_code
+ * @property string|null $reference
+ * @property string|null $remediation_code
  * @property ?string $server_id
  * @property ?string $site_id
  * @property ?string $source_id
@@ -41,8 +41,8 @@ use Illuminate\Support\Facades\Cache;
  * @property-read ?Server $server
  * @property-read ?Site $site
  * @property-read ?User $dismisser
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ErrorEvent extends Model
 {

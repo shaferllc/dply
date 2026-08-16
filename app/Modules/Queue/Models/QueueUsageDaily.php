@@ -24,8 +24,8 @@ use Illuminate\Support\Carbon;
  * @property string $source
  * @property ?array<string, mixed> $meta
  * @property-read ?Organization $organization
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class QueueUsageDaily extends Model
 {

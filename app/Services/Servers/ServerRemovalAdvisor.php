@@ -66,7 +66,6 @@ final class ServerRemovalAdvisor
     public static function willDestroyCloudResource(Server $server): bool
     {
         return filled($server->provider_id)
-            && $server->provider instanceof ServerProvider
             && $server->provider !== ServerProvider::Custom;
     }
 

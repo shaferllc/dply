@@ -36,8 +36,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Server $server
  * @property-read ?ServerRecipe $recipe
  * @property-read ?User $queuedByUser
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerCommandRun extends Model
 {

@@ -91,6 +91,9 @@ class Activity extends Component
      * via {@see AuditActionMeta::family} so the resolver and the query
      * stay in sync (one source of truth for "what counts as `server`").
      */
+    /**
+     * @return LengthAwarePaginator<int, AuditLog>
+     */
     public function getAuditLogsProperty(): LengthAwarePaginator
     {
         // Eager-load the morphTo subject so the subject_summary accessor
@@ -159,6 +162,9 @@ class Activity extends Component
      * Accepts either a {@see Builder} or a {@see HasMany} relation; chains
      * on Eloquent relations stay on the relation object rather than
      * promoting to Builder, so this method has to handle both.
+     */
+    /**
+     * @param  Builder<AuditLog>|HasMany<AuditLog, Organization>  $query
      */
     private function applyFamilyFilter(Builder|HasMany $query, string $family): void
     {

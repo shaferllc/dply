@@ -125,7 +125,7 @@ final class ServerSystemdServiceSnapshotDiff
     {
         $map = [];
         foreach ($rows as $row) {
-            if (! is_array($row) || empty($row['unit'])) {
+            if (empty($row['unit'])) {
                 continue;
             }
             $u = (string) $row['unit'];
@@ -159,6 +159,6 @@ final class ServerSystemdServiceSnapshotDiff
     {
         $u = preg_replace('/\.service$/i', '', $unit) ?? $unit;
 
-        return is_string($u) ? $u : $unit;
+        return $u;
     }
 }

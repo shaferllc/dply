@@ -78,7 +78,7 @@ class EdgeDashboardBindingProvisioner
     private function createD1(EdgeCloudflareClient $client, string $label): string
     {
         foreach ($client->listD1Databases() as $db) {
-            if (is_array($db) && ($db['name'] ?? null) === $label && is_string($db['uuid'] ?? null)) {
+            if (($db['name'] ?? null) === $label && is_string($db['uuid'] ?? null)) {
                 return (string) $db['uuid'];
             }
         }
@@ -95,7 +95,7 @@ class EdgeDashboardBindingProvisioner
     private function createQueue(EdgeCloudflareClient $client, string $label): string
     {
         foreach ($client->listQueues() as $queue) {
-            if (is_array($queue) && ($queue['queue_name'] ?? null) === $label) {
+            if (($queue['queue_name'] ?? null) === $label) {
                 return $label;
             }
         }

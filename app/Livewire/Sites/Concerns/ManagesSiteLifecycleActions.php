@@ -27,7 +27,7 @@ trait ManagesSiteLifecycleActions
             'name' => $siteName,
             'slug' => $this->site->slug,
             'server_id' => (string) $this->site->server_id,
-            'type' => $this->site->type instanceof \BackedEnum ? $this->site->type->value : (string) $this->site->type,
+            'type' => $this->site->type->value,
             'runtime' => $this->site->runtime,
             'git_repository_url' => $this->site->git_repository_url,
         ];

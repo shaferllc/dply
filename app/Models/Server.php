@@ -32,15 +32,15 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property ?Carbon $comped_until
  * @property ?string $health_status
  * @property ?string $hetzner_network_id
- * @property string $hosting_backend
+ * @property string|null $hosting_backend
  * @property ?string $ip_address
  * @property ?Carbon $last_health_check_at
- * @property string $logo_path
+ * @property string|null $logo_path
  * @property ?array<string, mixed> $meta
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $pool_role
- * @property string $private_ip_address
+ * @property string|null $private_ip_address
  * @property ?string $private_network_id
  * @property ServerProvider $provider
  * @property ?string $provider_credential_id
@@ -88,8 +88,8 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property-read Collection<int, ServerProvisionRun> $provisionRuns
  * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
  * @property-read ?PrivateNetwork $privateNetwork
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Server extends Model
 {
@@ -992,7 +992,7 @@ class Server extends Model
         $counts = [];
 
         foreach ($sites as $site) {
-            $type = $site->type instanceof SiteType ? $site->type->value : (string) $site->type;
+            $type = $site->type->value;
             $counts[$type] = ($counts[$type] ?? 0) + 1;
         }
 

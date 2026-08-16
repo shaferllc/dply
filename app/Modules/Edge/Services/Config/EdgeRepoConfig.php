@@ -69,13 +69,13 @@ final class EdgeRepoConfig
     /**
      * @return array{
      *     source_path: string,
-     *     build: array<string, string>,
+     *     build: array{command?: string, output?: string, root?: string, node?: string},
      *     env_files: list<string>,
      *     redirects: list<array{from: string, to: string, status: int}>,
      *     rewrites: list<array{from: string, to: string}>,
      *     headers: list<array{for: string, values: array<string, string>}>,
      *     crons: list<array{schedule: string, handler?: string}>,
-     *     firewall: array<string, mixed>,
+     *     firewall: array{country_mode?: string, countries?: list<string>},
      *     alerts: array<string, mixed>,
      *     origin: array<string, mixed>,
      *     images: array<string, mixed>,
@@ -131,7 +131,7 @@ final class EdgeRepoConfig
     public function cronSchedules(): array
     {
         return array_values(array_filter(array_map(
-            static fn (array $entry): ?string => is_string($entry['schedule']) && $entry['schedule'] !== ''
+            static fn (array $entry): ?string => $entry['schedule'] !== ''
                 ? $entry['schedule']
                 : null,
             $this->crons,

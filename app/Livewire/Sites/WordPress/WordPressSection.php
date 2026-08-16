@@ -146,7 +146,7 @@ class WordPressSection extends Component
             $result = $wpcli->run(
                 site: $this->site,
                 command: $command,
-                args: array_values(array_filter($args ?: [], fn ($a) => is_string($a) && $a !== '')),
+                args: array_values(array_filter($args ?: [], fn ($a) => $a !== '')),
                 queuedBy: auth()->user(),
             );
         } catch (RemoteCliPermissionDeniedException $e) {
@@ -351,12 +351,12 @@ class WordPressSection extends Component
             return;
         }
 
-        $this->themes = array_values(array_map(static fn (array $row): array => [
+        $this->themes = array_map(static fn (array $row): array => [
             'name' => (string) ($row['name'] ?? ''),
             'status' => (string) ($row['status'] ?? ''),
             'version' => (string) ($row['version'] ?? ''),
             'update' => (string) ($row['update'] ?? 'none'),
-        ], $rows));
+        ], $rows);
 
         $this->themesLoaded = true;
     }
@@ -429,13 +429,13 @@ class WordPressSection extends Component
             return;
         }
 
-        $this->users = array_values(array_map(static fn (array $row): array => [
+        $this->users = array_map(static fn (array $row): array => [
             'id' => (string) ($row['ID'] ?? $row['id'] ?? ''),
             'login' => (string) ($row['user_login'] ?? ''),
             'name' => (string) ($row['display_name'] ?? ''),
             'email' => (string) ($row['user_email'] ?? ''),
             'roles' => (string) ($row['roles'] ?? ''),
-        ], $rows));
+        ], $rows);
 
         $this->usersLoaded = true;
     }

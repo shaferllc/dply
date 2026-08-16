@@ -204,18 +204,17 @@ trait AsContext
      *
      * (Shape is described above rather than in the tag: object shapes are not
      * valid PHPDoc syntax for \stdClass.)
-     *
-     * @return \stdClass
      */
     protected function getContext(): \stdClass
     {
         if ($this->context === null) {
+            $request = request();
             $this->context = (object) array_merge([
                 'user' => auth()->user(),
-                'ip' => request()?->ip(),
-                'user_agent' => request()?->userAgent(),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'timestamp' => now(),
-                'request_id' => request()?->header('X-Request-ID'),
+                'request_id' => $request->header('X-Request-ID'),
             ], $this->getContextData());
         }
 

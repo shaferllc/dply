@@ -168,7 +168,7 @@ class DeployConsoleRows
             $activeDeployment = $startingFresh ? null : $latest;
             $gitSha = filled($activeDeployment?->git_sha) ? (string) $activeDeployment->git_sha : null;
             $branch = trim((string) ($peer->git_branch ?? ''));
-            $serverIp = trim((string) ($peer->server?->ip_address ?? ''));
+            $serverIp = trim((string) ($peer->server->ip_address ?? ''));
 
             $rows[] = [
                 'id' => (string) $peer->id,

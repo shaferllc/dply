@@ -78,10 +78,6 @@ final class MarkdownDocRenderer
         $headings = [];
 
         foreach ($document->getElementsByTagName('*') as $element) {
-            if (! $element instanceof \DOMElement) {
-                continue;
-            }
-
             $level = match ($element->tagName) {
                 'h2' => 2,
                 'h3' => 3,
@@ -124,10 +120,6 @@ final class MarkdownDocRenderer
         $usedIds = [];
 
         foreach ($document->getElementsByTagName('*') as $element) {
-            if (! $element instanceof \DOMElement) {
-                continue;
-            }
-
             if (! in_array($element->tagName, ['h1', 'h2', 'h3', 'h4'], true)) {
                 continue;
             }
@@ -232,15 +224,7 @@ final class MarkdownDocRenderer
         $headers = [];
 
         foreach ($table->getElementsByTagName('thead') as $thead) {
-            if (! $thead instanceof \DOMElement) {
-                continue;
-            }
-
             foreach ($thead->getElementsByTagName('tr') as $tr) {
-                if (! $tr instanceof \DOMElement) {
-                    continue;
-                }
-
                 foreach ($tr->getElementsByTagName('th') as $th) {
                     if ($th instanceof \DOMElement) {
                         $headers[] = $this->cellInnerHtml($document, $th);
@@ -254,10 +238,6 @@ final class MarkdownDocRenderer
         }
 
         foreach ($table->getElementsByTagName('tr') as $tr) {
-            if (! $tr instanceof \DOMElement) {
-                continue;
-            }
-
             $firstRowHeaders = [];
 
             foreach ($tr->getElementsByTagName('th') as $th) {
@@ -284,15 +264,7 @@ final class MarkdownDocRenderer
         $rows = [];
 
         foreach ($table->getElementsByTagName('tbody') as $tbody) {
-            if (! $tbody instanceof \DOMElement) {
-                continue;
-            }
-
             foreach ($tbody->getElementsByTagName('tr') as $tr) {
-                if (! $tr instanceof \DOMElement) {
-                    continue;
-                }
-
                 $row = $this->rowCells($document, $tr);
 
                 if ($row !== []) {
@@ -308,10 +280,6 @@ final class MarkdownDocRenderer
         $skippedHeader = false;
 
         foreach ($table->getElementsByTagName('tr') as $tr) {
-            if (! $tr instanceof \DOMElement) {
-                continue;
-            }
-
             if (! $skippedHeader && $tr->getElementsByTagName('th')->length > 0) {
                 $skippedHeader = true;
 
@@ -380,7 +348,7 @@ final class MarkdownDocRenderer
                 return false;
             }
 
-            if ($this->cellPlainText($row[0] ?? '') === '') {
+            if ($this->cellPlainText($row[0]) === '') {
                 return false;
             }
         }

@@ -23,8 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read ?Site $site
  * @property-read ?User $user
  * @property-read ?User $invitedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class EdgeSiteMember extends Model
 {

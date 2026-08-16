@@ -103,10 +103,10 @@ trait ManagesSiteBindingActions
                 (string) $server->provider_credential_id,
                 (string) $server->region,
             );
-            $this->dedicatedVmSizes = collect($catalog['sizes'] ?? [])
+            $this->dedicatedVmSizes = collect($catalog['sizes'])
                 ->map(fn ($s): array => [
-                    'value' => (string) ($s['value'] ?? ''),
-                    'label' => (string) ($s['label'] ?? ($s['value'] ?? '')),
+                    'value' => (string) $s['value'],
+                    'label' => (string) $s['label'],
                 ])
                 ->filter(fn (array $s): bool => $s['value'] !== '')
                 ->values()
@@ -490,8 +490,7 @@ trait ManagesSiteBindingActions
         // the app's composer.json, so add the dependency on the box now (no-op
         // when already present) — the next deploy's composer install picks it up.
         if ($binding->type === 'error_tracking'
-            && (((array) $binding->config)['provider'] ?? '') === 'lookout'
-            && method_exists($this, 'ensureComposerPackage')) {
+            && (((array) $binding->config)['provider'] ?? '') === 'lookout') {
             $this->ensureComposerPackage($binding, 'lookout/tracing');
         }
 
@@ -501,7 +500,7 @@ trait ManagesSiteBindingActions
         // Without them the app (and a test-send) dies with `Class "…HttpClient"
         // not found`. Mirror the Lookout path — add each leg's package on the box
         // now (no-op when present) — so the binding sends instead of fataling.
-        if ($binding->type === 'mail' && method_exists($this, 'ensureComposerPackage')) {
+        if ($binding->type === 'mail') {
             $mailConfig = (array) $binding->config;
             $mailProviders = array_merge(
                 [(string) ($mailConfig['provider'] ?? '')],
@@ -691,8 +690,8 @@ trait ManagesSiteBindingActions
             return;
         }
 
-        $config = is_array($binding->config) ? $binding->config : [];
-        $env = is_array($binding->injected_env) ? $binding->injected_env : [];
+        $config = $binding->config;
+        $env = $binding->injected_env;
 
         $vars = [];
         foreach ($env as $key => $value) {
@@ -852,7 +851,7 @@ trait ManagesSiteBindingActions
                 // site's primary when switching to it.
                 $this->resetCloudflareEmailGuidance();
                 if ($value === 'cloudflare') {
-                    $this->bindingForm['cf_domain'] = (string) ($this->site->primaryDomain()?->hostname ?? '');
+                    $this->bindingForm['cf_domain'] = (string) ($this->site->primaryDomain()->hostname ?? '');
                 }
 
                 // Entering a chain mode seeds two legs; leaving it drops them.

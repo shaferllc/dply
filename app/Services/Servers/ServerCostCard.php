@@ -43,9 +43,9 @@ final class ServerCostCard
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
         $hardware = $this->hardware($server);
-        $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
+        $providerCents = (int) $provider['monthly_usd_cents'];
         $stackCents = $providerCents + $dplyCents;
-        $providerKnown = ($provider['source'] ?? '') !== 'unknown';
+        $providerKnown = ($provider['source']) !== 'unknown';
 
         $nudge = $this->rightSizeNudge($siteCount, $hardware, $capacity);
         $perSiteCents = $siteCount > 0 ? (int) round($stackCents / $siteCount) : null;
@@ -319,9 +319,9 @@ final class ServerCostCard
         if ($nudge !== null) {
             $alerts[] = [
                 'kind' => 'nudge',
-                'severity' => (string) ($nudge['severity'] ?? 'info'),
-                'title' => (string) ($nudge['title'] ?? ''),
-                'message' => (string) ($nudge['message'] ?? ''),
+                'severity' => (string) $nudge['severity'],
+                'title' => (string) $nudge['title'],
+                'message' => (string) $nudge['message'],
                 'action_label' => null,
                 'action_route' => null,
                 'action_anchor' => null,

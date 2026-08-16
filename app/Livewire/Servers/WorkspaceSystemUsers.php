@@ -345,9 +345,9 @@ class WorkspaceSystemUsers extends Component
         return collect($this->remote_rows)
             ->filter(static fn (array $r): bool => ! empty($r['is_orphan'])
                 && empty($r['is_protected'])
-                && (int) ($r['site_count'] ?? 0) === 0
-                && (int) ($r['worker_count'] ?? 0) === 0
-                && (int) ($r['cron_count'] ?? 0) === 0)
+                && $r['site_count'] === 0
+                && $r['worker_count'] === 0
+                && $r['cron_count'] === 0)
             ->pluck('username')
             ->filter()
             ->values()

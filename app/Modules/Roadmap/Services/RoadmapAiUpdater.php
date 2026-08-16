@@ -116,7 +116,7 @@ final class RoadmapAiUpdater
     }
 
     /**
-     * @param  array<string, mixed> $commits
+     * @param  list<array<string, string>> $commits
      * @param  Collection<int, RoadmapSuggestion>  $suggestions
      * @return array<string, mixed>
      */

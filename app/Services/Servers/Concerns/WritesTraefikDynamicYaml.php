@@ -63,9 +63,6 @@ trait WritesTraefikDynamicYaml
         if (is_string($csv)) {
             $csv = preg_split('/[\s,]+/', trim($csv)) ?: [];
         }
-        if (! is_array($csv)) {
-            return [];
-        }
 
         return array_values(array_filter(array_map(static fn ($v): string => trim((string) $v), $csv)));
     }

@@ -63,7 +63,9 @@ class VultrControlPlaneProvisionCommand extends Command
             return self::FAILURE;
         }
 
-        $pubkeyPath = (string) ($this->option('ssh-pubkey') ?: (($_SERVER['HOME'] ?? getenv('HOME') ?: '').'/.ssh/id_ed25519.pub'));
+        $home = $_SERVER['HOME'] ?? getenv('HOME');
+        $home = is_string($home) ? $home : '';
+        $pubkeyPath = (string) ($this->option('ssh-pubkey') ?: $home.'/.ssh/id_ed25519.pub');
         $pubkey = is_readable($pubkeyPath) ? trim((string) file_get_contents($pubkeyPath)) : '';
         if ($pubkey === '') {
             $this->error("SSH public key not readable: {$pubkeyPath}");
@@ -111,7 +113,7 @@ class VultrControlPlaneProvisionCommand extends Command
                 $id = $vultr->createInstance(
                     region: $region,
                     plan: $spec['plan'],
-                    osId: (int) ($spec['os_id'] ?: config('services.vultr.default_os_id', 2284)),
+                    osId: $spec['os_id'],
                     label: $spec['label'],
                     sshKeyIds: [$sshKeyId],
                     vpcIds: [$vpcId],

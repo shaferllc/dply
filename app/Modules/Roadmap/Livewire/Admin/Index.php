@@ -329,7 +329,7 @@ class Index extends Component
 
         $columns[$status] = array_values(array_unique(array_filter(
             $orderedIds,
-            fn (mixed $id): bool => is_string($id) && $id !== '',
+            fn (mixed $id): bool => $id !== '',
         )));
 
         $this->syncRoadmapColumns($columns);
@@ -359,7 +359,7 @@ class Index extends Component
         foreach ($columns as $status => $orderedIds) {
             $orderedIds = array_values(array_unique(array_filter(
                 $orderedIds,
-                fn (mixed $id): bool => is_string($id) && $id !== '',
+                fn (mixed $id): bool => $id !== '',
             )));
 
             foreach ($orderedIds as $index => $id) {

@@ -140,7 +140,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function run(array $command, string $workingDirectory): string
     {

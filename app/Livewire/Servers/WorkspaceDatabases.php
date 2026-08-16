@@ -266,7 +266,7 @@ class WorkspaceDatabases extends Component
                 ->orderByDesc('created_at')
                 ->limit(60)
                 ->get()
-                ->groupBy(fn ($b) => $b->serverDatabase?->engine ?? 'unknown');
+                ->groupBy(fn ($b) => $b->serverDatabase->engine ?? 'unknown');
         }
 
         $orgAllowsCredentialShares = true;

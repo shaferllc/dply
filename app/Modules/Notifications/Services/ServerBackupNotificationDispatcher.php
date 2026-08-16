@@ -3,11 +3,11 @@
 namespace App\Modules\Notifications\Services;
 
 use App\Events\Servers\BackupStatusBroadcast;
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Models\Server;
 use App\Models\User;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Support\ServerBackupNotificationKeys;
 
 /**
@@ -27,8 +27,8 @@ final class ServerBackupNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $resourceLabels  affected backup/schedule labels
-     * @param  array<string, mixed> $extraMetadata  should include `backup_type`
+     * @param  list<string>  $resourceLabels  affected backup/schedule labels
+     * @param  array<string, mixed>  $extraMetadata  should include `backup_type`
      */
     public function notify(
         Server $server,

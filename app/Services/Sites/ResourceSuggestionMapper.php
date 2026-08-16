@@ -160,7 +160,7 @@ class ResourceSuggestionMapper
      */
     /**
      * @return list<array<string, mixed>>
-     * @param  array<string, mixed> $keys
+     * @param  list<string> $keys
      */
     public function forKeys(array $keys): array
     {
@@ -205,7 +205,7 @@ class ResourceSuggestionMapper
      * True when $key equals an exact pattern or starts with a prefix pattern.
      * Patterns ending in `_` are treated as prefixes; everything else is exact.
      *
-     * @param  array<string, mixed> $patterns
+     * @param  list<string> $patterns
      */
     private function keyMatches(string $key, array $patterns): bool
     {

@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property ?string $clickhouse_admin_password
- * @property string $clickhouse_admin_username
+ * @property string|null $clickhouse_admin_username
  * @property ?string $mongodb_admin_password
- * @property string $mongodb_admin_username
+ * @property string|null $mongodb_admin_username
  * @property ?string $mysql_root_password
  * @property string $mysql_root_username
  * @property ?string $postgres_password
@@ -19,8 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $postgres_use_sudo
  * @property ?string $server_id
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerDatabaseAdminCredential extends Model
 {

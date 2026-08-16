@@ -232,7 +232,7 @@ final class ServerDeployPolicyGuard
     }
 
     /**
-     * @param  array<string, mixed> $days
+     * @param  list<string> $days
      */
     public function formatDaysLabel(array $days): string
     {
@@ -262,8 +262,8 @@ final class ServerDeployPolicyGuard
     public function formatRuleSummary(array $rule): string
     {
         $days = ($rule['days'] );
-        $start = (string) ($rule['start'] ?? '');
-        $end = (string) ($rule['end'] ?? '');
+        $start = (string) $rule['start'];
+        $end = (string) $rule['end'];
 
         return $this->formatDaysLabel($days).' · '.$start.'–'.$end;
     }

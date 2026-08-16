@@ -27,7 +27,7 @@ class WorkspaceCliPreview extends Component
 
     // No return type: Livewire swaps the redirector for its own, so this hands
     // back either its Redirector or null.
-    public function mount(Server $server)
+    public function mount(Server $server): mixed
     {
         // The real CLI page shipped — send old teaser links there rather than
         // dead-ending bookmarks on a 404.

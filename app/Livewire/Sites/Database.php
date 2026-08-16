@@ -179,7 +179,7 @@ class Database extends Component
 
         return array_values(array_filter(
             DatabaseWorkspaceEngines::ENGINE_TABS,
-            fn (string $engine): bool => $caps[$engine] ?? false,
+            fn (string $engine): bool => $caps[$engine],
         ));
     }
 
@@ -621,7 +621,7 @@ class Database extends Component
         }
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
-        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+        $filename = ($backup->serverDatabase->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
         try {
             return $downloader->response($backup, $filename);

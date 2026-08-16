@@ -179,7 +179,11 @@ class TelegramWebhookController extends Controller
         });
     }
 
-    /** Groups carry `title`; private chats only have names. */
+    /**
+     * Groups carry `title`; private chats only have names.
+     *
+     * @param  array<string, mixed>  $chat
+     */
     private function chatTitle(array $chat): string
     {
         $title = $chat['title'] ?? null;

@@ -38,12 +38,8 @@ class ServerProviderCostEstimator
     /**
      * Providers we know how to look up prices for.
      */
-    public static function isSupported(?ServerProvider $provider): bool
+    public static function isSupported(ServerProvider $provider): bool
     {
-        if (! $provider instanceof ServerProvider) {
-            return false;
-        }
-
         return in_array($provider, [
             ServerProvider::DigitalOcean,
             ServerProvider::Hetzner,
@@ -77,11 +73,6 @@ class ServerProviderCostEstimator
     public function estimate(Server $server): array
     {
         $provider = $server->provider;
-        if (! $provider instanceof ServerProvider) {
-            throw new ProviderCostUnavailableException(
-                __('This server has no recorded provider, so cost cannot be looked up.')
-            );
-        }
 
         $credential = $this->resolveProviderCredential($server);
         if ($credential === null) {
@@ -379,14 +370,14 @@ class ServerProviderCostEstimator
     }
 
     /**
-     * @param  array<string, mixed>  $rows
+     * @param  array<int, array<string, mixed>>  $rows
      * @param  callable(array<string, mixed>): bool  $predicate
      * @return array<string, mixed>|null
      */
     protected function findFirst(array $rows, callable $predicate): ?array
     {
         foreach ($rows as $row) {
-            if (is_array($row) && $predicate($row)) {
+            if ($predicate($row)) {
                 return $row;
             }
         }

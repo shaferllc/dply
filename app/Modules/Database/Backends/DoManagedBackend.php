@@ -83,10 +83,10 @@ class DoManagedBackend implements DatabaseBackend
         }
 
         $cluster = $service->getDatabaseCluster((string) $database->backend_id);
-        $connection = is_array($cluster['connection'] ?? null) ? $cluster['connection'] : [];
+        $connection = $cluster['connection'];
 
         return [
-            'status' => (string) ($cluster['status'] ?? ''),
+            'status' => (string) $cluster['status'],
             'connection' => $connection,
         ];
     }

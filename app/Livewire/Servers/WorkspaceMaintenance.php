@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\PruneServerOrphanVhostsJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -12,8 +14,6 @@ use App\Livewire\Servers\Concerns\ManagesPreferredMaintenanceSchedule;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
-use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\PruneServerOrphanVhostsJob;
 use App\Models\AuditLog;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -187,7 +187,7 @@ class WorkspaceMaintenance extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -439,7 +439,7 @@ class WorkspaceMaintenance extends Component
      * Recent visitor-maintenance enable/disable events for this server, read
      * from the audit log (already written by ServerMaintenanceWindow).
      *
-     * @return list<array{action: string, label: string, at: \Illuminate\Support\Carbon, by: ?string, detail: ?string, ok: bool}>
+     * @return list<array{action: string, label: string, at: Carbon, by: ?string, detail: ?string, ok: bool}>
      */
     protected function maintenanceHistory(int $limit = 12): array
     {
@@ -486,7 +486,7 @@ class WorkspaceMaintenance extends Component
      * the silent failure mode that can leave a box broken after a maintenance
      * toggle. Surfaced with a one-click re-apply.
      *
-     * @return list<array{site_id: string, name: string, error: string, at: ?\Illuminate\Support\Carbon}>
+     * @return list<array{site_id: string, name: string, error: string, at: ?Carbon}>
      */
     protected function recentApplyFailures(): array
     {
@@ -513,7 +513,9 @@ class WorkspaceMaintenance extends Component
 
         return $latest->map(fn (ConsoleAction $a): array => [
             'site_id' => (string) $a->subject_id,
-            'name' => $names->get((string) $a->subject_id)?->name ?? (string) $a->subject_id,
+            'name' => ($site = $names->get((string) $a->subject_id)) !== null
+                ? $site->name
+                : (string) $a->subject_id,
             'error' => trim((string) ($a->error ?? '')) ?: __('Webserver config apply failed.'),
             'at' => $a->finished_at ?? $a->created_at,
         ])->values()->all();

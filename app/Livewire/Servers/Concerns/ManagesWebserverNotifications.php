@@ -140,13 +140,11 @@ trait ManagesWebserverNotifications
         }
 
         $channel = $sub->channel;
-        if ($channel !== null) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $snapshot = [
             'channel_id' => (string) $sub->notification_channel_id,
-            'channel_label' => $channel?->label,
+            'channel_label' => $channel->label,
             'event_key' => $sub->event_key,
             'scope' => 'webserver',
         ];

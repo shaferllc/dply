@@ -94,7 +94,7 @@ trait ParsesGitRemotes
     }
 
     /**
-     * @param  array<string, mixed> $entries
+     * @param  list<array<string, mixed>> $entries
      * @return list<mixed>
      */
     private function sortEntries(array $entries): array
@@ -111,7 +111,7 @@ trait ParsesGitRemotes
         // redundant array copies per listing at runtime and made PHPStan
         // re-infer the entry shape 32 times over — the whole app/Modules run
         // went from >22min to seconds once this collapsed to a single call.
-        return array_values($entries);
+        return $entries;
     }
 
     private function looksBinary(string $raw): bool

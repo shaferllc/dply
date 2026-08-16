@@ -105,10 +105,10 @@ trait ManagesFeatureNotificationMatrix
             $channels,
         );
 
-        if (($result['changed'] ?? 0) > 0 && $this->server->organization) {
+        if ($result['changed'] > 0 && $this->server->organization) {
             audit_log($this->server->organization, Auth::user(), 'server.notifications.subscriptions_updated', $this->server, null, [
-                'added' => $result['added'] ?? 0,
-                'removed' => $result['removed'] ?? 0,
+                'added' => $result['added'],
+                'removed' => $result['removed'],
                 'surface' => $this->featureNotificationSurface(),
             ]);
         }

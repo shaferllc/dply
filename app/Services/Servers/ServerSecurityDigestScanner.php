@@ -82,8 +82,6 @@ final class ServerSecurityDigestScanner
         $wantRoot = (bool) config('server_settings.inventory_use_root_ssh', true);
         $fallback = (bool) config('server_settings.inventory_fallback_to_deploy_user_ssh', true);
         $candidates = $wantRoot && $deploy !== 'root' ? array_filter(['root', $fallback ? $deploy : null]) : [$deploy];
-        $candidates = array_values(array_filter($candidates));
-
         $lastError = null;
         foreach ($candidates as $loginUser) {
             try {
@@ -158,7 +156,7 @@ final class ServerSecurityDigestScanner
         }
 
         $summary = $report['summary'] ?? [];
-        if (isset($summary['auth_failed_total']) && $summary['auth_failed_total'] !== null) {
+        if (isset($summary['auth_failed_total'])) {
             $lines[] = __('auth.log failures: :count', ['count' => $summary['auth_failed_total']]);
         }
 

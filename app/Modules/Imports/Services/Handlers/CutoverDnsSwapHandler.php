@@ -210,7 +210,7 @@ class CutoverDnsSwapHandler implements StepHandler
         $token = $credential->getApiToken() ?? '';
         $service = new DigitalOceanService($token);
         $created = $service->createDomainRecord($zone, 'A', $relative, $newIp, ttl: 60);
-        $recordId = is_array($created) ? (int) ($created['id'] ?? 0) : 0;
+        $recordId = (int) ($created['id'] ?? 0);
 
         return [
             'zone' => $zone,
@@ -228,7 +228,7 @@ class CutoverDnsSwapHandler implements StepHandler
     {
         $service = new CloudflareDnsService($credential);
         $result = $service->upsertARecord($zone, $relative, $newIp);
-        $recordId = is_array($result) ? (string) ($result['id'] ?? '') : '';
+        $recordId = (string) ($result['id'] ?? '');
 
         return [
             'zone' => $zone,

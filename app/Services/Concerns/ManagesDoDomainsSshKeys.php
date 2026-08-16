@@ -150,10 +150,6 @@ trait ManagesDoDomainsSshKeys
         }
 
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
-
             if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
                 continue;
             }

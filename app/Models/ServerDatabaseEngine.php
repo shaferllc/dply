@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      rows, single-engine servers have one. Exactly one row per server may be
  *                      marked `is_default`; the Site `database_engine` field defaults to that
  *                      unless overridden.
- * @property string $allowed_from
+ * @property string|null $allowed_from
  * @property string $engine
  * @property ?string $error_message
  * @property bool $is_default
@@ -28,8 +28,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property ?string $version
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerDatabaseEngine extends Model
 {

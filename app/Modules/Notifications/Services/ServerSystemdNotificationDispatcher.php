@@ -20,8 +20,8 @@ final class ServerSystemdNotificationDispatcher
      */
     public function notifyIfSubscribed(Server $server, array $event): void
     {
-        $kind = (string) ($event['kind'] ?? '');
-        $unit = (string) ($event['unit'] ?? '');
+        $kind = (string) $event['kind'];
+        $unit = (string) $event['unit'];
         if ($unit === '' || ! in_array($kind, ServerSystemdServiceNotificationKeys::KINDS, true)) {
             return;
         }
@@ -43,7 +43,7 @@ final class ServerSystemdNotificationDispatcher
             return;
         }
 
-        $label = (string) ($event['label'] ?? $unit);
+        $label = (string) $event['label'];
         $detail = isset($event['detail']) && is_string($event['detail']) ? $event['detail'] : null;
         $subject = '['.config('app.name').'] '.$server->name.' — '.$label.' — '.$kind;
         $lines = [
@@ -74,7 +74,7 @@ final class ServerSystemdNotificationDispatcher
 
         $org = $server->organization;
         $digest = $org !== null
-            && ($org->mergedServicesPreferences()['systemd_notifications_digest'] ?? 'immediate') === 'hourly';
+            && $org->mergedServicesPreferences()['systemd_notifications_digest'] === 'hourly';
 
         if ($digest) {
             $bucket = now('UTC')->format('Y-m-d-H');
@@ -97,9 +97,6 @@ final class ServerSystemdNotificationDispatcher
 
         foreach ($subs as $sub) {
             $channel = $sub->channel;
-            if (! $channel instanceof NotificationChannel) {
-                continue;
-            }
             $channel->sendOperationalMessage($subject, $text, $url, __('Open Services'));
         }
     }

@@ -195,7 +195,7 @@ final class ServerAccessMap
         }
         foreach ($accounts as $account) {
             foreach (['sites', 'workers', 'crons'] as $kind) {
-                if (($account[$kind] ?? 0) <= 0 || ! isset($workloadY[$kind])) {
+                if ($account[$kind] <= 0 || ! isset($workloadY[$kind])) {
                     continue;
                 }
                 $edges[] = [

@@ -163,7 +163,7 @@ class ApplyRemediationJob implements ShouldQueue
     /** The script's real exit status from the trailing marker, or null if absent. */
     private function parseExitMarker(string $buffer, string $marker): ?int
     {
-        if (preg_match_all('/'.preg_quote($marker, '/').':(\d+)/', $buffer, $m) && $m[1] !== []) {
+        if (preg_match_all('/'.preg_quote($marker, '/').':(\d+)/', $buffer, $m)) {
             return (int) end($m[1]);
         }
 

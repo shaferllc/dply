@@ -14,18 +14,18 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property array<string, mixed> $aliases
+ * @property array<string, mixed>|null $aliases
  * @property ?string $build_log_path
  * @property int $cf_kv_version
  * @property ?Carbon $failed_at
  * @property ?string $failure_reason
  * @property ?string $git_branch
  * @property ?string $git_commit
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property ?string $organization_id
  * @property ?Carbon $pruned_at
  * @property ?Carbon $published_at
- * @property array<string, mixed> $repo_config
+ * @property array<string, mixed>|null $repo_config
  * @property ?string $site_id
  * @property string $status
  * @property ?string $storage_prefix

@@ -206,7 +206,7 @@ BASH;
     {
         $out = [];
         foreach (self::PARAMS as $key => $meta) {
-            $out[$key] = (string) ($meta['default'] ?? '');
+            $out[$key] = (string) $meta['default'];
         }
 
         return $out;
@@ -259,7 +259,7 @@ BASH;
     {
         $normalized = self::defaultOperatorSettings();
         foreach (self::PARAMS as $key => $meta) {
-            $normalized[$key] = trim((string) ($values[$key] ?? $meta['default'] ?? ''));
+            $normalized[$key] = trim((string) ($values[$key] ?? $meta['default']));
         }
 
         $meta = is_array($server->meta) ? $server->meta : [];

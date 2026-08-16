@@ -68,7 +68,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
             $keyName = 'dply-'.$this->server->name.'-'.Str::random(6);
             $hetznerKey = $hetzner->addSshKey($keyName, $keys['recovery_public_key']);
             $sshKeyId = $hetznerKey['id'] ?? null;
-            if ($sshKeyId === null) {
+            if (! is_int($sshKeyId) && ! is_string($sshKeyId)) {
                 $this->markFailed('Hetzner accepted the SSH key request but returned no id — cannot create server.');
 
                 return;

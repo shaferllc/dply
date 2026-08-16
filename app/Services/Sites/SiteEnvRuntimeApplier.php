@@ -74,7 +74,7 @@ final class SiteEnvRuntimeApplier
         $missing = $this->requiredEnv->evaluateAndRecord($site);
         if (is_array($missing) && $missing !== []) {
             $keys = array_map(
-                static fn ($entry): string => is_array($entry) ? (string) ($entry['key'] ?? '?') : (string) $entry,
+                static fn ($entry): string => (string) $entry['key'],
                 $missing,
             );
             throw new \RuntimeException(
@@ -89,7 +89,7 @@ final class SiteEnvRuntimeApplier
         ), 120);
 
         $restart = $this->pipelineRunner->runManagedRestart($ssh, $site, $active);
-        $log .= (string) ($restart['log'] ?? '');
+        $log .= (string) $restart['log'];
 
         return $log;
     }

@@ -139,7 +139,7 @@ class ServerlessDeployProgress
             $steps[$index] = $entry;
         }
 
-        $deployment->recordPhaseResults(self::PHASE, array_values($steps));
+        $deployment->recordPhaseResults(self::PHASE, $steps);
     }
 
     private function runningDeployment(Site $site): ?SiteDeployment

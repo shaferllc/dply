@@ -19,18 +19,18 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property ?string $log_output
  * @property ?array<string, mixed> $phase_results
  * @property ?string $project_id
- * @property string $release_folder
+ * @property string|null $release_folder
  * @property ?string $resume_of_deployment_id
  * @property ?string $site_id
- * @property string $skip_reason
- * @property string $skip_rule_summary
+ * @property string|null $skip_reason
+ * @property string|null $skip_rule_summary
  * @property string $trigger
  * @property-read ?self $resumeOf
  * @property-read ?Site $site
  * @property-read ?Project $project
  * @property-read ?SiteDeploymentEphemeralCredential $ephemeralCredential
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteDeployment extends Model
 {

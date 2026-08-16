@@ -60,7 +60,7 @@ class TraefikCustomRoutesConfig
             );
         }
 
-        usort($routes, fn (array $a, array $b): int => strcmp((string) ($a['slug'] ?? ''), (string) ($b['slug'] ?? '')));
+        usort($routes, fn (array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
 
         return ['routes' => $routes, 'unreadable' => false];
     }
@@ -74,7 +74,7 @@ class TraefikCustomRoutesConfig
     {
         $slug = $this->normalizeSlug($slug);
         foreach ($this->read($server)['routes'] as $route) {
-            if (($route['slug'] ?? '') === $slug) {
+            if ($route['slug'] === $slug) {
                 throw new \RuntimeException("A custom route `{$slug}` already exists.");
             }
         }
@@ -92,7 +92,7 @@ class TraefikCustomRoutesConfig
         $slug = $this->normalizeSlug($slug);
         $found = false;
         foreach ($this->read($server)['routes'] as $route) {
-            if (($route['slug'] ?? '') === $slug) {
+            if ($route['slug'] === $slug) {
                 $found = true;
                 break;
             }
@@ -126,11 +126,11 @@ class TraefikCustomRoutesConfig
      */
     public function render(string $slug, array $fields): string
     {
-        $hosts = $this->hostsList($fields['hosts'] ?? []);
+        $hosts = $this->hostsList($fields['hosts']);
         if ($hosts === []) {
             throw new \InvalidArgumentException('At least one hostname is required.');
         }
-        $upstream = trim((string) ($fields['upstream'] ?? ''));
+        $upstream = trim((string) $fields['upstream']);
         if ($upstream === '') {
             throw new \InvalidArgumentException('Upstream URL is required (e.g. http://127.0.0.1:3000).');
         }
@@ -197,7 +197,7 @@ YAML;
         $rule = is_array($router) ? (string) ($router['rule'] ?? '') : '';
         $hosts = [];
         if (preg_match_all('/Host\(`([^`]+)`\)/', $rule, $hm) > 0) {
-            $hosts = array_values($hm[1]);
+            $hosts = $hm[1];
         }
 
         $middlewares = is_array($router['middlewares'] ?? null) ? array_values(array_map('strval', $router['middlewares'])) : [];
@@ -272,9 +272,6 @@ YAML;
         if (is_string($hosts)) {
             $hosts = preg_split('/[\s,]+/', trim($hosts)) ?: [];
         }
-        if (! is_array($hosts)) {
-            return [];
-        }
 
         return array_values(array_filter(array_map(static fn ($h): string => trim((string) $h), $hosts)));
     }
@@ -287,9 +284,6 @@ YAML;
     {
         if (is_string($middlewares)) {
             $middlewares = preg_split('/[\s,]+/', trim($middlewares)) ?: [];
-        }
-        if (! is_array($middlewares)) {
-            return [];
         }
 
         return array_values(array_filter(array_map(static fn ($m): string => trim((string) $m), $middlewares)));

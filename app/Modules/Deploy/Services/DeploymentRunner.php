@@ -93,7 +93,7 @@ class DeploymentRunner
     }
 
     /**
-     * @param  array<string, mixed> $steps
+     * @param  list<array<string, mixed>> $steps
      */
     private function phaseOk(array $steps): bool
     {

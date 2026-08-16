@@ -77,7 +77,9 @@ class RunServerCommandJob implements ShouldQueue
             'started_at' => now(),
         ])->save();
 
+        /** @var string $stdout */
         $stdout = '';
+        /** @var string $stderr */
         $stderr = '';
         $lastFlush = microtime(true);
         $dirtyBytes = 0;

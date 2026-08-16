@@ -20,7 +20,7 @@ final class SiteIndexAssembler
     {
         $primary = $site->primaryDomain();
         $detection = $site->resolvedRuntimeAppDetection();
-        $framework = is_array($detection) ? (string) ($detection['framework'] ?? '') : '';
+        $framework = is_array($detection) ? (string) $detection['framework'] : '';
         if ($framework === '' || $framework === 'unknown') {
             $framework = null;
         }
@@ -48,8 +48,8 @@ final class SiteIndexAssembler
             'workspace_id' => $site->workspace_id !== null ? (string) $site->workspace_id : null,
             'workspace_name' => $site->workspace?->name,
             'name' => (string) $site->name,
-            'type' => $site->type instanceof SiteType ? $site->type->value : (string) $site->type,
-            'type_label' => $site->type instanceof SiteType ? $site->type->label() : self::typeLabel((string) $site->type),
+            'type' => $site->type->value,
+            'type_label' => $site->type->label(),
             'runtime' => $site->runtime,
             'runtime_version' => $site->runtime_version,
             'php_version' => $site->phpVersion(),

@@ -37,14 +37,14 @@ use Illuminate\Support\Str;
  * @property ?string $parent_site_id
  * @property string $name
  * @property string $slug
- * @property string $logo_path
+ * @property string|null $logo_path
  * @property SiteType $type
  * @property ?string $document_root
  * @property ?string $repository_path
  * @property ?string $runtime
  * @property ?string $runtime_version
  * @property ?string $database_engine
- * @property ?string $app_port
+ * @property ?int $app_port
  * @property ?string $internal_port
  * @property ?string $build_command
  * @property ?string $start_command
@@ -65,7 +65,7 @@ use Illuminate\Support\Str;
  * @property ?string $post_deploy_command
  * @property ?string $deploy_script_id
  * @property string $deploy_strategy
- * @property string $deploy_method
+ * @property string|null $deploy_method
  * @property int $releases_to_keep  smallint in the schema
  * @property ?string $nginx_extra_raw
  * @property bool $engine_http_cache_enabled
@@ -84,7 +84,7 @@ use Illuminate\Support\Str;
  * @property ?string $container_backend
  * @property ?string $container_backend_id
  * @property ?string $container_region
- * @property string $serverless_backend
+ * @property string|null $serverless_backend
  * @property ?string $serverless_provider_credential_id
  * @property ?string $edge_backend
  * @property ?string $edge_backend_id
@@ -92,8 +92,8 @@ use Illuminate\Support\Str;
  * @property ?array<string, mixed> $meta
  * @property ?string $dns_provider_credential_id
  * @property ?string $dns_zone
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?string $php_version
  * @property-read int $code_action_count
  */
@@ -285,6 +285,7 @@ class Site extends Model
             'env_file_content' => 'encrypted',
             'env_synced_at' => 'datetime',
             'meta' => 'array',
+            'app_port' => 'integer',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
             'engine_http_cache_enabled' => 'boolean',

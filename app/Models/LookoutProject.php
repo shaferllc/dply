@@ -29,9 +29,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property ?int $retention_days
  * @property ?string $error_message
- * @property array<string, mixed> $meta
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property array<string, mixed>|null $meta
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read ?Organization $organization
  */
 class LookoutProject extends Model

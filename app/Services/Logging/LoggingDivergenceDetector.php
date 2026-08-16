@@ -122,8 +122,8 @@ final class LoggingDivergenceDetector
     }
 
     /**
-     * @param  array<string, mixed> $nonStock
-     * @param  array<string, mixed> $retyped
+     * @param  list<string> $nonStock
+     * @param  list<string> $retyped
      * @return array{customized: bool, verified: bool, non_stock_channels: list<string>, retyped_channels: list<string>, default_changed: bool, message: string}
      */
     private function result(bool $customized, bool $verified, array $nonStock, array $retyped, bool $defaultChanged, string $message): array
@@ -131,8 +131,8 @@ final class LoggingDivergenceDetector
         return [
             'customized' => $customized,
             'verified' => $verified,
-            'non_stock_channels' => array_values($nonStock),
-            'retyped_channels' => array_values($retyped),
+            'non_stock_channels' => $nonStock,
+            'retyped_channels' => $retyped,
             'default_changed' => $defaultChanged,
             'message' => $message,
         ];

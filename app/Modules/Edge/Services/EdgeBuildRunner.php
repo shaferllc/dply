@@ -13,7 +13,7 @@ use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use App\Services\DeployContract\DeployContractPolicyLoader;
-use Illuminate\Process\ProcessResult;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -210,7 +210,7 @@ class EdgeBuildRunner
                     $repoArr['contract'] = $contract;
                     $this->appendBuildLog($buildLog, "[dply-contract] Loaded promote requirements from repo.\n");
                 }
-                $yamlBindings = is_array($repoArr['bindings'] ?? null) ? $repoArr['bindings'] : [];
+                $yamlBindings = $repoArr['bindings'];
 
                 // Merge dply.yaml `bindings:` + wrangler.toml discoveries.
                 // Both are co-equal declarative sources; on conflict
@@ -218,7 +218,7 @@ class EdgeBuildRunner
                 // typically more current for Workers projects).
                 $merged = $yamlBindings;
                 foreach ($wranglerBindings as $kind => $entries) {
-                    if (! is_array($entries) || $entries === []) {
+                    if ($entries === []) {
                         continue;
                     }
                     $existing = is_array($merged[$kind] ?? null) ? $merged[$kind] : [];
@@ -241,9 +241,6 @@ class EdgeBuildRunner
                     }
                 }
                 foreach ($wranglerBindings as $kind => $entries) {
-                    if (! is_array($entries)) {
-                        continue;
-                    }
                     foreach ($entries as $bindingName => $value) {
                         $this->appendBuildLog($buildLog, "[bindings] wrangler.toml: {$kind}.{$bindingName} → '{$value}'\n");
                     }
@@ -278,9 +275,6 @@ class EdgeBuildRunner
                 // consumers (host map publisher) don't need filesystem
                 // access. Skip + warn when the file is missing.
                 foreach (['error_pages', 'maintenance'] as $section) {
-                    if (! is_array($repoArr[$section] ?? null)) {
-                        continue;
-                    }
                     foreach (['html_404_path' => 'html_404', 'html_500_path' => 'html_500', 'html_path' => 'html'] as $pathKey => $htmlKey) {
                         if (! isset($repoArr[$section][$pathKey])) {
                             continue;
@@ -317,9 +311,6 @@ class EdgeBuildRunner
                         ],
                     ]);
                     foreach ($wranglerBindings as $kind => $entries) {
-                        if (! is_array($entries)) {
-                            continue;
-                        }
                         foreach ($entries as $bindingName => $value) {
                             $this->appendBuildLog($buildLog, "[bindings] Discovered wrangler.toml: {$kind}.{$bindingName} → '{$value}'\n");
                         }
@@ -375,9 +366,6 @@ class EdgeBuildRunner
                 $envPublic = is_array($repoConfig->env['public'] ?? null) ? $repoConfig->env['public'] : [];
                 $addedPublic = 0;
                 foreach ($envPublic as $k => $v) {
-                    if (! is_string($k) || ! is_string($v)) {
-                        continue;
-                    }
                     if (array_key_exists($k, $env)) {
                         continue; // dashboard wins
                     }
@@ -396,9 +384,6 @@ class EdgeBuildRunner
                     $dashKnown = array_flip(array_keys($env));
                     $missing = [];
                     foreach ($envSecretNames as $name) {
-                        if (! is_string($name)) {
-                            continue;
-                        }
                         if (! isset($dashKnown[$name])) {
                             $missing[] = $name;
                         }
@@ -640,10 +625,10 @@ class EdgeBuildRunner
                 'git_commit_at' => $commitDetails['committed_at'] ?? null,
             ];
 
-            if (($middlewareBundle['bundled']) === true) {
+            if ($middlewareBundle['bundled'] === true) {
                 $result['middleware_modules'] = $middlewareBundle['modules'];
-                $result['middleware_entry_module'] = (string) ($middlewareBundle['entry_module'] ?? 'middleware.js');
-                $result['middleware_source_path'] = (string) ($middlewareBundle['source_path'] ?? '');
+                $result['middleware_entry_module'] = (string) $middlewareBundle['entry_module'];
+                $result['middleware_source_path'] = (string) $middlewareBundle['source_path'];
             }
 
             if ($cacheAsync !== null) {

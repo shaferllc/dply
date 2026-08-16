@@ -32,6 +32,9 @@ class NotificationChannels extends Component
         return $this->team;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function notificationChannelsViewData(): array
     {
         return [

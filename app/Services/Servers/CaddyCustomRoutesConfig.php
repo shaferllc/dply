@@ -67,7 +67,7 @@ class CaddyCustomRoutesConfig
             );
         }
 
-        usort($routes, fn (array $a, array $b): int => strcmp((string) ($a['slug'] ?? ''), (string) ($b['slug'] ?? '')));
+        usort($routes, fn (array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
 
         return ['routes' => $routes, 'unreadable' => false];
     }
@@ -83,7 +83,7 @@ class CaddyCustomRoutesConfig
         $path = $this->pathForSlug($slug);
 
         foreach ($this->read($server)['routes'] as $route) {
-            if (($route['slug'] ?? '') === $slug) {
+            if ($route['slug'] === $slug) {
                 throw new \RuntimeException("A custom route `{$slug}` already exists.");
             }
         }
@@ -104,7 +104,7 @@ class CaddyCustomRoutesConfig
 
         $exists = false;
         foreach ($this->read($server)['routes'] as $route) {
-            if (($route['slug'] ?? '') === $slug) {
+            if ($route['slug'] === $slug) {
                 $exists = true;
                 break;
             }
@@ -148,9 +148,9 @@ class CaddyCustomRoutesConfig
      */
     public function render(Server $server, string $slug, array $fields): string
     {
-        $hosts = $this->normalizeList($fields['hosts'] ?? []);
-        $root = trim((string) ($fields['root'] ?? ''));
-        $upstream = trim((string) ($fields['upstream'] ?? ''));
+        $hosts = $this->normalizeList($fields['hosts']);
+        $root = trim((string) $fields['root']);
+        $upstream = trim((string) $fields['upstream']);
         $upstream = $this->resolvePhpUpstream($server, $upstream);
 
         if ($hosts === []) {
@@ -202,8 +202,8 @@ class CaddyCustomRoutesConfig
         $emit->step('caddy-custom-routes', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'caddy', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'])) {
-            throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'caddy validate rejected the new file.')));
+        if (! $result['validate_ok']) {
+            throw new \RuntimeException(trim((string) $result['validate_output']));
         }
 
         $ssh = new SshConnection($server);

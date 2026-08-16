@@ -63,7 +63,7 @@ final class ServerSystemdInventoryRecorder
             // constraint, so emitting duplicates here would blow up the insert.
             $rows[$u] = [
                 'unit' => $u,
-                'label' => is_string($label) ? $label : $u,
+                'label' => $label,
                 'active' => $act,
                 'sub' => $sub,
                 'ts' => $ts,

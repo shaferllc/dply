@@ -76,9 +76,14 @@ class WorkspaceWorkerPool extends Component
 
     public bool $cr_ack_secrets = false;
 
-    /** Loaded region/size catalog for the chosen provider+credential (empty → text fallback). */
+    /**
+     * Loaded region/size catalog for the chosen provider+credential (empty → text fallback).
+     *
+     * @var list<array<string, mixed>>
+     */
     public array $cr_regions = [];
 
+    /** @var list<array<string, mixed>> */
     public array $cr_sizes = [];
 
     // Autoscale config

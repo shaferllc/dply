@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Gate;
  *  - `webhook` — the original pasted incoming-webhook URL. Kept as a first-class
  *                option, not a legacy path: self-hosters without a registered
  *                Slack app depend on it, and existing rows must keep working.
+ *
+ * @mixin DispatchesToastNotifications
  */
 trait ResolvesSlackWorkspaces
 {
@@ -240,9 +242,7 @@ trait ResolvesSlackWorkspaces
             ], null);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Slack workspace ":team" disconnected.', ['team' => $teamName]));
-        }
+        $this->toastSuccess(__('Slack workspace ":team" disconnected.', ['team' => $teamName]));
     }
 
     /**
@@ -259,7 +259,7 @@ trait ResolvesSlackWorkspaces
             $this->{$prefix.'slack_mode'} = 'oauth';
             if ((string) $this->{$prefix.'slack_installation_id'} === '') {
                 $first = $this->slackInstallations()->first();
-                $this->{$prefix.'slack_installation_id'} = $first instanceof SlackInstallation ? (string) $first->id : '';
+                $this->{$prefix.'slack_installation_id'} = (string) $first->id;
             }
 
             return;

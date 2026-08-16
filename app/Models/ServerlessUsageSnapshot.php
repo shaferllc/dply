@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  *                      billing month to compute the metered usage charge on top of the flat fee.
  * @property int $gib_seconds
  * @property int $invocations
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property ?string $organization_id
  * @property Carbon $period_end
  * @property Carbon $period_start
@@ -24,8 +24,8 @@ use Illuminate\Support\Carbon;
  * @property string $source
  * @property-read ?Organization $organization
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerlessUsageSnapshot extends Model
 {

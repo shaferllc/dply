@@ -304,21 +304,21 @@ class DeployScript extends Component
 
         foreach (DeployPipelinePalette::stepCatalogFor($this->site) as $group) {
             foreach ($group['entries'] as $entry) {
-                if (! ($entry['visible'] ?? true)) {
+                if (! $entry['visible']) {
                     continue;
                 }
                 $cmd = $entry['command_preview'] ?? null;
                 if (! is_string($cmd) || trim($cmd) === '') {
                     continue;
                 }
-                $phase = (string) ($entry['phase'] ?? 'build');
+                $phase = (string) $entry['phase'];
                 if (! array_key_exists($phase, $byPhase)) {
                     continue;
                 }
                 $byPhase[$phase][] = [
                     'label' => (string) $entry['label'],
                     'command' => $cmd,
-                    'group' => (string) ($group['label'] ?? ''),
+                    'group' => (string) $group['label'],
                 ];
             }
         }

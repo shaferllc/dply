@@ -86,7 +86,7 @@ trait ManagesGitProviderTokens
      * what to fix. The biggest footgun is a fine-grained GitHub PAT without
      * "Read access to profile information" — the most common shape.
      *
-     * @param  array{profile: array|null, status: int|null, message: string|null}  $result
+     * @param  array{profile: array<string, mixed>|null, status: int|null, message: string|null}  $result
      */
     private function describePatRejection(string $provider, array $result): string
     {

@@ -286,9 +286,9 @@ class PlatformPanel extends Component
         $this->consoleResult = [
             'ok' => $result['ok'],
             'error' => $result['error'],
-            'success' => $invocation?->success ?? false,
+            'success' => $invocation->success ?? false,
             'status' => $invocation?->status_code,
-            'duration' => $invocation?->duration_ms ?? 0,
+            'duration' => $invocation->duration_ms ?? 0,
             'logs' => $invocation?->logLines() ?? [],
             'excerpt' => $invocation?->result_excerpt,
         ];
@@ -410,7 +410,7 @@ class PlatformPanel extends Component
     /**
      * Toast an OpenWhisk result; returns whether it succeeded.
      *
-     * @param  array{ok: bool, error: ?string, data: mixed}  $result
+     * @param  array{ok: bool, error: ?string, data?: mixed}  $result
      */
     private function toast(array $result, string $successMessage): bool
     {

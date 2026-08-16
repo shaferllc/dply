@@ -272,7 +272,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * @return list<string>
      */
     /**
-     * @param  array<string, mixed> $shadowedNames
+     * @param  list<string> $shadowedNames
      */
     protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
     {
@@ -494,7 +494,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * Stat a set of paths on the box in one round trip.
      *
-     * @param  array<string, mixed> $paths
+     * @param  array<int, string> $paths
      * @return array<string, bool>
      */
     protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array

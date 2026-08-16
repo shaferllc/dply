@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\Gate;
  *  - `connected` — points at a {@see TelegramInstallation} discovered this way.
  *  - `manual`    — the original pasted bot token + chat ID, still first-class
  *                  for self-hosters who never registered a bot with us.
+ *
+ * @mixin DispatchesToastNotifications
  */
 trait ResolvesTelegramChats
 {
@@ -118,7 +120,7 @@ trait ResolvesTelegramChats
             return $me['ok'] ? $me['username'] : '';
         });
 
-        return is_string($cached) ? $cached : '';
+        return $cached;
     }
 
     /**
@@ -135,9 +137,7 @@ trait ResolvesTelegramChats
 
         $username = $this->telegramBotUsername();
         if ($username === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Could not reach Telegram to identify the dply bot. Check the bot token on this deployment.'));
-            }
+            $this->toastError(__('Could not reach Telegram to identify the dply bot. Check the bot token on this deployment.'));
 
             return;
         }
@@ -193,9 +193,7 @@ trait ResolvesTelegramChats
         if ($token->consumed_at === null) {
             if ($token->expires_at->isPast()) {
                 $this->cancelTelegramConnect();
-                if (method_exists($this, 'toastError')) {
-                    $this->toastError(__('That Telegram link expired before a chat was picked. Try connecting again.'));
-                }
+                $this->toastError(__('That Telegram link expired before a chat was picked. Try connecting again.'));
             }
 
             return;
@@ -211,9 +209,7 @@ trait ResolvesTelegramChats
             $this->new_telegram_mode = 'connected';
             $this->new_telegram_installation_id = (string) $installation->id;
 
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('Connected to ":chat".', ['chat' => $installation->chat_title]));
-            }
+            $this->toastSuccess(__('Connected to ":chat".', ['chat' => $installation->chat_title]));
         }
 
         $this->cancelTelegramConnect();
@@ -256,11 +252,9 @@ trait ResolvesTelegramChats
             ], null);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Telegram chat ":chat" disconnected. Remove the dply bot in Telegram to fully revoke it.', [
-                'chat' => $chatTitle,
-            ]));
-        }
+        $this->toastSuccess(__('Telegram chat ":chat" disconnected. Remove the dply bot in Telegram to fully revoke it.', [
+            'chat' => $chatTitle,
+        ]));
     }
 
     protected function syncTelegramModeDefault(string $prefix = 'new_'): void
@@ -271,7 +265,7 @@ trait ResolvesTelegramChats
             $this->{$prefix.'telegram_mode'} = 'connected';
             if ((string) $this->{$prefix.'telegram_installation_id'} === '') {
                 $first = $installations->first();
-                $this->{$prefix.'telegram_installation_id'} = $first instanceof TelegramInstallation ? (string) $first->id : '';
+                $this->{$prefix.'telegram_installation_id'} = (string) $first->id;
             }
 
             return;

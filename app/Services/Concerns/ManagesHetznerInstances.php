@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
-
-
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -13,8 +11,6 @@ namespace App\Services\Concerns;
  */
 trait ManagesHetznerInstances
 {
-
-
     /**
      * Register an SSH public key in the Hetzner project. Returns key array with id.
      *
@@ -49,12 +45,9 @@ trait ManagesHetznerInstances
     /**
      * Create a new server (instance) and return its ID.
      *
-     * @param  array<string, mixed> $sshKeyIds  Hetzner SSH key IDs or names
-     */
-    /**
-     * @param  array<string, mixed> $sshKeyIds  Hetzner SSH key IDs or names
-     * @param  array<string, mixed> $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
-     * @param  array<string, mixed> $labels  Hetzner labels (key/value), e.g. ProviderResourceTags::labels()
+     * @param  list<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
+     * @param  list<int|string>  $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
+     * @param  array<string, string>  $labels  Hetzner labels (key/value), e.g. ProviderResourceTags::labels()
      */
     public function createInstance(
         string $name,
@@ -85,7 +78,7 @@ trait ManagesHetznerInstances
         if ($firewallIds !== []) {
             $body['firewalls'] = array_map(
                 static fn ($id) => ['firewall' => (int) $id],
-                array_values($firewallIds)
+                $firewallIds
             );
         }
         if ($networkId !== null) {
@@ -212,7 +205,7 @@ trait ManagesHetznerInstances
      * locations (usable to create servers in any region). Returns
      * ['action' => <action>, 'image_id' => <int>].
      *
-     * @param  array<string, mixed> $labels
+     * @param  array<string, mixed>  $labels
      * @return array{action: array<string, mixed>, image_id: int}
      */
     public function createImageFromServer(int $id, string $description, array $labels = []): array

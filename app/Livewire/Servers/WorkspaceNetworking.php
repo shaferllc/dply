@@ -57,23 +57,27 @@ class WorkspaceNetworking extends Component
     /** @var list<string> */
     public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
 
-    /** @var 'servers'|'access'|'attached'|'routes'|'notifications' */
     #[Url(as: 'tab', except: 'servers', history: true)]
     public string $networking_tab = 'servers';
 
     /** CIDR inputs keyed by database ID. */
+    /** @var array<string, string> */
     public array $db_networking_allowed_from = [];
 
     /** Selected jump-host server ID per database ID (jump-host access helper). */
+    /** @var array<string, string> */
     public array $db_jump_host = [];
 
     /** Chosen local tunnel port per database ID (jump-host access helper). */
+    /** @var array<string, string> */
     public array $db_jump_local_port = [];
 
     /** Network ID inputs keyed by server ID (for attach-to-network forms). */
+    /** @var array<string, string> */
     public array $attach_network_id = [];
 
     /** Available Hetzner networks for the attach dropdown — loaded on demand. */
+    /** @var list<array<string, mixed>> */
     public array $hetzner_networks = [];
 
     public bool $hetzner_networks_loading = false;
@@ -84,9 +88,11 @@ class WorkspaceNetworking extends Component
     public string $new_network_ip_range = '10.0.0.0/8';
 
     /** dply Server IDs to attach when creating a new network. */
+    /** @var list<string> */
     public array $new_network_server_ids = [];
 
     /** CIDR inputs keyed by cache service ID (for inline cache expose form). */
+    /** @var array<string, string> */
     public array $cache_networking_allowed_from = [];
 
     // ── Network routes ────────────────────────────────────────────────────────
@@ -158,7 +164,7 @@ class WorkspaceNetworking extends Component
             ? $this->server
             : Server::query()->where('organization_id', $this->server->organization_id)->find($serverId);
 
-        if (! $target || ! ($target->provider?->supportsPrivateIpLookup() ?? false)) {
+        if (! $target || ! $target->provider->supportsPrivateIpLookup()) {
             $this->toastError(__('Server not found or its provider does not support private IP lookup.'));
 
             return;
@@ -645,7 +651,7 @@ class WorkspaceNetworking extends Component
                 try {
                     $hetzner = new HetznerService($credential);
                     $networkInfo = $hetzner->getNetwork($networkId);
-                    $networkRoutes = $networkInfo['routes'] ?? [];
+                    $networkRoutes = $networkInfo['routes'];
                 } catch (\Throwable) {
                     // API unavailable — show empty routes, don't crash the page.
                 }

@@ -46,7 +46,7 @@ class ServerSystemUserService
                 'uid' => $u->uid,
                 'home' => (string) $u->home,
                 'shell' => (string) $u->shell,
-                'groups' => (array_values($u->groups) ),
+                'groups' => (array_values($u->groups)),
             ])
             ->all();
 
@@ -54,7 +54,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
     private function persistSystemUsers(Server $server, array $details): void
     {
@@ -90,7 +90,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $details
+     * @param  array<int, array<string, int|list<mixed>|string|null>>  $details
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
@@ -155,7 +155,7 @@ class ServerSystemUserService
      * /system-users page; the site-level "Create user" path is gone — sites
      * pick from the existing-users dropdown via {@see assignExistingUserToSite()}.
      *
-     * @param  array<string, mixed> $extraGroups  supplementary groups (e.g. www-data)
+     * @param  list<string>  $extraGroups  supplementary groups (e.g. www-data)
      *
      * @throws \RuntimeException
      */
@@ -282,7 +282,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $extraGroups
+     * @param  list<string>  $extraGroups
      */
     private function createUserIfMissing(Server $server, string $username, bool $grantSudo, string $shell, array $extraGroups): void
     {

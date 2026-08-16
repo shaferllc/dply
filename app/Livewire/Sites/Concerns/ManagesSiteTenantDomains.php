@@ -278,7 +278,7 @@ trait ManagesSiteTenantDomains
                 continue;
             }
             $parts = array_map('trim', explode(',', $line, 3));
-            $hostname = strtolower($parts[0] ?? '');
+            $hostname = strtolower($parts[0]);
             $key = $parts[1] ?? null;
             $label = $parts[2] ?? null;
             if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
@@ -361,7 +361,7 @@ trait ManagesSiteTenantDomains
         }
 
         $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
-        if (! ($reachability['ok'] ?? false) && empty($reachability['behind_cloudflare'])) {
+        if (! $reachability['ok'] && empty($reachability['behind_cloudflare'])) {
             $this->toastError($reachability['error']
                 ?? __('“:host” isn’t pointed at this server yet — point its DNS here, then request SSL.', ['host' => $hostname]));
 

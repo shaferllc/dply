@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * @property string $allowed_from
+ * @property string|null $allowed_from
  * @property ?string $description
  * @property string $engine
  * @property string $host
@@ -29,8 +29,8 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, ServerDatabaseExtraUser> $extraUsers
  * @property-read Collection<int, ServerDatabaseCredentialShare> $credentialShares
  * @property-read Collection<int, ServerDatabaseBackup> $backups
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerDatabase extends Model
 {

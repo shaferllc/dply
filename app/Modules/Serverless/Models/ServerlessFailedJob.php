@@ -29,8 +29,8 @@ use Illuminate\Support\Str;
  * @property ?string $exception_excerpt
  * @property ?Carbon $retried_at
  * @property ?Carbon $failed_at
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?Site $site
  */
 class ServerlessFailedJob extends Model

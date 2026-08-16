@@ -11,7 +11,6 @@ use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
 use DateTimeZone;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +47,7 @@ class Hub extends Component
      * Replaced in mount() by defaultInsightsState()/insightsStateFromOrg(); the
      * literal here just has to satisfy the declared shape.
      *
-     * @var array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     * @var array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int, allow_config_mutation: bool}
      */
     public array $organizationInsights = [
         'digest_non_critical' => false,
@@ -56,6 +55,7 @@ class Hub extends Component
         'quiet_hours_enabled' => false,
         'quiet_hours_start' => 22,
         'quiet_hours_end' => 7,
+        'allow_config_mutation' => true,
     ];
 
     /** @var array<string, mixed> */
@@ -183,7 +183,7 @@ class Hub extends Component
 
         // The Servers & Sites tab reads the user's timezone as a label —
         // keep its local string in sync after a profile save.
-        $this->profileTimezone = $user->fresh()?->timezone ?? config('app.timezone');
+        $this->profileTimezone = $user->fresh()->timezone ?? config('app.timezone');
 
         $this->toastSuccess(__('Profile details saved.'));
         $this->dispatch('profile-updated');
@@ -207,7 +207,7 @@ class Hub extends Component
     public function sendVerificationEmail(): void
     {
         $user = $this->authUser();
-        if (! $user || ! ($user instanceof MustVerifyEmail) || $user->hasVerifiedEmail()) {
+        if (! $user || $user->hasVerifiedEmail()) {
             return;
         }
         $user->sendEmailVerificationNotification();
@@ -304,7 +304,7 @@ class Hub extends Component
     }
 
     /**
-     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int, allow_config_mutation: bool}
      */
     protected function defaultInsightsState(): array
     {
@@ -327,17 +327,15 @@ class Hub extends Component
     protected function insightsStateFromOrg(Organization $org): array
     {
         $m = $org->mergedInsightsPreferences();
-        $freq = ($m['digest_frequency'] ?? 'daily') === 'weekly' ? 'weekly' : 'daily';
+        $freq = $m['digest_frequency'] === 'weekly' ? 'weekly' : 'daily';
 
         return [
-            'digest_non_critical' => (bool) ($m['digest_non_critical'] ?? false),
+            'digest_non_critical' => $m['digest_non_critical'],
             'digest_frequency' => $freq,
-            'quiet_hours_enabled' => (bool) ($m['quiet_hours_enabled'] ?? false),
-            'quiet_hours_start' => (int) ($m['quiet_hours_start'] ?? 22),
-            'quiet_hours_end' => (int) ($m['quiet_hours_end'] ?? 7),
-            'allow_config_mutation' => array_key_exists('allow_config_mutation', $m)
-                ? (bool) $m['allow_config_mutation']
-                : true,
+            'quiet_hours_enabled' => $m['quiet_hours_enabled'],
+            'quiet_hours_start' => $m['quiet_hours_start'],
+            'quiet_hours_end' => $m['quiet_hours_end'],
+            'allow_config_mutation' => (bool) ($m['allow_config_mutation'] ?? true),
         ];
     }
 
@@ -423,16 +421,13 @@ class Hub extends Component
         ]);
 
         $stored = $org->insights_preferences ?? [];
-        if (! is_array($stored)) {
-            $stored = [];
-        }
 
-        $stored['digest_non_critical'] = (bool) ($this->organizationInsights['digest_non_critical'] ?? false);
-        $stored['digest_frequency'] = ($this->organizationInsights['digest_frequency'] ?? 'daily') === 'weekly' ? 'weekly' : 'daily';
-        $stored['quiet_hours_enabled'] = (bool) ($this->organizationInsights['quiet_hours_enabled'] ?? false);
-        $stored['quiet_hours_start'] = (int) ($this->organizationInsights['quiet_hours_start'] ?? 22);
-        $stored['quiet_hours_end'] = (int) ($this->organizationInsights['quiet_hours_end'] ?? 7);
-        $stored['allow_config_mutation'] = (bool) ($this->organizationInsights['allow_config_mutation'] ?? true);
+        $stored['digest_non_critical'] = $this->organizationInsights['digest_non_critical'];
+        $stored['digest_frequency'] = $this->organizationInsights['digest_frequency'] === 'weekly' ? 'weekly' : 'daily';
+        $stored['quiet_hours_enabled'] = $this->organizationInsights['quiet_hours_enabled'];
+        $stored['quiet_hours_start'] = $this->organizationInsights['quiet_hours_start'];
+        $stored['quiet_hours_end'] = $this->organizationInsights['quiet_hours_end'];
+        $stored['allow_config_mutation'] = $this->organizationInsights['allow_config_mutation'];
 
         $org->update(['insights_preferences' => $stored]);
 

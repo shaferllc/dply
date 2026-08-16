@@ -69,7 +69,7 @@ final readonly class CloudIndexRow
             region: is_string($site->container_region) && $site->container_region !== ''
                 ? $site->container_region
                 : null,
-            hostname: is_string($hostname) && $hostname !== '' ? $hostname : null,
+            hostname: is_string($hostname) ? $hostname : null,
             liveUrl: is_string($liveUrl) && $liveUrl !== '' ? $liveUrl : null,
             isPreviewChild: $isPreviewChild,
             previewBranch: isset($containerMeta['preview_branch']) && is_string($containerMeta['preview_branch'])

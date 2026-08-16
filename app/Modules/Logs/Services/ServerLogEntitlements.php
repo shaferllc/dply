@@ -21,7 +21,7 @@ class ServerLogEntitlements
         $defaults = (array) config('server_logs.entitlements.defaults', []);
         $plans = (array) config('server_logs.entitlements.plans', []);
 
-        $planKey = (string) ($organization->currentSubscriptionPlan()['key'] ?? 'free');
+        $planKey = (string) $organization->currentSubscriptionPlan()['key'];
         $override = is_array($plans[$planKey] ?? null) ? $plans[$planKey] : [];
 
         return ServerLogEntitlement::fromConfig($planKey, $defaults, $override);

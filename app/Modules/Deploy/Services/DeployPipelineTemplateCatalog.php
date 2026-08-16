@@ -70,7 +70,7 @@ final class DeployPipelineTemplateCatalog
         if (! is_array($meta)) {
             if (str_starts_with($key, 'runtime-')) {
                 $parts = explode('-', substr($key, 8), 2);
-                $runtime = $parts[0] ?? null;
+                $runtime = $parts[0];
                 $framework = $parts[1] ?? null;
 
                 return $this->stripSortOrder($this->runtimeDefaults->defaultsFor($runtime, $framework));
@@ -117,8 +117,8 @@ final class DeployPipelineTemplateCatalog
 
     /**
      * @param  array<string, mixed> $meta
-     * @param  array<string, mixed> $steps
-     * @return array{key: string, label: string, description: string, runtime: string|null, framework: string|null, steps: array<string, mixed>}
+     * @param  list<array<string, int|string>> $steps
+     * @return array{key: string, label: string, description: string, runtime: string|null, framework: string|null, steps: list<array<string, int|string>>}
      */
     private function formatTemplate(string $key, array $meta, array $steps): array
     {
@@ -133,7 +133,7 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @param  array<string, mixed> $steps
+     * @param  list<array<string, int|string>> $steps
      */
     private function stripSortOrder(array $steps): array
     {

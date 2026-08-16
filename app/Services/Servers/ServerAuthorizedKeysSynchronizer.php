@@ -134,7 +134,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  array<string, mixed> $targets
+     * @param  list<string> $targets
      * @return array<string, mixed>
      */
     protected function buildSyncPayload(Server $server, array $targets): array
@@ -185,7 +185,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  array<string, mixed> $targets
+     * @param  list<string> $targets
      */
     protected function persistSyncedTargets(Server $server, array $targets): void
     {
@@ -312,7 +312,7 @@ class ServerAuthorizedKeysSynchronizer
         }
 
         // Record what dply manages for this target (flushed to meta after the write succeeds).
-        $this->managedFingerprintsByTarget[$targetUser] = array_values(array_keys($desiredFps));
+        $this->managedFingerprintsByTarget[$targetUser] = array_keys($desiredFps);
 
         // Read what's currently on the box. If we genuinely can't read it (e.g. sudo -n denied for a
         // non-login user), fall back to the desired set rather than crash — same situation in which

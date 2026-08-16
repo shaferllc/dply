@@ -23,6 +23,15 @@ use Livewire\Attributes\Computed;
  */
 trait ManagesCacheView
 {
+    /**
+     * Request-scoped memo for {@see cacheServices()}. A single render fans the
+     * row set out to several consumers; render() nulls this before its first
+     * read so the view always reflects rows a mutating action just created.
+     *
+     * @var Collection<int, ServerCacheService>|null
+     */
+    private ?Collection $cacheServicesMemo = null;
+
     public function render(
         CacheServiceStats $statsService,
     ): View {
@@ -142,6 +151,9 @@ trait ManagesCacheView
         ));
     }
 
+    /**
+     * @return Collection<int, ServerCacheService>
+     */
     protected function cacheServices(): Collection
     {
         return $this->cacheServicesMemo ??= ServerCacheService::query()
@@ -186,5 +198,15 @@ trait ManagesCacheView
         return in_array($this->workspace_tab, CacheServiceInstallScripts::supportedEngines(), true)
             ? $this->workspace_tab
             : null;
+    }
+
+    /**
+     * Bust the cached stats/overview snapshots for a row's engine after a
+     * mutating action, so the next render reads live values rather than the
+     * 24h-cached ones {@see CacheServiceStats::snapshot()} hands out.
+     */
+    protected function forgetStats(ServerCacheService $cacheService): void
+    {
+        app(CacheServiceStats::class)->forget($this->server, $cacheService->engine);
     }
 }

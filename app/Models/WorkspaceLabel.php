@@ -16,8 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $slug
  * @property-read ?Organization $organization
  * @property-read Collection<int, Workspace> $workspaces
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WorkspaceLabel extends Model
 {

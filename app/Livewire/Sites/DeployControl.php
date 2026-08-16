@@ -114,7 +114,7 @@ class DeployControl extends Component
     #[Computed]
     public function inProgress(): bool
     {
-        return $this->status?->inProgress ?? false;
+        return $this->status->inProgress ?? false;
     }
 
     /**
@@ -123,7 +123,7 @@ class DeployControl extends Component
     #[Computed]
     public function completedFixerKeys(): array
     {
-        return $this->status?->completedFixerKeys ?? [];
+        return $this->status->completedFixerKeys ?? [];
     }
 
     #[Computed]
@@ -312,7 +312,7 @@ class DeployControl extends Component
     #[Computed]
     public function syncRows(): array
     {
-        return DeployConsoleRows::forSiteIds($this->syncedSiteIds, (string) ($this->site?->id ?? ''));
+        return DeployConsoleRows::forSiteIds($this->syncedSiteIds, (string) ($this->site->id ?? ''));
     }
 
     /** Whether any peer in the active sync batch is still deploying. */

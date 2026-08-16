@@ -13,16 +13,16 @@ use Illuminate\Support\Carbon;
  * @property string $id
  *                      One recorded scheduler run's captured output. Rolling history, count-capped
  *                      per heartbeat (pruned inline on write). See [[project_schedule_mirrors_workers]].
- * @property int $duration_ms
- * @property int $exit_code
+ * @property int|null $duration_ms
+ * @property int|null $exit_code
  * @property ?Carbon $ran_at
  * @property ?string $server_scheduler_heartbeat_id
- * @property string $stderr_excerpt
- * @property string $stdout_excerpt
+ * @property string|null $stderr_excerpt
+ * @property string|null $stdout_excerpt
  * @property string $trigger
  * @property-read ?ServerSchedulerHeartbeat $heartbeat
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SchedulerTickOutput extends Model
 {

@@ -31,7 +31,7 @@ class TenantDnsProvisioner
             return ['status' => 'invalid', 'zone' => null, 'message' => 'Tenant has no hostname.'];
         }
 
-        $serverIp = trim((string) ($site->server?->ip_address ?? ''));
+        $serverIp = trim((string) ($site->server->ip_address ?? ''));
         if ($serverIp === '') {
             return ['status' => 'no_server_ip', 'zone' => null, 'message' => 'The server has no IP address yet.'];
         }

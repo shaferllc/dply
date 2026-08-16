@@ -16,8 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $request_ip
  * @property ?string $site_id
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WebhookDeliveryLog extends Model
 {

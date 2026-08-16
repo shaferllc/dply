@@ -94,14 +94,14 @@ class VultrService
             $body['sshkey_id'] = $sshKeyIds;
         }
         $vpcIds = array_values(array_filter(array_map(
-            static fn (mixed $id): string => is_string($id) ? trim($id) : '',
+            static fn (mixed $id): string => trim($id),
             $vpcIds,
         )));
         if ($vpcIds !== []) {
             $body['vpc_ids'] = $vpcIds;
         }
         $tags = array_values(array_filter(array_map(
-            static fn (mixed $tag): string => is_string($tag) ? trim($tag) : '',
+            static fn (mixed $tag): string => trim($tag),
             $tags,
         )));
         if ($tags !== []) {
@@ -263,7 +263,7 @@ class VultrService
             'notes' => $rule['notes'] ?? '',
         ];
         $port = trim((string) ($rule['port'] ?? ''));
-        if ($port !== '' && ($rule['protocol'] ?? '') !== 'icmp') {
+        if ($port !== '' && ($rule['protocol']) !== 'icmp') {
             $body['port'] = $port;
         }
         $response = $this->request('post', '/firewalls/'.$firewallGroupId.'/rules', $body);
@@ -612,10 +612,6 @@ class VultrService
         $name = self::normalizeRecordName($name, $domainName);
 
         foreach ($this->getDomainRecords($domainName) as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
-
             if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
                 continue;
             }
@@ -795,7 +791,7 @@ class VultrService
             'label' => $label,
         ];
         if ($trustedIps !== []) {
-            $body['trusted_ips'] = array_values($trustedIps);
+            $body['trusted_ips'] = $trustedIps;
         }
 
         $response = $this->request('post', '/databases', $body);
@@ -825,7 +821,7 @@ class VultrService
     public function setDatabaseTrustedSources(string $id, array $trustedIps): void
     {
         $response = $this->request('put', '/databases/'.$id, [
-            'trusted_ips' => array_values($trustedIps),
+            'trusted_ips' => $trustedIps,
         ]);
         $this->assertSuccess($response, 'set database trusted ips');
     }

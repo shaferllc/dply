@@ -24,15 +24,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      rejected for App Runner sites via CloudBackend::supportsWorkers().
  * @property string $command
  * @property int $instance_count
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $site_id
  * @property string $size
  * @property string $status
  * @property string $type
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class CloudWorker extends Model
 {

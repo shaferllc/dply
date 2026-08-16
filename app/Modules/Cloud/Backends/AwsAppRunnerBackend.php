@@ -326,7 +326,7 @@ class AwsAppRunnerBackend implements CloudBackend
 
         // Image mode — updateImage already re-pushes env vars alongside
         // the (unchanged) image.
-        if (($site->container_image) && $site->container_image !== '') {
+        if ($site->container_image) {
             $service->updateImage(
                 $site->container_backend_id,
                 $site->container_image,
@@ -491,9 +491,9 @@ class AwsAppRunnerBackend implements CloudBackend
                     ];
                 }
 
-                $hasPoints = ($series['cpu'] ?? []) !== []
-                    || ($series['memory'] ?? []) !== []
-                    || ($series['requests'] ?? []) !== [];
+                $hasPoints = ($series['cpu']) !== []
+                    || ($series['memory']) !== []
+                    || ($series['requests']) !== [];
 
                 return [
                     'window' => $window,

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
-
-
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -13,8 +11,6 @@ namespace App\Services\Concerns;
  */
 trait ManagesDoDroplets
 {
-
-
     /**
      * List all droplets.
      *
@@ -58,7 +54,7 @@ trait ManagesDoDroplets
         if (! is_string($detail) || $detail === '') {
             $detail = $response->body();
         }
-        if (! is_string($detail) || trim($detail) === '') {
+        if (trim($detail) === '') {
             $detail = 'HTTP '.$status;
         }
 
@@ -82,7 +78,7 @@ trait ManagesDoDroplets
     /**
      * Create a new droplet. Returns droplet array (IP may not be available immediately).
      *
-     * @param  array<string, mixed> $sshKeyIds  Optional DO SSH key IDs or fingerprints
+     * @param  list<int|string>  $sshKeyIds  Optional DO SSH key IDs or fingerprints
      * @param  array{
      *     ipv6?: bool,
      *     backups?: bool,
@@ -107,7 +103,7 @@ trait ManagesDoDroplets
         $rawVpc = $options['vpc_uuid'] ?? null;
         $vpcUuid = is_string($rawVpc) ? trim($rawVpc) : '';
         $tags = $options['tags'] ?? [];
-        $tags = (array_values(array_filter($tags, static fn ($t) => ($t) && $t !== '')) );
+        $tags = array_values(array_filter($tags));
 
         $body = [
             'name' => $name,

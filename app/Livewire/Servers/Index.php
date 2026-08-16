@@ -327,6 +327,10 @@ class Index extends Component
         return $targets;
     }
 
+    /**
+     * @param  Collection<int, Server>  $servers
+     * @return Collection<string, Collection<int, Server>>
+     */
     protected function groupedServers(Collection $servers): Collection
     {
         return $servers
@@ -350,8 +354,8 @@ class Index extends Component
      * in that priority order, so each peer appears once. Peers are drawn from
      * the full in-scope set so a server hidden by the active filter still links.
      *
-     * @param  Collection<int, Server>  $servers   the rows actually rendered
-     * @param  Collection<int, Server>  $candidates the full in-scope fleet
+     * @param  Collection<int, Server>  $servers  the rows actually rendered
+     * @param  Collection<int, Server>  $candidates  the full in-scope fleet
      * @return array<int|string, list<array{server: Server, reason: string}>>
      */
     protected function relatedServersMap(Collection $servers, Collection $candidates): array
@@ -394,6 +398,9 @@ class Index extends Component
         return $map;
     }
 
+    /**
+     * @return Builder<Server>|null
+     */
     protected function baseQuery(): ?Builder
     {
         $org = auth()->user()->currentOrganization();
@@ -420,6 +427,10 @@ class Index extends Component
         return $query;
     }
 
+    /**
+     * @param  Builder<Server>  $query
+     * @return Builder<Server>
+     */
     protected function applyFilters(Builder $query): Builder
     {
         $term = trim($this->search);
@@ -521,7 +532,7 @@ class Index extends Component
             return ServerIndexRow::fromServer(
                 $server,
                 $latestSnapshots->get($server->id),
-                (int) ($insights['open'] ?? 0),
+                (int) $insights['open'],
                 isset($insights['worst']) ? (string) $insights['worst'] : null,
                 $relatedServers[$server->id] ?? [],
                 $target !== null,

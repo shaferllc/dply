@@ -22,22 +22,22 @@ use Illuminate\Support\Carbon;
  *                      box and handed back, so the edge installer ({@see VectorLogAgentInstallScripts})
  *                      can configure shipping without any manual env. The cert material is encrypted at
  *                      rest. See docs/SERVER_LOGS_ADDON.md.
- * @property string $edge_ca_cert_b64
- * @property string $edge_client_cert_b64
- * @property string $edge_client_key_b64
- * @property string $endpoint
+ * @property string|null $edge_ca_cert_b64
+ * @property string|null $edge_client_cert_b64
+ * @property string|null $edge_client_key_b64
+ * @property string|null $endpoint
  * @property ?string $private_endpoint
  * @property ?string $error_message
- * @property string $install_output
+ * @property string|null $install_output
  * @property ?Carbon $last_seen_at
  * @property int $listen_port
  * @property ?string $server_id
  * @property string $status
- * @property string $version
+ * @property string|null $version
  * @property ?int $config_version
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerLogAggregator extends Model
 {

@@ -192,11 +192,11 @@ trait ManagesCronJobs
             );
             $this->emitPanelEvent(
                 __('Cron job updated — sync to apply'),
-                array_filter([
+                [
                     sprintf('> Updated "%s" in the panel.', $job->fresh()->description ?: $payload['command']),
                     sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
                     '> Click "Sync crontab" to install the new Dply-managed block on the server.',
-                ]),
+                ],
             );
             $this->toastSuccess(__('Cron job updated. Sync crontab on the server to apply changes.'));
         } else {
@@ -223,11 +223,11 @@ trait ManagesCronJobs
             );
             $this->emitPanelEvent(
                 __('Cron job added — sync to install on server'),
-                array_filter([
+                [
                     sprintf('> Added "%s" to the panel.', $created->description ?: $payload['command']),
                     sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
                     '> Click "Sync crontab" to install the Dply-managed block on the server.',
-                ]),
+                ],
             );
             $this->toastSuccess(__('Cron job added. Sync crontab on the server to install the Dply-managed block.'));
         }

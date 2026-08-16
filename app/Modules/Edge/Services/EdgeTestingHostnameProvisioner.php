@@ -156,9 +156,6 @@ final class EdgeTestingHostnameProvisioner
     {
         $do = new DigitalOceanService($token);
         foreach ($do->getDomainRecords($zone) as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
             $name = trim((string) ($record['name'] ?? ''));
             $type = strtoupper((string) ($record['type'] ?? ''));
             if ($name === '*' && in_array($type, ['A', 'AAAA', 'CNAME'], true)) {

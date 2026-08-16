@@ -232,7 +232,7 @@ trait ReadsDoAppState
                 $tail = array_slice($allLines, -$lines);
 
                 return [
-                    'lines' => array_values($tail),
+                    'lines' => $tail,
                     'available' => true,
                     'url' => $archiveUrl,
                 ];

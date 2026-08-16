@@ -356,7 +356,7 @@ class SiteDeployCoordinator
         $latest ??= $this->latestDeployment($site);
         // $latest is null for a site that has never deployed — guard the reads so
         // the deploy-control panel renders (no deploy → no "since" cutoff).
-        $since = $latest?->finished_at ?? $latest?->created_at;
+        $since = $latest->finished_at ?? $latest?->created_at;
 
         $query = ConsoleAction::query()
             ->where('subject_type', $site->getMorphClass())

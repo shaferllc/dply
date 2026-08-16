@@ -13,7 +13,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property int $bytes_egress
  * @property int $cache_hits
- * @property string $duration_ms_p95
+ * @property string|null $duration_ms_p95
  * @property int $duration_ms_total
  * @property Carbon $hour_start
  * @property ?string $organization_id
@@ -24,8 +24,8 @@ use Illuminate\Support\Carbon;
  * @property int $status_4xx
  * @property int $status_5xx
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class EdgePerformanceHourly extends Model
 {

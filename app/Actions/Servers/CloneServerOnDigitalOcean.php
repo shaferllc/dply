@@ -53,13 +53,13 @@ final class CloneServerOnDigitalOcean
     {
         $this->assertCloneable($source, $org);
 
-        $name = isset($overrides['name']) && is_string($overrides['name']) && trim($overrides['name']) !== ''
+        $name = isset($overrides['name']) && trim($overrides['name']) !== ''
             ? trim($overrides['name'])
             : $source->name.' (clone)';
-        $region = isset($overrides['region']) && is_string($overrides['region']) && $overrides['region'] !== ''
+        $region = isset($overrides['region']) && $overrides['region'] !== ''
             ? $overrides['region']
             : (string) $source->region;
-        $size = isset($overrides['size']) && is_string($overrides['size']) && $overrides['size'] !== ''
+        $size = isset($overrides['size']) && $overrides['size'] !== ''
             ? $overrides['size']
             : (string) $source->size;
 

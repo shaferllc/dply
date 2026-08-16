@@ -58,7 +58,7 @@ final class OpsCopilotAdvisor
             );
         }
 
-        if ($suggestions === [] && $haystack !== '') {
+        if ($suggestions === []) {
             $suggestions[] = new OpsCopilotSuggestion(
                 id: 'generic_review_log',
                 title: 'Review the deploy log excerpt',

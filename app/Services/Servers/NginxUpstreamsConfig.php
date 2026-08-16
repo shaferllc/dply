@@ -157,8 +157,8 @@ class NginxUpstreamsConfig
             $payload = $updates[$block['name']];
             $rendered = $this->renderUpstream(
                 $block['name'],
-                array_values((array) ($payload['servers'] ?? [])),
-                (array) ($payload['values'] ?? []),
+                (array) $payload['servers'],
+                (array) $payload['values'],
             );
             $newContents = str_replace($block['raw'], $rendered, $newContents);
             $rewritten++;
@@ -180,7 +180,7 @@ class NginxUpstreamsConfig
      * section (or at end-of-file if there's no http block, which would be
      * an unusual nginx.conf but we don't want to fail outright).
      *
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
@@ -274,7 +274,7 @@ class NginxUpstreamsConfig
     /**
      * Build the canonical `upstream <name> { ... }` text from the form data.
      *
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      * @param  array<string, mixed> $values
      */
     private function renderUpstream(string $name, array $servers, array $values): string
@@ -315,7 +315,7 @@ class NginxUpstreamsConfig
         if (preg_match_all('/^[\t ]*upstream\s+(\S+)\s*\{/m', $contents, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $i => $headerMatch) {
+        foreach ($matches[0] as $i => $headerMatch) {
             $name = $matches[1][$i][0];
             $rawStart = $headerMatch[1];
             $bodyStart = $rawStart + strlen($headerMatch[0]);

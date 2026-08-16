@@ -159,8 +159,8 @@ final class EdgeLiveBuildLog
         $body = substr($bodyFull, $offset, max(1, $maxBytes));
 
         return [
-            'body' => $body === false ? '' : $body,
-            'offset' => $offset + ($body === false ? 0 : strlen($body)),
+            'body' => $body,
+            'offset' => $offset + (strlen($body)),
             'exists' => true,
         ];
     }

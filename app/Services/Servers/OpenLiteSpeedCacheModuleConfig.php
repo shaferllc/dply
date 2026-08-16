@@ -343,7 +343,7 @@ class OpenLiteSpeedCacheModuleConfig
             return [];
         }
 
-        return array_values(array_filter(array_map('trim', $matches[1] ?? []), fn (string $v) => $v !== ''));
+        return array_values(array_filter(array_map('trim', $matches[1]), fn (string $v) => $v !== ''));
     }
 
     private function normalizeScalar(string $type, string $raw, string $default): string

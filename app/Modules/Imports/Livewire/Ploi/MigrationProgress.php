@@ -240,7 +240,7 @@ class MigrationProgress extends Component
             return;
         }
         $items[$index]['dismissed_at'] = now()->toIso8601String();
-        $this->migration->manual_review_items = array_values($items);
+        $this->migration->manual_review_items = $items;
         $this->migration->save();
         $this->toastSuccess(__('Marked reviewed.'));
     }

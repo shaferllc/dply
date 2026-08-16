@@ -109,21 +109,21 @@ final class FilterServerProvisionOptionsForCreateForm
      */
     private function removeComingSoonEngines(array $out): array
     {
-        if (isset($out['cache_services']) && is_array($out['cache_services'])) {
+        if (isset($out['cache_services'])) {
             $out['cache_services'] = array_values(array_filter(
                 $out['cache_services'],
                 fn (array $row): bool => CacheEngineAvailability::isAvailable((string) ($row['id'] ?? '')),
             ));
         }
 
-        if (isset($out['server_roles']) && is_array($out['server_roles'])) {
+        if (isset($out['server_roles'])) {
             $out['server_roles'] = array_values(array_filter(
                 $out['server_roles'],
                 fn (array $row): bool => ! (($row['id'] ?? null) === 'valkey' && CacheEngineAvailability::isComingSoon('valkey')),
             ));
         }
 
-        if (isset($out['databases']) && is_array($out['databases'])) {
+        if (isset($out['databases'])) {
             $out['databases'] = array_values(array_filter(
                 $out['databases'],
                 fn (array $row): bool => ! DatabaseEngineAvailability::isProvisionOptionComingSoon((string) ($row['id'] ?? '')),
@@ -159,7 +159,7 @@ final class FilterServerProvisionOptionsForCreateForm
                 }
                 $stripped[] = Arr::except($row, self::STRIP_ROW_KEYS);
             }
-            $out[$key] = array_values($stripped);
+            $out[$key] = $stripped;
         }
 
         return $out;
@@ -177,7 +177,7 @@ final class FilterServerProvisionOptionsForCreateForm
     ): array {
         $filtered = [];
         foreach ($rows as $row) {
-            if (! is_array($row) || ! isset($row['id'])) {
+            if (! isset($row['id'])) {
                 continue;
             }
             if (! $this->rowIsEnabled($row)) {
@@ -200,7 +200,7 @@ final class FilterServerProvisionOptionsForCreateForm
             $filtered[] = Arr::except($row, self::STRIP_ROW_KEYS);
         }
 
-        return array_values($filtered);
+        return $filtered;
     }
 
     /**

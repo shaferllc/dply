@@ -281,7 +281,7 @@ final class ServerNetworkMap
     private function cacheExposure(mixed $cache): array
     {
         $resolved = $this->exposure->resolveExposure($cache);
-        if (! ($resolved['exposed'] ?? false)) {
+        if (! $resolved['exposed']) {
             return [false, null, __('Bound to localhost — no firewall rule opens this port.')];
         }
 

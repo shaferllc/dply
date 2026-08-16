@@ -111,7 +111,7 @@ SH;
         }
 
         $parts = explode('::', $ok);
-        $newMtime = (int) ($parts[0] ?? 0);
+        $newMtime = (int) $parts[0];
         $newSha = $parts[1] ?? '';
 
         return new FileBrowserWriteResult(

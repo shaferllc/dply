@@ -46,12 +46,8 @@ class SiteReachabilityChecker
      */
     public function check(Site $site): array
     {
-        $previewDomains = $site->previewDomains instanceof Collection
-            ? $site->previewDomains
-            : $site->previewDomains()->get();
-        $domains = $site->domains instanceof Collection
-            ? $site->domains
-            : $site->domains()->get();
+        $previewDomains = $site->previewDomains;
+        $domains = $site->domains;
         $primaryHostname = $domains->firstWhere('is_primary', true)->hostname
             ?? $domains->first()?->hostname;
         $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)->hostname
@@ -241,7 +237,7 @@ class SiteReachabilityChecker
             'points_here' => $pointsHere,
             'behind_cloudflare' => $behindCloudflare,
             'http_ok' => $httpOk,
-            'resolved_ips' => array_values($resolved),
+            'resolved_ips' => $resolved,
             'server_ip' => $serverIp,
             'error' => $error,
             'checked_at' => now()->toIso8601String(),
@@ -312,12 +308,6 @@ class SiteReachabilityChecker
     private function statusMeansReachable(int $status): bool
     {
         if ($status >= 200 && $status < 400) {
-            return true;
-        }
-
-        // A redirect to HTTPS still proves something is listening on :80 — do
-        // not follow the redirect (port 443 may not be configured yet).
-        if (in_array($status, [301, 302, 307, 308], true)) {
             return true;
         }
 

@@ -117,7 +117,7 @@ trait ManagesExtendedServerSettings
      */
     public function providerCostPullSupported(): bool
     {
-        return ServerProviderCostEstimator::isSupported($this->server->provider ?? null)
+        return ServerProviderCostEstimator::isSupported($this->server->provider)
             && $this->server->providerCredential !== null
             && (string) $this->server->size !== '';
     }
@@ -145,7 +145,7 @@ trait ManagesExtendedServerSettings
         } catch (\Throwable $e) {
             Log::warning('Provider cost pull failed', [
                 'server_id' => $this->server->id,
-                'provider' => $this->server->provider?->value,
+                'provider' => $this->server->provider->value,
                 'error' => $e->getMessage(),
             ]);
             $this->toastError(__('Could not reach the provider API for pricing right now.'));
@@ -219,7 +219,7 @@ trait ManagesExtendedServerSettings
                 'name' => $this->server->name,
                 'status' => $this->server->status,
                 'health_status' => $this->server->health_status,
-                'provider' => $this->server->provider?->value,
+                'provider' => $this->server->provider->value,
                 'provider_id' => $this->server->provider_id,
                 'region' => $this->server->region,
                 'ip_address' => $this->server->ip_address,
@@ -243,8 +243,8 @@ trait ManagesExtendedServerSettings
                 'archived_at' => $note->archived_at?->toIso8601String(),
                 'created_by' => $note->creator?->name,
                 'updated_by' => $note->editor?->name,
-                'created_at' => $note->created_at?->toIso8601String(),
-                'updated_at' => $note->updated_at?->toIso8601String(),
+                'created_at' => $note->created_at->toIso8601String(),
+                'updated_at' => $note->updated_at->toIso8601String(),
             ])->values()->all(),
         ];
 

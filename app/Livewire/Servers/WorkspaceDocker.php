@@ -19,14 +19,11 @@ use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\SshConnectionFactory;
 use App\Support\Servers\DockerContainerShellSupport;
 use App\Support\Servers\DockerWorkspaceViewData;
-use App\Support\Servers\ServerDockerRemoteInspector;
 use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -190,7 +187,7 @@ class WorkspaceDocker extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -201,7 +198,6 @@ class WorkspaceDocker extends Component
         $this->workspace_tab = in_array($tab, self::TABS, true) ? $tab : 'overview';
         $this->loadTabIfNeeded($this->workspace_tab);
     }
-
 
     public function syncManageRemoteTaskFromCache(): void
     {
@@ -298,11 +294,8 @@ class WorkspaceDocker extends Component
         ]);
     }
 
-
     protected function forceExtendedInventoryProbe(): bool
     {
         return true;
     }
-
-
 }

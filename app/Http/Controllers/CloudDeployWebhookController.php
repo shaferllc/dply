@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -38,12 +38,8 @@ class CloudDeployWebhookController extends Controller
         }
 
         $allowedIps = $site->webhook_allowed_ips;
-        // The 'array' cast round-trips a single configured CIDR/IP back as a
-        // string; normalize to a list so a lone value still filters (and a
-        // null/empty allowlist is a no-op rather than an array_map() fatal).
-        $allowedIps = is_array($allowedIps)
-            ? $allowedIps
-            : ((string) $allowedIps === '' ? [] : [$allowedIps]);
+        // Cast is `array`; a null/empty allowlist is a no-op.
+        $allowedIps = is_array($allowedIps) ? $allowedIps : [];
         if ($allowedIps !== []) {
             $allowed = array_filter(array_map(static fn (mixed $ip): string => trim((string) $ip), $allowedIps));
             $clientIp = (string) $request->ip();

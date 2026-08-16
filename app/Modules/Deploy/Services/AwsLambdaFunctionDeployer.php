@@ -41,7 +41,7 @@ final class AwsLambdaFunctionDeployer
             ],
         ];
 
-        $functionName = trim((string) ($resolvedConfig['function_name'] ?? ''));
+        $functionName = trim((string) $resolvedConfig['function_name']);
         $deployResult = $this->provisionerFactory
             ->make('aws')
             ->deployFunction(

@@ -15,10 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *                      An org-level private network (Hetzner private network or DigitalOcean VPC).
  *                      Servers that belong to the network reference it via `private_network_id`.
  *                      Routes are stored on Hetzner's side — fetched live via the API.
- * @property string $ip_range
- * @property array<string, mixed> $meta
+ * @property string|null $ip_range
+ * @property array<string, mixed>|null $meta
  * @property string $name
- * @property string $network_zone
+ * @property string|null $network_zone
  * @property ?string $organization_id
  * @property string $provider
  * @property ?string $provider_credential_id
@@ -26,8 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read ?Organization $organization
  * @property-read ?ProviderCredential $providerCredential
  * @property-read Collection<int, Server> $servers
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class PrivateNetwork extends Model
 {

@@ -374,7 +374,7 @@ class ServerlessRouting extends Component
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
 
-        $routing['headers'] = array_values($this->headers);
+        $routing['headers'] = $this->headers;
         $routing['cors'] = [
             'enabled' => $this->corsEnabled,
             'origins' => $this->splitCsv($this->corsOrigins),

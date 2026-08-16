@@ -164,6 +164,6 @@ class ScaffoldPrerequisites
             return false;
         }
 
-        return $out instanceof ProcessOutput && $out->getExitCode() === 0;
+        return $out->getExitCode() === 0;
     }
 }

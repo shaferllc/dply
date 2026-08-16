@@ -57,7 +57,7 @@ class OpenRestyCustomUpstreamsConfig
     }
 
     /**
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      */
     public function add(
         Server $server,
@@ -73,7 +73,7 @@ class OpenRestyCustomUpstreamsConfig
 
         $rows = $this->read($server);
         foreach ($rows as $row) {
-            if (($row['name'] ?? '') === $name) {
+            if ($row['name'] === $name) {
                 throw new \RuntimeException("An upstream named `{$name}` already exists.");
             }
         }
@@ -87,7 +87,7 @@ class OpenRestyCustomUpstreamsConfig
         $name = $this->normalizeName($name);
         $rows = array_values(array_filter(
             $this->read($server),
-            fn (array $row): bool => ($row['name'] ?? '') !== $name,
+            fn (array $row): bool => $row['name'] !== $name,
         ));
 
         if (count($rows) === count($this->read($server))) {

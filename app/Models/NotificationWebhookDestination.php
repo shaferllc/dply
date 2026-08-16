@@ -31,8 +31,8 @@ use Illuminate\Support\Carbon;
  * @property string $webhook_url
  * @property-read ?Organization $organization
  * @property-read ?Site $site
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class NotificationWebhookDestination extends Model
 {

@@ -129,7 +129,8 @@ class Artisan extends RemoteCli
     /**
      * `cd <site-root> && php artisan <command> <args>` so artisan
      * picks up the site's own .env / vendor / config.
-     * @param  array<string, mixed> $args
+     *
+     * @param  list<string>  $args
      */
     protected function buildShellCommand(Site $site, string $command, array $args): string
     {

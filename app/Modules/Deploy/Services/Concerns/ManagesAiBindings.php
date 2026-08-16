@@ -86,7 +86,7 @@ trait ManagesAiBindings
                 throw new InvalidArgumentException(__('That saved AI credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return array_filter([

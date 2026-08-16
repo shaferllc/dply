@@ -64,7 +64,7 @@ class DiscordGuildClient
             return self::make()->channels($installation->guild_id);
         });
 
-        return is_array($cached) ? $cached : [];
+        return $cached;
     }
 
     public static function forgetChannelCache(DiscordInstallation $installation): void
@@ -98,7 +98,7 @@ class DiscordGuildClient
             $channels[] = [
                 'id' => $id,
                 'name' => (string) ($row['name'] ?? $id),
-                'is_announcement' => ($row['type'] ?? 0) === 5,
+                'is_announcement' => ($row['type']) === 5,
                 'position' => (int) ($row['position'] ?? 0),
             ];
         }

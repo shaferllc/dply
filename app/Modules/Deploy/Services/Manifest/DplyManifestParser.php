@@ -439,9 +439,6 @@ class DplyManifestParser
     {
         $warnings = [];
         foreach (array_keys($data) as $key) {
-            if (! is_string($key)) {
-                continue;
-            }
             if (! in_array($key, DplyManifest::KNOWN_TOP_LEVEL_KEYS, true)) {
                 $warnings[] = "Unknown top-level key `{$key}` ignored — this version of dply does not recognize it. (Newer manifests may add fields older clients can safely skip.)";
             }

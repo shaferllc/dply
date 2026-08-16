@@ -45,7 +45,7 @@ use Laravel\Cashier\Billable;
  * @property ?array<string, mixed> $insights_preferences
  * @property ?array<string, mixed> $services_preferences
  * @property ?string $alert_slack_webhook_url
- * @property array<string, mixed> $alert_extra_emails
+ * @property array<string, mixed>|null $alert_extra_emails
  * @property ?string $invoice_email
  * @property ?string $vat_number
  * @property ?string $billing_currency

@@ -122,7 +122,7 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $gems
+     * @param  list<string> $gems
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      */
@@ -207,7 +207,7 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $gems
+     * @param  list<string> $gems
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      * @return list<DetectedProcess>

@@ -11,16 +11,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $content
- * @property string $content_after
- * @property string $content_before
+ * @property string|null $content_after
+ * @property string|null $content_before
  * @property string $engine
  * @property string $label
  * @property ?string $organization_id
  * @property ?string $user_id
  * @property-read ?Organization $organization
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WebserverTemplate extends Model
 {

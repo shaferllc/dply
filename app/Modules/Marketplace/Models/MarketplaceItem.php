@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $slug
  * @property string $sort_order
  * @property ?string $summary
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class MarketplaceItem extends Model
 {

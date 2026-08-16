@@ -118,6 +118,56 @@ composer analyse        # phpstan
 composer test           # includes the module-boundary check (tests/Unit/ModuleBoundaryTest.php)
 ```
 
+### Test suites
+
+`phpunit.xml` declares four suites; `defaultTestSuite` is `Unit,Feature`, so a
+bare `artisan test` runs exactly those two.
+
+```
+composer test:unit / test:feature      # one suite
+composer test:modules                  # app/Modules/*/Tests   — NOT green yet
+composer test:app                      # app/Actions/**/tests  — NOT green yet
+composer test:arch                     # tests/Arch — Pest arch rules (~45s)
+composer test:all                      # all five
+composer test:parallel / test:coverage / test:profile
+```
+
+`Modules` and `App` cover the ~124 test files that live next to their code.
+They went uncollected for a long time and rotted (see the comment in
+`phpunit.xml`); they are registered so they can be run and paid down, but stay
+out of the default run until green.
+
+### Architecture tests
+
+`tests/Arch/ArchTest.php` holds Pest arch rules — enums are enums, Concerns are
+traits, Jobs implement `ShouldQueue`, Livewire classes extend `Component`,
+controllers are suffixed, and no `dd`/`dump`/`shell_exec`/`eval` reaches app
+code. Every `ignoring()` there is an inspected exception, commented in place.
+
+They sit in their own suite (not `defaultTestSuite`) because the whole-app scan
+costs ~45s and needs 2G — the file raises `memory_limit` itself, since PHPUnit's
+`<ini>` setting overrides `php -d`. CI runs them as a separate step.
+
+The **module boundary is not** an arch rule: `tests/Unit/ModuleBoundaryTest.php`
+already owns it, with a BASELINE of tracked debt an arch rule would duplicate.
+
+### Test groups
+
+Every test carries a layer group (`unit`, `feature`, `app`, `modules`) plus
+domain groups derived from its filename and directory — `servers`, `sites`,
+`deploy`, `cloud`, `edge`, `serverless`, `billing`, `queue`, `console`,
+`webserver`, `containers`, `livewire`, and ~25 more. The map lives at the
+bottom of `tests/Pest.php`; add a token there rather than tagging files.
+
+```
+php artisan test --group=servers
+php artisan test --group=sites --group=deploy        # union
+php artisan test --group=billing --exclude-group=livewire
+```
+
+Domain groups register only when a `--group` / `--exclude-group` flag is
+present — resolving them costs seconds per run, so unfiltered runs skip it.
+
 ## Critical do-nots (see memory / AGENTS.md for the rest)
 
 - **Never** `migrate:fresh` / `migrate:reset` / `db:wipe` on any env (incl. testing)

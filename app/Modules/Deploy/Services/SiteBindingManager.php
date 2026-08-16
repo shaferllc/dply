@@ -411,7 +411,7 @@ class SiteBindingManager
      * is therefore unaffected.
      *
      * @param  array<string, mixed>  $attributes
-     * @param  array<string, mixed>  $matchOn  Attribute keys (from $attributes, plus the
+     * @param  array<int, string>  $matchOn  Attribute keys (from $attributes, plus the
      *                                         implicit site_id/type) to match the existing row on.
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding

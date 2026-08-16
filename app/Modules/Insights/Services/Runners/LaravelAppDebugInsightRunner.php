@@ -41,7 +41,7 @@ class LaravelAppDebugInsightRunner implements InsightRunnerInterface
         }
 
         $parsed = $this->parser->parse($envContent);
-        $vars = $parsed['variables'] ?? [];
+        $vars = $parsed['variables'];
 
         $appEnv = strtolower(trim((string) ($vars['APP_ENV'] ?? '')));
         $appDebug = strtolower(trim((string) ($vars['APP_DEBUG'] ?? '')));

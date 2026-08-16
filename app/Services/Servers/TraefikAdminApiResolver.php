@@ -106,7 +106,7 @@ BASH;
 
     /**
      * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $candidates
+     * @param  list<string> $candidates
      */
     private function buildUnreachableException(Server $server, array $parsed, array $candidates): \RuntimeException
     {

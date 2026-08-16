@@ -48,7 +48,7 @@ final class ServerReleaseHygieneScanStatus
             $frames = array_slice($frames, -self::MAX_FRAMES);
         }
 
-        Cache::put(self::progressKey($serverId), array_values($frames), self::TTL_SECONDS);
+        Cache::put(self::progressKey($serverId), $frames, self::TTL_SECONDS);
     }
 
     /** @return list<array{t: int, line: string}> */

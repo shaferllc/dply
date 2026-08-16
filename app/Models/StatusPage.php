@@ -23,8 +23,8 @@ use Illuminate\Support\Str;
  * @property-read ?User $user
  * @property-read Collection<int, StatusPageMonitor> $monitors
  * @property-read Collection<int, Incident> $incidents
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class StatusPage extends Model
 {

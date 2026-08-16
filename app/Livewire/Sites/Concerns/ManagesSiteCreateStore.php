@@ -122,7 +122,7 @@ trait ManagesSiteCreateStore
 
         $meta = [];
         if ($functionsHost) {
-            $detectedRuntime = is_array($this->functionsDetection) ? $this->functionsDetection : [];
+            $detectedRuntime = $this->functionsDetection;
             $meta['runtime_profile'] = $this->server->isAwsLambdaHost() ? 'aws_lambda_bref_web' : 'digitalocean_functions_web';
             $meta['serverless'] = [
                 'target' => $this->server->hostKind(),

@@ -17,7 +17,7 @@ use App\Modules\Edge\Services\EdgeBuildRunner;
 final class EdgeSsrFrameworkProfile
 {
     /**
-     * @param  array<string, mixed> $detectDependencies  Any one match in package.json triggers this profile.
+     * @param  array<int, string> $detectDependencies  Any one match in package.json triggers this profile.
      * @param  ?string  $adapterDependency  Required adapter package for the build to succeed (null when the framework itself is the adapter, e.g. Next.js relies on OpenNext run by dply).
      * @param  ?string  $buildCommandOverride  Shell command dply runs in place of the user's build_command. Null = run the user's command unchanged.
      * @param  string  $workerPath  File or directory (relative to checkout) where the bundled Worker lands.

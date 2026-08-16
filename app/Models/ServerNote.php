@@ -35,8 +35,8 @@ use Illuminate\Support\Str;
  * @property ?string $archived_by_user_id
  * @property ?string $created_by_user_id
  * @property ?string $updated_by_user_id
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?Server $server
  * @property-read ?User $creator
  * @property-read ?User $editor

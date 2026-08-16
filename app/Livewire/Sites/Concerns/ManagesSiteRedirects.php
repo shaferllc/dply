@@ -170,9 +170,7 @@ trait ManagesSiteRedirects
         $this->authorize('update', $this->site);
         $redirect = SiteRedirect::query()->where('site_id', $this->site->id)->findOrFail($redirectId);
         $this->editing_redirect_id = (string) $redirect->id;
-        $this->editing_redirect_kind = $redirect->kind instanceof SiteRedirectKind
-            ? $redirect->kind->value
-            : (string) $redirect->kind;
+        $this->editing_redirect_kind = $redirect->kind->value;
         $this->editing_redirect_from = (string) $redirect->from_path;
         $this->editing_redirect_to = (string) $redirect->to_url;
         $this->editing_redirect_code = (int) $redirect->status_code;

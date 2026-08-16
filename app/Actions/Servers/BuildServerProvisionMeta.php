@@ -49,7 +49,7 @@ final class BuildServerProvisionMeta
             'database' => $database,
         ];
 
-        $cleaned = array_filter($runtimeDefaults, static fn ($v) => is_string($v) && $v !== '');
+        $cleaned = array_filter($runtimeDefaults, static fn (string $v): bool => $v !== '');
         if ($cleaned !== []) {
             $meta['runtime_defaults'] = $cleaned;
         }

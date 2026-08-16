@@ -28,9 +28,7 @@ trait DismissesDaemonSuggestions
      */
     protected function daemonSuggestionSite(): ?Site
     {
-        return property_exists($this, 'site') && $this->site instanceof Site
-            ? $this->site
-            : null;
+        return $this->site;
     }
 
     public function dismissDaemonSuggestion(string $key): void

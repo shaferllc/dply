@@ -88,7 +88,7 @@ trait ManagesEdgeRepoDetection
      */
     private function filterResults(array $rows): array
     {
-        $rows = array_values(array_filter($rows, fn ($r) => ($r['sha'] ?? '') !== ''));
+        $rows = array_values(array_filter($rows, fn ($r) => ($r['sha']) !== ''));
         $search = mb_strtolower(trim($this->refPickerSearch));
         if ($search === '') {
             return $rows;
@@ -255,7 +255,7 @@ trait ManagesEdgeRepoDetection
         }
 
         $this->repo = EdgeCreateForm::normalizeRepo((string) $match['url']);
-        $this->branch = is_string($match['branch'] ?? null) && $match['branch'] !== ''
+        $this->branch = $match['branch'] !== ''
             ? (string) $match['branch']
             : 'main';
 
@@ -598,9 +598,9 @@ trait ManagesEdgeRepoDetection
 
         try {
             $result = app(EdgeMonorepoDetector::class)->inspectUrl($url, $branch);
-            $this->monorepoDetected = (bool) ($result['is_monorepo'] ?? false);
-            $this->monorepoPackages = is_array($result['packages'] ?? null) ? $result['packages'] : [];
-            $this->monorepoMarkers = is_array($result['markers'] ?? null) ? $result['markers'] : [];
+            $this->monorepoDetected = (bool) $result['is_monorepo'];
+            $this->monorepoPackages = $result['packages'];
+            $this->monorepoMarkers = $result['markers'];
 
             if ($this->monorepoDetected && ! $this->repoRootTouched && count($this->monorepoPackages) === 1) {
                 $this->form->repo_root = (string) ($this->monorepoPackages[0]['path'] ?? '');

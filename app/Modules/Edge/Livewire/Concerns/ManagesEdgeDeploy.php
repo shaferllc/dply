@@ -119,10 +119,10 @@ trait ManagesEdgeDeploy
 
         $count = 0;
         foreach ($this->pendingImportedEnvVars as $key => $value) {
-            if (! is_string($key) || ! EdgeSiteEnvVar::keyIsValid($key)) {
+            if (! EdgeSiteEnvVar::keyIsValid($key)) {
                 continue;
             }
-            $stringValue = is_string($value) ? $value : (is_scalar($value) ? (string) $value : '');
+            $stringValue = is_string($value) ? $value : ((string) $value);
             if ($stringValue === '') {
                 // Importer signals secret-redacted values with an
                 // empty string (Cloudflare Pages); skip — the user

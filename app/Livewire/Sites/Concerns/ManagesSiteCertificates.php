@@ -605,7 +605,7 @@ trait ManagesSiteCertificates
         }
 
         $typedDomains = collect(preg_split('/[\s,]+/', (string) ($validated['new_certificate_domains'] ?? '')) ?: [])
-            ->filter(fn (mixed $hostname): bool => is_string($hostname) && HostnameValidator::isValid($hostname))
+            ->filter(fn (mixed $hostname): bool => HostnameValidator::isValid($hostname))
             ->map(fn (string $hostname): string => strtolower(trim($hostname)))
             ->unique()
             ->values()

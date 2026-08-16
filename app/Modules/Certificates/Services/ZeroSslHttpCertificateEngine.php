@@ -158,7 +158,7 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed> $domains
+     * @param  list<string> $domains
      */
     protected function createRemoteCertificate(string $accessKey, array $domains, string $csrPem): array
     {
@@ -219,7 +219,7 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
      */
     /**
      * @return list<array<string, mixed>>
-     * @param  array<string, mixed> $domains
+     * @param  list<string> $domains
      * @param  array<string, mixed> $remoteCertificate
      */
     protected function extractValidationFiles(array $remoteCertificate, array $domains): array
@@ -251,7 +251,7 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed> $files
+     * @param  list<array<string, mixed>> $files
      */
     protected function publishValidationFiles(Server $server, Site $site, array $files): void
     {

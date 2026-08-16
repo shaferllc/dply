@@ -171,9 +171,9 @@ final class DigitalOceanFunctionsActionDeployer
         // function (e.g. the Laravel adapter's `main`). Reading it earlier
         // would use the pre-build placeholder and deploy a wrong `main`.
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site->fresh() ?? $site);
-        $package = trim((string) ($resolvedConfig['package'] ?? 'default'));
-        $kind = trim((string) ($resolvedConfig['runtime'] ?? 'nodejs:18'));
-        $entrypoint = trim((string) ($resolvedConfig['entrypoint'] ?? 'main')) ?: 'main';
+        $package = trim((string) $resolvedConfig['package']);
+        $kind = trim((string) $resolvedConfig['runtime']);
+        $entrypoint = trim((string) $resolvedConfig['entrypoint']) ?: 'main';
 
         if (! str_ends_with(strtolower($artifactPath), '.zip')) {
             throw new \RuntimeException('DigitalOcean Functions deploy expects a .zip artifact.');
@@ -352,7 +352,7 @@ final class DigitalOceanFunctionsActionDeployer
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));
         $accessKey = trim((string) ($hostConfig['access_key'] ?? ''));
-        $package = trim((string) ($resolvedConfig['package'] ?? 'default'));
+        $package = trim((string) $resolvedConfig['package']);
         $actionName = trim((string) ($site->serverlessConfig()['action_name'] ?? $this->actionName($site)));
 
         if ($apiHost === '' || $namespace === '' || $accessKey === '' || $actionName === '') {

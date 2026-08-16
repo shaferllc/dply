@@ -168,7 +168,7 @@ trait ManagesSiteAliases
                 continue;
             }
             $parts = array_map('trim', explode(',', $line, 2));
-            $hostname = strtolower($parts[0] ?? '');
+            $hostname = strtolower($parts[0]);
             $label = $parts[1] ?? null;
             if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
                 $this->addError('bulk_alias_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));

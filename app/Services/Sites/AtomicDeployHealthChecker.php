@@ -221,7 +221,7 @@ final class AtomicDeployHealthChecker
             if ($code !== 200) {
                 $broken[] = ['path' => $path, 'reason' => 'HTTP '.($code !== 0 ? $code : '(no response)')];
             } elseif (str_contains($ctype, 'text/html')) {
-                $broken[] = ['path' => $path, 'reason' => '200 but MIME '.($ctype !== '' ? $ctype : 'unknown').' (served the fallback page, not the asset)'];
+                $broken[] = ['path' => $path, 'reason' => '200 but MIME '.($ctype).' (served the fallback page, not the asset)'];
             }
         }
 

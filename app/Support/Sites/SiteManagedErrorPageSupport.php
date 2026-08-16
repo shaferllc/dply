@@ -129,7 +129,7 @@ NGINX;
             return false;
         }
 
-        $vars = app(DotEnvFileParser::class)->parse($content)['variables'] ?? [];
+        $vars = app(DotEnvFileParser::class)->parse($content)['variables'];
         $value = strtolower(trim((string) ($vars['APP_DEBUG'] ?? '')));
 
         return in_array($value, ['true', '1', 'on', 'yes'], true);

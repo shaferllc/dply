@@ -87,7 +87,7 @@ class TraefikDashboardExposure
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
         $enabled = ! empty($options['enabled']);
-        $path = $this->normalizePath((string) ($options['path'] ?? '/traefik-dashboard'));
+        $path = $this->normalizePath((string) $options['path']);
 
         if (! $enabled) {
             $this->remove($server, $emit);
@@ -99,7 +99,7 @@ class TraefikDashboardExposure
         $password = (string) ($options['password'] ?? '');
         $existing = $this->read($server);
         if ($password === '' && $username !== '' && ! empty($existing['auth_user_line'])) {
-            $existingUser = explode(':', (string) $existing['auth_user_line'], 2)[0] ?? '';
+            $existingUser = explode(':', (string) $existing['auth_user_line'], 2)[0];
             if ($existingUser === $username) {
                 $contents = $this->renderWithAuthLine($path, (string) $existing['auth_user_line']);
             } else {

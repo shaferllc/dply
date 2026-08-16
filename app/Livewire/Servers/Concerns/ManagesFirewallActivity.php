@@ -22,7 +22,7 @@ trait ManagesFirewallActivity
      * shape the view can branch on: `kind=apply` (expandable, with output) vs `kind=audit`
      * (compact one-liner).
      *
-     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: ServerFirewallApplyLog, event?: ServerFirewallAuditEvent}>
+     * @return list<array{kind: string, at: \Illuminate\Support\Carbon, key: string, log?: ServerFirewallApplyLog, event?: ServerFirewallAuditEvent}>
      */
     /**
      * Activity timeline window size. Grows by {@see ACTIVITY_PAGE_SIZE} each time the operator
@@ -86,8 +86,8 @@ trait ManagesFirewallActivity
         }
 
         usort($items, function (array $a, array $b): int {
-            $at = $a['at']?->getTimestamp() ?? 0;
-            $bt = $b['at']?->getTimestamp() ?? 0;
+            $at = $a['at']->getTimestamp();
+            $bt = $b['at']->getTimestamp();
 
             return $bt <=> $at;
         });

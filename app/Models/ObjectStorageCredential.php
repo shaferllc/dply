@@ -17,16 +17,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      holds the cloud platform API token. The secret is encrypted at rest.
  * @property ?string $access_key_id
  * @property ?string $created_by_user_id
- * @property string $endpoint
+ * @property string|null $endpoint
  * @property string $name
  * @property ?string $organization_id
  * @property string $provider
- * @property string $region
+ * @property string|null $region
  * @property string $secret_access_key
  * @property-read ?Organization $organization
  * @property-read ?User $createdByUser
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ObjectStorageCredential extends Model
 {

@@ -29,12 +29,12 @@ class DebounceDecorator
 
     public const METHOD_CUSTOM = 'custom';
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $key = $this->getDebounceKey(...$arguments);
         $delay = $this->getDebounceDelay();
@@ -63,6 +63,8 @@ class DebounceDecorator
 
     /**
      * Schedule execution using the configured method (queue, scheduler, or custom).
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function scheduleExecution(string $key, int $delay, array $arguments, string $cacheKey): void
     {
@@ -78,6 +80,8 @@ class DebounceDecorator
 
     /**
      * Schedule execution via queue.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function scheduleViaQueue(string $cacheKey, int $delay, array $arguments): void
     {
@@ -98,6 +102,8 @@ class DebounceDecorator
      * For true scheduler-based execution (e.g., using a scheduled command that
      * processes pending debounced actions), implement a custom executeDebounced
      * method on your action.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function scheduleViaScheduler(string $cacheKey, int $delay, array $arguments): void
     {
@@ -108,6 +114,8 @@ class DebounceDecorator
 
     /**
      * Schedule execution via custom method defined on the action.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function scheduleViaCustom(string $key, int $delay, array $arguments): void
     {
@@ -133,7 +141,7 @@ class DebounceDecorator
         );
     }
 
-    protected function getDebounceKey(...$arguments): string
+    protected function getDebounceKey(mixed ...$arguments): string
     {
         if ($this->hasMethod('getDebounceKey')) {
             return $this->callMethod('getDebounceKey', $arguments);

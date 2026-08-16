@@ -75,7 +75,7 @@ trait ManagesLoggingBindings
         (new LoggingSpecValidator)->validate($spec);
 
         $existing = $site->bindings->firstWhere('type', 'logging');
-        $existingEnv = ($existing instanceof SiteBinding && is_array($existing->injected_env)) ? $existing->injected_env : [];
+        $existingEnv = ($existing instanceof SiteBinding) ? $existing->injected_env : [];
 
         return $this->persist($site, 'logging', [
             'mode' => 'attach_existing',
@@ -187,7 +187,7 @@ trait ManagesLoggingBindings
                 throw new InvalidArgumentException(__('That saved log drain credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return match ($provider) {

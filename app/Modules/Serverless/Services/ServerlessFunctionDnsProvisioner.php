@@ -260,8 +260,8 @@ final class ServerlessFunctionDnsProvisioner
             // directly by ID rather than logging and letting the create fail.
             $stillThere = $this->dumpRecordsAtName($token, $zone, $recordName);
             $blocking = array_values(array_filter($stillThere, function (array $r) use ($type, $value): bool {
-                $rt = strtoupper((string) ($r['type'] ?? ''));
-                $rv = strtolower(rtrim((string) ($r['data'] ?? ''), '.'));
+                $rt = strtoupper((string) $r['type']);
+                $rv = strtolower(rtrim((string) $r['data'], '.'));
                 $sameTargetMatch = $rt === strtoupper($type) && $rv === strtolower(rtrim($value, '.'));
                 if ($sameTargetMatch) {
                     return false; // exact match — upsert will no-op on this row
@@ -278,7 +278,7 @@ final class ServerlessFunctionDnsProvisioner
                 ]);
                 $do = new DigitalOceanService($token);
                 foreach ($blocking as $r) {
-                    $recordId = (int) ($r['id'] ?? 0);
+                    $recordId = (int) $r['id'];
                     if ($recordId > 0) {
                         $do->deleteDomainRecord($zone, $recordId);
                     }
@@ -365,9 +365,6 @@ final class ServerlessFunctionDnsProvisioner
         ];
 
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
             $recordName = strtolower(rtrim((string) ($record['name'] ?? ''), '.'));
             $existingType = strtoupper((string) ($record['type'] ?? ''));
             if ($recordName === '' || $existingType === '') {
@@ -433,9 +430,6 @@ final class ServerlessFunctionDnsProvisioner
         $do = new DigitalOceanService($token);
         $records = $do->getDomainRecords($zone);
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
             $name = trim((string) ($record['name'] ?? ''));
             $type = strtoupper((string) ($record['type'] ?? ''));
             if ($name !== '*') {
@@ -468,9 +462,6 @@ final class ServerlessFunctionDnsProvisioner
 
         $out = [];
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
             $recordName = strtolower(rtrim((string) ($record['name'] ?? ''), '.'));
             if (! in_array($recordName, $targets, true)) {
                 continue;

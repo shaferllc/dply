@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Modules\Cloud\Actions\CreateCloudDatabase;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Models\ProviderCredential;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
@@ -67,6 +67,9 @@ class DatabaseCreate extends Component
         ['slug' => 'blr1', 'label' => 'Bangalore 1 (IN)'],
     ];
 
+    /**
+     * @return array<string, list<string>>
+     */
     public function rules(): array
     {
         return [

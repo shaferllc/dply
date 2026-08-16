@@ -314,7 +314,7 @@ final class ServerHealthCockpit
 
         foreach ($certs as $cert) {
             $site = $cert->site;
-            $domain = is_array($cert->domains_json) ? (string) ($cert->domains_json[0] ?? '') : '';
+            $domain = (string) ($cert->domains_json[0] ?? '');
             $isFailed = $cert->status === SiteCertificate::STATUS_FAILED;
 
             if ($isFailed) {

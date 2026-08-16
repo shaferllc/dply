@@ -32,8 +32,8 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, WorkspaceVariable> $variables
  * @property-read Collection<int, WorkspaceDeployRun> $deployRuns
  * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class Workspace extends Model
 {

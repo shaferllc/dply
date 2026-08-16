@@ -57,7 +57,7 @@ trait ManagesSiteCreateFunctions
     public function updatedFormFunctionsRepositorySelection(string $value): void
     {
         foreach ($this->availableFunctionsRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
+            if ($repository['url'] !== $value) {
                 continue;
             }
 

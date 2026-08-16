@@ -72,7 +72,13 @@ jobs:
 
       - name: Run tests (Laravel)
         if: matrix.directory != 'packages/dply-core'
-        run: php artisan test
+        run: composer test
+
+      # Its own step so a ~45s whole-app parse is not charged to every local
+      # `composer test` (which skips it via --exclude-group=arch).
+      - name: Run architecture tests
+        if: matrix.directory != 'packages/dply-core'
+        run: composer test:arch
 
       - name: Run tests (dply-core)
         if: matrix.directory == 'packages/dply-core'

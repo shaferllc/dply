@@ -58,7 +58,7 @@ class NeonBackend implements DatabaseBackend
 
         $database->forceFill([
             'backend_id' => (string) $result['id'],
-            'connection' => is_array($result['connection']) ? $result['connection'] : [],
+            'connection' => $result['connection'],
         ])->save();
     }
 

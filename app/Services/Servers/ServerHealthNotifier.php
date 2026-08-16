@@ -33,7 +33,7 @@ final class ServerHealthNotifier
         $prior = $this->priorOverall($server);
 
         $report = $this->cockpit->forServer($server);
-        $overall = (string) ($report['overall'] ?? 'ok');
+        $overall = (string) $report['overall'];
 
         // Stamp the posture we evaluated regardless of whether it transitioned,
         // so the next run compares against the freshest baseline.

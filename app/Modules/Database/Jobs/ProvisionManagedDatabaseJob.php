@@ -84,7 +84,7 @@ class ProvisionManagedDatabaseJob implements ShouldQueue
             return;
         }
 
-        $connection = is_array($result['connection']) ? $result['connection'] : [];
+        $connection = $result['connection'];
         $online = $result['status'] === 'online' && (string) ($connection['host'] ?? '') !== '';
 
         if (! $online) {

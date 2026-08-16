@@ -26,7 +26,7 @@ use Illuminate\Support\Carbon;
  *                      exposed in the UI — multi-instance support was removed once it became clear most operators
  *                      never used it and the templated systemd-unit machinery was producing more bugs than value.
  * @property ?string $auth_password
- * @property string $cache_prefix
+ * @property string|null $cache_prefix
  * @property ?Carbon $cancel_requested_at
  * @property string $engine
  * @property ?string $error_message
@@ -38,8 +38,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $target_engine
  * @property ?string $version
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerCacheService extends Model
 {

@@ -82,10 +82,6 @@ class OracleComputeService
             ],
         );
 
-        if (! is_array($payload)) {
-            return [];
-        }
-
         $domains = [];
         foreach ($payload as $item) {
             if (is_array($item)) {
@@ -203,7 +199,7 @@ class OracleComputeService
             path: '/instances/'.rawurlencode($instanceId),
         );
 
-        if (! is_array($payload) || $payload === []) {
+        if ($payload === []) {
             throw new RuntimeException('Oracle Cloud did not return an instance payload.');
         }
 
@@ -335,10 +331,6 @@ class OracleComputeService
             ],
         );
 
-        if (! is_array($payload)) {
-            return null;
-        }
-
         foreach ($payload as $attachment) {
             if (! is_array($attachment)) {
                 continue;
@@ -375,10 +367,6 @@ class OracleComputeService
                 'limit' => 50,
             ],
         );
-
-        if (! is_array($payload)) {
-            return null;
-        }
 
         foreach ($payload as $subnet) {
             if (! is_array($subnet)) {

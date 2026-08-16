@@ -256,8 +256,8 @@ trait ManagesSiteRepositoryConfig
         $this->site->save();
 
         $result = $provisioner->enablePoll($this->site);
-        if (! ($result['ok'] ?? false)) {
-            $this->toastError((string) ($result['message'] ?? __('Could not enable poll mode.')));
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
         } else {
             $this->toastSuccess((string) $result['message']);
         }
@@ -304,9 +304,9 @@ trait ManagesSiteRepositoryConfig
         $this->site->refresh();
         $this->syncFormFromSite();
 
-        if (! ($result['checked'] ?? false)) {
+        if (! $result['checked']) {
             $this->toastError(__('Poll check skipped (:reason).', [
-                'reason' => (string) ($result['reason'] ?? __('unknown')),
+                'reason' => (string) $result['reason'],
             ]));
 
             return;
@@ -316,13 +316,13 @@ trait ManagesSiteRepositoryConfig
             ? (string) $result['message']
             : __('Checked Git for new commits.');
 
-        if (($result['dispatched'] ?? false) || ($result['outcome'] ?? null) === 'deploy_queued') {
+        if ($result['dispatched'] || $result['outcome'] === 'deploy_queued') {
             $this->toastSuccess($message);
 
             return;
         }
 
-        if (($result['outcome'] ?? null) === 'error') {
+        if ($result['outcome'] === 'error') {
             $this->toastError($message);
 
             return;
@@ -393,7 +393,7 @@ trait ManagesSiteRepositoryConfig
     public function updatedFunctionsRepositorySelection(string $value): void
     {
         foreach ($this->availableFunctionsRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
+            if ($repository['url'] !== $value) {
                 continue;
             }
 

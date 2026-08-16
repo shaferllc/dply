@@ -722,7 +722,7 @@ class TestingHostnameProvisioner
      * Same selection strategy as {@see chooseZone()} but against an arbitrary
      * zone list — used after the per-provider pool is resolved.
      *
-     * @param  array<string, mixed> $pool
+     * @param  list<string> $pool
      */
     private function chooseZoneFromPool(Site $site, array $pool): string
     {

@@ -155,9 +155,6 @@ class DnsPanel extends Component
         $targets = [strtolower(trim($recordName)), strtolower(rtrim($recordName.'.'.$zone, '.'))];
         $deleted = 0;
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
             $rname = strtolower(rtrim((string) ($record['name'] ?? ''), '.'));
             if (! in_array($rname, $targets, true)) {
                 continue;

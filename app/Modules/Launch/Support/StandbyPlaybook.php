@@ -13,9 +13,9 @@ namespace App\Modules\Launch\Support;
 final readonly class StandbyPlaybook
 {
     /**
-     * @param  array<string, mixed> $steps
-     * @param  array<string, mixed> $resources
-     * @param  array<string, mixed> $gaps
+     * @param  list<array<string, string|null>> $steps
+     * @param  list<array<string, string|null>> $resources
+     * @param  list<string> $gaps
      */
     public function __construct(
         public string $key,

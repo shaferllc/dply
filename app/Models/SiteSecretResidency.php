@@ -24,16 +24,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      - {@see MODE_EXTERNAL}: `$store_id` + `$reference` point at the customer's
  *                      own secret store (Vault / AWS Secrets Manager / Doppler). The value never
  *                      enters dply; it is fetched at deploy (by dply or on the box).
- * @property string $ciphertext
+ * @property string|null $ciphertext
  * @property string $key
  * @property ?array<string, mixed> $meta
  * @property string $mode
- * @property string $reference
+ * @property string|null $reference
  * @property ?string $site_id
  * @property ?string $store_id
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteSecretResidency extends Model
 {

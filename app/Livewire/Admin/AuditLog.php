@@ -69,7 +69,7 @@ class AuditLog extends Component
                     foreach ($logs as $log) {
                         fputcsv($out, [
                             $log->id,
-                            $log->created_at?->toIso8601String(),
+                            $log->created_at->toIso8601String(),
                             $log->action,
                             $log->user?->email,
                             $log->organization?->name,

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
-
-
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -13,13 +11,11 @@ namespace App\Services\Concerns;
  */
 trait ManagesHetznerLoadBalancers
 {
-
-
     /**
      * Create a load balancer and return its ID.
      *
-     * @param  array<string, mixed> $targetServerProviderIds  Hetzner server IDs to add as targets immediately
-     * @param  array<string, mixed> $services
+     * @param  list<int>  $targetServerProviderIds  Hetzner server IDs to add as targets immediately
+     * @param  list<array<string, mixed>>  $services
      */
     public function createLoadBalancer(
         string $name,
@@ -47,7 +43,7 @@ trait ManagesHetznerLoadBalancers
                 'type' => 'server',
                 'server' => ['id' => (int) $id],
                 'use_private_ip' => $networkId !== null,
-            ], array_values($targetServerProviderIds));
+            ], $targetServerProviderIds);
         }
 
         if ($services !== []) {

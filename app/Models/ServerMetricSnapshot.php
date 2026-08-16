@@ -11,8 +11,8 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed> $payload
  * @property ?string $server_id
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerMetricSnapshot extends Model
 {

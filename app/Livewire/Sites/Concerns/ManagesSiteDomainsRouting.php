@@ -319,7 +319,7 @@ trait ManagesSiteDomainsRouting
      */
     private function dispatchCertReissue(array $plan): void
     {
-        $row = collect($plan['optIn'] ?? [])->firstWhere('key', 'reissue_cert');
+        $row = collect($plan['optIn'])->firstWhere('key', 'reissue_cert');
         $certIds = is_array($row) ? ($row['detail']['cert_ids'] ?? []) : [];
         if (! is_array($certIds) || $certIds === []) {
             return;
@@ -421,7 +421,7 @@ trait ManagesSiteDomainsRouting
         $this->authorize('update', $this->site);
 
         $domain = SiteDomain::query()->where('site_id', $this->site->id)->find($domainId);
-        $hostname = $domain?->hostname ?? __('this domain');
+        $hostname = $domain->hostname ?? __('this domain');
 
         $this->openConfirmActionModal(
             'removeDomain',
@@ -527,18 +527,14 @@ trait ManagesSiteDomainsRouting
         );
 
         // Stream certbot progress into the page-top banner instead of making the
-        // operator refresh to read last_output. Guarded so any host component
-        // reusing this trait without the console-action machinery still works.
-        $useConsole = method_exists($this, 'seedQueuedConsoleAction') && method_exists($this, 'watchConsoleAction');
-        $run = $useConsole
-            ? $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]))
-            : null;
+        // operator refresh to read last_output.
+        $run = $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]));
 
         IssueServerWildcardCertificateJob::dispatch(
             $serverId,
             $zone,
-            $run !== null ? (string) $run->id : null,
-            $run !== null ? (string) $this->site->id : null,
+            (string) $run->id,
+            (string) $this->site->id,
         );
 
         $org = $this->site->server?->organization;
@@ -650,8 +646,8 @@ trait ManagesSiteDomainsRouting
                 : ($host === $zone ? '@' : rtrim(substr($host, 0, -(strlen($zone) + 1)), '.'));
 
             $status = ! empty($reach['behind_cloudflare']) ? 'cloudflare'
-                : (($reach['points_here'] ?? false) ? 'pointing'
-                : (($reach['resolves'] ?? false) ? 'wrong' : 'missing'));
+                : ($reach['points_here'] ? 'pointing'
+                : ($reach['resolves'] ? 'wrong' : 'missing'));
 
             $rows[] = [
                 'hostname' => $host,
@@ -661,7 +657,7 @@ trait ManagesSiteDomainsRouting
                 'zone' => $zone,
                 'in_zone' => $inZone,
                 'status' => $status,
-                'resolved_ips' => array_values($reach['resolved_ips'] ?? []),
+                'resolved_ips' => $reach['resolved_ips'],
             ];
         }
 

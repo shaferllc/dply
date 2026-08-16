@@ -287,14 +287,14 @@ final class ServerlessBuildHostTools
     public function findPhp(): string
     {
         $candidates = array_filter([
-            PHP_BINARY !== '' ? PHP_BINARY : null,
+            PHP_BINARY,
             '/usr/bin/php',
             '/usr/local/bin/php',
             '/opt/homebrew/bin/php',
         ]);
 
         foreach ($candidates as $candidate) {
-            if (is_string($candidate) && is_file($candidate)) {
+            if (is_file($candidate)) {
                 return $candidate;
             }
         }

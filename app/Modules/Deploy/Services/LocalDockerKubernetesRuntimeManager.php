@@ -191,7 +191,7 @@ class LocalDockerKubernetesRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $subCommand
+     * @param  array<int, string> $subCommand
      */
     private function kubectl(Site $site, array $subCommand, bool $allowFailure = false): string
     {
@@ -223,7 +223,7 @@ class LocalDockerKubernetesRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $argv  Command and args after `kubectl exec … --`
+     * @param  list<string> $argv  Command and args after `kubectl exec … --`
      * @param  callable(string): void  $onChunk
      */
     public function execInDeploymentApp(Site $site, array $argv, int $timeoutSeconds, callable $onChunk): int

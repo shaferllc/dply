@@ -101,10 +101,7 @@ class StepWhat extends Component
         $this->autoSelectSingletonKubernetesCluster();
         $this->ensureDefaultNewClusterName();
         $this->ensureDefaultOsImage();
-
-        if (! $skipsStack) {
-            $this->syncInstallProfileForServerRole();
-        }
+        $this->syncInstallProfileForServerRole();
 
         return null;
     }
@@ -608,7 +605,7 @@ class StepWhat extends Component
         $this->notifySizeRoleGuidance();
     }
 
-    public function updated($name): void
+    public function updated(string $name): void
     {
         foreach ([
             'form.webserver',
@@ -638,9 +635,7 @@ class StepWhat extends Component
                     && $this->form->webserver === 'none'
                 ) {
                     $this->form->webserver = 'caddy';
-                    if (method_exists($this, 'toastInfo')) {
-                        $this->toastInfo(__('Worker hosts always run Caddy so sites can attach testing URLs. The webserver was reset to Caddy.'));
-                    }
+                    $this->toastInfo(__('Worker hosts always run Caddy so sites can attach testing URLs. The webserver was reset to Caddy.'));
                 }
 
                 break;
@@ -682,7 +677,7 @@ class StepWhat extends Component
 
         return view('livewire.servers.create.step-what', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'reachedStep' => $this->currentDraft()?->step ?? 3,
+            'reachedStep' => ($draft = $this->currentDraft()) !== null ? $draft->step : 3,
             'provisionOptions' => $context['provisionOptions'],
             'installProfiles' => FilterServerProvisionOptionsForCreateForm::offeredInstallProfiles(),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
@@ -708,7 +703,7 @@ class StepWhat extends Component
             'sizeRoleMismatch' => $isKubernetes ? null : $this->sizeRoleMismatchForForm($catalog),
             'stepWhereRoute' => route(self::routeNameForStep(2)),
             'isDedicatedServerPurpose' => ! $isKubernetes && $this->isDedicatedServerPurposeRole(),
-            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+            'selectedServerRole' => collect($this->provisionOptionList($context['provisionOptions'], 'server_roles'))
                 ->firstWhere('id', $this->form->server_role),
             'dedicatedCacheEngineOptions' => $this->dedicatedCacheEngineOptions($context['provisionOptions']),
             ...$this->dedicatedAllowFromSuggestions(),
@@ -730,7 +725,7 @@ class StepWhat extends Component
 
         if ($this->form->type === 'digitalocean' && $this->form->do_vpc_uuid !== '') {
             $vpc = collect($this->form->do_vpcs)->firstWhere('id', $this->form->do_vpc_uuid);
-            $networkCidr = is_array($vpc) ? ($vpc['ip_range'] ?? null) : null;
+            $networkCidr = is_array($vpc) ? $vpc['ip_range'] : null;
         } elseif ($this->form->type === 'hetzner' && $this->form->hetzner_network_id !== '') {
             $networkCidr = PrivateNetwork::query()
                 ->where('provider', PrivateNetwork::PROVIDER_HETZNER)
@@ -738,8 +733,8 @@ class StepWhat extends Component
                 ->value('ip_range');
         } elseif ($this->form->type === 'vultr' && $this->form->vultr_vpc_id !== '') {
             $vpc = collect($this->form->vultr_vpcs)->firstWhere('id', $this->form->vultr_vpc_id);
-            $networkCidr = is_array($vpc) ? ($vpc['ip_range'] ?? null) : null;
-            if (($networkCidr === null || $networkCidr === '') && $this->form->vultr_vpc_id !== '') {
+            $networkCidr = is_array($vpc) ? $vpc['ip_range'] : null;
+            if ($networkCidr === null || $networkCidr === '') {
                 $networkCidr = PrivateNetwork::query()
                     ->where('provider', PrivateNetwork::PROVIDER_VULTR)
                     ->where('provider_id', $this->form->vultr_vpc_id)

@@ -25,8 +25,8 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Server> $servers
  * @property-read Collection<int, TeamSshKey> $sshKeys
  * @property-read Collection<int, NotificationChannel> $notificationChannels
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Team extends Model
 {

@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\Gate;
  *  - `oauth`   — points at a {@see DiscordInstallation} plus a channel id.
  *  - `webhook` — the original pasted webhook URL, still first-class for
  *                self-hosters with no Discord application registered.
+ *
+ * @mixin DispatchesToastNotifications
  */
 trait ResolvesDiscordGuilds
 {
@@ -179,11 +181,9 @@ trait ResolvesDiscordGuilds
             ], null);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Discord server ":guild" disconnected. Remove the dply bot in Discord to fully revoke it.', [
-                'guild' => $guildName,
-            ]));
-        }
+        $this->toastSuccess(__('Discord server ":guild" disconnected. Remove the dply bot in Discord to fully revoke it.', [
+            'guild' => $guildName,
+        ]));
     }
 
     /**
@@ -237,7 +237,7 @@ trait ResolvesDiscordGuilds
             $this->{$prefix.'discord_mode'} = 'oauth';
             if ((string) $this->{$prefix.'discord_installation_id'} === '') {
                 $first = $installations->first();
-                $this->{$prefix.'discord_installation_id'} = $first instanceof DiscordInstallation ? (string) $first->id : '';
+                $this->{$prefix.'discord_installation_id'} = (string) $first->id;
             }
 
             return;

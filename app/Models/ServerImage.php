@@ -22,21 +22,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      dump) — this is the whole-machine image, the "images" surface of the unified
  *                      Snapshots workspace. Only providers whose service wraps the image API qualify
  *                      (see {@see ServerProvider::supportsImageSnapshots()}).
- * @property int $bytes
+ * @property int|null $bytes
  * @property ?string $error_message
  * @property string $name
  * @property ?string $organization_id
  * @property string $provider
  * @property ?string $provider_action_id
  * @property ?string $provider_image_id
- * @property string $region
+ * @property string|null $region
  * @property ?string $server_id
  * @property string $status
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerImage extends Model
 {

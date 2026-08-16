@@ -22,8 +22,8 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property string $trigger
  * @property-read ?ServerCronJob $cronJob
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerCronJobRun extends Model
 {

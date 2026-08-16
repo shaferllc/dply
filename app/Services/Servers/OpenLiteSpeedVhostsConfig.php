@@ -263,7 +263,7 @@ class OpenLiteSpeedVhostsConfig
 
         try {
             foreach ($updates as $vhostName => $payload) {
-                $confPath = (string) ($payload['conf_path'] ?? '');
+                $confPath = (string) $payload['conf_path'];
                 if ($confPath === '' || ! str_starts_with($confPath, '/')) {
                     $emit->warn('Skipping `'.$vhostName.'` — missing conf_path.');
 
@@ -278,7 +278,7 @@ class OpenLiteSpeedVhostsConfig
                     continue;
                 }
 
-                $merged = $this->mergeIntoVhconf($current, (array) ($payload['values'] ?? []));
+                $merged = $this->mergeIntoVhconf($current, (array) $payload['values']);
                 if ($merged === $current) {
                     $emit->info('No changes for '.$vhostName.'.');
 
@@ -443,7 +443,7 @@ class OpenLiteSpeedVhostsConfig
             return [];
         }
 
-        return array_values($m[0] ?? []);
+        return $m[0];
     }
 
     /**
@@ -455,7 +455,7 @@ class OpenLiteSpeedVhostsConfig
             return [];
         }
 
-        return array_values($m[0] ?? []);
+        return $m[0];
     }
 
     private function extractVirtualHostName(string $block): ?string
@@ -518,7 +518,7 @@ class OpenLiteSpeedVhostsConfig
     {
         $domains = [];
         if (preg_match_all('/^[\t ]*member\s+\S+\s*\{(.*?)^[\t ]*\}/sm', $block, $matches)) {
-            foreach ($matches[1] ?? [] as $body) {
+            foreach ($matches[1] as $body) {
                 if (preg_match_all('/^[\t ]*vhDomain\s+(\S.*?)\s*$/m', $body, $dm)) {
                     foreach ($dm[1] as $d) {
                         foreach (preg_split('/\s*,\s*/', $d) ?: [] as $one) {

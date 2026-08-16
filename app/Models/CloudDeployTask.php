@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *                      --force'); the Create form's first-class "Run migrations" toggle is
  *                      just a thin convenience over this row.
  * @property string $command
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $site_id
  * @property string $size
@@ -31,8 +31,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $trigger
  * @property-read ?Site $site
  * @property-read Collection<int, CloudDeployTaskRun> $runs
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class CloudDeployTask extends Model
 {

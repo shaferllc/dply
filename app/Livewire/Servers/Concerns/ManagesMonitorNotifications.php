@@ -133,9 +133,7 @@ trait ManagesMonitorNotifications
 
         // Only allow removal when the user can manage the underlying channel
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $sub->delete();
         $this->toastSuccess(__('Subscription removed.'));

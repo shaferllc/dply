@@ -755,7 +755,7 @@ class DeploymentsList extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $keys = array_map(static fn ($e): string => (string) ($e['key'] ?? ''), $this->deployBlockedEnvKeys());
+        $keys = array_map(static fn ($e): string => (string) $e['key'], $this->deployBlockedEnvKeys());
         $derived = DomainDerivedEnvDefaults::resolve($this->site, $keys);
 
         if ($derived === []) {

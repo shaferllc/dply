@@ -78,7 +78,7 @@ class RemediationCatalog
     /**
      * Resolve a single action within a remediation.
      *
-     * @return list<string>
+     * @return array<string, mixed>|null
      */
     public function action(string $code, string $actionKey): ?array
     {

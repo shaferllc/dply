@@ -15,6 +15,7 @@ use App\Models\ErrorEvent;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
@@ -122,8 +123,8 @@ class WorkspaceErrors extends Component
         $onNotificationsTab = $this->errorsTab === 'notifications';
 
         return view('livewire.servers.workspace-errors', [
-            'notifChannels' => $onNotificationsTab ? $this->assignableErrorsNotificationChannels() : collect(),
-            'notifSubscriptions' => $onNotificationsTab ? $this->errorsNotificationSubscriptions() : collect(),
+            'notifChannels' => $onNotificationsTab ? $this->assignableErrorsNotificationChannels() : new Collection(),
+            'notifSubscriptions' => $onNotificationsTab ? $this->errorsNotificationSubscriptions() : new Collection(),
             'notifEventLabels' => $onNotificationsTab ? $this->errorsEventLabels() : [],
         ]);
     }

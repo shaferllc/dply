@@ -25,8 +25,8 @@ final class DockerDeployEngine implements DeployEngine
         $dockerRuntime = is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [];
 
         $meta['docker_runtime'] = array_merge($dockerRuntime, [
-            'compose_yaml' => $result['compose_yaml'] ?? ($dockerRuntime['compose_yaml']),
-            'dockerfile' => $result['dockerfile'] ?? ($dockerRuntime['dockerfile']),
+            'compose_yaml' => $result['compose_yaml'],
+            'dockerfile' => $result['dockerfile'],
             'workspace_path' => $result['workspace_path'] ?? ($dockerRuntime['workspace_path'] ?? null),
             'repository_checkout_path' => $result['repository_checkout_path'] ?? ($dockerRuntime['repository_checkout_path'] ?? null),
             'working_directory' => $result['working_directory'] ?? ($dockerRuntime['working_directory'] ?? null),

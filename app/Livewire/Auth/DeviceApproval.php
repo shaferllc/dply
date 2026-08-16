@@ -320,13 +320,13 @@ class DeviceApproval extends Component
             }
         }
 
-        $availableScopes = array_values(array_map(
+        $availableScopes = array_map(
             fn (string $ability): array => [
                 'ability' => $ability,
                 'label' => __((string) ($labels[$ability] ?? $catalogLabels[$ability] ?? $ability)),
             ],
             $grantable,
-        ));
+        );
 
         return view('livewire.auth.device-approval', [
             'organizations' => $organizations,

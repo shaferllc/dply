@@ -169,7 +169,7 @@ BASH;
             return [];
         }
         if (preg_match_all('/^[\t ]*module\s+([A-Za-z0-9_]+)\s*\{/m', $config, $matches) !== false) {
-            return array_values(array_unique($matches[1] ?? []));
+            return array_values(array_unique($matches[1]));
         }
 
         return [];

@@ -12,7 +12,7 @@ use App\Support\Servers\SiteLoadAttributionHistory;
 final class SiteLoadAttributorScript
 {
     /**
-     * @param  array<string, mixed> $sites
+     * @param  list<array<string, string>> $sites
      */
     public function build(array $sites): string
     {
@@ -106,9 +106,9 @@ SH;
 
                 continue;
             }
-            if (str_starts_with($line, 'mem_kb=') && $current === null) {
+            if (str_starts_with($line, 'mem_kb=')) {
                 $total['mem_kb'] = (int) substr($line, strlen('mem_kb='));
-            } elseif (str_starts_with($line, 'cpu_pct=') && $current === null) {
+            } elseif (str_starts_with($line, 'cpu_pct=')) {
                 $total['cpu_pct'] = (float) substr($line, strlen('cpu_pct='));
             }
         }
@@ -116,7 +116,7 @@ SH;
         $total['mem_mb'] = round($total['mem_kb'] / 1024, 1);
 
         $attributedMem = array_sum(array_column($sites, 'mem_kb'));
-        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) ($row['cpu_pct'] ?? 0), $sites));
+        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) $row['cpu_pct'], $sites));
 
         $unattributedMem = max(0, $total['mem_kb'] - $attributedMem);
         $unattributedCpu = max(0.0, $total['cpu_pct'] - $attributedCpu);

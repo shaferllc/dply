@@ -26,7 +26,7 @@ class AssignableNotificationChannels
      */
     public static function forUser(User $user, ?Organization $org): Collection
     {
-        $key = (string) $user->id.'|'.(string) ($org?->id ?? '');
+        $key = (string) $user->id.'|'.(string) ($org->id ?? '');
         if (isset(self::$memo[$key])) {
             return self::$memo[$key];
         }

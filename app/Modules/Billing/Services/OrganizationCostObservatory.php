@@ -120,18 +120,18 @@ final class OrganizationCostObservatory
         if (ServerProviderCostEstimator::isSupported($server->provider)) {
             try {
                 $estimate = $this->providerCostEstimator->estimate($server);
-                $currency = (string) ($estimate['currency'] ?? 'USD');
+                $currency = (string) $estimate['currency'];
 
                 return [
                     'id' => (string) $server->id,
                     'name' => (string) $server->name,
-                    'provider' => (string) ($estimate['provider_label'] ?? $server->provider->label()),
-                    'plan' => (string) ($estimate['plan'] ?? $server->size),
+                    'provider' => (string) $estimate['provider_label'],
+                    'plan' => (string) $estimate['plan'],
                     'monthly_usd_cents' => $this->noteParser->toUsdCents((float) $estimate['monthly'], $currency),
                     'native_amount' => (float) $estimate['monthly'],
                     'native_currency' => $currency,
                     'source' => 'catalog',
-                    'detail' => (string) ($estimate['source'] ?? __('Provider catalog')),
+                    'detail' => (string) $estimate['source'],
                 ];
             } catch (ProviderCostUnavailableException $e) {
                 return $this->unknownRow($server, $e->getMessage());

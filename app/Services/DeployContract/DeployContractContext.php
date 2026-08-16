@@ -11,7 +11,7 @@ use App\Models\User;
 final class DeployContractContext
 {
     /**
-     * @param  array<string, mixed> $linkedByoSites
+     * @param  list<\App\Models\Site> $linkedByoSites
      * @param  array<int, Site> $linkedBackendSites  dply.yaml `site.<name>` backend refs
      */
     public function __construct(

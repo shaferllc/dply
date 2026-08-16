@@ -81,7 +81,11 @@ class StepScan extends Component
     /** Server whose stored key to reuse when adoptKeySource is 'existing'. */
     public string $adoptKeyServerId = '';
 
-    /** Result of the last Test connection run: ['ok' => bool, 'message' => string]. */
+    /**
+     * Result of the last Test connection run.
+     *
+     * @var array{ok: bool, message: string}|null
+     */
     public ?array $probeResult = null;
 
     /**
@@ -246,7 +250,11 @@ class StepScan extends Component
         $this->adoptKeyServerId = (string) ($reusable->first()->id ?? '');
     }
 
-    /** The Server a scan row resolved to, scoped to the current org. */
+    /**
+     * The Server a scan row resolved to, scoped to the current org.
+     *
+     * @param  array<string, mixed>|null  $row
+     */
     private function matchedServer(?array $row): ?Server
     {
         $serverId = $row['server_id'] ?? null;

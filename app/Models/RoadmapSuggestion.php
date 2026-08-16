@@ -17,16 +17,16 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * @property string $admin_notes
+ * @property string|null $admin_notes
  * @property ?string $description
  * @property string $email
- * @property string $ip_address
- * @property string $name
+ * @property string|null $ip_address
+ * @property string|null $name
  * @property ?string $promoted_roadmap_item_id
  * @property string $status
  * @property string $title
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class RoadmapSuggestion extends Model
 {

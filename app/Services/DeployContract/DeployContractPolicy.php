@@ -9,13 +9,14 @@ namespace App\Services\DeployContract;
  *
  * @phpstan-type PolicyArray array{
  *   requires?: list<string>,
+ *   promote?: array{requires?: list<string>, min_replay_pass_rate?: float|int, require_replay?: bool},
  *   min_replay_pass_rate?: float|int,
  *   require_replay?: bool,
  * }
  */
 final class DeployContractPolicy
 {
-    /** @param  array<string, mixed> $requires */
+    /** @param  list<string> $requires */
     public function __construct(
         public readonly array $requires = [],
         public readonly ?float $minReplayPassRate = null,
@@ -39,7 +40,7 @@ final class DeployContractPolicy
         $requires = [];
         if (isset($contract['requires']) && is_array($contract['requires'])) {
             foreach ($contract['requires'] as $key) {
-                if (($key) && $key !== '') {
+                if ($key) {
                     $requires[] = $key;
                 }
             }
@@ -48,7 +49,7 @@ final class DeployContractPolicy
         $promote = is_array($contract['promote'] ?? null) ? $contract['promote'] : [];
         if ($requires === [] && isset($promote['requires']) && is_array($promote['requires'])) {
             foreach ($promote['requires'] as $key) {
-                if (is_string($key) && $key !== '') {
+                if ($key !== '') {
                     $requires[] = $key;
                 }
             }

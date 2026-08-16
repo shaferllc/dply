@@ -16,7 +16,7 @@ namespace App\Modules\Ai\Services;
 final class LlmSynthesisResult
 {
     /**
-     * @param  array<string, mixed> $suggestions
+     * @param  list<array<string, list<array<string, string>>|string|null>> $suggestions
      * @param  array<string, mixed> $metadata
      */
     public function __construct(

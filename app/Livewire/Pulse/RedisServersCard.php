@@ -20,6 +20,9 @@ class RedisServersCard extends ServiceServersCard
         return 'heroicon-o-server-stack';
     }
 
+    /**
+     * @return Collection<int, int|string>
+     */
     protected function serverIds(): Collection
     {
         return DB::table('server_cache_services')->distinct()->pluck('server_id');

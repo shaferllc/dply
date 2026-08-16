@@ -93,7 +93,7 @@ class SitePromote extends Component
         $dest = Server::query()->where('organization_id', $org->id)->findOrFail($this->destination_server_id);
         $source = $this->site->fresh(['server', 'domains']);
 
-        $sourceProduction = (string) ($source->primaryDomain()?->hostname ?? '');
+        $sourceProduction = (string) ($source->primaryDomain()->hostname ?? '');
 
         $primaryHostname = $this->hostname_mode === 'preview'
             ? $hostnameResolver->resolve($source, $dest)
@@ -147,7 +147,7 @@ class SitePromote extends Component
 
         return view('livewire.sites.promote', [
             'previewHostname' => $previewHostname,
-            'sourceProductionHostname' => (string) ($this->site->primaryDomain()?->hostname ?? ''),
+            'sourceProductionHostname' => (string) ($this->site->primaryDomain()->hostname ?? ''),
             'cutoverPreview' => $cutoverPreview,
         ]);
     }

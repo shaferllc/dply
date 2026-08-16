@@ -50,15 +50,15 @@ class ServerConfigFileCatalog
                     }
 
                     foreach ($this->formatEngineProbeFiles($probeResults[$index] ?? [], $engine) as $row) {
-                        $path = (string) ($row['path'] ?? '');
+                        $path = (string) $row['path'];
                         if ($path === '' || isset($seen[$path])) {
                             continue;
                         }
                         $seen[$path] = true;
                         $files[] = $this->fileRow(
                             $path,
-                            (string) ($row['label'] ?? basename($path)),
-                            (int) ($row['size'] ?? 0),
+                            (string) $row['label'],
+                            (int) $row['size'],
                             $row['mtime'] ?? null,
                             $groupKey,
                             $engine,
@@ -94,7 +94,7 @@ class ServerConfigFileCatalog
                     }
 
                     foreach ($probeResults[$index] ?? [] as $row) {
-                        $path = (string) ($row['path'] ?? '');
+                        $path = (string) $row['path'];
                         if ($path === '' || isset($seen[$path])) {
                             continue;
                         }
@@ -102,7 +102,7 @@ class ServerConfigFileCatalog
                         $files[] = $this->fileRow(
                             $path,
                             basename($path),
-                            (int) ($row['size'] ?? 0),
+                            (int) $row['size'],
                             $row['mtime'] ?? null,
                             $groupKey,
                         );
@@ -388,7 +388,7 @@ class ServerConfigFileCatalog
     }
 
     /**
-     * @param  array<string, mixed> $rows
+     * @param  list<array<string, int|string|null>> $rows
      * @return list<array{path: string, label: string, size: int, mtime: int|null}>
      */
     private function formatEngineProbeFiles(array $rows, string $engine): array

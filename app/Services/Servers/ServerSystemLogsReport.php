@@ -54,7 +54,7 @@ final class ServerSystemLogsReport
             && $server->organization?->userIsDeployer($user);
 
         $opsReady = $server->isReady() && filled($server->ssh_private_key);
-        $logKey = (string) ($viewer['log_key'] ?? '');
+        $logKey = (string) $viewer['log_key'];
         $activeDef = $logSources[$logKey] ?? [];
         $activeType = (string) ($activeDef['type'] ?? 'file');
         $sshRequiredForActive = ! in_array($activeType, ['dply', 'dply_site'], true);
@@ -64,10 +64,6 @@ final class ServerSystemLogsReport
         $groups = [];
 
         foreach ($logSources as $key => $def) {
-            if (! is_array($def)) {
-                continue;
-            }
-
             $group = (string) ($def['group'] ?? 'other');
             $type = (string) ($def['type'] ?? 'file');
             $groups[$group] = ($groups[$group] ?? 0) + 1;
@@ -108,8 +104,8 @@ final class ServerSystemLogsReport
                 'source_count' => count($sourceRows),
                 'site_source_count' => $siteSourceCount,
                 'group_count' => count($groups),
-                'filtered_lines' => (int) ($viewer['log_filtered_lines'] ?? 0),
-                'total_lines' => (int) ($viewer['log_total_lines'] ?? 0),
+                'filtered_lines' => (int) $viewer['log_filtered_lines'],
+                'total_lines' => (int) $viewer['log_total_lines'],
             ],
             'active_source' => [
                 'key' => $logKey,
@@ -121,13 +117,13 @@ final class ServerSystemLogsReport
             'source_rows' => $sourceRows,
             'viewer' => [
                 'last_fetched_at' => $this->parseTimestamp($viewer['log_last_fetched_at'] ?? null),
-                'auto_refresh' => (bool) ($viewer['log_auto_refresh'] ?? false),
-                'auto_refresh_seconds' => (int) ($viewer['log_auto_refresh_seconds'] ?? 30),
+                'auto_refresh' => (bool) $viewer['log_auto_refresh'],
+                'auto_refresh_seconds' => (int) $viewer['log_auto_refresh_seconds'],
                 'time_range_minutes' => $viewer['log_time_range_minutes'] ?? null,
                 'error' => $remoteError,
-                'truncated' => (bool) ($viewer['log_last_fetch_truncated'] ?? false),
-                'raw_bytes' => (int) ($viewer['log_last_fetch_raw_bytes'] ?? 0),
-                'broadcast_subscribable' => (bool) ($viewer['log_broadcast_subscribable'] ?? false),
+                'truncated' => (bool) $viewer['log_last_fetch_truncated'],
+                'raw_bytes' => (int) $viewer['log_last_fetch_raw_bytes'],
+                'broadcast_subscribable' => (bool) $viewer['log_broadcast_subscribable'],
             ],
         ];
     }

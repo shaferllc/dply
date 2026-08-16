@@ -65,7 +65,7 @@ class NginxCustomHostsConfig
             );
         }
 
-        usort($hosts, fn (array $a, array $b): int => strcmp((string) ($a['slug'] ?? ''), (string) ($b['slug'] ?? '')));
+        usort($hosts, fn (array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
 
         return ['hosts' => $hosts, 'unreadable' => false];
     }
@@ -81,7 +81,7 @@ class NginxCustomHostsConfig
         $path = $this->pathForSlug($slug);
 
         foreach ($this->read($server)['hosts'] as $host) {
-            if (($host['slug'] ?? '') === $slug) {
+            if ($host['slug'] === $slug) {
                 throw new \RuntimeException("A custom host `{$slug}` already exists.");
             }
         }
@@ -102,7 +102,7 @@ class NginxCustomHostsConfig
 
         $exists = false;
         foreach ($this->read($server)['hosts'] as $host) {
-            if (($host['slug'] ?? '') === $slug) {
+            if ($host['slug'] === $slug) {
                 $exists = true;
                 break;
             }
@@ -146,10 +146,10 @@ class NginxCustomHostsConfig
      */
     public function render(string $slug, array $fields): string
     {
-        $serverNames = $this->normalizeList($fields['server_names'] ?? []);
-        $listens = $this->normalizeList($fields['listen'] ?? ['80', '[::]:80']);
-        $root = trim((string) ($fields['root'] ?? ''));
-        $upstream = trim((string) ($fields['upstream'] ?? ''));
+        $serverNames = $this->normalizeList($fields['server_names']);
+        $listens = $this->normalizeList($fields['listen']);
+        $root = trim((string) $fields['root']);
+        $upstream = trim((string) $fields['upstream']);
 
         if ($serverNames === []) {
             throw new \InvalidArgumentException('At least one server_name is required.');
@@ -200,8 +200,8 @@ class NginxCustomHostsConfig
         $emit->step('nginx-custom-hosts', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'nginx', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'])) {
-            throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'nginx -t rejected the new file.')));
+        if (! $result['validate_ok']) {
+            throw new \RuntimeException(trim((string) $result['validate_output']));
         }
 
         $ssh = new SshConnection($server);

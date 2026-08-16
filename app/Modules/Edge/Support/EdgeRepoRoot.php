@@ -103,7 +103,7 @@ final class EdgeRepoRoot
      * When set, only changes under repo_root/** or repo-level dply config
      * files trigger a production redeploy.
      *
-     * @param  array<string, mixed> $changedFiles
+     * @param  list<string> $changedFiles
      */
     public static function pushTouchesSite(string $repoRoot, array $changedFiles): bool
     {

@@ -29,8 +29,8 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property bool $validate_timestamps
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerPhpOpcacheProfile extends Model
 {

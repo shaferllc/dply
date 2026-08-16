@@ -38,7 +38,7 @@ class ServerPhpSiteRuntimeMigrator
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      */
     public function resolveMigrationTargetVersion(array $installedIds, string $fromVersion): ?string
     {

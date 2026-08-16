@@ -37,6 +37,7 @@ class ActionResourceRegistrar extends ResourceRegistrar
                 'store' => 'Create'.ucfirst($actionName),
                 'update' => 'Update'.ucfirst($actionName),
                 'destroy' => 'Delete'.ucfirst($actionName),
+                default => ucfirst($method).ucfirst($actionName),
             };
         }
 

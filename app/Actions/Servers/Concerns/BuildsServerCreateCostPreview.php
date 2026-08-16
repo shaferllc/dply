@@ -14,8 +14,6 @@ use Illuminate\Support\Collection;
  */
 trait BuildsServerCreateCostPreview
 {
-
-
     /**
      * @param  array{
      *     credentials: Collection<int, mixed>,
@@ -64,7 +62,7 @@ trait BuildsServerCreateCostPreview
             return $this->buildEksCostPreview($form);
         }
 
-        $size = collect($catalog['sizes'] ?? [])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
+        $size = collect($catalog['sizes'])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
 
         if (! is_array($size)) {
             if ($form->type === 'digitalocean_functions') {

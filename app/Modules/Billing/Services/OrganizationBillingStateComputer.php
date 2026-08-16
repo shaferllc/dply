@@ -189,7 +189,7 @@ class OrganizationBillingStateComputer
             $this->billableByoServerCountWithoutMetrics($organization),
         );
 
-        if (max(0, (int) ($plan['price_cents'] ?? 0)) > 0) {
+        if (max(0, (int) $plan['price_cents']) > 0) {
             return false;
         }
 
@@ -399,7 +399,7 @@ class OrganizationBillingStateComputer
             'bytes_egress' => $usageTotals->bytesEgress,
             'r2_storage_bytes' => $usageTotals->r2StorageBytes,
         ]);
-        $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents'] ?? 0);
+        $edgeUsageSubtotalCents = (int) $edgeUsageEstimate['subtotal_cents'];
 
         // dply Logs ingest overage — metered pass-through, billed against the
         // org's plan entitlement (included GB + per-GB rate). Volume is the
@@ -430,7 +430,7 @@ class OrganizationBillingStateComputer
         [$slPeriodStart, $slPeriodEnd] = $this->serverlessUsageReader->currentMonthWindow();
         $serverlessUsageTotals = $this->serverlessUsageReader->totalsForOrganization($organization, $slPeriodStart, $slPeriodEnd);
         $serverlessUsageEstimate = $this->serverlessUsageCostCalculator->estimate($serverlessUsageTotals, $managedServerlessCount);
-        $serverlessUsageSubtotalCents = (int) ($serverlessUsageEstimate['subtotal_cents'] ?? 0)
+        $serverlessUsageSubtotalCents = (int) $serverlessUsageEstimate['subtotal_cents']
             + $this->serverlessResourceCalculator->subtotalCents($managedServerlessSites);
 
         // The flat plan is chosen by billable BYO server count.

@@ -118,7 +118,7 @@ final class PhpRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $packages
+     * @param  list<(int|string)> $packages
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      */
@@ -153,7 +153,7 @@ final class PhpRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $packages
+     * @param  list<(int|string)> $packages
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      * @return list<DetectedProcess>

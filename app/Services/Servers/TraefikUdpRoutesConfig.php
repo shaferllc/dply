@@ -80,7 +80,7 @@ class TraefikUdpRoutesConfig
     {
         $slug = $this->normalizeTraefikSlug($slug);
         foreach ($this->read($server)['routes'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("UDP route `{$slug}` already exists.");
             }
         }
@@ -110,7 +110,7 @@ class TraefikUdpRoutesConfig
         if ($entryPoints === []) {
             $entryPoints = ['web'];
         }
-        $addr = trim((string) ($fields['server_address'] ?? ''));
+        $addr = trim((string) $fields['server_address']);
         if ($addr === '') {
             throw new \InvalidArgumentException('Backend address is required.');
         }

@@ -19,18 +19,18 @@ use Illuminate\Support\Carbon;
  *                      historical runs survive task renames or trigger changes.
  * @property ?string $cloud_deploy_task_id
  * @property ?string $deployment_id
- * @property int $duration_ms
+ * @property int|null $duration_ms
  * @property ?string $error
- * @property int $exit_code
+ * @property int|null $exit_code
  * @property ?Carbon $finished_at
- * @property string $log_tail
- * @property array<string, mixed> $meta
+ * @property string|null $log_tail
+ * @property array<string, mixed>|null $meta
  * @property ?Carbon $started_at
  * @property string $status
  * @property string $trigger
  * @property-read ?CloudDeployTask $task
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class CloudDeployTaskRun extends Model
 {

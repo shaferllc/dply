@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
@@ -90,7 +89,7 @@ trait DetectsRepositoryRuntime
 
         try {
             $plan = app(RepositoryRuntimePreview::class)->fromUrl($url, $branch);
-        } catch (GitCloneException|Throwable $e) {
+        } catch (Throwable $e) {
             $this->detectedPlan = [
                 'error' => $e->getMessage(),
                 'url' => $url,
@@ -171,7 +170,7 @@ trait DetectsRepositoryRuntime
                 'kind' => 'serverless',
             ];
         } finally {
-            if ($checkout !== null && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
+            if ($checkout !== null) {
                 app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
             }
         }

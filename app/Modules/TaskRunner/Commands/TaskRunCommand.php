@@ -7,6 +7,7 @@ namespace App\Modules\TaskRunner\Commands;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Facades\TaskRunner;
 use App\Modules\TaskRunner\ParallelTaskExecutor;
+use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\TaskChain;
 use Illuminate\Console\Command;
 
@@ -35,7 +36,8 @@ class TaskRunCommand extends Command
         // "An argument with name "command" already exists." on every invocation.
         $command = $this->argument('cmd');
         $name = $this->option('name') ?: $command;
-        $timeout = $this->option('timeout');
+        $rawTimeout = $this->option('timeout');
+        $timeout = is_string($rawTimeout) && $rawTimeout !== '' ? (int) $rawTimeout : null;
         $connection = $this->option('connection');
         $parallel = $this->option('parallel');
         $maxConcurrency = (int) $this->option('max-concurrency');
@@ -90,7 +92,7 @@ class TaskRunCommand extends Command
             return $this->runAndFollow($task, $quiet);
         }
 
-        $result = TaskRunner::run($task);
+        $result = TaskRunner::run(new PendingTask($task));
 
         if ($quiet) {
             return $result->isSuccessful() ? 0 : 1;
@@ -201,7 +203,7 @@ class TaskRunCommand extends Command
             return $this->runAndFollow($task, $quiet);
         }
 
-        $result = TaskRunner::run($task);
+        $result = TaskRunner::run(new PendingTask($task));
 
         if ($quiet) {
             return $result->isSuccessful() ? 0 : 1;

@@ -4,27 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Modules\Cloud\Actions\CreateCloudSite;
-use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
-use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Cloud\Concerns\ManagesCloudCostBackend;
 use App\Livewire\Cloud\Concerns\ManagesCloudRepository;
 use App\Livewire\Cloud\Concerns\ManagesCloudResources;
 use App\Livewire\Cloud\Concerns\ValidatesCloudCreateForm;
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
-use App\Models\CloudBucket;
 use App\Models\CloudDatabase;
 use App\Models\CloudDeployTask;
-use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
-use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
+use App\Modules\Cloud\Actions\CreateCloudSite;
+use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
 use App\Modules\Cloud\Backends\CloudRouter;
-use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
-use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
-use App\Modules\SourceControl\Services\DefaultBranchResolver;
-use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\View\View;
@@ -76,7 +69,6 @@ class Create extends Component
 
         $this->mode = $value;
     }
-
 
     public string $name = '';
 
@@ -182,6 +174,12 @@ class Create extends Component
      *     version: string,
      *     size: string,
      *     env_prefix: string,
+     *     host?: string,
+     *     port?: int,
+     *     database?: string,
+     *     username?: string,
+     *     password?: string,
+     *     ssl?: bool,
      * }>
      */
     public array $databases = [];
@@ -247,7 +245,6 @@ class Create extends Component
      */
     public array $costPreview = ['value' => null, 'error' => null];
 
-
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         abort_unless(Feature::active('surface.cloud'), 404);
@@ -288,7 +285,6 @@ class Create extends Component
         }
     }
 
-
     /**
      * Pre-fill the container HTTP port from the detected app port, unless the
      * user has already typed their own.
@@ -305,7 +301,6 @@ class Create extends Component
         }
     }
 
-
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
         if ($this->linkedSourceControlAccounts === []) {
@@ -319,7 +314,6 @@ class Create extends Component
         $this->loadRepositoriesForSelectedAccount();
         $this->repo_source = 'connected';
     }
-
 
     public function deploy(): void
     {
@@ -344,8 +338,9 @@ class Create extends Component
         // container_failed. Skips silently when there's no DO
         // credential yet (Fake / no-cred dev installs).
         $this->recomputeCostPreview();
-        if (is_string($this->costPreview['error'] ?? null) && $this->costPreview['error'] !== '') {
-            $this->toastError(__('Spec rejected by cloud provider: :error', ['error' => $this->costPreview['error']]));
+        $costPreviewError = $this->costPreview['error'];
+        if ($costPreviewError !== null && $costPreviewError !== '') {
+            $this->toastError(__('Spec rejected by cloud provider: :error', ['error' => $costPreviewError]));
 
             return;
         }
@@ -388,7 +383,6 @@ class Create extends Component
         $this->toastSuccess(__('App is provisioning. We\'ll keep this page updated as it comes online.'));
         $this->redirect(route('sites.show', ['server' => $site->server, 'site' => $site]), navigate: true);
     }
-
 
     public function render(): View
     {

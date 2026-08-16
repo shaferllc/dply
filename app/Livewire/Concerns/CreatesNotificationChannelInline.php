@@ -131,9 +131,12 @@ trait CreatesNotificationChannelInline
         $result = $channel->sendTest(Auth::user());
         $this->testingChannelId = null;
 
+        // Bind the morphTo result to a local first — `instanceof` narrows a
+        // variable, but not a relation property fetch re-read in each arm.
+        $owner = $channel->owner;
         $org = match (true) {
-            $channel->owner instanceof Organization => $channel->owner,
-            $channel->owner instanceof Team => $channel->owner->organization,
+            $owner instanceof Organization => $owner,
+            $owner instanceof Team => $owner->organization,
             default => Auth::user()?->currentOrganization(),
         };
         if ($org !== null) {
@@ -142,7 +145,7 @@ trait CreatesNotificationChannelInline
                 'type' => $channel->type,
                 'label' => $channel->label,
                 'result' => $result['ok'] ? 'success' : 'failed',
-                'message' => isset($result['message']) ? (string) $result['message'] : null,
+                'message' => $result['message'],
                 'surface' => 'subscription_matrix',
             ]);
         }

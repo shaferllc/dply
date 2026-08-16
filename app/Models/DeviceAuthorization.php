@@ -27,18 +27,18 @@ use Illuminate\Support\Str;
  * @property ?Carbon $delivered_at
  * @property string $device_code_hash
  * @property ?Carbon $expires_at
- * @property string $ip_address
+ * @property string|null $ip_address
  * @property ?string $organization_id
  * @property string $status
- * @property string $token_plaintext
- * @property string $user_agent
+ * @property string|null $token_plaintext
+ * @property string|null $user_agent
  * @property string $user_code
  * @property ?string $user_id
  * @property-read ?User $user
  * @property-read ?Organization $organization
  * @property-read ?ApiToken $apiToken
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class DeviceAuthorization extends Model
 {

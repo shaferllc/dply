@@ -79,7 +79,7 @@ class TraefikHttpServicesConfig
     {
         $slug = $this->normalizeTraefikSlug($slug);
         foreach ($this->read($server)['services'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("Service `{$slug}` already exists.");
             }
         }
@@ -105,7 +105,7 @@ class TraefikHttpServicesConfig
     public function render(string $slug, array $fields): string
     {
         $name = self::FILE_PREFIX.$slug;
-        $urls = $this->csvList($fields['servers'] ?? []);
+        $urls = $this->csvList($fields['servers']);
         if ($urls === []) {
             throw new \InvalidArgumentException('At least one server URL is required.');
         }

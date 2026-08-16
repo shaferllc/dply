@@ -79,10 +79,10 @@ trait ManagesSiteDomainsGeneral
     {
         $this->site->loadMissing('previewDomains');
         $previewDomain = $this->site->primaryPreviewDomain();
-        $this->preview_primary_hostname = (string) ($previewDomain?->hostname ?? $this->site->testingHostname());
-        $this->preview_label = (string) ($previewDomain?->label ?? 'Managed preview');
-        $this->preview_auto_ssl = (bool) ($previewDomain?->auto_ssl ?? true);
-        $this->preview_https_redirect = (bool) ($previewDomain?->https_redirect ?? true);
+        $this->preview_primary_hostname = (string) ($previewDomain->hostname ?? $this->site->testingHostname());
+        $this->preview_label = (string) ($previewDomain->label ?? 'Managed preview');
+        $this->preview_auto_ssl = (bool) ($previewDomain->auto_ssl ?? true);
+        $this->preview_https_redirect = (bool) ($previewDomain->https_redirect ?? true);
     }
 
     private function syncDnsSettingsForm(): void
@@ -108,7 +108,7 @@ trait ManagesSiteDomainsGeneral
         ]);
 
         $rawCred = $this->settings_dns_provider_credential_id;
-        $credentialId = is_string($rawCred) && $rawCred !== '' ? $rawCred : null;
+        $credentialId = $rawCred !== '' ? $rawCred : null;
 
         if ($credentialId !== null) {
             $ok = ProviderCredential::query()
@@ -466,7 +466,7 @@ trait ManagesSiteDomainsGeneral
      */
     public function canAddManagedPreview(): bool
     {
-        return trim((string) ($this->site->server?->ip_address ?? '')) !== ''
+        return trim((string) ($this->site->server->ip_address ?? '')) !== ''
             && app(TestingHostnameProvisioner::class)->isEnabledForSite($this->site);
     }
 

@@ -66,7 +66,7 @@ class RateLimits extends Component
         $this->site->mergeEdgeMeta([
             'rate_limit' => [
                 'enabled' => $this->enabled,
-                'rules' => array_values($this->rules),
+                'rules' => $this->rules,
             ],
         ]);
         $this->site->save();

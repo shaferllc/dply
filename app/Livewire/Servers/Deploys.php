@@ -13,7 +13,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -238,7 +240,7 @@ class Deploys extends Component
     }
 
     /**
-     * @return array{deployments: \Illuminate\Contracts\Pagination\LengthAwarePaginator, sites: \Illuminate\Support\Collection, statuses: list<string>}
+     * @return array{deployments: LengthAwarePaginator<int, SiteDeployment>, sites: Collection<int|string, Site>, statuses: list<string>}
      */
     private function historyData(): array
     {

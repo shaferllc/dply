@@ -98,7 +98,7 @@ class ResourceNotificationContextResolver
         }
 
         $organizationId = null;
-        if (isset($subject->organization_id) && is_string((string) $subject->organization_id) && $subject->organization_id !== '') {
+        if (isset($subject->organization_id) && $subject->organization_id !== '') {
             $organizationId = (string) $subject->organization_id;
         }
 

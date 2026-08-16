@@ -165,7 +165,7 @@ final class OpsCopilotContextBuilder
             ->first(['id', 'status', 'failure_reason', 'build_log_path', 'repo_config', 'failed_at', 'created_at']);
 
         $byoAt = $byo?->finished_at;
-        $edgeAt = $edge?->failed_at ?? $edge?->created_at;
+        $edgeAt = $edge->failed_at ?? $edge?->created_at;
 
         if ($byo === null && $edge === null) {
             return null;

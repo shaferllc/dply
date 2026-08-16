@@ -244,14 +244,14 @@ class NotificationChannel extends Model
 
         return match ($this->type) {
             self::TYPE_SLACK => $this->usesSlackOauth()
-                ? (string) ($this->slackInstallation()?->team_name ?? __('Connected workspace'))
+                ? (string) ($this->slackInstallation()->team_name ?? __('Connected workspace'))
                 : self::describeWebhookHost($cfg['webhook_url'] ?? null),
             self::TYPE_DISCORD => $this->usesDiscordOauth()
-                ? (string) ($this->discordInstallation()?->guild_name ?? __('Connected server'))
+                ? (string) ($this->discordInstallation()->guild_name ?? __('Connected server'))
                 : self::describeWebhookHost($cfg['webhook_url'] ?? null),
             self::TYPE_EMAIL => (string) ($cfg['email'] ?? ''),
             self::TYPE_TELEGRAM => $this->usesTelegramConnected()
-                ? (string) ($this->telegramInstallation()?->chat_title ?? __('Connected chat'))
+                ? (string) ($this->telegramInstallation()->chat_title ?? __('Connected chat'))
                 : __('Chat :id', ['id' => (string) ($cfg['chat_id'] ?? '—')]),
             self::TYPE_PUSHOVER => __('User key …:tail', ['tail' => self::lastFour($cfg['user_key'] ?? null)]),
             self::TYPE_MICROSOFT_TEAMS, self::TYPE_ROCKETCHAT, self::TYPE_GOOGLE_CHAT => self::describeWebhookHost($cfg['webhook_url'] ?? null),

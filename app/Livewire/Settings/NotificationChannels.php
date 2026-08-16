@@ -29,6 +29,9 @@ class NotificationChannels extends Component
         return Auth::user();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function notificationChannelsViewData(): array
     {
         return [

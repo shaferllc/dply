@@ -37,8 +37,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Server $targetServer
  * @property-read Collection<int, ImportSiteMigration> $siteMigrations
  * @property-read Collection<int, ImportMigrationStep> $steps
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ImportServerMigration extends Model
 {

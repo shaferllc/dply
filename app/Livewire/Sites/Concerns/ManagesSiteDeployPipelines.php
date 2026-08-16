@@ -345,7 +345,7 @@ trait ManagesSiteDeployPipelines
     protected function syncEditingPipelineBranches(): void
     {
         $branches = $this->editingDeployPipeline()->deploy_branches ?? [];
-        $this->editing_pipeline_branches = is_array($branches) && $branches !== []
+        $this->editing_pipeline_branches = $branches !== []
             ? implode(', ', $branches)
             : '';
     }

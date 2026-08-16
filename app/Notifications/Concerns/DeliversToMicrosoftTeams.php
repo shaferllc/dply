@@ -53,27 +53,24 @@ trait DeliversToMicrosoftTeams
     public function toMicrosoftTeams(object $notifiable): MicrosoftTeamsMessage
     {
         $channel = $this->microsoftTeamsChannelFor($notifiable);
-        $mail = method_exists($this, 'toMail') ? $this->toMail($notifiable) : null;
+        $mail = $this->toMail($notifiable);
 
-        $title = $mail instanceof MailMessage && is_string($mail->subject) && $mail->subject !== ''
+        $title = $mail->subject !== ''
             ? $mail->subject
             : (string) config('app.name');
 
-        $body = '';
         $actionUrl = null;
         $actionLabel = null;
 
-        if ($mail instanceof MailMessage) {
-            $lines = array_values(array_filter(
-                array_map(static fn ($l): string => trim((string) $l), array_merge($mail->introLines, $mail->outroLines)),
-                static fn (string $l): bool => $l !== ''
-            ));
-            $body = implode("\n\n", $lines);
+        $lines = array_values(array_filter(
+            array_map(static fn ($l): string => trim((string) $l), array_merge($mail->introLines, $mail->outroLines)),
+            static fn (string $l): bool => $l !== ''
+        ));
+        $body = implode("\n\n", $lines);
 
-            if (is_string($mail->actionText) && $mail->actionText !== '' && is_string($mail->actionUrl)) {
-                $actionUrl = $mail->actionUrl;
-                $actionLabel = $mail->actionText;
-            }
+        if ($mail->actionText !== '' && $mail->actionUrl !== '') {
+            $actionUrl = $mail->actionUrl;
+            $actionLabel = $mail->actionText;
         }
 
         if ($channel instanceof NotificationChannel) {

@@ -75,11 +75,12 @@ class Members extends Component
             }
         }
 
+        $actor = auth()->user();
         $invitation = OrganizationInvitation::createFor(
             $this->organization,
             $email,
             $this->invite_role ?: 'member',
-            auth()->user()
+            $actor
         );
 
         $event = app(NotificationPublisher::class)->publish(
@@ -88,7 +89,7 @@ class Members extends Component
             title: 'Invitation sent',
             body: $email.' was invited to join '.$this->organization->name.'.',
             url: route('organizations.members', $this->organization, absolute: true),
-            actor: auth()->user(),
+            actor: $actor,
             recipientUsers: $this->organization->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')->all(),
             metadata: [
                 'invitation_id' => $invitation->id,
@@ -96,7 +97,7 @@ class Members extends Component
                 'email' => $email,
                 'role' => $invitation->role,
                 'organization_name' => $this->organization->name,
-                'inviter_name' => auth()->user()?->name ?? auth()->user()?->email ?? __('Someone'),
+                'inviter_name' => $actor->name !== '' ? $actor->name : ($actor->email !== '' ? $actor->email : __('Someone')),
             ],
         );
         Notification::route('mail', $email)->notify(new OrganizationInvitationNotification($event));

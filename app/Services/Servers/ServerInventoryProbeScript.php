@@ -460,9 +460,6 @@ SH;
 
             $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
             foreach ($miseRuntimes as $runtime => $data) {
-                if (! is_array($data)) {
-                    continue;
-                }
                 $active = trim((string) ($data['active'] ?? ''));
                 if ($active !== '') {
                     $defaults[$runtime] = $active;
@@ -692,7 +689,7 @@ SH;
         // Variant 1: keyed by tool name.
         $looksKeyed = false;
         foreach (array_keys($decoded) as $k) {
-            if (is_string($k) && array_key_exists($k, $shape)) {
+            if (array_key_exists($k, $shape)) {
                 $looksKeyed = true;
                 break;
             }
@@ -700,7 +697,7 @@ SH;
 
         if ($looksKeyed) {
             foreach ($decoded as $tool => $entries) {
-                if (! is_string($tool) || ! is_array($entries) || ! array_key_exists($tool, $shape)) {
+                if (! is_array($entries) || ! array_key_exists($tool, $shape)) {
                     continue;
                 }
                 foreach ($entries as $entry) {

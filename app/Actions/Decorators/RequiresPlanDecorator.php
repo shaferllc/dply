@@ -87,15 +87,7 @@ class RequiresPlanDecorator
      */
     protected function getOrganization(User $user): mixed
     {
-        if (method_exists($user, 'getCurrentOrganization')) {
-            return $user->getCurrentOrganization();
-        }
-
-        if (method_exists($user, 'currentTeam')) {
-            return $user->currentTeam();
-        }
-
-        return null;
+        return $user->currentOrganization();
     }
 
     /**

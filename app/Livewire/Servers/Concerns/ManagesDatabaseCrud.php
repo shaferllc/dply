@@ -10,9 +10,9 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -76,7 +76,7 @@ trait ManagesDatabaseCrud
         }
 
         $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
-        if (! ($capabilities[$engine] ?? false)) {
+        if (! $capabilities[$engine]) {
             $this->toastError(__(':engine is not installed on this server.', ['engine' => DatabaseWorkspaceEngines::label($engine)]));
 
             return;
@@ -214,7 +214,7 @@ trait ManagesDatabaseCrud
             // keep as passed
         } else {
             $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
-            if (($capabilities['mariadb'] ?? false) && ! ($capabilities['mysql'] ?? false)) {
+            if ($capabilities['mariadb'] && ! $capabilities['mysql']) {
                 $engine = 'mariadb';
             } else {
                 $engine = 'mysql';
@@ -274,12 +274,12 @@ trait ManagesDatabaseCrud
             $rules['new_db_password'] = 'nullable';
         } elseif ($this->new_db_username !== '') {
             $rules['new_db_username'] = 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/';
-            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+            $rules['new_db_password'] = $this->new_db_password !== ''
                 ? 'required|string|max:200'
                 : 'nullable';
         } else {
             $rules['new_db_username'] = 'nullable';
-            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+            $rules['new_db_password'] = $this->new_db_password !== ''
                 ? 'required|string|max:200'
                 : 'nullable';
         }
@@ -327,7 +327,7 @@ trait ManagesDatabaseCrud
 
         $password = $existingMysqlUser['password'] ?? $this->new_db_password;
         $passwordGenerated = false;
-        if (! $isSqlite && ($password === null || $password === '')) {
+        if (! $isSqlite && $password === '') {
             $password = ServerDatabase::generateConnectionSafePassword();
             $passwordGenerated = true;
         }

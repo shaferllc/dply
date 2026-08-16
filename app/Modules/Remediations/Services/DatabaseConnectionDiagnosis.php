@@ -46,7 +46,7 @@ final class DatabaseConnectionDiagnosis
     public const ACTION_REPAIR = 'repair';
 
     /**
-     * @param  array<string, mixed> $actions  ordered guided action keys; first is the recommended/primary fix
+     * @param  list<string> $actions  ordered guided action keys; first is the recommended/primary fix
      */
     public function __construct(
         public readonly string $subclass,

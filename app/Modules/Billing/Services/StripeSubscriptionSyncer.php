@@ -35,8 +35,11 @@ class StripeSubscriptionSyncer
      */
     public function reconcile(Organization $organization, DesiredBillingState $desired): array
     {
+        // Cashier is bound to this module's Subscription model in
+        // AppServiceProvider, but Billable::subscription() is only typed as the
+        // base class — assert the binding rather than assume it.
         $subscription = $organization->subscription('default');
-        if (! $subscription || ! $subscription->valid()) {
+        if (! $subscription instanceof Subscription || ! $subscription->valid()) {
             return [];
         }
 

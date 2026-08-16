@@ -63,10 +63,6 @@ final class BackendHealthyCheck implements DeployContractCheck
 
         $failures = [];
         foreach ($context->linkedBackendSites as $backend) {
-            if (! $backend instanceof Site) {
-                continue;
-            }
-
             $reason = $this->unhealthyReason($backend);
             if ($reason !== null) {
                 $failures[] = $backend->name.' ('.$reason.')';

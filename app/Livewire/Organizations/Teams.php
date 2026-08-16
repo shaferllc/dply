@@ -334,11 +334,12 @@ class Teams extends Component
             }
         }
 
+        $actor = auth()->user();
         $invitation = OrganizationInvitation::createFor(
             $this->organization,
             $email,
             $this->invite_role ?: 'member',
-            auth()->user(),
+            $actor,
             $team,
         );
 
@@ -348,7 +349,7 @@ class Teams extends Component
             title: 'Invitation sent',
             body: $email.' was invited to join '.$this->organization->name.' on the team '.$team->name.'.',
             url: route('organizations.teams', $this->organization, absolute: true),
-            actor: auth()->user(),
+            actor: $actor,
             recipientUsers: $this->organization->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')->all(),
             metadata: [
                 'invitation_id' => $invitation->id,
@@ -357,7 +358,7 @@ class Teams extends Component
                 'role' => $invitation->role,
                 'organization_name' => $this->organization->name,
                 'team_name' => $team->name,
-                'inviter_name' => auth()->user()?->name ?? auth()->user()?->email ?? __('Someone'),
+                'inviter_name' => $actor->name !== '' ? $actor->name : ($actor->email !== '' ? $actor->email : __('Someone')),
             ],
         );
         Notification::route('mail', $email)->notify(new OrganizationInvitationNotification($event));
@@ -417,8 +418,8 @@ class Teams extends Component
             [$teamId, $userId],
             __('Remove from team'),
             __('Remove :member from the team “:team”?', [
-                'member' => $member?->name ?? __('this member'),
-                'team' => $team?->name ?? __('this team'),
+                'member' => $member->name,
+                'team' => $team->name,
             ]),
             __('Remove'),
             true,

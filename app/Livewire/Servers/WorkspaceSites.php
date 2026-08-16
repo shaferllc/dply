@@ -69,6 +69,9 @@ class WorkspaceSites extends Component
      */
     public array $phpVersions = [];
 
+    /**
+     * @return array{blocked_reason: string, can_create: bool}
+     */
     #[Computed]
     public function siteCreateAccess(): array
     {

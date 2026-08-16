@@ -189,7 +189,7 @@ CONF;
                 continue;
             }
             $safe = preg_replace('/[^a-zA-Z0-9_]/', '_', $cookie);
-            if (! is_string($safe) || $safe === '') {
+            if (! is_string($safe)) {
                 continue;
             }
             $base[] = '$cookie_'.$safe;

@@ -39,7 +39,7 @@ use Throwable;
  * @property ?string $output
  * @property ?int $exit_code
  * @property ?int $timeout
- * @property string $user
+ * @property string|null $user
  * @property \App\Modules\TaskRunner\Enums\TaskStatus $status
  * @property ?string $server_id
  * @property ?string $created_by

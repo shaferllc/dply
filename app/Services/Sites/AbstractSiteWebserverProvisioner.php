@@ -380,7 +380,7 @@ BASH;
      */
     private function emitterSource(): string
     {
-        return method_exists($this, 'webserver') ? $this->webserver() : 'webserver';
+        return $this->webserver();
     }
 
     protected function privilegedCommand(Server $server, string $command): string

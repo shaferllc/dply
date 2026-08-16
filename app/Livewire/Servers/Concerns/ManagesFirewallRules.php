@@ -142,11 +142,11 @@ trait ManagesFirewallRules
             }
             $this->emitPanelEvent(
                 __('Rule updated — apply to reconcile the host firewall'),
-                array_values(array_filter([
+                [
                     sprintf('> Updated "%s" in the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
                     sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
                     $this->lastUfwHostSyncError ? '> Host sync failed: '.Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
-                ])),
+                ],
             );
             $this->dispatchFirewallNotification('updated', [$this->firewallRuleLabel($rule)], [
                 'rule_id' => $rule->id,
@@ -197,16 +197,16 @@ trait ManagesFirewallRules
             }
             $this->emitPanelEvent(
                 __('Rule added — apply to push to the server'),
-                array_values(array_filter([
+                array_filter([
                     sprintf('> Added "%s" to the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
                     sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
                     $rule->enabled
                         ? '> Rule is enabled. Click "Apply rules" to reconcile the host firewall.'
                         : '> Rule is disabled — Apply will skip it until you toggle it on.',
-                    isset($this->lastUfwHostSyncError) && $this->lastUfwHostSyncError !== null
+                    $this->lastUfwHostSyncError !== null
                         ? '> Inline host apply failed: '.Str::limit($this->lastUfwHostSyncError, 200)
                         : null,
-                ])),
+                ]),
             );
             $this->dispatchFirewallNotification('created', [$this->firewallRuleLabel($rule)], [
                 'rule_id' => $rule->id,

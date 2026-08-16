@@ -247,8 +247,7 @@ trait ManagesWorkspaceSettingsForm
     {
         $provider = $this->server->provider;
 
-        return $provider !== null
-            && $provider->supportsPrivateIpLookup()
+        return $provider->supportsPrivateIpLookup()
             && $this->server->providerCredential !== null
             && filled($this->server->provider_id);
     }

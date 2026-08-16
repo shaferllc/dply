@@ -70,8 +70,8 @@ class EdgeGithubPreviewEnsurer
                 $result = $this->provisioner->enable($site->fresh(), $account);
                 $results[] = [
                     'slug' => (string) $site->slug,
-                    'connected' => (bool) ($result['ok'] ?? false),
-                    'message' => (string) ($result['message'] ?? ''),
+                    'connected' => (bool) $result['ok'],
+                    'message' => (string) $result['message'],
                 ];
             });
 

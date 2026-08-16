@@ -17,10 +17,10 @@ final class EdgeSiteNotificationKeys
      */
     public static function eventKeys(): array
     {
-        return array_values(array_map(
+        return array_map(
             static fn (mixed $key): string => (string) $key,
             array_keys((array) config('notification_events.categories.edge.events', [])),
-        ));
+        );
     }
 
     /**

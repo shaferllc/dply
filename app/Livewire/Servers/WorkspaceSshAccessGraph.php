@@ -47,7 +47,11 @@ class WorkspaceSshAccessGraph extends Component
     /** Time window for the access-over-time chart: 7d, 30d, or 90d. */
     public string $timeline_range = '30d';
 
-    /** Detail payload for the currently-open access-event modal. */
+    /**
+     * Detail payload for the currently-open access-event modal.
+     *
+     * @var array<string, mixed>|null
+     */
     public ?array $selectedEvent = null;
 
     /** Current page of the recent-changes (events) list. */
@@ -93,7 +97,7 @@ class WorkspaceSshAccessGraph extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -222,7 +226,7 @@ class WorkspaceSshAccessGraph extends Component
             $rows[] = ['label' => __('Source'), 'value' => $event->source];
         }
 
-        $rows[] = ['label' => __('Initiated by'), 'value' => $event->user?->name ?? $event->user?->email ?? __('Dply platform')];
+        $rows[] = ['label' => __('Initiated by'), 'value' => $event->user->name ?? $event->user->email ?? __('Dply platform')];
 
         $jobUuid = (string) data_get($event->meta, 'job_uuid', '');
         if ($jobUuid !== '') {
@@ -265,7 +269,7 @@ class WorkspaceSshAccessGraph extends Component
             $rows[] = ['label' => __('Revoked'), 'value' => $session->revoked_at->format('M j, Y · H:i')];
         }
 
-        $rows[] = ['label' => __('Created by'), 'value' => $session->createdBy?->name ?? $session->createdBy?->email ?? __('Unknown')];
+        $rows[] = ['label' => __('Created by'), 'value' => $session->createdBy->name ?? $session->createdBy->email ?? __('Unknown')];
 
         if ($session->target_linux_user) {
             $rows[] = ['label' => __('Linux user'), 'value' => $session->target_linux_user, 'mono' => true];
@@ -312,8 +316,8 @@ class WorkspaceSshAccessGraph extends Component
         };
 
         $rows = [
-            ['label' => __('When'), 'value' => $event->created_at?->format('M j, Y · H:i') ?? '—'],
-            ['label' => __('Actor'), 'value' => $event->user?->name ?? $event->user?->email ?? __('System')],
+            ['label' => __('When'), 'value' => $event->created_at->format('M j, Y · H:i')],
+            ['label' => __('Actor'), 'value' => $event->user->name ?? $event->user->email ?? __('System')],
         ];
 
         $name = (string) data_get($event->meta, 'name', '');

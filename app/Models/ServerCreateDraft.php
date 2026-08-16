@@ -21,8 +21,8 @@ use Illuminate\Support\Carbon;
  * @property int $step
  * @property array<string, mixed> $payload
  * @property Carbon|null $expires_at
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?User $user
  * @property-read ?Organization $organization
  */

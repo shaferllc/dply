@@ -77,10 +77,6 @@ class EdgeDplyResourceResolver
 
         $out = [];
         foreach ($refs as $envName => $ref) {
-            if (! is_string($envName) || ! is_string($ref)) {
-                continue;
-            }
-
             [$rawKind, $name] = array_pad(explode('.', $ref, 2), 2, '');
             $rawKind = strtolower(trim($rawKind));
             $name = trim($name);
@@ -228,9 +224,6 @@ class EdgeDplyResourceResolver
     {
         $names = [];
         foreach ($refs as $ref) {
-            if (! is_string($ref)) {
-                continue;
-            }
             [$kind, $name] = array_pad(explode('.', $ref, 2), 2, '');
             if (in_array(strtolower(trim($kind)), ['site', 'api', 'service'], true) && trim($name) !== '') {
                 $names[] = trim($name);

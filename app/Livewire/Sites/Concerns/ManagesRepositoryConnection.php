@@ -149,7 +149,7 @@ trait ManagesRepositoryConnection
             $storedProvider = $this->detectProviderKind($this->git_repository_url);
         }
         $accountProviders = array_map(
-            static fn (array $account): string => (string) ($account['provider'] ?? ''),
+            static fn (array $account): string => (string) $account['provider'],
             $this->linkedSourceControlAccounts,
         );
         $hasMatchingAccount = $this->source_control_account_id !== '' && in_array($storedProvider, $accountProviders, true);
@@ -351,13 +351,13 @@ trait ManagesRepositoryConnection
         // Pass the already-loaded (and just-saved) instance — enable() mutates it
         // in place; avoid fresh()/refresh() round-trips for the same site row.
         $result = $provisioner->enable($this->site, $account);
-        if (! ($result['ok'] ?? false)) {
-            $this->toastError((string) ($result['message'] ?? __('Could not enable quick deploy.')));
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
 
             return;
         }
 
-        $this->toastSuccess((string) ($result['message'] ?? __('Quick deploy enabled.')));
+        $this->toastSuccess((string) $result['message']);
     }
 
     /**
@@ -396,14 +396,14 @@ trait ManagesRepositoryConnection
         $this->site->save();
 
         $result = $provisioner->enablePoll($this->site);
-        if (! ($result['ok'] ?? false)) {
-            $this->toastError((string) ($result['message'] ?? __('Could not enable poll mode.')));
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
 
             return;
         }
 
         $this->site->refresh();
-        $this->toastSuccess((string) ($result['message'] ?? __('Quick deploy poll mode enabled.')));
+        $this->toastSuccess((string) $result['message']);
     }
 
     public function disableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
@@ -433,9 +433,9 @@ trait ManagesRepositoryConnection
         $result = $poller->poll($this->site->fresh() ?? $this->site);
         $this->site->refresh();
 
-        if (! ($result['checked'] ?? false)) {
+        if (! $result['checked']) {
             $this->toastError(__('Poll check skipped (:reason).', [
-                'reason' => (string) ($result['reason'] ?? __('unknown')),
+                'reason' => (string) $result['reason'],
             ]));
 
             return;
@@ -445,13 +445,13 @@ trait ManagesRepositoryConnection
             ? (string) $result['message']
             : __('Checked Git for new commits.');
 
-        if (($result['dispatched'] ?? false) || ($result['outcome'] ?? null) === 'deploy_queued') {
+        if ($result['dispatched'] || $result['outcome'] === 'deploy_queued') {
             $this->toastSuccess($message);
 
             return;
         }
 
-        if (($result['outcome'] ?? null) === 'error') {
+        if ($result['outcome'] === 'error') {
             $this->toastError($message);
 
             return;

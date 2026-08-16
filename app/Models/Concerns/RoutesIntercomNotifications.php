@@ -32,10 +32,6 @@ trait RoutesIntercomNotifications
      */
     public function routeNotificationForIntercom(mixed $notification = null): array|false
     {
-        if (! method_exists($this, 'notificationChannels')) {
-            return false;
-        }
-
         $channel = $this->notificationChannels()
             ->where('type', NotificationChannel::TYPE_INTERCOM)
             ->first();

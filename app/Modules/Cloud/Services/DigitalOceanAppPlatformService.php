@@ -56,10 +56,10 @@ class DigitalOceanAppPlatformService
      *                                               to add to the spec alongside the web service.
      * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block.
      * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
-     * @return array{id: string, default_ingress: ?string}
-     * @param  array<string, mixed> $alerts
+     * @return array{id: string, default_ingress: ?string, alerts: list<array<string, mixed>>}
+     * @param  list<array<string, mixed>> $alerts
      * @param  array<string, mixed> $buildEnvVars
-     * @param  array<string, mixed> $jobs
+     * @param  list<array<string, mixed>> $jobs
      */
     public function createApp(
         string $appName,
@@ -109,13 +109,13 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values($workers);
+            $spec['workers'] = $workers;
         }
         if ($jobs !== []) {
-            $spec['jobs'] = array_values($jobs);
+            $spec['jobs'] = $jobs;
         }
         if ($alerts !== []) {
-            $spec['alerts'] = array_values($alerts);
+            $spec['alerts'] = $alerts;
         }
 
         $response = $this->request('post', '/apps', ['spec' => $spec]);
@@ -144,10 +144,10 @@ class DigitalOceanAppPlatformService
      *                                               to add to the spec alongside the web service.
      * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block (omits fixed instance_count).
      * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
-     * @return array{id: string, default_ingress: ?string}
-     * @param  array<string, mixed> $alerts
+     * @return array{id: string, default_ingress: ?string, alerts: list<array<string, mixed>>}
+     * @param  list<array<string, mixed>> $alerts
      * @param  array<string, mixed> $buildEnvVars
-     * @param  array<string, mixed> $jobs
+     * @param  list<array<string, mixed>> $jobs
      */
     public function createAppFromSource(
         string $appName,
@@ -207,13 +207,13 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values($workers);
+            $spec['workers'] = $workers;
         }
         if ($jobs !== []) {
-            $spec['jobs'] = array_values($jobs);
+            $spec['jobs'] = $jobs;
         }
         if ($alerts !== []) {
-            $spec['alerts'] = array_values($alerts);
+            $spec['alerts'] = $alerts;
         }
 
         $response = $this->request('post', '/apps', ['spec' => $spec]);

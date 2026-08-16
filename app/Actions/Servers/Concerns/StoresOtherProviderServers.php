@@ -30,8 +30,6 @@ use Illuminate\Validation\ValidationException;
  */
 trait StoresOtherProviderServers
 {
-
-
     /**
      * @param  list<string>  $scriptKeys
      */
@@ -407,7 +405,7 @@ trait StoresOtherProviderServers
         }
 
         foreach ($serverTypes as $st) {
-            if (! is_array($st) || (string) ($st['name'] ?? '') !== $size) {
+            if ((string) ($st['name'] ?? '') !== $size) {
                 continue;
             }
 

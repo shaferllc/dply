@@ -32,10 +32,6 @@ class TestingHostnameRecordPruner
 
         foreach ($this->provisioner->configuredDomains() as $zone) {
             foreach ($this->digitalOcean()->getDomainRecords($zone) as $record) {
-                if (! is_array($record)) {
-                    continue;
-                }
-
                 if (strtoupper((string) ($record['type'] ?? '')) !== 'A') {
                     continue;
                 }
@@ -92,7 +88,7 @@ class TestingHostnameRecordPruner
      */
     public function deleteRecord(array $record): void
     {
-        if (($record['record_id']) <= 0) {
+        if ($record['record_id'] <= 0) {
             return;
         }
 
@@ -117,7 +113,7 @@ class TestingHostnameRecordPruner
     }
 
     /**
-     * @param  array<string, mixed> $zones
+     * @param  array<int, string> $zones
      */
     private function isTestingHostname(string $hostname, array $zones): bool
     {

@@ -289,7 +289,7 @@ trait ManagesServerLogExplorer
                 }
                 $events[] = [
                     'type' => 'deploy',
-                    'label' => __('Deploy · :site (:status)', ['site' => $deploy->site?->name ?? $deploy->site_id, 'status' => $deploy->status]),
+                    'label' => __('Deploy · :site (:status)', ['site' => $deploy->site->name ?? $deploy->site_id, 'status' => $deploy->status]),
                     'time' => $at->toIso8601String(),
                     'x_pct' => $x,
                 ];
@@ -511,7 +511,7 @@ trait ManagesServerLogExplorer
                 'timestamp' => $anchor->format('Y-m-d H:i:s.v'),
                 'deployment_id' => $deploy->id,
                 'site' => $deploy->site,
-                'site_name' => $deploy->site?->name ?? $deploy->site_id,
+                'site_name' => $deploy->site->name ?? $deploy->site_id,
                 'status' => (string) $deploy->status,
                 'running' => $deploy->finished_at === null,
             ];

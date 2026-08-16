@@ -237,7 +237,7 @@ class WorkspaceMonitor extends Component
                 return 'healthy';
             };
 
-            $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+            $latestPayload = $rangeData['latest_payload'];
             $metricStatuses = [
                 'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
                 'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),

@@ -25,12 +25,12 @@ use Illuminate\Support\Carbon;
  * @property ?string $shipped_release_id
  * @property int $sort_order
  * @property string $status
- * @property string $summary
+ * @property string|null $summary
  * @property ?string $target_quarter
  * @property ?string $target_release_id
  * @property string $title
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class RoadmapItem extends Model
 {

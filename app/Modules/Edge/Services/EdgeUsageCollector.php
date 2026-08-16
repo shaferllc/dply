@@ -189,7 +189,7 @@ class EdgeUsageCollector
     }
 
     /**
-     * @param  array<string, mixed> $hostnames
+     * @param  list<string> $hostnames
      * @param  Collection<string, EdgeUsageTotals>  $usageByHostname
      */
     private function usageForSite(array $hostnames, Collection $usageByHostname): EdgeUsageTotals

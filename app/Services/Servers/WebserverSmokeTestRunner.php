@@ -146,7 +146,7 @@ class WebserverSmokeTestRunner
      * Errors get a 0 status and the curl --write-out catches `errormsg`
      * via a trailing pipe.
      *
-     * @param  array<string, mixed> $hostnames
+     * @param  list<string> $hostnames
      */
     private function buildCurlScript(array $hostnames): string
     {
@@ -190,7 +190,7 @@ BASH;
                 continue;
             }
             $parts = explode('|', $line);
-            $host = $parts[0] ?? '';
+            $host = $parts[0];
             $scheme = $parts[1] ?? '';
             if ($host === '' || ! in_array($scheme, ['http', 'https'], true)) {
                 continue;
@@ -279,18 +279,16 @@ BASH;
     {
         // dply's Site model exposes a `webserverHostnames()` array that the
         // per-site config builders already use. First entry is the primary.
-        if (method_exists($site, 'webserverHostnames')) {
-            try {
-                $names = $site->webserverHostnames();
-                if (($names) && $names !== []) {
-                    $first = (string) reset($names);
-                    if ($first !== '') {
-                        return $first;
-                    }
+        try {
+            $names = $site->webserverHostnames();
+            if ($names) {
+                $first = (string) reset($names);
+                if ($first !== '') {
+                    return $first;
                 }
-            } catch (\Throwable) {
-                // Fall through.
             }
+        } catch (\Throwable) {
+            // Fall through.
         }
 
         // Fallback: primary domain → first alias.

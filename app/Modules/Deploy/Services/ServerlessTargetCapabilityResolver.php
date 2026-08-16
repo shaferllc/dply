@@ -143,9 +143,9 @@ final class ServerlessTargetCapabilityResolver
      */
     private static function featureValues(array $features): array
     {
-        return array_values(array_map(
+        return array_map(
             static fn (ServerlessFeature $feature): string => $feature->value,
             $features,
-        ));
+        );
     }
 }

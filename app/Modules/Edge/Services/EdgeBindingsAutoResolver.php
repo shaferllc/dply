@@ -80,7 +80,7 @@ class EdgeBindingsAutoResolver
 
         $out = [];
         foreach ($bucket as $name => $value) {
-            if (! is_string($name) || ! is_string($value) || trim($value) === '') {
+            if (trim($value) === '') {
                 continue;
             }
             $value = trim($value);

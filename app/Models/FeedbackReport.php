@@ -13,13 +13,13 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * @property string $admin_notes
+ * @property string|null $admin_notes
  * @property ?string $assigned_to_user_id
- * @property array<string, mixed> $attachments
+ * @property array<string, mixed>|null $attachments
  * @property ?Carbon $attachments_pruned_at
- * @property array<string, mixed> $context
+ * @property array<string, mixed>|null $context
  * @property ?string $description
- * @property string $ip_address
+ * @property string|null $ip_address
  * @property ?string $organization_id
  * @property string $reference
  * @property ?Carbon $resolved_at
@@ -29,8 +29,8 @@ use Illuminate\Support\Str;
  * @property string $title
  * @property string $type
  * @property ?string $user_id
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class FeedbackReport extends Model
 {

@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $site_id
- * @property string $pipeline_id
+ * @property string|null $pipeline_id
  * @property int $sort_order
  * @property string $phase
  * @property string $hook_kind

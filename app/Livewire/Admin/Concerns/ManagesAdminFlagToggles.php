@@ -67,6 +67,7 @@ trait ManagesAdminFlagToggles
     }
 
     /**
+     * @param  array<string, string>  $flags
      * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool}>
      */
     protected function orgFlagEntries(?Organization $org, array $flags): array
@@ -88,6 +89,7 @@ trait ManagesAdminFlagToggles
     /**
      * Read-only config-default rows shown on the platform product-line pages.
      *
+     * @param  array<string, string>  $flags
      * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool}>
      */
     protected function platformDefaultFlagEntries(array $flags): array
@@ -109,6 +111,8 @@ trait ManagesAdminFlagToggles
     }
 
     /**
+     * @param  array<string, string>  $parentFlags
+     * @param  array<string, string>  $allFlagsInGroup
      * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool, preview: array{key: string, label: string, active: bool, default: bool, configDefault: bool}|null}>
      */
     protected function groupedPlatformFlagEntries(array $parentFlags, array $allFlagsInGroup): array
@@ -142,6 +146,7 @@ trait ManagesAdminFlagToggles
     }
 
     /**
+     * @param  array<string, string>  $flags
      * @return list<array{key: string, label: string, active: bool, default: bool}>
      */
     protected function globalFlagEntries(array $flags): array

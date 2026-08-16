@@ -244,7 +244,7 @@ class CaddySnippetsConfig
         if (preg_match_all('/^\s*\(([A-Za-z0-9_.-]+)\)\s*\{/m', $contents, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $i => $headerMatch) {
+        foreach ($matches[0] as $i => $headerMatch) {
             $name = $matches[1][$i][0];
             $rawStart = $headerMatch[1];
             $bodyStart = $rawStart + strlen($headerMatch[0]);

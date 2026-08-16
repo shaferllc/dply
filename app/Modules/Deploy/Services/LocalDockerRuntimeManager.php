@@ -22,7 +22,7 @@ class LocalDockerRuntimeManager
     {
         $workspace = $this->workspace->ensure($site);
         $repositoryPath = $workspace['repository_path'];
-        $workingDirectory = $workspace['working_directory'] ?? $repositoryPath;
+        $workingDirectory = $workspace['working_directory'];
         $dockerfile = $this->dockerfileBuilder->build($site);
         $composeYaml = $this->composeBuilder->build($site);
 
@@ -165,7 +165,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $subCommand
+     * @param  array<int, string> $subCommand
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
     private function simpleAction(
@@ -205,7 +205,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function run(array $command, string $workingDirectory, bool $allowFailure = false): string
     {
@@ -258,7 +258,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $subCommand
+     * @param  array<int, string> $subCommand
      */
     private function missingRuntimeMessage(Site $site, array $subCommand, string $repositoryPath, string $workingDirectory, string $composePath): string
     {
@@ -270,7 +270,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function commandFailureMessage(array $command, string $workingDirectory, string $output, ?int $exitCode): string
     {
@@ -286,7 +286,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function composePathFromCommand(array $command): string
     {
@@ -569,7 +569,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function timedOutMessage(Process $process, array $command): string
     {
@@ -584,7 +584,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function inspectCompose(array $command, string $workingDirectory, string $label): string
     {

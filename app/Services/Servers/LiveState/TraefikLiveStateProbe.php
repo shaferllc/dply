@@ -209,9 +209,6 @@ BASH;
         }
         $rows = [];
         foreach ($routers as $r) {
-            if (! is_array($r)) {
-                continue;
-            }
             $rows[] = [
                 'name' => (string) ($r['name'] ?? '?'),
                 'rule' => (string) ($r['rule'] ?? ''),
@@ -240,9 +237,6 @@ BASH;
         }
         $rows = [];
         foreach ($services as $s) {
-            if (! is_array($s)) {
-                continue;
-            }
             $loadBalancer = is_array($s['loadBalancer'] ?? null) ? $s['loadBalancer'] : [];
             $servers = is_array($loadBalancer['servers'] ?? null) ? $loadBalancer['servers'] : [];
             $serverUrls = array_values(array_map(
@@ -281,9 +275,6 @@ BASH;
         }
         $rows = [];
         foreach ($middlewares as $m) {
-            if (! is_array($m)) {
-                continue;
-            }
             $rows[] = [
                 'name' => (string) ($m['name'] ?? '?'),
                 'type' => (string) ($m['type'] ?? '?'),
@@ -309,16 +300,13 @@ BASH;
 
         // Traefik returns a map keyed by entry-point name, not a JSON array.
         $items = isset($entrypoints[0]) ? $entrypoints : array_map(
-            static fn (string $name, mixed $ep): array => is_array($ep) ? array_merge($ep, ['name' => $name]) : ['name' => $name],
+            static fn (string $name, mixed $ep): array => array_merge($ep, ['name' => $name]),
             array_keys($entrypoints),
             array_values($entrypoints),
         );
 
         $rows = [];
         foreach ($items as $ep) {
-            if (! is_array($ep)) {
-                continue;
-            }
             $address = $ep['address'] ?? null;
             if ($address === null && is_array($ep['http'] ?? null)) {
                 $address = $ep['http']['address'] ?? null;
@@ -345,9 +333,6 @@ BASH;
         }
         $rows = [];
         foreach ($routers as $r) {
-            if (! is_array($r)) {
-                continue;
-            }
             $rows[] = [
                 'name' => (string) ($r['name'] ?? '?'),
                 'rule' => (string) ($r['rule'] ?? ''),
@@ -372,9 +357,6 @@ BASH;
         }
         $rows = [];
         foreach ($services as $s) {
-            if (! is_array($s)) {
-                continue;
-            }
             $loadBalancer = is_array($s['loadBalancer'] ?? null) ? $s['loadBalancer'] : [];
             $servers = is_array($loadBalancer['servers'] ?? null) ? $loadBalancer['servers'] : [];
             $addrs = array_values(array_map(
@@ -404,9 +386,6 @@ BASH;
         }
         $rows = [];
         foreach ($routers as $r) {
-            if (! is_array($r)) {
-                continue;
-            }
             $rows[] = [
                 'name' => (string) ($r['name'] ?? '?'),
                 'service' => (string) ($r['service'] ?? ''),
@@ -430,9 +409,6 @@ BASH;
         }
         $rows = [];
         foreach ($services as $s) {
-            if (! is_array($s)) {
-                continue;
-            }
             $loadBalancer = is_array($s['loadBalancer'] ?? null) ? $s['loadBalancer'] : [];
             $servers = is_array($loadBalancer['servers'] ?? null) ? $loadBalancer['servers'] : [];
             $addrs = array_values(array_map(
@@ -471,9 +447,6 @@ BASH;
         );
         $rows = [];
         foreach ($items as $store) {
-            if (! is_array($store)) {
-                continue;
-            }
             $name = (string) ($store['name'] ?? 'default');
             $certs = is_array($store['certificates'] ?? null)
                 ? $store['certificates']
@@ -521,7 +494,7 @@ BASH;
         $counts = [];
         foreach ([$routers, $tcpRouters] as $routerList) {
             foreach ($routerList as $r) {
-                $p = is_array($r) ? (string) ($r['provider'] ?? '') : '';
+                $p = (string) ($r['provider'] ?? '');
                 if ($p === '') {
                     continue;
                 }
@@ -530,7 +503,7 @@ BASH;
         }
         foreach ([$services, $tcpServices] as $serviceList) {
             foreach ($serviceList as $s) {
-                $p = is_array($s) ? (string) ($s['provider'] ?? '') : '';
+                $p = (string) ($s['provider'] ?? '');
                 if ($p === '') {
                     continue;
                 }

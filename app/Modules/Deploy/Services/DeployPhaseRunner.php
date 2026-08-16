@@ -214,7 +214,7 @@ class DeployPhaseRunner
             $result['command'] = $cmd;
             $hookLog = $this->hookRunner->runAfterStep($shell, $site, (string) $step->id, $cwd);
             if ($hookLog !== '') {
-                $result['output'] = ($result['output'] ?? '').$hookLog;
+                $result['output'] = ($result['output']).$hookLog;
             }
             $results[] = $result;
 

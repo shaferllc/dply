@@ -51,7 +51,7 @@ class DigitalOceanFunctionsArtifactBuilder
             'build-'.$site->id,
             $repositoryUrl,
             (string) ($site->git_branch ?: 'main'),
-            (string) ($resolvedConfig['repository_subdirectory'] ?? ''),
+            (string) $resolvedConfig['repository_subdirectory'],
             $site->user_id,
             isset($resolvedConfig['source_control_account_id']) && is_string($resolvedConfig['source_control_account_id'])
                 ? $resolvedConfig['source_control_account_id']
@@ -96,8 +96,8 @@ class DigitalOceanFunctionsArtifactBuilder
         // with no framework. It gets a logging shim rather than a framework
         // adapter, and (unlike a framework build) may legitimately have no
         // build step at all.
-        $isRawAction = ($detected['deploy_kind'] ?? '') === 'raw'
-            && trim((string) ($detected['entry_file'] ?? '')) !== ''
+        $isRawAction = ($detected['deploy_kind']) === 'raw'
+            && trim((string) $detected['entry_file']) !== ''
             && in_array($detected['language'], ['node', 'python', 'php', 'go'], true);
 
         // DigitalOcean Functions runs PHP natively but ships no Laravel
@@ -187,7 +187,7 @@ class DigitalOceanFunctionsArtifactBuilder
             $injection = $this->shimInjector->inject(
                 $checkout['working_directory'],
                 (string) $detected['language'],
-                (string) ($detected['entry_file'] ?? ''),
+                (string) $detected['entry_file'],
             );
             if ($injection['ran']) {
                 $shimLog[] = $injection['output'];
@@ -405,7 +405,7 @@ class DigitalOceanFunctionsArtifactBuilder
      * successful deploy so serverless-artifacts/<site> stops growing by one
      * zip per deploy. Best-effort: returns the count removed, never throws.
      *
-     * @param  array<string, mixed>  $keepPaths
+     * @param  list<mixed>  $keepPaths
      */
     public function pruneArtifactsExcept(Site $site, array $keepPaths): int
     {
@@ -542,7 +542,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  array<string, mixed>  $patterns
+     * @param  list<string>  $patterns
      */
     private function isExcluded(string $localName, array $patterns): bool
     {
@@ -566,7 +566,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  array<string, mixed>  $excludePatterns
+     * @param  list<string>  $excludePatterns
      */
     private function zipPath(string $sourcePath, string $artifactPath, array $excludePatterns = []): void
     {

@@ -235,13 +235,13 @@ class EdgeCreateForm extends Form
         }
 
         if (preg_match('~^https?://github\.com/[^/]+/[^/]+?(?:\.git)?/(?:tree|blob|commits?)/([^/?#]+)~i', $value, $m) === 1) {
-            return $m[1] !== '' ? $m[1] : null;
+            return $m[1];
         }
         if (preg_match('~^https?://gitlab\.com/.+?(?:\.git)?/-/(?:tree|blob|commits?)/([^/?#]+)~i', $value, $m) === 1) {
-            return $m[1] !== '' ? $m[1] : null;
+            return $m[1];
         }
         if (preg_match('~^https?://bitbucket\.org/[^/]+/[^/]+?(?:\.git)?/(?:src|branch|commits?)/([^/?#]+)~i', $value, $m) === 1) {
-            return $m[1] !== '' ? $m[1] : null;
+            return $m[1];
         }
 
         return null;

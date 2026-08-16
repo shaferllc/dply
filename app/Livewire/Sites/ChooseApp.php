@@ -98,10 +98,10 @@ class ChooseApp extends Component
         $this->tiles = $catalog->forServer($server);
 
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
-            $this->phpVersion = (string) ($phpManager->siteCreationPhpData($server)['preselected_version'] ?? '');
+            $this->phpVersion = (string) $phpManager->siteCreationPhpData($server)['preselected_version'];
         }
 
-        $this->scaffold_admin_email = (string) (auth()->user()?->email ?? '');
+        $this->scaffold_admin_email = (string) (auth()->user()->email ?? '');
 
         // Drop bogus values supplied by the URL — they would leave the picker
         // in a "tile selected but config invisible" state.
@@ -202,9 +202,7 @@ class ChooseApp extends Component
     {
         $this->syncRepoUrlToSite();
         if (trim((string) $this->site->git_repository_url) === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Choose a repository first.'));
-            }
+            $this->toastError(__('Choose a repository first.'));
 
             return;
         }

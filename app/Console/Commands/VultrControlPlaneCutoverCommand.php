@@ -53,22 +53,20 @@ class VultrControlPlaneCutoverCommand extends Command
 
         $webIp = trim((string) data_get($hosts, 'web.ip_address', ''));
 
-        if ($this->option('checklist') || true) {
-            $this->newLine();
-            $this->info('Cutover checklist (manual / deliberate — this command does not flip DNS or migrate prod):');
-            foreach ([
-                '1. [infra] Bootstrap packages + atomic layout (php artisan dply:vultr:control-plane:bootstrap --execute)'.($bootstrapped !== '' ? ' ✓' : ''),
-                '2. [infra] Postgres/Redis on private VPC IPs (done by bootstrap)'.($bootstrapped !== '' ? ' ✓' : ''),
-                '3. Copy LIVE SHARED⊕overlay .env from Hetzner with identical APP_KEY (deploy/ENV_SYNC.md) — replace staging secrets',
-                '4. Deploy app release onto web+worker current/; run migrations on worker; horizon + nginx',
-                '5. Staging smoke against Vultr web IP (hosts file or temp CF record): login, BYO SSH, Edge Docker, Horizon',
-                '6. Maintenance window: pg_dump Hetzner dply-database-1 → restore Vultr Postgres (10.50.0.5)',
-                '7. Flip Cloudflare DNS for dply.io → '.($webIp !== '' ? $webIp : 'Vultr web public IP').' (proxy on)',
-                '8. Verify Stripe/OAuth/TaskRunner webhooks against https://dply.io',
-                '9. Keep Hetzner boxes 24–48h healthy, then destroy',
-            ] as $step) {
-                $this->line($step);
-            }
+        $this->newLine();
+        $this->info('Cutover checklist (manual / deliberate — this command does not flip DNS or migrate prod):');
+        foreach ([
+            '1. [infra] Bootstrap packages + atomic layout (php artisan dply:vultr:control-plane:bootstrap --execute)'.($bootstrapped !== '' ? ' ✓' : ''),
+            '2. [infra] Postgres/Redis on private VPC IPs (done by bootstrap)'.($bootstrapped !== '' ? ' ✓' : ''),
+            '3. Copy LIVE SHARED⊕overlay .env from Hetzner with identical APP_KEY (deploy/ENV_SYNC.md) — replace staging secrets',
+            '4. Deploy app release onto web+worker current/; run migrations on worker; horizon + nginx',
+            '5. Staging smoke against Vultr web IP (hosts file or temp CF record): login, BYO SSH, Edge Docker, Horizon',
+            '6. Maintenance window: pg_dump Hetzner dply-database-1 → restore Vultr Postgres (10.50.0.5)',
+            '7. Flip Cloudflare DNS for dply.io → '.($webIp !== '' ? $webIp : 'Vultr web public IP').' (proxy on)',
+            '8. Verify Stripe/OAuth/TaskRunner webhooks against https://dply.io',
+            '9. Keep Hetzner boxes 24–48h healthy, then destroy',
+        ] as $step) {
+            $this->line($step);
         }
 
         return $ok ? self::SUCCESS : self::FAILURE;

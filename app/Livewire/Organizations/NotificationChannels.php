@@ -27,6 +27,9 @@ class NotificationChannels extends Component
         return $this->organization;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function notificationChannelsViewData(): array
     {
         return [

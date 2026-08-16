@@ -41,7 +41,7 @@ class MiseInstallScriptBuilder
     {
         $catalog = config('server_manage.mise_runtimes');
         if (is_array($catalog) && $catalog !== []) {
-            return array_values(array_map('strval', array_keys($catalog)));
+            return array_map('strval', array_keys($catalog));
         }
 
         return self::SUPPORTED_RUNTIMES;

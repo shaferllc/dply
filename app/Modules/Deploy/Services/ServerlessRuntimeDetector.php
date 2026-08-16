@@ -68,7 +68,11 @@ final class ServerlessRuntimeDetector
      *     confidence: string,
      *     reasons: list<string>,
      *     warnings: list<string>,
-     *     unsupported_for_target: bool
+     *     unsupported_for_target: bool,
+     *     laravel_octane?: bool,
+     *     laravel_horizon?: bool,
+     *     laravel_pulse?: bool,
+     *     laravel_reverb?: bool
      * }
      */
     public function detect(string $workingDirectory, array $capabilities): array
@@ -197,7 +201,7 @@ final class ServerlessRuntimeDetector
 
         $lp = app(LaravelComposerPackageDetector::class)->flags(is_array($composerJson) ? $composerJson : []);
         foreach (LaravelComposerPackageDetector::PACKAGE_KEYS as $short => $packageName) {
-            if ($lp[$short] ?? false) {
+            if ($lp[$short]) {
                 $reasons[] = 'Detected '.$packageName.' in composer.json.';
             }
         }
@@ -354,7 +358,7 @@ final class ServerlessRuntimeDetector
     /**
      * Build a PHP framework / generic result.
      *
-     * @param  array<string, mixed> $reasons
+     * @param  array<int, string> $reasons
      * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>
      */
@@ -477,7 +481,7 @@ final class ServerlessRuntimeDetector
             'framework' => 'gin',
             'deploy_kind' => 'framework',
             'language' => 'go',
-            'runtime' => $supported ? (self::RAW_RUNTIME_DEFAULTS['go'] ?? 'go:1.22') : '',
+            'runtime' => $supported ? (self::RAW_RUNTIME_DEFAULTS['go']) : '',
             'entrypoint' => 'main',
             'entry_file' => '',
             'build_command' => '',

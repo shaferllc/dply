@@ -35,7 +35,8 @@ final class ServerSystemdServiceNotificationKeys
     }
 
     /**
-     * @param  SystemdNotifyKind  $kind
+     * $kind is validated at runtime rather than by type — callers pass values
+     * parsed out of remote systemd output.
      */
     public static function eventKey(string $normalizedUnit, string $kind): string
     {

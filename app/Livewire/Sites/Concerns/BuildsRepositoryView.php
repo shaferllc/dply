@@ -211,7 +211,7 @@ trait BuildsRepositoryView
         return [
             'connectionQuickDeploy' => $quickDeploy,
             'connectionQuickDeployMode' => $quickDeploy ? $mode : null,
-            'connectionDeployHookUrl' => method_exists($this->site, 'deployHookUrl') ? $this->site->deployHookUrl() : null,
+            'connectionDeployHookUrl' => $this->site->deployHookUrl(),
             'connectionPollLastTipSha' => is_string($repoMeta['poll_last_tip_sha'] ?? null) ? (string) $repoMeta['poll_last_tip_sha'] : null,
             'connectionPollLastCheckedAt' => is_string($repoMeta['poll_last_checked_at'] ?? null) ? (string) $repoMeta['poll_last_checked_at'] : null,
             'connectionPollLog' => array_values($pollLog),

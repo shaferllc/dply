@@ -200,13 +200,13 @@ class NginxModulesConfig
         foreach ($availableRows as $stem => $meta) {
             $modules[] = [
                 'name' => $stem,
-                'conf_file' => (string) ($meta['conf_file'] ?? $stem),
+                'conf_file' => (string) $meta['conf_file'],
                 'enabled' => isset($enabled[$stem]),
                 'protected' => in_array($stem, self::PROTECTED_MODULES, true),
                 'type' => $this->classify($stem),
                 'source' => 'dynamic',
                 'package' => $meta['package'],
-                'installed' => (bool) ($meta['installed'] ?? false),
+                'installed' => (bool) $meta['installed'],
                 'so_path' => $meta['so_path'],
             ];
         }
@@ -239,7 +239,7 @@ class NginxModulesConfig
         $args = $m[1];
         $rows = [];
         if (preg_match_all('/--with(?:out)?-([a-z0-9_]+)_module\b/', $args, $matches) !== false) {
-            foreach ($matches[1] ?? [] as $stem) {
+            foreach ($matches[1] as $stem) {
                 $rows[] = [
                     'name' => str_replace('_', '-', $stem),
                     'type' => 'builtin',

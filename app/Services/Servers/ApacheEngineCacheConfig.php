@@ -33,7 +33,7 @@ class ApacheEngineCacheConfig
         $modules = app(ApacheModulesConfig::class)->read($server);
         $enabled = [];
         foreach ($modules['modules'] as $row) {
-            if (($row['enabled']) === true) {
+            if ($row['enabled'] === true) {
                 $enabled[$row['name']] = true;
             }
         }

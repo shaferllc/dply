@@ -164,6 +164,9 @@ trait ManagesNotificationChannels
      */
     abstract protected function owner(): Model;
 
+    /**
+     * @return array<string, mixed>
+     */
     abstract protected function notificationChannelsViewData(): array;
 
     /** {@see ResolvesSlackWorkspaces} — Slack installs hang off the same owner as the channels. */

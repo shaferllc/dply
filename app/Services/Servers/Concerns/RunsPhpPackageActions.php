@@ -202,7 +202,7 @@ trait RunsPhpPackageActions
             return;
         }
 
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($target === null) {
@@ -225,7 +225,7 @@ trait RunsPhpPackageActions
         ?string $actingUserId,
     ): array {
         $migrator = app(ServerPhpSiteRuntimeMigrator::class);
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($target === null) {
@@ -327,7 +327,7 @@ trait RunsPhpPackageActions
         array $preflightInventory,
         ?\Closure $onProgress,
     ): array {
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $fallback = app(ServerPhpSiteRuntimeMigrator::class)->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($fallback === null) {
@@ -346,7 +346,7 @@ trait RunsPhpPackageActions
                 $installedIds,
             ),
             'detected_default_version' => $detectedCli,
-            'is_supported_environment' => (bool) ($preflightInventory['supported'] ?? true),
+            'is_supported_environment' => (bool) $preflightInventory['supported'],
         ]);
 
         $needsCliReassign = ($defaults['cli_default'] ?? null) === $version || $detectedCli === $version;

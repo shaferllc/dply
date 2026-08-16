@@ -36,7 +36,7 @@ class TraefikTcpRoutesConfig
     {
         $slug = $this->normalizeTraefikSlug($slug);
         foreach ($this->read($server)['routes'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("TCP route `{$slug}` already exists.");
             }
         }
@@ -68,7 +68,7 @@ class TraefikTcpRoutesConfig
         if ($entryPoints === []) {
             $entryPoints = ['web'];
         }
-        $addr = trim((string) ($fields['server_address'] ?? ''));
+        $addr = trim((string) $fields['server_address']);
         if ($addr === '') {
             throw new \InvalidArgumentException('Backend address is required (e.g. :3306 or 127.0.0.1:6379).');
         }

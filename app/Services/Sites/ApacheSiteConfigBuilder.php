@@ -336,7 +336,7 @@ APACHE;
                 continue;
             }
             $pattern = '^'.preg_quote($from, '#').'$';
-            $kind = $redirect->kind instanceof SiteRedirectKind ? $redirect->kind : SiteRedirectKind::Http;
+            $kind = $redirect->kind;
             if ($kind === SiteRedirectKind::InternalRewrite) {
                 $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $redirect->to_url);
                 if ($to === '') {

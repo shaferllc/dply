@@ -111,7 +111,7 @@ trait ManagesReleaseHygieneLogViewer
             $lines,
         );
 
-        $raw = (string) ($result['output'] ?? '');
+        $raw = (string) $result['output'];
         $maxStored = (int) config('server_system_logs.max_stored_bytes', 524288);
         if ($maxStored > 0 && strlen($raw) > $maxStored) {
             $raw = '[dply] '.__('Output truncated for the UI.')."\n\n".substr($raw, 0, $maxStored);

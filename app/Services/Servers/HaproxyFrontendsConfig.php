@@ -170,8 +170,8 @@ class HaproxyFrontendsConfig
             $payload = $updates[$block['name']];
             $rendered = $this->renderFrontend(
                 $block['name'],
-                array_values((array) ($payload['binds'] ?? [])),
-                (array) ($payload['values'] ?? []),
+                (array) $payload['binds'],
+                (array) $payload['values'],
             );
             $newContents = str_replace($block['raw'], $rendered, $newContents);
             $rewritten++;
@@ -189,7 +189,7 @@ class HaproxyFrontendsConfig
     }
 
     /**
-     * @param  array<string, mixed> $binds
+     * @param  list<string> $binds
      * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
@@ -266,7 +266,7 @@ class HaproxyFrontendsConfig
      * / option-* / maxconn lines are emitted in a stable order so `haproxy fmt`
      * (no such command, but) and operator-readable diffs stay clean.
      *
-     * @param  array<string, mixed> $binds
+     * @param  list<string> $binds
      * @param  array<string, mixed> $values
      */
     private function renderFrontend(string $name, array $binds, array $values): string
@@ -308,7 +308,7 @@ class HaproxyFrontendsConfig
         if (preg_match_all('/^frontend\s+(\S+)/m', $contents, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $i => $headerMatch) {
+        foreach ($matches[0] as $i => $headerMatch) {
             $name = $matches[1][$i][0];
             $headerStart = $headerMatch[1];
             $bodyStart = $this->findLineEnd($contents, $headerStart + strlen($headerMatch[0]));

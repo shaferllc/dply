@@ -131,7 +131,7 @@ class WorkspaceSnapshots extends Component
         $this->authorize('update', $this->server);
 
         if (! ServerImageProvider::supports($this->server)) {
-            $this->toastError(__('Image snapshots are not available on :provider.', ['provider' => $this->server->provider?->label() ?? __('this provider')]));
+            $this->toastError(__('Image snapshots are not available on :provider.', ['provider' => $this->server->provider->label()]));
 
             return;
         }
@@ -151,7 +151,7 @@ class WorkspaceSnapshots extends Component
             'server_id' => $this->server->id,
             'organization_id' => $this->server->organization_id,
             'user_id' => auth()->id(),
-            'provider' => $this->server->provider?->value,
+            'provider' => $this->server->provider->value,
             'name' => $name,
             'status' => ServerImage::STATUS_PENDING,
         ]);
@@ -243,7 +243,7 @@ class WorkspaceSnapshots extends Component
         RestoreSiteSnapshotJob::dispatch($snapshot->id, auth()->id());
 
         $snapshot->loadMissing('site');
-        $this->dispatchSnapshotNotification('restored', [__('Database snapshot — :site', ['site' => $snapshot->site?->name ?? ('#'.$snapshot->id)])], [
+        $this->dispatchSnapshotNotification('restored', [__('Database snapshot — :site', ['site' => $snapshot->site->name])], [
             'snapshot_type' => 'database',
             'snapshot_id' => $snapshot->id,
             'site_id' => $snapshot->site_id,
@@ -263,7 +263,7 @@ class WorkspaceSnapshots extends Component
             return;
         }
         $snapshot->loadMissing('site');
-        $siteName = $snapshot->site?->name ?? ('#'.$snapshot->id);
+        $siteName = $snapshot->site->name;
         $snapshot->delete();
         $this->dispatchSnapshotNotification('deleted', [__('Database snapshot — :site', ['site' => $siteName])], [
             'snapshot_type' => 'database',
@@ -320,7 +320,7 @@ class WorkspaceSnapshots extends Component
             $this->redisSnapshotViewData(),
             [
                 'imagesSupported' => ServerImageProvider::supports($this->server),
-                'volumesSupported' => $this->server->provider?->supportsVolumeSnapshots() ?? false,
+                'volumesSupported' => $this->server->provider->supportsVolumeSnapshots(),
                 'opsReady' => $this->serverOpsReady(),
                 'serverImages' => $serverImages,
                 'imagesInFlight' => $imagesInFlight,

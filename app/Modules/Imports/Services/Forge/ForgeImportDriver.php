@@ -66,10 +66,10 @@ class ForgeImportDriver implements ImportDriver
 
         $rows = $this->collectionFrom($response->json(), 'servers');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $row): array => $this->normaliseServer($row),
             $rows,
-        ));
+        );
     }
 
     public function fetchServerDetail(int $sourceServerId): array
@@ -90,10 +90,10 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "list sites for server {$sourceServerId}");
         $rows = $this->collectionFrom($response->json(), 'sites');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $row): array => $this->normaliseSite($row),
             $rows,
-        ));
+        );
     }
 
     /**
@@ -293,9 +293,6 @@ class ForgeImportDriver implements ImportDriver
         // Prefer an active LE cert; fall back to the first.
         $primary = null;
         foreach ($rows as $cert) {
-            if (! is_array($cert)) {
-                continue;
-            }
             if (($cert['active'] ?? false) === true) {
                 $primary = $cert;
                 break;
@@ -337,14 +334,14 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "list webhooks for site {$sourceServerId}/{$sourceSiteId}");
         $rows = $this->collectionFrom($response->json(), 'webhooks');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'url' => (string) ($r['url'] ?? ''),
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void

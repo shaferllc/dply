@@ -56,10 +56,10 @@ final readonly class DplyManifest
     ];
 
     /**
-     * @param  array<string, mixed>  $build
-     * @param  array<string, mixed>  $release
+     * @param  list<string>  $build
+     * @param  list<string>  $release
      * @param  array<string, mixed>  $processes
-     * @param  array<string, mixed>  $warnings
+     * @param  list<string>  $warnings
      */
     public function __construct(
         public ?string $runtime,

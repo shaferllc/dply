@@ -64,18 +64,18 @@ trait BuildsPhpWorkspaceData
         ));
 
         foreach ($rows as $id => $row) {
-            if ($row['is_installed'] ?? false) {
+            if ($row['is_installed']) {
                 $rows[$id]['uninstall_fallback_version'] = $migrator->resolveMigrationTargetVersion($installedIds, $id);
             }
 
-            if ((int) ($row['site_count'] ?? 0) > 0 && ($row['is_installed'] ?? false)) {
+            if ((int) $row['site_count'] > 0 && ($row['is_installed'])) {
                 $rows[$id]['migration_target_version'] = $rows[$id]['uninstall_fallback_version'];
             }
 
             // Counts only — the full catalog is built lazily for whichever
             // version the operator expands, so a server with eight versions
             // does not pay for eight catalogs on every render.
-            $rows[$id]['extension_count'] = ($row['is_installed'] ?? false)
+            $rows[$id]['extension_count'] = ($row['is_installed'])
                 ? count($this->cachedExtensionsFor($server, (string) $id)['enabled'])
                 : 0;
         }
@@ -309,7 +309,7 @@ trait BuildsPhpWorkspaceData
             ],
             array_values(array_filter(
                 $inventory['installed_versions'],
-                fn (array $version): bool => (bool) ($version['is_supported'] ?? false)
+                fn (array $version): bool => (bool) $version['is_supported']
             ))
         );
         $availableVersionIds = array_column($availableVersions, 'id');

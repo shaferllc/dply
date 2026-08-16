@@ -268,9 +268,6 @@ final class ServerCertificateInventory
         // domain (lowercased) => earliest CarbonImmutable expiry from the scan.
         $expiryByDomain = [];
         foreach ($liveCerts as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
             $expiresAt = $row['expires_at'] ?? null;
             if (! $expiresAt instanceof CarbonImmutable) {
                 continue;

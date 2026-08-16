@@ -25,10 +25,8 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Support\Servers\CacheServiceInstallScripts;
-use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\CacheWorkspaceViewData;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -240,18 +238,6 @@ class WorkspaceCaches extends Component
         }
     }
 
-    /** All cache service rows for this server, keyed by ULID and ordered by engine name. */
-    /**
-     * Request-scoped memo for {@see cacheServices()}. A single render fans the
-     * row set out to several consumers (the render() body, the
-     * {@see cacheConsumers()} computed, {@see CacheWorkspaceViewData}), each of
-     * which used to re-run the identical `server_cache_services` select.
-     * render() nulls this before its first read, so the rendered view always
-     * reflects rows a mutating action just created — the memo only collapses
-     * reads within one lifecycle, it never carries a stale set into a render.
-     */
-    private ?Collection $cacheServicesMemo = null;
-
     /** Validate caller-supplied engine name against the supported list. Toasts + returns false on miss. */
     protected function validateEngine(string $engine): bool
     {
@@ -307,12 +293,4 @@ class WorkspaceCaches extends Component
         $this->monitorPayload = null;
     }
 
-    /** @internal Drop the stats cache for a row's engine. */
-    private function forgetStats(?ServerCacheService $row): void
-    {
-        if ($row === null) {
-            return;
-        }
-        app(CacheServiceStats::class)->forget($row->server, $row->engine);
-    }
 }

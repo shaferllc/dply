@@ -38,8 +38,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Site $site
  * @property-read ?SitePreviewDomain $previewDomain
  * @property-read ?ProviderCredential $providerCredential
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteCertificate extends Model
 {

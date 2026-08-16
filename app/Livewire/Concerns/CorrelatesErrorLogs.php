@@ -49,7 +49,7 @@ trait CorrelatesErrorLogs
         }
 
         $instant = $error->occurred_at ?? $error->created_at;
-        $this->errorLogsLabel = $instant?->toDayDateTimeString();
+        $this->errorLogsLabel = $instant->toDayDateTimeString();
         $this->errorLogsResult = app(ServerLogCorrelator::class)->forErrorEvent($error);
         $this->errorLogsOpen = true;
     }

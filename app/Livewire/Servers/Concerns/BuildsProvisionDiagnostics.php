@@ -19,8 +19,6 @@ use Illuminate\Support\Collection;
  */
 trait BuildsProvisionDiagnostics
 {
-
-
     /**
      * Extract a one-line "why did this fail" headline + a few supporting lines from the
      * captured step output (or full task output as a fallback). Surfaces the actual error
@@ -176,7 +174,7 @@ trait BuildsProvisionDiagnostics
             // Strip prefix and split "<path> :: <action> :: <detail>".
             $body = trim((string) preg_replace('/^.*\[dply-rollback\]\s*/', '', $line));
             $segments = array_map('trim', explode('::', $body, 3));
-            $path = $segments[0] ?? '';
+            $path = $segments[0];
             $action = strtolower($segments[1] ?? '');
             $detail = $segments[2] ?? '';
 
@@ -338,7 +336,7 @@ trait BuildsProvisionDiagnostics
     }
 
     /**
-     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta:?array{seconds:int,samples:int}}>  $steps
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta?:array{seconds:int,samples:int}|null}>  $steps
      * @return array{eta:string,eta_samples:?int,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
      */
     protected function stallState(?Task $task, array $steps): ?array
@@ -364,11 +362,11 @@ trait BuildsProvisionDiagnostics
         // when sample size cleared the configured threshold.
         $etaSamples = null;
         $stepEta = $activeStep['eta'] ?? null;
-        if (is_array($stepEta) && ($stepEta['seconds'] ?? 0) > 0) {
-            $eta = sprintf('Avg %s', $this->formatRunDuration((int) $stepEta['seconds']));
-            $etaSamples = (int) ($stepEta['samples'] ?? 0);
+        if (is_array($stepEta) && $stepEta['seconds'] > 0) {
+            $eta = sprintf('Avg %s', $this->formatRunDuration($stepEta['seconds']));
+            $etaSamples = $stepEta['samples'];
         } else {
-            $eta = match ($activeStep['key'] ?? null) {
+            $eta = match ($activeStep['key']) {
                 'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
                 'setup' => 'Usually 5-10 minutes',
                 default => 'Usually a few minutes',

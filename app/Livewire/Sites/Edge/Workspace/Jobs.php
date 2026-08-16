@@ -118,14 +118,14 @@ class Jobs extends Component
         $bindings = EdgeEffectiveBindings::for($this->site, $live);
         $queues = [];
         foreach ($bindings as $binding) {
-            if (($binding['kind'] ?? '') === 'queue') {
+            if ($binding['kind'] === 'queue') {
                 $queues[] = $binding;
             }
         }
 
         $dashboardQueues = array_values(array_filter(
             $this->dashboard_bindings,
-            static fn (array $b): bool => ($b['kind'] ?? '') === 'queue',
+            static fn (array $b): bool => $b['kind'] === 'queue',
         ));
 
         return view('livewire.sites.edge.workspace.jobs', array_merge(

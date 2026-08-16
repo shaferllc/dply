@@ -127,13 +127,41 @@
         ],
         "test": [
             "@php artisan config:clear --ansi",
-            "@php artisan test"
+            "@php artisan test --exclude-group=arch"
+        ],
+        "test:unit": [
+            "@php artisan test --testsuite=Unit"
+        ],
+        "test:feature": [
+            "@php artisan test --testsuite=Feature"
+        ],
+        "test:modules": [
+            "@php artisan test --testsuite=Modules"
+        ],
+        "test:app": [
+            "@php artisan test --testsuite=App"
+        ],
+        "test:arch": [
+            "@php artisan test --testsuite=Arch"
+        ],
+        "test:all": [
+            "@php artisan test --testsuite=Unit,Feature,Modules,App,Arch"
+        ],
+        "test:parallel": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel"
+        ],
+        "test:coverage": [
+            "@php artisan test --coverage"
+        ],
+        "test:profile": [
+            "@php artisan test --profile"
         ],
         "analyse": [
-            "@php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress"
+            "@php -d memory_limit=2G vendor/bin/phpstan analyse --no-progress"
         ],
         "analyse:baseline": [
-            "@php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress --generate-baseline=phpstan-baseline.neon"
+            "@php -d memory_limit=2G vendor/bin/phpstan analyse --no-progress --generate-baseline=phpstan-baseline.neon"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

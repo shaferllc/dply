@@ -47,7 +47,7 @@ class Crons extends Component
         $overrides = is_array($this->site->edgeMeta()['crons_overrides'] ?? null) ? $this->site->edgeMeta()['crons_overrides'] : [];
         $this->dashboard_crons = array_values(array_map(
             static fn ($e): array => [
-                'schedule' => (string) ($e['schedule'] ?? ''),
+                'schedule' => (string) $e['schedule'],
                 'handler' => (string) ($e['handler'] ?? ''),
             ],
             array_filter($overrides, static fn ($e): bool => is_array($e) && is_string($e['schedule'] ?? null) && $e['schedule'] !== ''),
@@ -96,13 +96,13 @@ class Crons extends Component
         $previous = is_array($this->site->edgeMeta()['crons_overrides'] ?? null) ? $this->site->edgeMeta()['crons_overrides'] : [];
 
         $this->site->mergeEdgeMeta([
-            'crons_overrides' => array_values(array_map(
+            'crons_overrides' => array_map(
                 static fn (array $e): array => [
                     'schedule' => $e['schedule'],
                     'handler' => $e['handler'] !== '' ? $e['handler'] : null,
                 ],
                 $this->dashboard_crons,
-            )),
+            ),
         ]);
         $this->site->save();
 

@@ -54,7 +54,7 @@ trait GuardsPhpPackageActions
     protected function guardPackageAction(Server $server, string $action, string $version, array $inventory): void
     {
         $supportedIds = array_column($this->supportedVersions($server), 'id');
-        $installedIds = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($inventory['installed_versions']);
         $detectedDefaultVersion = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
 
         if (
@@ -77,10 +77,10 @@ trait GuardsPhpPackageActions
                 'site_count' => 0,
             ], $installedIds),
             'detected_default_version' => $detectedDefaultVersion,
-            'is_supported_environment' => (bool) ($inventory['supported'] ?? true),
+            'is_supported_environment' => (bool) $inventory['supported'],
         ]);
 
-        if (! ($inventory['supported'] ?? true)) {
+        if (! $inventory['supported']) {
             throw new \RuntimeException('This server does not report a supported PHP package environment.');
         }
 
@@ -96,7 +96,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      */
     protected function guardMigrateSitesAction(Server $server, string $version, array $installedIds): void
     {
@@ -115,7 +115,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $supportedIds
+     * @param  list<string> $supportedIds
      */
     protected function guardInstallAction(string $version, array $supportedIds): void
     {
@@ -125,7 +125,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      */
     protected function guardSetCliDefaultAction(string $version, array $installedIds): void
     {
@@ -135,7 +135,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      */
     protected function guardSetNewSiteDefaultAction(string $version, array $installedIds): void
     {
@@ -145,7 +145,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      */
     protected function guardPatchAction(string $version, array $installedIds): void
     {
@@ -155,7 +155,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed> $installedIds
+     * @param  list<string> $installedIds
      * @param  array{cli_default: ?string, new_site_default: ?string}  $defaults
      */
     protected function guardUninstallAction(string $version, array $installedIds, int $siteCount, array $defaults): void

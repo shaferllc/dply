@@ -24,13 +24,13 @@ use Illuminate\Support\Str;
  * @property string $namespace_id
  * @property ?string $organization_id
  * @property ?Carbon $revoked_at
- * @property array<int, string> $scopes
+ * @property array<int, string>|null $scopes
  * @property string $token_hash
  * @property string $token_prefix
  * @property-read ?QueueNamespace $queueNamespace
  * @property-read ?Organization $organization
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class QueueCredential extends Model
 {

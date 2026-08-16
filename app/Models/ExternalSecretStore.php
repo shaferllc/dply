@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $organization_id
  * @property string $resolution
  * @property-read ?Organization $organization
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ExternalSecretStore extends Model
 {

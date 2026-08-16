@@ -25,8 +25,8 @@ final class ServerWebserverNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $detailLines  human detail (e.g. "nginx → caddy", "caddy: /etc/caddy/Caddyfile")
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string|array<mixed>>  $detailLines  human detail (e.g. "nginx → caddy", "caddy: /etc/caddy/Caddyfile")
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

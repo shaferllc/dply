@@ -40,8 +40,8 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property ?Carbon $two_factor_confirmed_at
  * @property ?string $referral_code
  * @property ?Carbon $referral_converted_at
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property ?array<string, mixed> $ui_preferences
  * @property-read Collection<int, Organization> $organizations
  * @property-read Collection<int, Team> $teams

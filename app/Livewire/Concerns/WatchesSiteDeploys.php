@@ -32,7 +32,11 @@ use Livewire\Attributes\Computed;
  */
 trait WatchesSiteDeploys
 {
-    /** Site ids launched from this surface, driving the deploy console. */
+    /**
+     * Site ids launched from this surface, driving the deploy console.
+     *
+     * @var list<string>
+     */
     public array $watchedSiteIds = [];
 
     /** Server-deploy modal: pick which attached sites to include before launching. */
@@ -278,7 +282,7 @@ trait WatchesSiteDeploys
             return;
         }
 
-        $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
+        $this->watchedSiteIds = $siteIds;
         unset($this->watchedRows, $this->watchedInProgress);
         $this->dispatch('deploy-console-focus', siteIds: $this->watchedSiteIds)
             ->to(DeployConsoleSidebar::class);

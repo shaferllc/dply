@@ -399,6 +399,6 @@ class SiteGitDeployer
             $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
         }
 
-        return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
+        return ['output' => $log, 'sha' => $sha];
     }
 }

@@ -16,7 +16,7 @@ final class ImportedEdgeProject
      * @param  array<string, mixed> $envVars  Plain text env vars to copy onto the site.
      * @param  array<string, mixed> $redirects
      * @param  list<array{for: string, values: array<string, string>}>  $headers
-     * @param  array<string, mixed> $customDomains
+     * @param  list<string> $customDomains
      */
     public function __construct(
         public readonly string $sourceProvider,

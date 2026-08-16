@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *                      See doc/specs/worker-pools/02-specification.md.
  * @property int $desired_count
  * @property int $max_size
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $primary_server_id
@@ -29,8 +29,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read ?Server $primaryServer
  * @property-read Collection<int, Server> $servers
  * @property-read Collection<int, Server> $replicas
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WorkerPool extends Model
 {

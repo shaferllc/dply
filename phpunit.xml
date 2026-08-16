@@ -3,6 +3,9 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="tests/bootstrap.php"
          colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnEmptyTestSuite="true"
+         defaultTestSuite="Unit,Feature"
 >
     <testsuites>
 
@@ -12,11 +15,56 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+
+        <!-- Tests that live beside the code they cover. Neither suite existed
+             here before 2026-08-16, so the ~124 test files under app/ were
+             never collected by `artisan test` — only by an explicit path
+             argument — and they rotted unnoticed.
+
+             Modules: each module's own suite (app/Modules/<Domain>/Tests).
+             App:     the Actions framework's tests (app/Actions/**).
+
+             Both are registered so they are runnable and visible
+             (`composer test:modules` / `composer test:app`), but kept OUT of
+             defaultTestSuite above until the rot is paid down. As of
+             2026-08-16: Modules = 463 failed / 1273 passed; App = 16 of 23
+             files under app/Actions/Tests failing, AsHydratableTest segfaults.
+             Move a suite into defaultTestSuite once it is green. -->
+        <!-- @see composer.json scripts: test, test:modules, test:app, test:all -->
+        <testsuite name="Modules">
+            <directory suffix="Test.php">app/Modules</directory>
+        </testsuite>
+        <testsuite name="App">
+            <directory suffix="Test.php">app/Actions</directory>
+        </testsuite>
+
+        <!-- Pest arch tests: structural invariants checked by parsing app/.
+             The whole-app scan costs ~45s and needs 2G (the file raises
+             memory_limit itself), so `composer test` skips it by excluding the
+             `arch` group, and CI runs `composer test:arch` as its own step.
+
+             NOTE: defaultTestSuite cannot exclude this one. Pest collects the
+             whole tests/ directory on top of the suites declared here, so a
+             testsuite filter only gates directories *outside* tests/ (the
+             Modules and App suites). Group exclusion is what actually works
+             for anything under tests/. -->
+        <testsuite name="Arch">
+            <directory>tests/Arch</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
             <directory>app</directory>
         </include>
+        <!-- Test files live under app/ too; they are not production code and
+             would otherwise inflate/skew coverage of the real classes. -->
+        <exclude>
+            <directory>app/Actions/Attributes/tests</directory>
+            <directory>app/Actions/Concerns/tests</directory>
+            <directory>app/Actions/Decorators/tests</directory>
+            <directory>app/Actions/Tests</directory>
+            <directory>app/Modules/*/Tests</directory>
+        </exclude>
     </source>
     <php>
 

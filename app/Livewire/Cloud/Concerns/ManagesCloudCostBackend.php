@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud\Concerns;
 
-use App\Models\CloudBucket;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
@@ -20,8 +19,6 @@ use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
  */
 trait ManagesCloudCostBackend
 {
-
-
     public function updatedBackend(string $value): void
     {
         $regions = $this->backendRegions($value);
@@ -32,14 +29,14 @@ trait ManagesCloudCostBackend
         // App Runner has no DO managed-DB create path — convert pending
         // "create" rows to external connection mode (and back on DO).
         foreach ($this->databases as $i => $row) {
-            $mode = (string) ($row['mode'] ?? '');
+            $mode = $row['mode'];
             if ($value === 'aws_app_runner' && $mode === 'create') {
                 $this->databases[$i]['mode'] = 'external';
                 $this->databases[$i]['ssl'] = $row['ssl'] ?? true;
-                $this->databases[$i]['port'] = $row['port'] ?? (($row['engine'] ?? '') === 'mysql' ? 3306 : 5432);
+                $this->databases[$i]['port'] = $row['port'] ?? ($row['engine'] === 'mysql' ? 3306 : 5432);
             } elseif ($value !== 'aws_app_runner' && $mode === 'external') {
                 $this->databases[$i]['mode'] = 'create';
-                $this->databases[$i]['size'] = $row['size'] ?? 'small';
+                $this->databases[$i]['size'] = $row['size'];
             }
         }
     }
@@ -158,19 +155,19 @@ trait ManagesCloudCostBackend
         $total = $estimator->cloudContainerPrice($this->size_tier) * max(1, $this->instances);
 
         foreach ($this->workers as $worker) {
-            $size = (string) ($worker['size'] ?? 'small');
-            $count = (int) ($worker['instance_count'] ?? 1);
-            $isScheduler = (string) ($worker['type'] ?? '') === CloudWorker::TYPE_SCHEDULER;
+            $size = $worker['size'];
+            $count = $worker['instance_count'];
+            $isScheduler = $worker['type'] === CloudWorker::TYPE_SCHEDULER;
             $total += $estimator->cloudContainerPrice($size) * ($isScheduler ? 1 : max(1, $count));
         }
 
         foreach ($this->databases as $database) {
             // Attached existing databases are already billed on the org; only
             // newly created ones add cost from this form.
-            if ((string) ($database['mode'] ?? 'create') !== 'create') {
+            if ($database['mode'] !== 'create') {
                 continue;
             }
-            $total += $estimator->cloudDatabasePrice((string) ($database['size'] ?? 'small'));
+            $total += $estimator->cloudDatabasePrice($database['size']);
         }
 
         return $total;
@@ -215,11 +212,11 @@ trait ManagesCloudCostBackend
 
         if ($this->workers !== []) {
             $extras['workers'] = array_map(static fn (array $w): array => [
-                'type' => (string) ($w['type'] ?? CloudWorker::TYPE_WORKER),
-                'name' => (string) ($w['name'] ?? ''),
-                'command' => (string) ($w['command'] ?? ''),
-                'size' => (string) ($w['size'] ?? 'small'),
-                'instance_count' => (int) ($w['instance_count'] ?? 1),
+                'type' => $w['type'],
+                'name' => $w['name'],
+                'command' => $w['command'],
+                'size' => $w['size'],
+                'instance_count' => $w['instance_count'],
             ], $this->workers);
         }
 
@@ -233,15 +230,15 @@ trait ManagesCloudCostBackend
             ];
         }
         foreach ($this->deploy_tasks as $task) {
-            $command = trim((string) ($task['command'] ?? ''));
+            $command = trim($task['command']);
             if ($command === '') {
                 continue;
             }
             $tasksPayload[] = [
-                'trigger' => (string) ($task['trigger'] ?? CloudDeployTask::TRIGGER_PRE_DEPLOY),
-                'name' => (string) ($task['name'] ?? ''),
+                'trigger' => $task['trigger'],
+                'name' => $task['name'],
                 'command' => $command,
-                'size' => (string) ($task['size'] ?? 'small'),
+                'size' => $task['size'],
             ];
         }
         if ($tasksPayload !== []) {
@@ -269,11 +266,11 @@ trait ManagesCloudCostBackend
 
         if ($this->databases !== []) {
             $extras['databases'] = array_map(function (array $row): array {
-                $mode = (string) ($row['mode'] ?? 'create');
+                $mode = $row['mode'];
                 $base = [
                     'mode' => $mode,
-                    'name' => (string) ($row['name'] ?? ''),
-                    'env_prefix' => strtoupper((string) ($row['env_prefix'] ?? 'DB')),
+                    'name' => $row['name'],
+                    'env_prefix' => strtoupper($row['env_prefix']),
                 ];
                 if ($mode === 'attach') {
                     $base['cloud_database_id'] = (string) ($row['cloud_database_id'] ?? '');
@@ -282,22 +279,22 @@ trait ManagesCloudCostBackend
                 }
                 if ($mode === 'external') {
                     return $base + [
-                        'engine' => (string) ($row['engine'] ?? 'postgres'),
+                        'engine' => $row['engine'],
                         'host' => (string) ($row['host'] ?? ''),
                         'port' => (int) ($row['port'] ?? 0),
                         'database' => (string) ($row['database'] ?? ''),
                         'username' => (string) ($row['username'] ?? ''),
                         'password' => (string) ($row['password'] ?? ''),
                         'ssl' => filter_var($row['ssl'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'version' => (string) ($row['version'] ?? ''),
+                        'version' => $row['version'],
                         'region' => 'external',
                     ];
                 }
 
                 return $base + [
-                    'engine' => (string) ($row['engine'] ?? 'postgres'),
-                    'size' => (string) ($row['size'] ?? 'small'),
-                    'version' => (string) ($row['version'] ?? ''),
+                    'engine' => $row['engine'],
+                    'size' => $row['size'],
+                    'version' => $row['version'],
                     'region' => $this->region,
                 ];
             }, $this->databases);
@@ -306,10 +303,10 @@ trait ManagesCloudCostBackend
         if ($this->buckets !== []) {
             $extras['buckets'] = array_map(function (array $row): array {
                 return [
-                    'name' => (string) ($row['name'] ?? ''),
-                    'backend' => (string) ($row['backend'] ?? CloudBucket::BACKEND_DIGITALOCEAN_SPACES),
-                    'region' => (string) ($row['region'] ?? $this->region),
-                    'env_prefix' => strtoupper((string) ($row['env_prefix'] ?? 'S3')),
+                    'name' => $row['name'],
+                    'backend' => $row['backend'],
+                    'region' => $row['region'],
+                    'env_prefix' => strtoupper($row['env_prefix']),
                 ];
             }, $this->buckets);
         }

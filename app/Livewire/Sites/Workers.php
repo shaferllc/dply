@@ -345,7 +345,7 @@ class Workers extends Component
     {
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $serverless['workers'] = array_values($this->workers);
+        $serverless['workers'] = $this->workers;
         $meta['serverless'] = $serverless;
 
         $this->site->update(['meta' => $meta]);

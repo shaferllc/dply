@@ -283,7 +283,7 @@ final class ServerlessQueueBackend
     {
         $parsed = (new DotEnvFileParser)->parse((string) $site->env_file_content);
 
-        return is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+        return $parsed['variables'];
     }
 
     /**

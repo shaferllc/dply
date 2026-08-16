@@ -101,7 +101,7 @@ class Invoices extends Component
             return $this->invoiceRowsCache = collect();
         }
 
-        $tz = auth()->user()?->timezone ?? config('app.timezone', 'UTC');
+        $tz = auth()->user()->timezone ?? config('app.timezone', 'UTC');
 
         // The closure's array<string, mixed> return keeps the mapped Collection
         // assignable to $invoiceRowsCache — Collection's TValue is invariant, so

@@ -219,10 +219,6 @@ final class ServerlessGluePlanner
         $out = [];
 
         foreach ($rows as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
             $label = (string) ($row[$labelKey] ?? '');
             if ($prefixKey !== null && ($row[$prefixKey] ?? '') !== '') {
                 $label = (string) $row[$prefixKey].' · '.$label;
@@ -291,7 +287,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  array<int, (array|string)> $reasons
      */
     private function missingReason(array $reasons): string
     {

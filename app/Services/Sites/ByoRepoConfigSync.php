@@ -140,9 +140,9 @@ final class ByoRepoConfigSync
             SiteRedirect::query()->create([
                 'site_id' => $site->id,
                 'kind' => SiteRedirectKind::Http,
-                'from_path' => (string) ($redirect['from'] ?? ''),
-                'to_url' => (string) ($redirect['to'] ?? ''),
-                'status_code' => (int) ($redirect['status'] ?? 301),
+                'from_path' => (string) $redirect['from'],
+                'to_url' => (string) $redirect['to'],
+                'status_code' => (int) $redirect['status'],
                 'comment' => self::MANAGED_REDIRECT_COMMENT,
                 'sort_order' => $order++,
             ]);
@@ -153,8 +153,8 @@ final class ByoRepoConfigSync
             SiteRedirect::query()->create([
                 'site_id' => $site->id,
                 'kind' => SiteRedirectKind::InternalRewrite,
-                'from_path' => (string) ($rewrite['from'] ?? ''),
-                'to_url' => (string) ($rewrite['to'] ?? ''),
+                'from_path' => (string) $rewrite['from'],
+                'to_url' => (string) $rewrite['to'],
                 'status_code' => 0,
                 'comment' => self::MANAGED_REDIRECT_COMMENT,
                 'sort_order' => $order++,
@@ -166,7 +166,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $crons
+     * @param  list<array<string, string|null>> $crons
      */
     private function syncCrons(Site $site, array $crons): int
     {
@@ -200,7 +200,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $crons
+     * @param  list<array<string, string|null>> $crons
      */
     private function syncServerCrons(Site $site, array $crons): int
     {
@@ -234,7 +234,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $hooks
+     * @param  list<array<string, int|string>> $hooks
      */
     private function syncDeployHooks(Site $site, array $hooks): int
     {

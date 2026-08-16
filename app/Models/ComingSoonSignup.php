@@ -10,8 +10,8 @@ use Illuminate\Support\Str;
  * @property string $id
  * @property string $email
  * @property ?string $source
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ComingSoonSignup extends Model
 {

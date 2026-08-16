@@ -76,7 +76,7 @@ return new class extends Migration
                 $type = self::DRIVER_MAP[$destination->driver] ?? null;
                 $url = $destination->webhook_url;
 
-                if (! $organization instanceof Organization || $type === null || ! is_string($url) || $url === '') {
+                if (! $organization instanceof Organization || $type === null || $url === '') {
                     $skipped++;
 
                     return;

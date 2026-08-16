@@ -90,7 +90,7 @@ class CreateDedicatedDockerDatabaseVm
         $createForm->database = 'none';
 
         if ($appServer->provider === ServerProvider::DigitalOcean) {
-            $vpc = (string) ($appServer->privateNetwork?->provider_id ?? '');
+            $vpc = (string) ($appServer->privateNetwork->provider_id ?? '');
             if ($vpc !== '') {
                 $createForm->do_vpc_uuid = $vpc;
             }

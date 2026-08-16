@@ -248,7 +248,7 @@ class ServerDatabaseProvisioner
 
             // CREATE DATABASE can't run inside a DO block / transaction, so guard
             // it with an existence check rather than catching a duplicate error.
-            $exists = trim((string) ($this->remoteExec->postgresTuples($server, "SELECT 1 FROM pg_database WHERE datname = '{$nameLit}'", 120)[0] ?? ''));
+            $exists = trim((string) ($this->remoteExec->postgresTuples($server, "SELECT 1 FROM pg_database WHERE datname = '{$nameLit}'", 120)[0]));
             $dbOut = '';
             if ($exists === '') {
                 $dbOut = $this->remoteExec->postgresRun($server, "CREATE DATABASE {$name} OWNER {$user};", 120)[0];

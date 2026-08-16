@@ -286,8 +286,8 @@ trait ManagesWebserverConfigRevisions
             if ($a !== null && $b !== null) {
                 return [
                     $registry->rendererFor(ServerWebserverConfigEditor::KIND)->render(
-                        is_array($a->snapshot) ? $a->snapshot : [],
-                        is_array($b->snapshot) ? $b->snapshot : [],
+                        $a->snapshot,
+                        $b->snapshot,
                     ),
                     (string) __('Comparing revisions :a → :b', [
                         'a' => optional($a->created_at)->format('Y-m-d H:i') ?? $a->id,

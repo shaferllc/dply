@@ -123,7 +123,8 @@ class WpCli extends RemoteCli
      * Build the wp-cli invocation. Always run as the site's deploy
      * user with `--path=<document_root>` so wp picks the right install
      * even when multiple WP sites coexist on the host.
-     * @param  array<string, mixed> $args
+     *
+     * @param  list<string>  $args
      */
     protected function buildShellCommand(Site $site, string $command, array $args): string
     {

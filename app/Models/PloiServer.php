@@ -26,8 +26,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $status
  * @property-read ?ProviderCredential $providerCredential
  * @property-read Collection<int, PloiSite> $sites
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class PloiServer extends Model
 {

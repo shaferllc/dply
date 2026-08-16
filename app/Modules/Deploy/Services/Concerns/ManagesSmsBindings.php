@@ -70,7 +70,7 @@ trait ManagesSmsBindings
                 throw new InvalidArgumentException(__('That saved SMS credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return match ($provider) {

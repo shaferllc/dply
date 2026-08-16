@@ -123,7 +123,7 @@ trait ManagesSiteCreateContainer
         if ($this->containerAvailableRepositories !== [] && $this->container_repository_selection === '') {
             $first = $this->containerAvailableRepositories[0];
             $this->container_repository_selection = (string) $first['url'];
-            $this->container_repository_branch = (string) ($first['branch'] ?? 'main');
+            $this->container_repository_branch = (string) $first['branch'];
         }
     }
 

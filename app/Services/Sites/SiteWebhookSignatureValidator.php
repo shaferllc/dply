@@ -37,7 +37,7 @@ class SiteWebhookSignatureValidator
         }
 
         $allowed = $site->webhook_allowed_ips;
-        if (($allowed) && $allowed !== []) {
+        if ($allowed) {
             $ip = (string) $request->ip();
             if (! IpUtils::checkIp($ip, $allowed)) {
                 return [

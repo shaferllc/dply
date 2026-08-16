@@ -180,7 +180,7 @@ final class ServerSecurityDigest
             ];
         }
 
-        if ($recentLines !== null && $recentLines >= $recentWarning && ($failedLines === null || $failedLines < $warning)) {
+        if ($recentLines !== null && $recentLines >= $recentWarning && ($failedLines < $warning)) {
             $alerts[] = [
                 'severity' => 'warning',
                 'title' => __('Recent brute-force burst'),

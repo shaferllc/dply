@@ -19,8 +19,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property-read ?Organization $organization
  * @property-read ?User $creator
  * @property-read Collection<int, ServerAuthorizedKey> $serverAuthorizedKeys
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class OrganizationSshKey extends Model
 {

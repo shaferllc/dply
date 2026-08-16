@@ -26,8 +26,9 @@ class UpCloudService
 
     /**
      * Create a server from template with SSH keys. Returns server UUID.
-     * @param  array<string, mixed> $sshPublicKeys
-     * @param  array<string, mixed> $labels  Server labels (key/value), e.g. ProviderResourceTags::labels()
+     *
+     * @param  list<string>  $sshPublicKeys
+     * @param  array<string, mixed>  $labels  Server labels (key/value), e.g. ProviderResourceTags::labels()
      */
     public function createServer(
         string $zone,
@@ -92,6 +93,7 @@ class UpCloudService
 
     /**
      * Get server by UUID.
+     *
      * @return array<string, mixed>
      */
     public function getServer(string $uuid): array
@@ -110,7 +112,8 @@ class UpCloudService
 
     /**
      * Get public IPv4 from server.
-     * @param  array<string, mixed> $server
+     *
+     * @param  array<string, mixed>  $server
      */
     public static function getPublicIp(array $server): ?string
     {
@@ -194,7 +197,7 @@ class UpCloudService
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      */
     protected function request(string $method, string $path, array $body = []): Response
     {

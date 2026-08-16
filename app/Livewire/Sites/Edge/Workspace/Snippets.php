@@ -170,16 +170,16 @@ HTML,
 
         $row = [
             'name' => (string) $example['name'],
-            'phase' => in_array($example['phase'] ?? 'head', ['head', 'body'], true)
+            'phase' => in_array($example['phase'], ['head', 'body'], true)
                 ? (string) $example['phase']
                 : 'head',
-            'path' => (string) ($example['path'] ?? '/*'),
-            'html' => (string) ($example['html'] ?? ''),
+            'path' => (string) $example['path'],
+            'html' => (string) $example['html'],
         ];
 
         $onlyBlankPlaceholder = count($this->items) === 1
-            && trim((string) ($this->items[0]['html'] ?? '')) === ''
-            && in_array(trim((string) ($this->items[0]['name'] ?? '')), ['', 'custom', 'snippet'], true);
+            && trim((string) $this->items[0]['html']) === ''
+            && in_array(trim((string) $this->items[0]['name']), ['', 'custom', 'snippet'], true);
 
         if ($onlyBlankPlaceholder) {
             $this->items = [$row];
@@ -217,7 +217,7 @@ HTML,
                 'enabled' => $this->enabled,
                 'items' => array_values(array_filter(
                     $this->items,
-                    static fn (array $i): bool => trim((string) ($i['html'] ?? '')) !== '',
+                    static fn (array $i): bool => trim((string) $i['html']) !== '',
                 )),
             ],
         ]);

@@ -159,7 +159,7 @@ class AwsEc2Service
     /**
      * Run an EC2 instance in the client's region. Returns instance ID.
      *
-     * @param  array<string, mixed> $tags  Extra key/value tags, e.g. ProviderResourceTags::labels()
+     * @param  array<string, mixed>  $tags  Extra key/value tags, e.g. ProviderResourceTags::labels()
      */
     public function runInstances(
         string $imageId,
@@ -237,7 +237,8 @@ class AwsEc2Service
 
     /**
      * Get public IPv4 from an instance array (first instance).
-     * @param  array<string, mixed> $instances
+     *
+     * @param  array<int, array<string, mixed>>  $instances
      */
     public static function getPublicIp(array $instances): ?string
     {
@@ -252,7 +253,8 @@ class AwsEc2Service
 
     /**
      * Get instance state (e.g. 'running', 'pending').
-     * @param  array<string, mixed> $instances
+     *
+     * @param  array<int, array<string, mixed>>  $instances
      */
     public static function getState(array $instances): ?string
     {
@@ -317,7 +319,7 @@ class AwsEc2Service
     /**
      * Default region list when API is unavailable (e.g. permission or network).
      *
-     * @return list<array<string, string>>
+     * @return list<array{id: string, name: string}>
      */
     public static function getDefaultRegions(): array
     {

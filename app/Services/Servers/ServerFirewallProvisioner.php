@@ -122,7 +122,7 @@ class ServerFirewallProvisioner
      * Join non-empty UFW grammar segments with single spaces. Skipping empties lets the iface
      * branch be optional without sprinkling conditionals through every return path.
      *
-     * @param  array<string, mixed> $segments
+     * @param  array<int, string> $segments
      */
     private function joinUfwSegments(array $segments): string
     {

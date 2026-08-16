@@ -109,7 +109,7 @@ class ProvisionJourney extends Component
 
         $task = $this->provisionTask();
         $run = $this->provisionRun();
-        $artifacts = $run?->artifacts()->get() ?? collect();
+        $artifacts = $run !== null ? $run->artifacts()->get() : collect();
         $steps = $this->steps($task);
         $completedCount = collect($steps)->where('state', 'completed')->count();
         $shouldPoll = $this->shouldPoll();
@@ -120,7 +120,7 @@ class ProvisionJourney extends Component
         $stallState = $this->stallState($task, $steps);
 
         $stepStatesSig = collect($steps)
-            ->map(fn (array $s): string => ($s['key'] ?? '').':'.$s['state'])
+            ->map(fn (array $s): string => $s['key'].':'.$s['state'])
             ->implode('|');
         $activeRow = collect($steps)->firstWhere('state', 'active');
         $failedRow = collect($steps)->firstWhere('state', 'failed');
@@ -206,12 +206,4 @@ class ProvisionJourney extends Component
         ]);
     }
 
-    /**
-     * Map of label_hash → recorded duration_seconds for every step that
-     * has emitted an end marker so far in this task's output. Cached
-     * per-render via a property to avoid re-parsing on every step row.
-     *
-     * @return array<string, int>
-     */
-    private array $stepEndDurationsCache = [];
 }

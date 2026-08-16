@@ -31,8 +31,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $zone
  * @property-read ?Site $site
  * @property-read Collection<int, SiteCertificate> $certificates
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SitePreviewDomain extends Model
 {

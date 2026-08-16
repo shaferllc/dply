@@ -234,6 +234,6 @@ class GitIdentityResolver
             ->get()
             ->all();
 
-        return array_values(array_merge($oauth, $pats));
+        return array_merge($oauth, $pats);
     }
 }

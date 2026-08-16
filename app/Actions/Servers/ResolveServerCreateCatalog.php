@@ -210,9 +210,6 @@ final class ResolveServerCreateCatalog
 
             $rawClusters = $do->getKubernetesClusters();
             foreach ($rawClusters as $cluster) {
-                if (! is_array($cluster)) {
-                    continue;
-                }
                 $clusters[] = $cluster;
             }
 
@@ -641,23 +638,23 @@ final class ResolveServerCreateCatalog
             //
         }
         foreach ($awsRegions as $r) {
-            $v = (string) ($r['id'] ?? '');
+            $v = $r['id'];
             if ($v === '') {
                 continue;
             }
             $regions[] = [
                 'value' => $v,
-                'label' => (string) ($r['name'] ?? $v),
+                'label' => $r['name'],
             ];
         }
         foreach (AwsEc2Service::getInstanceTypes() as $s) {
-            $v = (string) ($s['id'] ?? '');
+            $v = $s['id'];
             if ($v === '') {
                 continue;
             }
             $sizes[] = [
                 'value' => $v,
-                'label' => (string) ($s['name'] ?? $v),
+                'label' => $s['name'],
                 'memory_mb' => $this->awsMemoryForInstanceType($v),
                 'vcpus' => $this->awsVcpusForInstanceType($v),
                 'disk_gb' => null,
@@ -681,14 +678,14 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         foreach (OracleComputeService::defaultRegions() as $region) {
-            $id = (string) ($region['id'] ?? '');
+            $id = $region['id'];
             if ($id === '') {
                 continue;
             }
 
             $regions[] = [
                 'value' => $id,
-                'label' => (string) ($region['name'] ?? $id),
+                'label' => $region['name'],
             ];
         }
 
@@ -767,13 +764,13 @@ final class ResolveServerCreateCatalog
         try {
             $service = new AzureComputeService($credential);
             foreach ($service->listLocations() as $region) {
-                $id = (string) ($region['id'] ?? '');
+                $id = $region['id'];
                 if ($id === '') {
                     continue;
                 }
                 $regions[] = [
                     'value' => $id,
-                    'label' => (string) ($region['name'] ?? $id),
+                    'label' => $region['name'],
                 ];
             }
         } catch (\Throwable) {
@@ -834,22 +831,6 @@ final class ResolveServerCreateCatalog
             $value = data_get($row, $path);
             if (is_numeric($value)) {
                 return round((float) $value, 4);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @param  list<string>  $paths
-     */
-    private function extractInt(array $row, array $paths): ?int
-    {
-        foreach ($paths as $path) {
-            $value = data_get($row, $path);
-            if (is_numeric($value)) {
-                return (int) $value;
             }
         }
 

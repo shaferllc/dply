@@ -95,7 +95,7 @@ final class DocsSearchIndex
     {
         preg_match_all('/^#{1,3}\s+(.+?)\s*#*$/m', $markdown, $m);
 
-        return collect($m[1] ?? [])
+        return collect($m[1])
             ->map(fn (string $h): string => trim(preg_replace('/[`*_]/', '', $h)))
             ->filter()
             ->unique()

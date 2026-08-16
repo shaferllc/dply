@@ -57,6 +57,11 @@ trait ServerCreateActions
     /** @var array<int, mixed>|null */
     protected ?array $memoCredentialProviderNav = null;
 
+    protected function stepNumber(): int
+    {
+        return 1;
+    }
+
     public function updatedActiveProvider(mixed $value): void
     {
         $ids = CredentialsIndex::credentialProviderIds();
@@ -258,7 +263,15 @@ trait ServerCreateActions
     }
 
     /**
-     * @param  list<array{id: string, label: string, linked: bool}>  $cards
+     * @param  list<array{
+     *     id: string,
+     *     label: string,
+     *     linked: bool,
+     *     server_count: int,
+     *     site_count: int,
+     *     installed_roles: list<array{id: string, label: string, count: int}>
+     * }>  $cards
+     * @return list<array{
      *     id: string,
      *     label: string,
      *     linked: bool,
@@ -281,7 +294,7 @@ trait ServerCreateActions
     protected function defaultProvisionProvider(): string
     {
         foreach ($this->provisionProviderCardsFromList($this->listServerProviderCards()) as $card) {
-            if (($card['linked'] ?? false) === true) {
+            if ($card['linked'] === true) {
                 return $card['id'];
             }
         }
@@ -289,6 +302,9 @@ trait ServerCreateActions
         return 'digitalocean';
     }
 
+    /**
+     * @param  Collection<int, ProviderCredential>|null  $credentials
+     */
     protected function syncProvisionPreferenceFields(?Collection $credentials = null): void
     {
         if (in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
@@ -315,7 +331,9 @@ trait ServerCreateActions
         ];
 
         foreach ($map as $prop => $configKey) {
-            $ids = collect($opts[$configKey] ?? [])->pluck('id')->filter()->values()->all();
+            /** @var list<array<string, mixed>> $rows */
+            $rows = is_array($opts[$configKey] ?? null) ? $opts[$configKey] : [];
+            $ids = collect($rows)->pluck('id')->filter()->values()->all();
             if ($ids === []) {
                 continue;
             }
@@ -337,7 +355,7 @@ trait ServerCreateActions
         $type = $preferredType;
         if ($type === null || ! ServerProviderGate::enabled($type)) {
             $type = collect($this->listServerProviderCards())
-                ->first(fn (array $card): bool => $card['id'] !== 'custom' && ($card['linked'] ?? false))['id'] ?? null;
+                ->first(fn (array $card): bool => $card['id'] !== 'custom' && $card['linked'])['id'] ?? null;
         }
 
         if (! is_string($type) || $type === '') {
@@ -380,7 +398,7 @@ trait ServerCreateActions
         // default geographic preference. After that, fall through to country-based tokens.
         $westCoastFirst = ['sfo', 'sea', 'lax', 'pdx', 'us-west', 'uswest', 'oregon', 'california', 'san-jose', 'silicon'];
 
-        $countryCode = strtoupper((string) (auth()->user()?->country_code ?? ''));
+        $countryCode = strtoupper((string) (auth()->user()->country_code ?? ''));
         $countryTokens = match ($countryCode) {
             'US', 'CA' => ['sfo', 'sea', 'lax', 'pdx', 'nyc', 'tor', 'atl', 'chi', 'iad'],
             'GB', 'IE' => ['lon', 'lhr', 'man', 'ams', 'fra'],
@@ -605,7 +623,7 @@ trait ServerCreateActions
                 // it to gate "blocking" severity on checks that only matter at
                 // submit (e.g. K8s cluster pick — empty on StepWhere isn't a
                 // bug, the user hasn't reached the picker yet).
-                method_exists($this, 'stepNumber') ? (int) $this->stepNumber() : null,
+                $this->stepNumber(),
             ),
             'canCreateServer' => $canCreateServer,
             'hasAnyProviderCredentials' => $hasAnyProviderCredentials,
@@ -619,7 +637,7 @@ trait ServerCreateActions
             return;
         }
 
-        $profile = collect(config('server_provision_options.install_profiles', []))
+        $profile = collect($this->provisionConfigRows('install_profiles'))
             ->firstWhere('id', $this->form->install_profile);
 
         if (! is_array($profile)) {
@@ -649,7 +667,7 @@ trait ServerCreateActions
             $this->normalizeDatabaseServerForm();
         }
 
-        $matching = collect(config('server_provision_options.install_profiles', []))->first(function (array $profile): bool {
+        $matching = collect($this->provisionConfigRows('install_profiles'))->first(function (array $profile): bool {
             return ($profile['server_role'] ?? null) === $this->form->server_role
                 && ($profile['cache_service'] ?? null) === $this->form->cache_service
                 && ($profile['webserver'] ?? null) === $this->form->webserver
@@ -747,11 +765,14 @@ trait ServerCreateActions
      * engines as coming-soon rows so operators see Valkey/KeyDB/etc. even when
      * {@see FilterServerProvisionOptionsForCreateForm} strips them from pickers.
      *
+     * @param  array<string, mixed>  $provisionOptions
      * @return list<array{id: string, label: string, coming_soon?: bool}>
      */
     protected function dedicatedCacheEngineOptions(array $provisionOptions): array
     {
-        $options = collect($provisionOptions['cache_services'] ?? [])
+        /** @var list<array<string, mixed>> $cacheServices */
+        $cacheServices = is_array($provisionOptions['cache_services'] ?? null) ? $provisionOptions['cache_services'] : [];
+        $options = collect($cacheServices)
             ->filter(fn (array $row): bool => ($row['id'] ?? '') !== 'none')
             ->values();
 
@@ -770,7 +791,7 @@ trait ServerCreateActions
                 continue;
             }
 
-            $configRow = collect(config('server_provision_options.cache_services', []))
+            $configRow = collect($this->provisionConfigRows('cache_services'))
                 ->firstWhere('id', $engine);
 
             if (! is_array($configRow)) {
@@ -789,7 +810,7 @@ trait ServerCreateActions
 
     protected function dedicatedCacheEngineAllowedForProvider(string $engine): bool
     {
-        $row = collect(config('server_provision_options.cache_services', []))
+        $row = collect($this->provisionConfigRows('cache_services'))
             ->firstWhere('id', $engine);
 
         if (! is_array($row)) {
@@ -834,7 +855,7 @@ trait ServerCreateActions
 
         $profileId = $this->installProfileIdForServerRole($this->form->server_role);
         if ($profileId !== null) {
-            $profile = collect(config('server_provision_options.install_profiles', []))
+            $profile = collect($this->provisionConfigRows('install_profiles'))
                 ->firstWhere('id', $profileId);
             if (is_array($profile)) {
                 $this->form->install_profile = $profileId;
@@ -953,7 +974,7 @@ trait ServerCreateActions
 
     protected function serverRoleLabel(string $serverRole): string
     {
-        $role = collect(config('server_provision_options.server_roles', []))
+        $role = collect($this->provisionConfigRows('server_roles'))
             ->firstWhere('id', $serverRole);
 
         if (is_array($role) && filled($role['label'] ?? null)) {
@@ -988,5 +1009,46 @@ trait ServerCreateActions
                 $this->addError($field, $message);
             }
         }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function provisionConfigRows(string $key): array
+    {
+        $rows = config('server_provision_options.'.$key, []);
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (is_array($row)) {
+                $out[] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $provisionOptions
+     * @return list<array<string, mixed>>
+     */
+    protected function provisionOptionList(array $provisionOptions, string $key): array
+    {
+        $rows = $provisionOptions[$key] ?? [];
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (is_array($row)) {
+                $out[] = $row;
+            }
+        }
+
+        return $out;
     }
 }

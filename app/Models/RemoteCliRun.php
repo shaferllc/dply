@@ -39,8 +39,8 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property-read ?Site $site
  * @property-read ?User $queuedByUser
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class RemoteCliRun extends Model
 {

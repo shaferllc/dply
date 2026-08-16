@@ -152,7 +152,7 @@ final class FullStackArchitecturePlanner
         return new FullStackLaunchPlan(
             repo: $repo,
             branch: $branch,
-            isMonorepo: (bool) ($monorepo['is_monorepo'] ?? false),
+            isMonorepo: (bool) $monorepo['is_monorepo'],
             layers: $layers,
             wiringHints: $this->wiringHints($layers),
             reasons: $reasons,
@@ -166,7 +166,7 @@ final class FullStackArchitecturePlanner
      */
     private function analysisTargets(string $checkoutPath, array $monorepo): array
     {
-        if (! ($monorepo['is_monorepo']) || ($monorepo['packages'] ?? []) === []) {
+        if (! ($monorepo['is_monorepo']) || ($monorepo['packages']) === []) {
             return [[
                 'path' => $checkoutPath,
                 'repo_root' => '',
@@ -176,7 +176,7 @@ final class FullStackArchitecturePlanner
 
         $targets = [];
         foreach ($monorepo['packages'] as $package) {
-            $relative = trim((string) ($package['path'] ?? ''), '/');
+            $relative = trim((string) $package['path'], '/');
             if ($relative === '' || $relative === '.') {
                 continue;
             }
@@ -187,7 +187,7 @@ final class FullStackArchitecturePlanner
             $targets[] = [
                 'path' => $absolute,
                 'repo_root' => $relative,
-                'label' => (string) ($package['label'] ?? $relative),
+                'label' => (string) $package['label'],
             ];
         }
 
@@ -203,7 +203,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  array<string, mixed> $targets
+     * @param  list<array<string, string>> $targets
      * @return list<array{path: string, repo_root: string, label: string}>
      */
     private function mergeComposerTargets(string $checkoutPath, array $targets): array
@@ -350,7 +350,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  array<string, mixed> $layers
+     * @param  list<\App\Modules\Launch\Support\FullStackLayer> $layers
      */
     private function shouldRecommendDatabase(array $layers): bool
     {
@@ -364,7 +364,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  array<string, mixed> $layers
+     * @param  list<\App\Modules\Launch\Support\FullStackLayer> $layers
      * @return list<FullStackLayer>
      */
     private function dedupeLayers(array $layers): array
@@ -384,7 +384,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  array<string, mixed> $layers
+     * @param  list<\App\Modules\Launch\Support\FullStackLayer> $layers
      * @return list<string>
      */
     private function wiringHints(array $layers): array

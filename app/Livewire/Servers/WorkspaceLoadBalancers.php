@@ -86,7 +86,6 @@ class WorkspaceLoadBalancers extends Component
     public function removeServiceRow(int $index): void
     {
         array_splice($this->lb_services, $index, 1);
-        $this->lb_services = array_values($this->lb_services);
     }
 
     public function createLoadBalancer(): void
@@ -330,7 +329,7 @@ class WorkspaceLoadBalancers extends Component
             return;
         }
 
-        $removedTargetName = $target->server?->name ?? __('a server');
+        $removedTargetName = $target->server->name;
         $removedLbId = $target->loadBalancer->id;
         $removedLbName = $target->loadBalancer->name;
 

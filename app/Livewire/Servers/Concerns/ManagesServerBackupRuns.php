@@ -268,7 +268,7 @@ trait ManagesServerBackupRuns
 
         Notification::send($admins, new BackupFailureNotification(
             schedule: $schedule,
-            errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()?->email ?? 'operator']),
+            errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()->email ?? 'operator']),
             serverName: (string) ($this->server->name ?? ''),
             isTest: true,
         ));

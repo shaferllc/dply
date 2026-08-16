@@ -27,7 +27,7 @@ class StepType extends Component
      * the mode drops out of the accepted values so a stale draft can't walk
      * into the scan step either.
      *
-     * {@see \App\Livewire\Servers\Create\StepScan} is untouched and still works
+     * {@see StepScan} is untouched and still works
      * the moment the switch flips back.
      */
     public static function importModeEnabled(): bool
@@ -266,7 +266,7 @@ class StepType extends Component
         $draft = $this->saveDraftFromForm($this->form, advanceTo: 2);
 
         // Stash the migration source on the draft so it survives subsequent steps.
-        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payload = $draft->payload;
         $payloadChanged = false;
         if ($this->migrationSourcePloiServerId !== null) {
             $payload['_ploi_migration_source_id'] = $this->migrationSourcePloiServerId;

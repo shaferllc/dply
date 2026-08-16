@@ -146,7 +146,7 @@ class NginxSiteConfigBuilder
         $redirects = $site->redirects->sortBy('sort_order')->values();
         $redirectBlock = '';
         foreach ($redirects as $r) {
-            $kind = $r->kind instanceof SiteRedirectKind ? $r->kind : SiteRedirectKind::Http;
+            $kind = $r->kind;
             $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $r->from_path);
             if ($from === '') {
                 continue;

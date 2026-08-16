@@ -112,7 +112,7 @@ class CertificateRequestService
             try {
                 $ssh = new SshConnection($certificate->site->server);
                 foreach ([$certificate->certificate_path, $certificate->private_key_path, $certificate->chain_path] as $path) {
-                    if (($path) && $path !== '') {
+                    if ($path) {
                         $ssh->exec('rm -f '.escapeshellarg($path), 60);
                     }
                 }

@@ -45,7 +45,7 @@ class AgentStatusCommand extends Command
             }
 
             return [
-                $a->server?->name ?? $a->server_id,
+                $a->server->name ?? $a->server_id,
                 $a->status,
                 $installed === null ? '—' : "v{$installed}",
                 "v{$current}",

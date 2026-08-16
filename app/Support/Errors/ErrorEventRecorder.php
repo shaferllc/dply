@@ -240,7 +240,7 @@ class ErrorEventRecorder
     {
         $lines = $action->lines();
         foreach (array_reverse($lines) as $line) {
-            if (($line['level']) === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
+            if ($line['level'] === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
                 return trim($line['line']);
             }
         }

@@ -93,7 +93,7 @@ trait ManagesSiteBindingCloudflareEmail
             return;
         }
 
-        $recipient = trim($this->mailTestRecipient) ?: (string) (auth()->user()?->email ?? '');
+        $recipient = trim($this->mailTestRecipient) ?: (string) (auth()->user()->email ?? '');
         if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
             $this->toastError(__('Enter a valid email address to send the verification to.'));
 
@@ -130,6 +130,6 @@ trait ManagesSiteBindingCloudflareEmail
             return $chosen;
         }
 
-        return strtolower(trim((string) ($this->site->primaryDomain()?->hostname ?? '')));
+        return strtolower(trim((string) ($this->site->primaryDomain()->hostname ?? '')));
     }
 }

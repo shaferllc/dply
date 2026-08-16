@@ -60,9 +60,6 @@ class ServerFirewallSnapshotService
         }
 
         $rules = $snapshot->rules;
-        if (! is_array($rules)) {
-            throw new \InvalidArgumentException('Invalid snapshot payload.');
-        }
 
         DB::transaction(function () use ($server, $rules, $snapshot, $user, $apiToken): void {
             ServerFirewallRule::query()->where('server_id', $server->id)->delete();

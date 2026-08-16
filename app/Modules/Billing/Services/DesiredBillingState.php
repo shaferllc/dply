@@ -120,7 +120,7 @@ class DesiredBillingState
     ): self {
         $billableServerCount = max(0, $billableServerCount);
 
-        $planPriceCents = max(0, (int) ($plan['price_cents'] ?? 0));
+        $planPriceCents = max(0, (int) $plan['price_cents']);
 
         $serverlessCount = max(0, $serverlessCount);
         $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
@@ -240,7 +240,7 @@ class DesiredBillingState
             queueCount: $queueCount,
             queueSubtotalCents: $queueSubtotal,
             queueTierQuantities: $queueTierNormalized,
-            queueBillableNamespaceIds: array_values(array_map(strval(...), $queueBillableNamespaceIds)),
+            queueBillableNamespaceIds: array_map(strval(...), $queueBillableNamespaceIds),
             monthlyTotalCents: $monthly,
             baseCents: 0,
             serverSubtotalCents: $planPriceCents,

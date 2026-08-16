@@ -381,18 +381,18 @@ trait ManagesEnvoyWebserver
             $form = [];
             $text = [];
             foreach ($clusters as $cluster) {
-                $name = (string) ($cluster['name'] ?? '');
+                $name = (string) $cluster['name'];
                 if ($name === '') {
                     continue;
                 }
                 $form[$name] = [
-                    'endpoints' => $cluster['endpoints'] ?? [],
+                    'endpoints' => $cluster['endpoints'],
                     'values' => [
-                        'connect_timeout' => (string) ($cluster['connect_timeout'] ?? '5s'),
-                        'lb_policy' => (string) ($cluster['lb_policy'] ?? 'ROUND_ROBIN'),
+                        'connect_timeout' => (string) $cluster['connect_timeout'],
+                        'lb_policy' => (string) $cluster['lb_policy'],
                     ],
                 ];
-                $text[$name] = implode("\n", $cluster['endpoints'] ?? []);
+                $text[$name] = implode("\n", $cluster['endpoints']);
             }
             $this->envoy_clusters_form = $form;
             $this->envoy_clusters_endpoints_text = $text;
@@ -430,7 +430,7 @@ trait ManagesEnvoyWebserver
                 array_map('trim', preg_split('/\R/', (string) $raw) ?: []),
                 fn (string $line): bool => $line !== '',
             ));
-            $values = $this->envoy_clusters_form[$name]['values'] ?? [];
+            $values = $this->envoy_clusters_form[$name]['values'];
             $clusters[] = [
                 'name' => $name,
                 'endpoints' => $endpoints,
@@ -494,14 +494,14 @@ trait ManagesEnvoyWebserver
             return;
         }
 
-        $name = trim((string) ($this->envoy_clusters_new['name'] ?? ''));
+        $name = trim((string) $this->envoy_clusters_new['name']);
         $endpoints = array_values(array_filter(
-            array_map('trim', preg_split('/\R/', (string) ($this->envoy_clusters_new['endpoints'] ?? '')) ?: []),
+            array_map('trim', preg_split('/\R/', (string) $this->envoy_clusters_new['endpoints']) ?: []),
             fn (string $line): bool => $line !== '',
         ));
         $values = [
-            'connect_timeout' => (string) ($this->envoy_clusters_new['connect_timeout'] ?? '5s'),
-            'lb_policy' => (string) ($this->envoy_clusters_new['lb_policy'] ?? 'ROUND_ROBIN'),
+            'connect_timeout' => (string) $this->envoy_clusters_new['connect_timeout'],
+            'lb_policy' => (string) $this->envoy_clusters_new['lb_policy'],
         ];
 
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy cluster: :name', ['name' => $name]));
@@ -586,15 +586,15 @@ trait ManagesEnvoyWebserver
             $form = [];
             $text = [];
             foreach ($virtualHosts as $row) {
-                $name = (string) ($row['name'] ?? '');
+                $name = (string) $row['name'];
                 if ($name === '') {
                     continue;
                 }
                 $form[$name] = [
-                    'domains' => $row['domains'] ?? [],
-                    'cluster' => (string) ($row['cluster'] ?? ''),
+                    'domains' => $row['domains'],
+                    'cluster' => (string) $row['cluster'],
                 ];
-                $text[$name] = implode("\n", $row['domains'] ?? []);
+                $text[$name] = implode("\n", $row['domains']);
             }
             $this->envoy_virtualhosts_form = $form;
             $this->envoy_virtualhosts_domains_text = $text;
@@ -635,7 +635,7 @@ trait ManagesEnvoyWebserver
             $virtualHosts[] = [
                 'name' => $name,
                 'domains' => $domains,
-                'cluster' => trim((string) ($this->envoy_virtualhosts_form[$name]['cluster'] ?? '')),
+                'cluster' => trim((string) $this->envoy_virtualhosts_form[$name]['cluster']),
             ];
         }
 
@@ -693,12 +693,12 @@ trait ManagesEnvoyWebserver
             return;
         }
 
-        $name = trim((string) ($this->envoy_virtualhosts_new['name'] ?? ''));
+        $name = trim((string) $this->envoy_virtualhosts_new['name']);
         $domains = array_values(array_filter(
-            array_map('trim', preg_split('/[\s,]+/', (string) ($this->envoy_virtualhosts_new['domains'] ?? '')) ?: []),
+            array_map('trim', preg_split('/[\s,]+/', (string) $this->envoy_virtualhosts_new['domains']) ?: []),
             fn (string $d): bool => $d !== '',
         ));
-        $cluster = trim((string) ($this->envoy_virtualhosts_new['cluster'] ?? ''));
+        $cluster = trim((string) $this->envoy_virtualhosts_new['cluster']);
 
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy virtual host: :name', ['name' => $name]));
         DB::table('console_actions')->where('id', $consoleId)->update([
@@ -781,15 +781,15 @@ trait ManagesEnvoyWebserver
             $listeners = app(EnvoyCustomListenersConfig::class)->read($this->server);
             $form = [];
             foreach ($listeners as $row) {
-                $name = (string) ($row['name'] ?? '');
+                $name = (string) $row['name'];
                 if ($name === '') {
                     continue;
                 }
                 $form[$name] = [
-                    'address' => (string) ($row['address'] ?? '0.0.0.0'),
-                    'port' => (int) ($row['port'] ?? 0),
-                    'mode' => (string) ($row['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED),
-                    'default_cluster' => (string) ($row['default_cluster'] ?? ''),
+                    'address' => (string) $row['address'],
+                    'port' => (int) $row['port'],
+                    'mode' => (string) $row['mode'],
+                    'default_cluster' => (string) $row['default_cluster'],
                 ];
             }
             $this->envoy_listeners_form = $form;
@@ -822,10 +822,10 @@ trait ManagesEnvoyWebserver
         foreach ($this->envoy_listeners_form as $name => $values) {
             $listeners[] = [
                 'name' => $name,
-                'address' => trim((string) ($values['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
-                'port' => (int) ($values['port'] ?? 0),
-                'mode' => trim((string) ($values['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
-                'default_cluster' => trim((string) ($values['default_cluster'] ?? '')),
+                'address' => trim((string) $values['address']) ?: '0.0.0.0',
+                'port' => (int) $values['port'],
+                'mode' => trim((string) $values['mode']),
+                'default_cluster' => trim((string) $values['default_cluster']),
             ];
         }
 
@@ -886,11 +886,11 @@ trait ManagesEnvoyWebserver
         }
 
         $fields = [
-            'name' => trim((string) ($this->envoy_listeners_new['name'] ?? '')),
-            'address' => trim((string) ($this->envoy_listeners_new['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
-            'port' => (int) ($this->envoy_listeners_new['port'] ?? 0),
-            'mode' => trim((string) ($this->envoy_listeners_new['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
-            'default_cluster' => trim((string) ($this->envoy_listeners_new['default_cluster'] ?? '')),
+            'name' => trim((string) $this->envoy_listeners_new['name']),
+            'address' => trim((string) $this->envoy_listeners_new['address']) ?: '0.0.0.0',
+            'port' => (int) $this->envoy_listeners_new['port'],
+            'mode' => trim((string) $this->envoy_listeners_new['mode']),
+            'default_cluster' => trim((string) $this->envoy_listeners_new['default_cluster']),
         ];
 
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy listener: :name', ['name' => $fields['name']]));

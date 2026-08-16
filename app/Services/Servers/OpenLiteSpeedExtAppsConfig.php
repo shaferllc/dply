@@ -261,9 +261,9 @@ class OpenLiteSpeedExtAppsConfig
         $emit = $emitter ?? new ConsoleEmitter(null);
         $ssh = new SshConnection($server);
 
-        $name = trim($identity['name'] ?? '');
-        $type = trim($identity['type'] ?? '');
-        $address = trim($identity['address'] ?? '');
+        $name = trim($identity['name']);
+        $type = trim($identity['type']);
+        $address = trim($identity['address']);
         $path = trim((string) ($identity['path'] ?? ''));
 
         if ($name === '' || ! preg_match('/^[A-Za-z0-9_.-]+$/', $name)) {
@@ -439,7 +439,7 @@ class OpenLiteSpeedExtAppsConfig
             return [];
         }
 
-        return array_values($m[0] ?? []);
+        return $m[0];
     }
 
     private function extractName(string $block): ?string
@@ -469,7 +469,7 @@ class OpenLiteSpeedExtAppsConfig
             return [];
         }
 
-        return array_values(array_filter(array_map('trim', $matches[1] ?? []), fn (string $v) => $v !== ''));
+        return array_values(array_filter(array_map('trim', $matches[1]), fn (string $v) => $v !== ''));
     }
 
     /**

@@ -147,9 +147,7 @@ class EdgeRepoBindingTranslator
                 continue;
             }
             foreach (array_keys($bucket) as $name) {
-                if (is_string($name)) {
-                    $names[] = $name;
-                }
+                $names[] = $name;
             }
         }
 

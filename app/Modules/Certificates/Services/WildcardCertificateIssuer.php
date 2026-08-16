@@ -55,7 +55,7 @@ class WildcardCertificateIssuer
                 ? trim((string) config('services.digitalocean.token'))
                 : '';
         }
-        if (! is_string($token) || trim($token) === '') {
+        if (trim($token) === '') {
             throw new \RuntimeException("No DNS API token available for provider [{$provider}] to issue *.{$zone}.");
         }
 

@@ -18,8 +18,8 @@ use Illuminate\Support\Carbon;
  * @property string $site_id
  * @property string|null $level
  * @property string $message
- * @property string $channel
- * @property array<string, mixed> $context
+ * @property string|null $channel
+ * @property array<string, mixed>|null $context
  * @property ?Carbon $created_at
  * @property ?Carbon $logged_at
  * @property-read ?Site $site

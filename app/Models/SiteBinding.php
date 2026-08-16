@@ -18,19 +18,19 @@ use Illuminate\Support\Carbon;
  *                      into the deployment environment at deploy time only — they are intentionally
  *                      kept out of the editable Variables list so the binding stays the source of
  *                      truth for them.
- * @property array<string, mixed> $config
+ * @property array<string, mixed>|null $config
  * @property array<string, mixed> $injected_env
- * @property string $last_error
+ * @property string|null $last_error
  * @property string $mode
- * @property string $name
+ * @property string|null $name
  * @property ?string $site_id
  * @property string $status
  * @property ?string $target_id
- * @property string $target_type
+ * @property string|null $target_type
  * @property string $type
  * @property-read ?Site $site
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class SiteBinding extends Model
 {

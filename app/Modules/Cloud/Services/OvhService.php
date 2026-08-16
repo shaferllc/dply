@@ -130,9 +130,6 @@ class OvhService
         $needle = strtolower(trim($nameContains));
 
         foreach ($this->getImages($project, $region) as $image) {
-            if (! is_array($image)) {
-                continue;
-            }
             $name = strtolower((string) ($image['name'] ?? ''));
             if ($needle !== '' && str_contains($name, $needle)) {
                 $id = (string) ($image['id'] ?? '');

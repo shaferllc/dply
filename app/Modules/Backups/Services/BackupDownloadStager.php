@@ -69,7 +69,7 @@ final class BackupDownloadStager
             }
 
             $target = $this->dbExporter->downloadTarget($backup);
-            if (($target['mode']) !== 'redirect' || ! isset($target['url'])) {
+            if ($target['mode'] !== 'redirect' || ! isset($target['url'])) {
                 throw new \RuntimeException(__('Backup is not available for direct download.'));
             }
 

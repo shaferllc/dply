@@ -133,9 +133,9 @@ class ErrorPages extends Component
             return;
         }
 
-        $this->error_404_html = (string) ($tpl['html_404'] ?? '');
-        $this->error_500_html = (string) ($tpl['html_500'] ?? '');
-        $this->maintenance_html = (string) ($tpl['maintenance'] ?? '');
+        $this->error_404_html = (string) $tpl['html_404'];
+        $this->error_500_html = (string) $tpl['html_500'];
+        $this->maintenance_html = (string) $tpl['maintenance'];
         $this->toastSuccess(__('Starter applied to 404, 500, and maintenance — review and Save.'));
     }
 

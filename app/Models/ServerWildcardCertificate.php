@@ -14,14 +14,14 @@ use Illuminate\Support\Carbon;
  *                      installed on a single server, shared by every testing-hostname site on that
  *                      server/zone. See the create_server_wildcard_certificates migration and
  *                      {@see WildcardCertificateIssuer}.
- * @property string $cert_path
- * @property string $key_path
+ * @property string|null $cert_path
+ * @property string|null $key_path
  * @property ?Carbon $last_installed_at
- * @property string $last_output
+ * @property string|null $last_output
  * @property ?Carbon $last_renewed_at
  * @property ?Carbon $last_requested_at
- * @property string $live_directory
- * @property array<string, mixed> $meta
+ * @property string|null $live_directory
+ * @property array<string, mixed>|null $meta
  * @property ?Carbon $not_after
  * @property string $provider
  * @property ?string $provider_credential_id
@@ -30,8 +30,8 @@ use Illuminate\Support\Carbon;
  * @property string $zone
  * @property-read ?Server $server
  * @property-read ?ProviderCredential $providerCredential
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerWildcardCertificate extends Model
 {

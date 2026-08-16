@@ -61,7 +61,7 @@ final class ServerIndexAssembler
                     'kind' => 'database',
                     'engine' => (string) $engine->engine,
                     'version' => $engine->version !== null ? (string) $engine->version : null,
-                    'status' => $engine->status !== null ? (string) $engine->status : null,
+                    'status' => (string) $engine->status,
                     'is_default' => (bool) $engine->is_default,
                 ];
             }
@@ -72,7 +72,7 @@ final class ServerIndexAssembler
                     'kind' => 'cache',
                     'engine' => (string) $cache->engine,
                     'version' => $cache->version !== null ? (string) $cache->version : null,
-                    'status' => $cache->status !== null ? (string) $cache->status : null,
+                    'status' => (string) $cache->status,
                     'is_default' => false,
                 ];
             }
@@ -193,7 +193,7 @@ final class ServerIndexAssembler
             'name' => (string) $site->name,
             'status' => (string) $site->status,
             'status_label' => $site->statusLabel(),
-            'ssl_status' => $site->ssl_status !== null ? (string) $site->ssl_status : null,
+            'ssl_status' => (string) $site->ssl_status,
             'type_label' => $site->type?->label(),
             'runtime_chip' => $runtimeChip,
             'logo_url' => $site->logoUrl(),

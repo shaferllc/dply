@@ -54,7 +54,7 @@ final class ServerReleaseHygieneScanner
         // before persisting, then stamp the notified posture into the same write.
         $server->setAttribute('meta', $meta);
         $report = $this->hygiene->forServer($server);
-        $overall = (string) ($report['overall'] ?? 'ok');
+        $overall = (string) $report['overall'];
 
         $meta[self::NOTIFIED_OVERALL_KEY] = $overall;
         $server->update(['meta' => $meta]);
@@ -84,8 +84,6 @@ final class ServerReleaseHygieneScanner
         $wantRoot = (bool) config('server_settings.inventory_use_root_ssh', true);
         $fallback = (bool) config('server_settings.inventory_fallback_to_deploy_user_ssh', true);
         $candidates = $wantRoot && $deploy !== 'root' ? array_filter(['root', $fallback ? $deploy : null]) : [$deploy];
-        $candidates = array_values(array_filter($candidates));
-
         $lastError = null;
         foreach ($candidates as $loginUser) {
             try {

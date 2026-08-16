@@ -50,7 +50,11 @@ class Backends extends Component
         }
     }
 
-    /** Backends ordered primary-first, then by creation. */
+    /**
+     * Backends ordered primary-first, then by creation.
+     *
+     * @return Collection<int, SiteBackend>
+     */
     #[Computed]
     public function backends(): Collection
     {

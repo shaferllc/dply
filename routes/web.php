@@ -1152,7 +1152,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         $organization = $user?->currentOrganization();
 
         app(Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', ProviderCredential::class);
-        abort_unless($organization, 404);
+        abort_unless($organization !== null, 404);
 
         $params = request()->query();
         $params['organization'] = $organization;

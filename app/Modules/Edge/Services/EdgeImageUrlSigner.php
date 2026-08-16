@@ -41,7 +41,7 @@ class EdgeImageUrlSigner
         }
 
         $hostname = $site->edgeHostname();
-        if (! is_string($hostname) || $hostname === '') {
+        if ($hostname === '') {
             throw new RuntimeException('Site has no Edge hostname yet — finish provisioning first.');
         }
 

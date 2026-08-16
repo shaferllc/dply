@@ -92,7 +92,7 @@ class PloiClient
                 $delay = (int) (1000 * (2 ** ($attempt - 1)));
                 if ($exception instanceof RequestException) {
                     $retryAfter = $exception->response->header('Retry-After');
-                    if (is_string($retryAfter) && ctype_digit($retryAfter)) {
+                    if (ctype_digit($retryAfter)) {
                         $delay = max($delay, (int) $retryAfter * 1000);
                     }
                 }

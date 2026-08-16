@@ -54,8 +54,8 @@ final class EdgeEffectiveAlerts
             $fromDash = is_array($dashboard[$key] ?? null) ? $dashboard[$key] : null;
             $chosen = $fromDash ?? $fromRepo ?? $base;
 
-            $enabled = (bool) ($chosen['enabled'] ?? false);
-            $threshold = $chosen['threshold'] ?? $base['threshold'];
+            $enabled = (bool) $chosen['enabled'];
+            $threshold = $chosen['threshold'];
             $merged[$key] = [
                 'enabled' => $enabled,
                 'threshold' => $key === 'error_rate' ? (float) $threshold : (int) $threshold,

@@ -32,14 +32,14 @@ trait ManagesCaddyCustomRoutes
             $result = app(CaddyCustomRoutesConfig::class)->read($this->server);
             $form = [];
             foreach ($result['routes'] as $route) {
-                $slug = (string) ($route['slug'] ?? '');
+                $slug = (string) $route['slug'];
                 if ($slug === '') {
                     continue;
                 }
                 $form[$slug] = [
-                    'hosts' => implode("\n", $route['hosts'] ?? []),
-                    'root' => (string) ($route['root'] ?? ''),
-                    'upstream' => (string) ($route['upstream'] ?? ''),
+                    'hosts' => implode("\n", $route['hosts']),
+                    'root' => (string) $route['root'],
+                    'upstream' => (string) $route['upstream'],
                 ];
             }
             $this->caddy_custom_routes_form = $form;
@@ -99,7 +99,7 @@ trait ManagesCaddyCustomRoutes
         $this->caddy_custom_routes_error = null;
 
         $fields = $this->caddyCustomRouteFieldsFromForm($this->caddy_custom_routes_new);
-        $slug = (string) ($this->caddy_custom_routes_new['slug'] ?? '');
+        $slug = (string) $this->caddy_custom_routes_new['slug'];
 
         $consoleId = $this->seedManageConsoleAction(
             $this->server->fresh(),

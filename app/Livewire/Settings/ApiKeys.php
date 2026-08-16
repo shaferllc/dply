@@ -153,12 +153,12 @@ class ApiKeys extends Component
             $allowedIps
         );
 
-        audit_log($org, $user, 'api_token.created', $created['token'] ?? null, null, [
+        audit_log($org, $user, 'api_token.created', $created['token'], null, [
             'token_name' => $this->token_name,
             'abilities' => $abilities,
             'expires_at' => $expiresAt?->toIso8601String(),
             'allowed_ips' => $allowedIps,
-            'token_id' => isset($created['token']) ? (string) $created['token']->id : null,
+            'token_id' => (string) $created['token']->id,
         ]);
 
         $this->new_token_plaintext = $created['plaintext'];

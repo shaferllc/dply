@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -130,15 +131,18 @@ class Index extends Component
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, string>
+     * @return Collection<int, string>
      */
-    protected function orgSiteIds(string $organizationId): \Illuminate\Support\Collection
+    protected function orgSiteIds(string $organizationId): Collection
     {
         return Site::query()
             ->whereIn('server_id', Server::query()->where('organization_id', $organizationId)->select('id'))
             ->pluck('id');
     }
 
+    /**
+     * @return Builder<Server>
+     */
     protected function serversQuery(string $organizationId): Builder
     {
         // Machines only, same as /servers — this is the fleet view.

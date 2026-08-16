@@ -84,7 +84,7 @@ class EnvoyCustomClustersConfig
     }
 
     /**
-     * @param  array<string, mixed> $endpoints
+     * @param  list<string> $endpoints
      * @param  array<string, mixed> $values
      */
     public function addCluster(
@@ -109,7 +109,7 @@ class EnvoyCustomClustersConfig
 
         $clusters = $this->read($server);
         foreach ($clusters as $cluster) {
-            if (($cluster['name'] ?? '') === $name) {
+            if ($cluster['name'] === $name) {
                 throw new \RuntimeException("A cluster named `{$name}` already exists.");
             }
         }
@@ -128,7 +128,7 @@ class EnvoyCustomClustersConfig
     {
         $clusters = array_values(array_filter(
             $this->read($server),
-            fn (array $c): bool => ($c['name'] ?? '') !== $name,
+            fn (array $c): bool => $c['name'] !== $name,
         ));
 
         if (count($clusters) === count($this->read($server))) {

@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property ?string $backend_id
  * @property array<string, mixed> $connection
  * @property string $engine
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $provider_credential_id
@@ -33,8 +33,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $version
  * @property-read ?Organization $organization
  * @property-read ?ProviderCredential $providerCredential
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class CloudDatabase extends Model
 {

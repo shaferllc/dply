@@ -17,10 +17,7 @@ class EmplaceIterator implements \Iterator
         $this->iterator = $iterator;
     }
 
-    /**
-     * @return mixed
-     */
-    public function current()
+    public function current(): mixed
     {
         if (! empty($this->ret)) {
             return array_pop($this->ret);
@@ -37,10 +34,7 @@ class EmplaceIterator implements \Iterator
         $this->iterator->next();
     }
 
-    /**
-     * @return bool|float|int|string|null
-     */
-    public function key()
+    public function key(): mixed
     {
         return $this->iterator->key();
     }

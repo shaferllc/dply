@@ -32,12 +32,6 @@ final class EdgeLogpushRecordImporter
         $skipped = 0;
 
         foreach ($records as $record) {
-            if (! is_array($record)) {
-                $skipped++;
-
-                continue;
-            }
-
             if ($this->importRecord($record)) {
                 $imported++;
             } else {

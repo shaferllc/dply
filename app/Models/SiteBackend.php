@@ -16,14 +16,14 @@ use Illuminate\Support\Carbon;
  *                      for rolling + canary deploys. See docs/MULTI_BACKEND_SITES.md.
  * @property ?string $backend_site_id
  * @property ?Carbon $drained_at
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $role
  * @property ?string $server_id
  * @property ?string $site_id
  * @property string $state
  * @property int $weight
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteBackend extends Model
 {

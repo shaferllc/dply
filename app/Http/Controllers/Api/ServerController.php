@@ -107,7 +107,7 @@ class ServerController extends Controller
                 return ServerIndexAssembler::toArray(
                     $s,
                     $latestSnapshots->get($s->id),
-                    (int) ($insights['open'] ?? 0),
+                    (int) $insights['open'],
                     isset($insights['worst']) ? (string) $insights['worst'] : null,
                     $relatedMap[$s->id] ?? [],
                     $meta !== null,

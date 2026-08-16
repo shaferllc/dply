@@ -311,9 +311,6 @@ BASH;
         }
         $rows = [];
         foreach ($upstreams as $u) {
-            if (! is_array($u)) {
-                continue;
-            }
             $rows[] = [
                 'address' => (string) ($u['address'] ?? '?'),
                 'healthy' => (bool) ($u['healthy'] ?? false),
@@ -517,7 +514,7 @@ BASH;
                 }
                 $rows[] = [
                     'kind' => 'ca',
-                    'name' => is_string($id) ? $id : (string) ($entry['id'] ?? 'ca'),
+                    'name' => $id,
                     'subjects' => [],
                     'issuer' => (string) ($entry['name'] ?? ''),
                     'on_demand' => false,

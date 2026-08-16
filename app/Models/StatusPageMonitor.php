@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string $sort_order
  * @property ?string $status_page_id
  * @property-read ?StatusPage $statusPage
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class StatusPageMonitor extends Model
 {

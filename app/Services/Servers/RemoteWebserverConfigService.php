@@ -25,6 +25,14 @@ use App\Services\SshConnection;
  */
 class RemoteWebserverConfigService
 {
+    /**
+     * Seconds allowed for an engine's own config-validation command. The
+     * webserver_config_layout blocks never carried a per-engine override —
+     * the old `$layout['validate_timeout'] ?? 60` lookup could only ever
+     * resolve to this default.
+     */
+    private const VALIDATE_TIMEOUT_SECONDS = 60;
+
     public function __construct(
         protected ServerManageSshExecutor $executor,
     ) {}
@@ -47,7 +55,7 @@ class RemoteWebserverConfigService
     public function listFiles(Server $server, string $engine): array
     {
         $layout = $this->layoutFor($engine);
-        $paths = array_merge([$layout['main']], $layout['globs'] ?? []);
+        $paths = array_merge([$layout['main']], $layout['globs']);
 
         // Build a tiny shell pipeline that expands the globs and reports
         // size+mtime for each existing file. Failure is non-fatal — we just
@@ -199,7 +207,7 @@ BASH;
             $server,
             'webserver-config:validate',
             (string) ($layout['validate'] ?? 'true'),
-            (int) ($layout['validate_timeout'] ?? 60),
+            self::VALIDATE_TIMEOUT_SECONDS,
             $emitter,
         );
         $validateOk = $this->validateOutputLooksOk($engine, $validate);
@@ -294,7 +302,7 @@ BASH;
             $server,
             'webserver-config:validate-buffer',
             $script,
-            (int) ($layout['validate_timeout'] ?? 60) + 10,
+            self::VALIDATE_TIMEOUT_SECONDS + 10,
             $emitter,
         );
         $emitter?->step('config', 'Restoring original (live file is unchanged)');
@@ -373,7 +381,7 @@ BASH;
             $server,
             'webserver-config:validate',
             (string) ($layout['validate'] ?? 'true'),
-            (int) ($layout['validate_timeout'] ?? 60),
+            self::VALIDATE_TIMEOUT_SECONDS,
         );
 
         return [

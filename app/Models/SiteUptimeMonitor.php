@@ -16,26 +16,26 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $check_type
- * @property array<string, mixed> $config
+ * @property array<string, mixed>|null $config
  * @property string $label
  * @property ?Carbon $last_checked_at
  * @property ?string $last_error
  * @property ?string $last_http_status
  * @property ?string $last_latency_ms
- * @property array<string, mixed> $last_meta
+ * @property array<string, mixed>|null $last_meta
  * @property ?bool $last_ok
  * @property ?string $last_state
  * @property ?string $path
  * @property string $probe_region
- * @property string $probe_worker
+ * @property string|null $probe_worker
  * @property ?string $site_id
  * @property string $sort_order
  * @property-read ?Site $site
  * @property-read Collection<int, StatusPageMonitor> $statusPageMonitors
  * @property-read Collection<int, SiteUptimeCheckResult> $checkResults
  * @property-read Collection<int, SiteUptimeIncident> $incidents
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteUptimeMonitor extends Model
 {

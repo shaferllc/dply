@@ -21,18 +21,18 @@ use Illuminate\Support\Carbon;
  *                      Enabling the add-on dispatches {@see InstallLogAgentJob}; the workspace renders
  *                      `install_output` live while status === installing. See docs/SERVER_LOGS_ADDON.md.
  * @property ?Carbon $cancel_requested_at
- * @property string $client_cert_fingerprint
- * @property array<string, mixed> $enabled_sources
+ * @property string|null $client_cert_fingerprint
+ * @property array<string, mixed>|null $enabled_sources
  * @property ?string $error_message
- * @property string $install_output
+ * @property string|null $install_output
  * @property ?Carbon $last_seen_at
  * @property ?string $server_id
  * @property string $status
- * @property string $version
+ * @property string|null $version
  * @property ?int $config_version
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerLogAgent extends Model
 {

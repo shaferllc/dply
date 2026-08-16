@@ -46,7 +46,7 @@ class Settings extends Component
 
     public string $timezone = '';
 
-    public $org_icon_upload = null;
+    public mixed $org_icon_upload = null;
 
     public string $delete_confirm = '';
 

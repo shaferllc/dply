@@ -144,7 +144,7 @@ final class NodeVersionDetector
         }
 
         preg_match_all('/\d+/', $normalized, $matches);
-        $numbers = array_map('intval', $matches[0] ?? []);
+        $numbers = array_map('intval', $matches[0]);
         if ($numbers === []) {
             return null;
         }

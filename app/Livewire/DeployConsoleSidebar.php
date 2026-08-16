@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\WatchesSiteDeploys;
 use App\Models\SiteDeployment;
 use App\Support\Sites\DeployConsoleRows;
 use Illuminate\Contracts\View\View;
@@ -16,7 +17,7 @@ use Livewire\Component;
 /**
  * Global deploy-status sidebar — mounted once in the app shell so operators can
  * watch BYO deploys from any page (floating dock) and so fleet kickoffs
- * ({@see \App\Livewire\Concerns\WatchesSiteDeploys}) open one shared console
+ * ({@see WatchesSiteDeploys}) open one shared console
  * focused on the newly queued run instead of a stale finished batch.
  *
  * "Dismiss finished" only hides terminal runs from this sidebar (session
@@ -36,7 +37,11 @@ class DeployConsoleSidebar extends Component
     /** Cap sites shown when browsing active + recent (keeps open cheap). */
     public const BROWSE_SITE_LIMIT = 8;
 
-    /** Site ids currently driving the console (kickoff batch or browse selection). */
+    /**
+     * Site ids currently driving the console (kickoff batch or browse selection).
+     *
+     * @var list<string>
+     */
     public array $watchedSiteIds = [];
 
     /**
@@ -345,9 +350,6 @@ class DeployConsoleSidebar extends Component
         }
 
         $at = $deployment->finished_at ?? $deployment->created_at;
-        if ($at === null) {
-            return false;
-        }
 
         return Carbon::parse($at)->lessThanOrEqualTo($dismissedBefore);
     }

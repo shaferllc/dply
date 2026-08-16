@@ -57,7 +57,7 @@ final class CloudflareWorkersProvisioner implements ServerlessFunctionProvisione
         }
 
         $etag = $response->header('ETag');
-        $revision = ($etag) && $etag !== ''
+        $revision = $etag
             ? trim($etag, '"')
             : (string) (is_array($json['result'] ?? null) ? ($json['result']['id'] ?? 'unknown') : 'unknown');
 

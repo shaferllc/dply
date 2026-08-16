@@ -95,7 +95,7 @@ class WorkspaceSecurityDigest extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -128,11 +128,11 @@ class WorkspaceSecurityDigest extends Component
         if (Feature::active('workspace.ssh_access_graph')) {
             $accessReport = $accessGraph->forServer($this->server);
             $sshAccess = [
-                'overall' => $accessReport['overall'] ?? 'ok',
-                'total_keys' => (int) ($accessReport['summary']['total'] ?? 0),
-                'review_overdue' => (int) ($accessReport['summary']['review_overdue'] ?? 0),
-                'active_sessions' => (int) ($accessReport['summary']['active_sessions'] ?? 0),
-                'never_synced' => (int) ($accessReport['summary']['never_synced'] ?? 0),
+                'overall' => $accessReport['overall'],
+                'total_keys' => $accessReport['summary']['total'],
+                'review_overdue' => $accessReport['summary']['review_overdue'],
+                'active_sessions' => $accessReport['summary']['active_sessions'],
+                'never_synced' => $accessReport['summary']['never_synced'],
             ];
         }
 

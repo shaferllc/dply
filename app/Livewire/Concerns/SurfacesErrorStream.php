@@ -135,6 +135,9 @@ trait SurfacesErrorStream
         $this->toastSuccess(__('Applying the fix — it resolves this error when it finishes.'));
     }
 
+    /**
+     * @return LengthAwarePaginator<int, ErrorEvent>
+     */
     public function getEventsProperty(): LengthAwarePaginator
     {
         $events = $this->scopedErrors()

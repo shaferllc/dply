@@ -26,12 +26,11 @@ class ServerProviderSpecSync
     /** Whether this server's provider supports a live spec lookup. */
     public function supports(Server $server): bool
     {
-        return $server->provider instanceof ServerProvider
-            && in_array($server->provider, [
-                ServerProvider::DigitalOcean,
-                ServerProvider::Hetzner,
-                ServerProvider::Aws,
-            ], true)
+        return in_array($server->provider, [
+            ServerProvider::DigitalOcean,
+            ServerProvider::Hetzner,
+            ServerProvider::Aws,
+        ], true)
             && $server->providerCredential !== null
             && filled($server->provider_id);
     }

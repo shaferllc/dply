@@ -97,7 +97,7 @@ final class FunctionCorsPolicy
 
         return array_filter([
             'allow_origins' => $this->allowOrigins,
-            'allow_methods' => array_values($methods),
+            'allow_methods' => $methods,
             'allow_headers' => $this->allowHeaders,
             'expose_headers' => $this->exposeHeaders,
             'allow_credentials' => $this->allowCredentials,

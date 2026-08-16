@@ -116,7 +116,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $deps
+     * @param  list<string> $deps
      * @param  list<string>  $reasons
      */
     private function detectFramework(array $deps, array &$reasons): ?string
@@ -228,7 +228,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @param  array<string, mixed> $scripts
-     * @param  array<string, mixed> $deps
+     * @param  list<string> $deps
      * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */

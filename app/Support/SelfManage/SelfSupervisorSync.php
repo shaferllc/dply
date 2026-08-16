@@ -55,7 +55,7 @@ class SelfSupervisorSync
         ];
 
         $config = $this->loadSupervisorConfig();
-        $useTemplates = (bool) ($config['use_templates'] ?? config('self_manage.supervisor.use_templates', true));
+        $useTemplates = (bool) $config['use_templates'];
         if (! $useTemplates && ! $force) {
             return $empty + ['message' => 'Template sync disabled (dply.yaml supervisor.use_templates / DPLY_SELF_SUPERVISOR_TEMPLATES=false).'];
         }
@@ -90,8 +90,8 @@ class SelfSupervisorSync
             ];
         }
 
-        $confD = rtrim((string) ($config['conf_d'] ?? '/etc/supervisor/conf.d'), '/');
-        $installAs = (string) ($config['install_as'] ?? 'dply-platform.conf');
+        $confD = rtrim((string) $config['conf_d'], '/');
+        $installAs = (string) $config['install_as'];
         $dest = $confD.'/'.$installAs;
 
         $template = (string) file_get_contents($source);

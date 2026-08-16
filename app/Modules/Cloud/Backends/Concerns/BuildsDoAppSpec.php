@@ -39,7 +39,7 @@ trait BuildsDoAppSpec
             return null;
         }
 
-        $body = is_array($cred->credentials) ? $cred->credentials : [];
+        $body = $cred->credentials;
         $username = (string) ($body['username'] ?? '');
         $token = (string) ($body['token'] ?? $body['api_token'] ?? '');
         if ($username === '' || $token === '') {
@@ -70,7 +70,7 @@ trait BuildsDoAppSpec
             'instance_size_slug' => (string) $payload['size_tier_slug'],
         ];
 
-        if (($payload['mode'] ?? 'image') === 'source') {
+        if ($payload['mode'] === 'source') {
             $service['github'] = [
                 'repo' => (string) ($payload['repo'] ?? ''),
                 'branch' => (string) ($payload['branch'] ?? 'main'),

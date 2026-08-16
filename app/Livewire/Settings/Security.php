@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\SocialAccount;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -30,6 +31,7 @@ class Security extends Component
      *
      * @var array<string, string>
      */
+    /** @var array<string, string> */
     public array $passkeyAliases = [];
 
     public function mount(): void
@@ -37,7 +39,7 @@ class Security extends Component
         $this->loadPasskeyAliases();
     }
 
-    protected function user()
+    protected function user(): User
     {
         return auth()->user();
     }
@@ -61,7 +63,7 @@ class Security extends Component
         ]);
 
         $raw = $this->passkeyAliases[$credentialId] ?? '';
-        $trimmed = is_string($raw) ? trim($raw) : '';
+        $trimmed = trim($raw);
 
         // The new package's `passkeys.name` column is NOT NULL; fall back to a
         // generic label when the operator clears the field rather than failing.

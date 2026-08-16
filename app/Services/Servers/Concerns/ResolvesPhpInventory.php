@@ -40,7 +40,7 @@ trait ResolvesPhpInventory
             ];
         }
 
-        return array_values($versions);
+        return $versions;
     }
 
     /**
@@ -129,7 +129,7 @@ trait ResolvesPhpInventory
     {
         try {
             return $this->normalizeVersionList(
-                $this->fetchRemoteInventory($server)['installed_versions'] ?? [],
+                $this->fetchRemoteInventory($server)['installed_versions'],
             );
         } catch (\Throwable) {
             return $this->installedVersionIds($server);
@@ -191,7 +191,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array{installed_versions?: mixed, detected_default_version?: mixed, supported?: mixed}  $freshInventory
+     * @param  array{installed_versions?: mixed, detected_default_version?: mixed, supported?: mixed, extensions?: mixed}  $freshInventory
      * @return array<string, mixed>
      */
     public function reconcileFreshInventory(Server $server, array $freshInventory): array
@@ -358,7 +358,7 @@ trait ResolvesPhpInventory
      */
     protected function isVersionInstalledInInventory(string $version, array $inventory): bool
     {
-        return in_array($version, $this->normalizeVersionList($inventory['installed_versions'] ?? []), true);
+        return in_array($version, $this->normalizeVersionList($inventory['installed_versions']), true);
     }
 
     /**
@@ -373,7 +373,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}
+     * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string, extensions: array<string, array{available: list<string>, enabled: list<string>}>}
      */
     protected function fetchRemoteInventory(Server $server): array
     {
@@ -398,11 +398,11 @@ trait ResolvesPhpInventory
      */
     protected function inventorySummaryOutput(array $inventory): string
     {
-        $installed = $this->normalizeVersionList($inventory['installed_versions'] ?? []);
+        $installed = $this->normalizeVersionList($inventory['installed_versions']);
         $default = $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
 
         return trim(implode("\n", array_filter([
-            'Supported environment: '.(($inventory['supported'] ?? false) ? 'yes' : 'no'),
+            'Supported environment: '.($inventory['supported'] ? 'yes' : 'no'),
             'Installed versions: '.($installed !== [] ? implode(', ', $installed) : 'none reported'),
             'Detected CLI default: '.($default ?? 'none reported'),
         ])));
@@ -462,7 +462,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}
+     * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string, extensions: array<string, array{available: list<string>, enabled: list<string>}>}
      */
     protected function parseRemoteInventoryOutput(string $output): array
     {

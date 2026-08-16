@@ -171,9 +171,6 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         $emit->step('edge', sprintf('syncing %d site backend(s) for %s edge', $sites->count(), $edgeProxy));
 
         $anchor = $sites->first();
-        if ($anchor === null) {
-            throw new \RuntimeException('No sites on this server to sync.');
-        }
 
         $ssh = $this->systemSsh($anchor);
         $sitesEnabled = rtrim((string) config('sites.caddy_sites_enabled'), '/');

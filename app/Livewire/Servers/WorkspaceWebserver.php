@@ -27,7 +27,6 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Servers\TraefikEntrypointsConfig;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
@@ -321,41 +320,6 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->engine_subtab !== 'backends') {
             $this->haproxy_backends_show_add = false;
         }
-    }
-
-    private function mergeTraefikStaticEntrypointsIntoMeta(): void
-    {
-        $server = $this->server->fresh();
-        $meta = (array) ($server->meta ?? []);
-        $state = data_get($meta, 'webserver_live_state.traefik');
-
-        if (
-            ! is_array($state)
-            || ! empty($state['units']['entrypoints'] ?? [])
-        ) {
-            return;
-        }
-
-        $read = app(TraefikEntrypointsConfig::class)->read($server);
-        $entrypoints = $read['entrypoints'] ?? [];
-
-        if (empty($entrypoints)) {
-            return;
-        }
-
-        $state['units']['entrypoints'] = array_map(
-            static fn (array $ep): array => [
-                'name' => $ep['name'],
-                'address' => $ep['address'],
-                'transport' => 'static',
-                'status' => 'configured',
-            ],
-            $entrypoints
-        );
-
-        $meta['webserver_live_state']['traefik'] = $state;
-
-        $server->update(['meta' => $meta]);
     }
 
     public function syncManageRemoteTaskFromCache(): void

@@ -29,8 +29,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Site $site
  * @property-read ?Team $team
  * @property-read ?User $acknowledgedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class InsightFinding extends Model
 {

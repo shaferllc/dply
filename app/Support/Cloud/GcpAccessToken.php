@@ -73,7 +73,7 @@ final class GcpAccessToken
     }
 
     /**
-     * @param  array<string, mixed> $scopes
+     * @param  array<int, string> $scopes
      */
     public function token(array $scopes): string
     {

@@ -178,8 +178,7 @@ class Parity extends Component
         $failedCutover = [];
         foreach ($migration->siteMigrations as $siteMigration) {
             if (
-                $siteMigration->source_site_id !== null
-                && $sourceSnapshot !== null
+                $sourceSnapshot !== null
                 && ! in_array($siteMigration->source_site_id, $sourceSiteIds, true)
             ) {
                 $removedFromSource[] = [

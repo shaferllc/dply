@@ -82,7 +82,7 @@ trait ManagesOauthBindings
                 throw new InvalidArgumentException(__('That saved OAuth credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return array_filter([

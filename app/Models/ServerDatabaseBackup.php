@@ -13,9 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $bytes
  * @property ?string $disk_path
  * @property ?string $error_message
- * @property string $remote_path
- * @property string $s3_bucket
- * @property string $s3_key
+ * @property string|null $remote_path
+ * @property string|null $s3_bucket
+ * @property string|null $s3_key
  * @property ?string $destination_path
  * @property ?string $server_database_id
  * @property string $status
@@ -24,8 +24,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read ?ServerDatabase $serverDatabase
  * @property-read ?BackupConfiguration $backupConfiguration
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerDatabaseBackup extends Model
 {

@@ -15,25 +15,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *                      selector + viewport so the dashboard can replay it. Stored centrally
  *                      (not on GitHub) because we want non-engineer reviewers to leave
  *                      comments without a GitHub account — see C6 magic-link RBAC.
- * @property string $author_email
- * @property string $author_label
+ * @property string|null $author_email
+ * @property string|null $author_label
  * @property string $body
  * @property ?string $created_by_user_id
  * @property ?string $organization_id
  * @property ?string $parent_id
  * @property ?string $resolved_at
  * @property ?string $resolved_by_user_id
- * @property string $selector
+ * @property string|null $selector
  * @property ?string $site_id
  * @property string $url_path
- * @property string $viewport_width
+ * @property string|null $viewport_width
  * @property-read ?Site $site
  * @property-read ?self $parent
  * @property-read ?Organization $organization
  * @property-read ?User $createdBy
  * @property-read ?User $resolvedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class EdgePreviewComment extends Model
 {

@@ -16,6 +16,7 @@ use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -42,7 +43,7 @@ trait ManagesDatabaseBackups
     /** @var array<string, mixed> Trait-shaped destination form for the 'new' mode. */
     public array $backupDestinationForm = [];
 
-    public $import_sql_file = null;
+    public TemporaryUploadedFile|null $import_sql_file = null;
 
     /**
      * Org-level backup destinations this server can reuse — every provider the
@@ -179,7 +180,7 @@ trait ManagesDatabaseBackups
             ->firstOrFail();
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
-        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+        $filename = ($backup->serverDatabase->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
         try {
             return $downloader->response($backup, $filename);

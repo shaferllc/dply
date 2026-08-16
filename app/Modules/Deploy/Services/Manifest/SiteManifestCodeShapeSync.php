@@ -143,7 +143,7 @@ final class SiteManifestCodeShapeSync
     }
 
     /**
-     * @param  array<string, mixed>  $commands
+     * @param  list<string>  $commands
      */
     private function reconcilePhase(Site $site, string $pipelineId, string $phase, array $commands): int
     {

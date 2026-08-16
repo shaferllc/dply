@@ -117,12 +117,12 @@ trait ManagesOpenRestyWebserver
             $form = [];
             $text = [];
             foreach ($rows as $row) {
-                $name = (string) ($row['name'] ?? '');
+                $name = (string) $row['name'];
                 if ($name === '') {
                     continue;
                 }
-                $form[$name] = ['servers' => $row['servers'] ?? []];
-                $text[$name] = implode("\n", $row['servers'] ?? []);
+                $form[$name] = ['servers' => $row['servers']];
+                $text[$name] = implode("\n", $row['servers']);
             }
             $this->openresty_upstreams_form = $form;
             $this->openresty_upstreams_servers_text = $text;
@@ -182,8 +182,8 @@ trait ManagesOpenRestyWebserver
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $name = trim((string) ($this->openresty_upstreams_new['name'] ?? ''));
-        $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_upstreams_new['servers'] ?? '')) ?: []), fn (string $s): bool => $s !== ''));
+        $name = trim((string) $this->openresty_upstreams_new['name']);
+        $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $this->openresty_upstreams_new['servers']) ?: []), fn (string $s): bool => $s !== ''));
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty upstream: :name', ['name' => $name]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
@@ -232,12 +232,12 @@ trait ManagesOpenRestyWebserver
             $form = [];
             $text = [];
             foreach ($rows as $row) {
-                $name = (string) ($row['name'] ?? '');
+                $name = (string) $row['name'];
                 if ($name === '') {
                     continue;
                 }
-                $form[$name] = ['server_names' => $row['server_names'] ?? [], 'upstream' => (string) ($row['upstream'] ?? '')];
-                $text[$name] = implode("\n", $row['server_names'] ?? []);
+                $form[$name] = ['server_names' => $row['server_names'], 'upstream' => (string) $row['upstream']];
+                $text[$name] = implode("\n", $row['server_names']);
             }
             $this->openresty_servers_form = $form;
             $this->openresty_servers_names_text = $text;
@@ -265,7 +265,7 @@ trait ManagesOpenRestyWebserver
             $servers[] = [
                 'name' => $name,
                 'server_names' => $serverNames,
-                'upstream' => trim((string) ($this->openresty_servers_form[$name]['upstream'] ?? '')),
+                'upstream' => trim((string) $this->openresty_servers_form[$name]['upstream']),
             ];
         }
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty custom servers'));
@@ -301,9 +301,9 @@ trait ManagesOpenRestyWebserver
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $name = trim((string) ($this->openresty_servers_new['name'] ?? ''));
-        $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_servers_new['server_names'] ?? '')) ?: []), fn (string $d): bool => $d !== ''));
-        $upstream = trim((string) ($this->openresty_servers_new['upstream'] ?? ''));
+        $name = trim((string) $this->openresty_servers_new['name']);
+        $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $this->openresty_servers_new['server_names']) ?: []), fn (string $d): bool => $d !== ''));
+        $upstream = trim((string) $this->openresty_servers_new['upstream']);
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty server: :name', ['name' => $name]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {

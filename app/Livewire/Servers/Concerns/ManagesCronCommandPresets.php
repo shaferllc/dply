@@ -63,7 +63,7 @@ trait ManagesCronCommandPresets
         // the entry by its key across every group.
         foreach ($this->artisanCommandPresets() as $items) {
             foreach ($items as $item) {
-                if (($item['key'] ?? null) === $key) {
+                if ($item['key'] === $key) {
                     $this->new_cron_command = $item['command'];
 
                     return;

@@ -132,7 +132,7 @@ trait ManagesEdgeRefPicker
                     collect($response->json() ?? [])->map(function (array $c): array {
                         $sha = (string) ($c['sha'] ?? '');
                         $msg = (string) ($c['commit']['message'] ?? '');
-                        $firstLine = explode("\n", $msg, 2)[0] ?? '';
+                        $firstLine = explode("\n", $msg, 2)[0];
 
                         return [
                             'label' => substr($sha, 0, 7),

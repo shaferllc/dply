@@ -169,7 +169,7 @@ class CloudflareCdnService
      * are preserved verbatim; ours are stripped and re-appended from
      * `$rules` so each save is a full overwrite of dply's slice.
      *
-     * @param  array<string, mixed> $rules
+     * @param  list<array{path: string, action: string, ttl?: int}>  $rules
      */
     public function syncCacheRules(string $zoneId, string $hostname, array $rules, string $managedPrefix): void
     {
@@ -180,7 +180,7 @@ class CloudflareCdnService
         ));
 
         $managed = [];
-        foreach (array_values($rules) as $i => $rule) {
+        foreach ($rules as $i => $rule) {
             $managed[] = $this->buildCacheRule($hostname, $rule, $managedPrefix.':'.$i);
         }
 
@@ -390,7 +390,7 @@ class CloudflareCdnService
     }
 
     /**
-     * @param  array<string, mixed> $queryOrBody
+     * @param  array<string, mixed>  $queryOrBody
      */
     private function request(string $method, string $path, array $queryOrBody = []): Response
     {

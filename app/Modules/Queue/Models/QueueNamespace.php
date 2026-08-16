@@ -29,7 +29,7 @@ use Illuminate\Support\Collection;
  * @property int $credential_epoch
  * @property ?string $error_message
  * @property ?int $max_queue_depth
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $site_id
@@ -38,8 +38,8 @@ use Illuminate\Support\Collection;
  * @property-read ?Organization $organization
  * @property-read ?Site $site
  * @property-read \Illuminate\Database\Eloquent\Collection<int, QueueCredential> $credentials
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class QueueNamespace extends Model
 {

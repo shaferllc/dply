@@ -191,7 +191,7 @@ final class SiteDaemonAdvisor
 
         $keys[] = $key;
         $meta = is_array($site->meta) ? $site->meta : [];
-        $meta['dismissed_daemon_suggestions'] = array_values($keys);
+        $meta['dismissed_daemon_suggestions'] = $keys;
         $site->meta = $meta;
         $site->save();
     }

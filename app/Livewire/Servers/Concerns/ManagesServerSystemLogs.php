@@ -476,7 +476,7 @@ trait ManagesServerSystemLogs
                 $this->logTimeRangeMinutes,
             );
 
-            $raw = (string) ($result['output'] ?? '');
+            $raw = (string) $result['output'];
             $maxStored = (int) config('server_system_logs.max_stored_bytes', 524288);
             $truncated = false;
             if ($maxStored > 0 && strlen($raw) > $maxStored) {

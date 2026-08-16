@@ -55,7 +55,11 @@ class WorkspacePhp extends Component
 
     public ?string $phpConfigEditorValidationOutput = null;
 
-    /** Line numbers extracted from the last validation failure, used to highlight offending lines in the editor snippet. */
+    /**
+     * Line numbers extracted from the last validation failure, used to highlight offending lines in the editor snippet.
+     *
+     * @var list<int>
+     */
     public array $phpConfigEditorErrorLines = [];
 
     /** Optional user-supplied note attached to the next successful save's revision. */
@@ -163,17 +167,17 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    if (($result['status'] ?? null) === 'stale') {
-                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    if ($result['status'] === 'stale') {
+                        throw new \RuntimeException($result['message']);
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP action completed.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
             );
 
             $this->server->refresh();
-            $this->toastSuccess($result['message'] ?? __('PHP action completed.'));
+            $this->toastSuccess($result['message']);
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -277,14 +281,14 @@ class WorkspacePhp extends Component
                         }
                     }
 
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP extension action completed.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
             );
 
             $this->server->refresh();
-            $this->toastSuccess($result['message'] ?? __('PHP extension action completed.'));
+            $this->toastSuccess($result['message']);
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -335,8 +339,8 @@ class WorkspacePhp extends Component
 
         $this->extensionTaskId = $result['task_id'] ?? null;
         $this->extensionTaskLabel = $label;
-        $this->remote_output = $result['message'] ?? null;
-        $this->toastSuccess($result['message'] ?? __('Queued.'));
+        $this->remote_output = $result['message'];
+        $this->toastSuccess($result['message']);
     }
 
     public function installCustomExtension(string $version): void
@@ -441,17 +445,17 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    if (($result['status'] ?? null) === 'stale') {
-                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    if ($result['status'] === 'stale') {
+                        throw new \RuntimeException($result['message']);
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP inventory refreshed.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
             );
 
             $this->server->refresh();
-            $this->toastSuccess($result['message'] ?? __('PHP inventory refreshed.'));
+            $this->toastSuccess($result['message']);
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -502,7 +506,7 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorPath = $result['path'];
             $this->phpConfigEditorContent = $result['content'];
             $this->phpConfigEditorOriginalContent = $result['content'];
-            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
+            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'];
             $this->phpConfigEditorSummary = '';
             $this->phpConfigEditorDiffRevisionId = null;
             $this->phpConfigEditorCompareMode = false;
@@ -530,7 +534,7 @@ class WorkspacePhp extends Component
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $content = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
 
         $this->phpConfigEditorContent = $content;
@@ -770,7 +774,7 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP config saved.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
@@ -781,8 +785,8 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorSummary = '';
             $this->refreshRevisionState($editor);
 
-            $this->toastSuccess($result['message'] ?? __('PHP config saved.'));
-            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
+            $this->toastSuccess($result['message']);
+            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'];
             $this->phpConfigEditorValidationOutput = $result['verification_output'] ?? null;
         } catch (ServerPhpConfigValidationException $e) {
             $this->phpConfigEditorValidationOutput = $e->validationOutput();
@@ -896,7 +900,7 @@ class WorkspacePhp extends Component
             'phpInventoryNeverRun' => $opsReady
                 && $refreshMeta === []
                 && $inventoryMeta === []
-                && ((int) ($phpData['summary']['installed_count'] ?? 0) === 0),
+                && $phpData['summary']['installed_count'] === 0,
             'phpConfigRevisions' => $revisions,
             'phpConfigDiffText' => $diffText,
             'phpConfigDiffHeader' => $diffHeader,
@@ -927,7 +931,7 @@ class WorkspacePhp extends Component
             return [
                 app(ConfigRevisionDiffRegistry::class)
                     ->rendererFor($a->kind)
-                    ->render(is_array($a->snapshot) ? $a->snapshot : [], is_array($b->snapshot) ? $b->snapshot : []),
+                    ->render($a->snapshot, $b->snapshot),
                 __('Comparing revisions :a → :b', [
                     'a' => optional($a->created_at)->format('Y-m-d H:i'),
                     'b' => optional($b->created_at)->format('Y-m-d H:i'),
@@ -947,7 +951,7 @@ class WorkspacePhp extends Component
             return [
                 app(ConfigRevisionDiffRegistry::class)
                     ->rendererFor($rev->kind)
-                    ->render(is_array($rev->snapshot) ? $rev->snapshot : [], $current),
+                    ->render($rev->snapshot, $current),
                 __('Revision :ts → current editor', [
                     'ts' => optional($rev->created_at)->format('Y-m-d H:i'),
                 ]),

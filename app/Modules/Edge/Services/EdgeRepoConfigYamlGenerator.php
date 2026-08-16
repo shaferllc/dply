@@ -296,7 +296,7 @@ final class EdgeRepoConfigYamlGenerator
         return implode("\n", $lines);
     }
 
-    /** @param  array<string, mixed> $allowedHosts */
+    /** @param  list<string> $allowedHosts */
     private function renderImages(array $allowedHosts): string
     {
         $lines = ['images:', '  allowed_hosts:'];
@@ -315,9 +315,6 @@ final class EdgeRepoConfigYamlGenerator
         if ($public !== []) {
             $lines[] = '  public:';
             foreach ($public as $name => $value) {
-                if (! is_string($name) || ! is_string($value)) {
-                    continue;
-                }
                 $lines[] = '    '.$name.': '.$this->quote($value);
             }
         }
@@ -325,7 +322,7 @@ final class EdgeRepoConfigYamlGenerator
         if ($secret !== []) {
             $lines[] = '  secret:';
             foreach ($secret as $name) {
-                if (($name) && $name !== '') {
+                if ($name) {
                     $lines[] = '    - '.$this->quote($name);
                 }
             }
@@ -412,8 +409,8 @@ final class EdgeRepoConfigYamlGenerator
     {
         $lines = ['alerts:'];
         foreach (EdgeEffectiveAlerts::KEYS as $key) {
-            $metric = is_array($alerts[$key] ?? null) ? $alerts[$key] : null;
-            if ($metric === null || ! ($metric['enabled'] ?? false)) {
+            $metric = $alerts[$key];
+            if (! $metric['enabled']) {
                 continue;
             }
             $threshold = $metric['threshold'];

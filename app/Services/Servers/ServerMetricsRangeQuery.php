@@ -339,7 +339,7 @@ final class ServerMetricsRangeQuery
     {
         $buckets = [];
         foreach ($snapshots as $snap) {
-            $payload = is_array($snap->payload) ? $snap->payload : [];
+            $payload = $snap->payload;
             if (! array_key_exists($metric, $payload)) {
                 continue;
             }

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\RemoteCli\Services;
 
-use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
+use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -67,7 +67,7 @@ abstract class RemoteCli
      * server inside the site's working directory. Subclasses build
      * the right binary + path prefix.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      */
     abstract protected function buildShellCommand(Site $site, string $command, array $args): string;
 
@@ -75,7 +75,7 @@ abstract class RemoteCli
      * Public entry-point for the async worker, which doesn't have
      * direct access to the protected builder.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      */
     public function buildShellForRun(Site $site, string $command, array $args): string
     {
@@ -85,7 +85,7 @@ abstract class RemoteCli
     /**
      * Run a command against the given site.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      *
      * @throws RemoteCliPermissionDeniedException When $queuedBy lacks
      *                                            the role for the command's risk level.
@@ -141,7 +141,8 @@ abstract class RemoteCli
      * On exit code != 0 OR timeout the run is marked 'failed'. PR 3+
      * may add an "auto-fallback to async on timeout" path per Q15;
      * v2 of the gate. v1 just records the failure.
-     * @param  array<string, mixed> $args
+     *
+     * @param  list<string>  $args
      */
     protected function executeSync(Site $site, RemoteCliRun $run, array $args, ?User $queuedBy): RemoteCliResult
     {

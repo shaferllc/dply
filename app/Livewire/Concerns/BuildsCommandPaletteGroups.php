@@ -634,7 +634,7 @@ trait BuildsCommandPaletteGroups
         $needle = mb_strtolower(trim($query));
         $rows = [];
         foreach ($peers as $peer) {
-            if ($needle !== '' && ! str_contains(mb_strtolower($peer->name.' '.($peer->server?->name ?? '')), $needle)) {
+            if ($needle !== '' && ! str_contains(mb_strtolower($peer->name.' '.$peer->server->name), $needle)) {
                 continue;
             }
             $isSelf = (string) $peer->id === (string) $site->id;

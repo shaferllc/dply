@@ -16,8 +16,6 @@ use App\Models\CloudWorker;
  */
 trait ManagesCloudResources
 {
-
-
     public function addDomain(): void
     {
         $hostname = strtolower(trim($this->new_domain));
@@ -46,7 +44,6 @@ trait ManagesCloudResources
             return;
         }
         array_splice($this->domains, $index, 1);
-        $this->domains = array_values($this->domains);
     }
 
     public function addWorker(string $type = CloudWorker::TYPE_WORKER): void
@@ -84,13 +81,12 @@ trait ManagesCloudResources
             return;
         }
         array_splice($this->workers, $index, 1);
-        $this->workers = array_values($this->workers);
     }
 
     public function hasScheduler(): bool
     {
         foreach ($this->workers as $worker) {
-            if (($worker['type'] ?? null) === CloudWorker::TYPE_SCHEDULER) {
+            if ($worker['type'] === CloudWorker::TYPE_SCHEDULER) {
                 return true;
             }
         }
@@ -105,7 +101,7 @@ trait ManagesCloudResources
      */
     public function addDatabase(string $engine = CloudDatabase::ENGINE_POSTGRES): void
     {
-        $aws = ($this->backend ?? '') === 'aws_app_runner';
+        $aws = $this->backend === 'aws_app_runner';
         $allowed = $aws
             ? [CloudDatabase::ENGINE_POSTGRES, CloudDatabase::ENGINE_MYSQL]
             : [CloudDatabase::ENGINE_POSTGRES, CloudDatabase::ENGINE_MYSQL, CloudDatabase::ENGINE_REDIS];
@@ -146,9 +142,8 @@ trait ManagesCloudResources
         if (! isset($this->databases[$index])) {
             return;
         }
-        $removedId = (string) ($this->databases[$index]['_id'] ?? '');
+        $removedId = $this->databases[$index]['_id'];
         array_splice($this->databases, $index, 1);
-        $this->databases = array_values($this->databases);
 
         if ($removedId !== '') {
             $this->dispatch('database-removed', id: $removedId);
@@ -163,7 +158,7 @@ trait ManagesCloudResources
     {
         $taken = [];
         foreach ($this->databases as $row) {
-            $taken[strtolower((string) ($row['name'] ?? ''))] = true;
+            $taken[strtolower($row['name'])] = true;
         }
         $org = auth()->user()?->currentOrganization();
         if ($org !== null) {
@@ -193,7 +188,7 @@ trait ManagesCloudResources
         $base = $engine === CloudDatabase::ENGINE_REDIS ? 'REDIS' : 'DB';
         $taken = [];
         foreach ($this->databases as $row) {
-            $taken[strtoupper((string) ($row['env_prefix'] ?? ''))] = true;
+            $taken[strtoupper($row['env_prefix'])] = true;
         }
         if (! isset($taken[$base])) {
             return $base;
@@ -240,9 +235,8 @@ trait ManagesCloudResources
         if (! isset($this->buckets[$index])) {
             return;
         }
-        $removedId = (string) ($this->buckets[$index]['_id'] ?? '');
+        $removedId = $this->buckets[$index]['_id'];
         array_splice($this->buckets, $index, 1);
-        $this->buckets = array_values($this->buckets);
         if ($removedId !== '') {
             $this->dispatch('bucket-removed', id: $removedId);
         }
@@ -252,7 +246,7 @@ trait ManagesCloudResources
     {
         $taken = [];
         foreach ($this->buckets as $row) {
-            $taken[strtolower((string) ($row['name'] ?? ''))] = true;
+            $taken[strtolower($row['name'])] = true;
         }
         $org = auth()->user()?->currentOrganization();
         if ($org !== null) {
@@ -276,7 +270,7 @@ trait ManagesCloudResources
         $base = 'S3';
         $taken = [];
         foreach ($this->buckets as $row) {
-            $taken[strtoupper((string) ($row['env_prefix'] ?? ''))] = true;
+            $taken[strtoupper($row['env_prefix'])] = true;
         }
         if (! isset($taken[$base])) {
             return $base;
@@ -313,6 +307,5 @@ trait ManagesCloudResources
             return;
         }
         array_splice($this->deploy_tasks, $index, 1);
-        $this->deploy_tasks = array_values($this->deploy_tasks);
     }
 }

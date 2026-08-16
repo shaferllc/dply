@@ -29,7 +29,7 @@ final class ServerBulkSiteActions
     {
         $deployable = $this->deployableSites($server);
         $renewReport = $this->certificateInventory->forServer($server);
-        $renewable = collect($renewReport['items'] ?? [])
+        $renewable = collect($renewReport['items'])
             ->filter(fn (array $item): bool => (bool) ($item['can_renew'] ?? false))
             ->count();
 
@@ -41,7 +41,7 @@ final class ServerBulkSiteActions
     }
 
     /**
-     * @param  array<string, mixed> $siteIds
+     * @param  list<string> $siteIds
      * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
      */
     public function previewSelected(Server $server, array $siteIds): array
@@ -51,7 +51,7 @@ final class ServerBulkSiteActions
             ->filter(fn (Site $site): bool => in_array((string) $site->id, $normalizedIds, true));
 
         $renewReport = $this->certificateInventory->forServer($server);
-        $renewable = collect($renewReport['items'] ?? [])
+        $renewable = collect($renewReport['items'])
             ->filter(fn (array $item): bool => (bool) ($item['can_renew'] ?? false))
             ->count();
 
@@ -75,7 +75,7 @@ final class ServerBulkSiteActions
     }
 
     /**
-     * @param  array<string, mixed> $siteIds
+     * @param  list<string> $siteIds
      * @return array{queued: int}
      */
     public function redeploySelected(Server $server, array $siteIds, User $actor): array
@@ -101,7 +101,7 @@ final class ServerBulkSiteActions
     }
 
     /**
-     * @param  array<string, mixed> $siteIds
+     * @param  list<string> $siteIds
      * @return list<string>
      */
     private function normalizeSiteIds(array $siteIds): array

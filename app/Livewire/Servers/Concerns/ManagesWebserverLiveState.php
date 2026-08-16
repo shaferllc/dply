@@ -215,10 +215,6 @@ trait ManagesWebserverLiveState
         try {
             $probe->probe($this->server->fresh(), $forceFresh);
             $this->server->refresh();
-            if ($engine === 'traefik') {
-                $this->mergeTraefikStaticEntrypointsIntoMeta();
-                $this->server->refresh();
-            }
         } catch (\Throwable $e) {
             if ($forceFresh) {
                 $this->toastError(__('Refresh failed: :msg', ['msg' => $e->getMessage()]));

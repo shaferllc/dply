@@ -119,7 +119,7 @@ trait ManagesSiteAccessGate
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
         $this->dispatch('close-modal', 'add-basic-auth-modal');
-        $this->finalizeRoutingMutation($savedMessage, __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
+        $this->finalizeRoutingMutation($savedMessage, __('Adding credential to :host …', ['host' => $this->site->server->name ?? $this->site->name]));
     }
 
     /**
@@ -168,7 +168,7 @@ trait ManagesSiteAccessGate
         $this->site->load('basicAuthUsers');
         $this->finalizeRoutingMutation(
             __('Basic auth credential marked for removal — track the apply in the banner.'),
-            __('Removing credential from :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+            __('Removing credential from :host …', ['host' => $this->site->server->name ?? $this->site->name]),
         );
     }
 
@@ -356,7 +356,7 @@ trait ManagesSiteAccessGate
         $this->site->load(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
         $this->finalizeRoutingMutation(
             __('Password gate credential saved.'),
-            __('Applying password gate on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+            __('Applying password gate on :host …', ['host' => $this->site->server->name ?? $this->site->name]),
         );
     }
 
@@ -505,7 +505,7 @@ trait ManagesSiteAccessGate
         $this->site->load('basicAuthUsers');
         $this->finalizeRoutingMutation(
             __('Password rotated.'),
-            __('Rotating credential password on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+            __('Rotating credential password on :host …', ['host' => $this->site->server->name ?? $this->site->name]),
         );
     }
 
@@ -647,7 +647,7 @@ trait ManagesSiteAccessGate
 
         $this->finalizeRoutingMutation(
             $message,
-            __('Importing credentials to :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+            __('Importing credentials to :host …', ['host' => $this->site->server->name ?? $this->site->name]),
         );
     }
 }

@@ -98,14 +98,14 @@ trait DeliversToPagerDuty
     public function toPagerDuty(object $notifiable): PagerDutyMessage
     {
         $channel = $this->pagerDutyChannelFor($notifiable);
-        $mail = method_exists($this, 'toMail') ? $this->toMail($notifiable) : null;
+        $mail = $this->toMail($notifiable);
 
-        $summary = $mail instanceof MailMessage && is_string($mail->subject) && $mail->subject !== ''
+        $summary = $mail->subject !== ''
             ? $mail->subject
             : class_basename(static::class);
 
-        $details = $mail instanceof MailMessage ? $this->pagerDutyDetailsFromMail($mail) : '';
-        $actionUrl = $mail instanceof MailMessage && is_string($mail->actionUrl) ? $mail->actionUrl : null;
+        $details = $this->pagerDutyDetailsFromMail($mail);
+        $actionUrl = $mail->actionUrl;
 
         $context = [
             'severity' => $this->pagerDutySeverity($notifiable),

@@ -81,7 +81,7 @@ class Forms extends Component
             'require_turnstile' => (bool) ($e['require_turnstile'] ?? true),
         ], $endpoints)) : [[
             'path' => '/contact',
-            'to_email' => (string) (auth()->user()?->email ?? ''),
+            'to_email' => (string) (auth()->user()->email ?? ''),
             'honeypot' => 'company',
             'require_turnstile' => true,
         ]];
@@ -91,7 +91,7 @@ class Forms extends Component
     {
         $this->endpoints[] = [
             'path' => '/contact',
-            'to_email' => (string) (auth()->user()?->email ?? ''),
+            'to_email' => (string) (auth()->user()->email ?? ''),
             'honeypot' => 'company',
             'require_turnstile' => true,
         ];
@@ -105,7 +105,7 @@ class Forms extends Component
         }
 
         $defaultEmail = trim((string) ($this->endpoints[0]['to_email'] ?? ''))
-            ?: (string) (auth()->user()?->email ?? '');
+            ?: (string) (auth()->user()->email ?? '');
 
         $row = [
             'path' => (string) $example['path'],
@@ -115,8 +115,8 @@ class Forms extends Component
         ];
 
         $onlyDefaultPlaceholder = count($this->endpoints) === 1
-            && trim((string) ($this->endpoints[0]['path'] ?? '')) === '/contact'
-            && trim((string) ($this->endpoints[0]['to_email'] ?? '')) === '';
+            && trim((string) $this->endpoints[0]['path']) === '/contact'
+            && trim((string) $this->endpoints[0]['to_email']) === '';
 
         if ($onlyDefaultPlaceholder) {
             $this->endpoints = [$row];
@@ -151,7 +151,7 @@ class Forms extends Component
         $this->site->mergeEdgeMeta([
             'forms' => [
                 'enabled' => $this->enabled,
-                'endpoints' => array_values($this->endpoints),
+                'endpoints' => $this->endpoints,
             ],
         ]);
         $this->site->save();
@@ -163,14 +163,14 @@ class Forms extends Component
     {
         $liveUrl = rtrim((string) ($this->site->edgeLiveUrl() ?? ''), '/');
         $primary = $this->endpoints[0] ?? null;
-        $samplePath = is_array($primary) ? (string) ($primary['path'] ?? '/contact') : '/contact';
+        $samplePath = is_array($primary) ? (string) $primary['path'] : '/contact';
         if ($samplePath === '' || ! str_starts_with($samplePath, '/')) {
             $samplePath = '/'.$samplePath;
         }
         $sampleHoneypot = is_array($primary)
-            ? (trim((string) ($primary['honeypot'] ?? '')) ?: 'company')
+            ? (trim((string) $primary['honeypot']) ?: 'company')
             : 'company';
-        $sampleRequireBot = is_array($primary) ? (bool) ($primary['require_turnstile'] ?? false) : false;
+        $sampleRequireBot = is_array($primary) ? (bool) $primary['require_turnstile'] : false;
         $sampleAction = $liveUrl !== '' ? $liveUrl.$samplePath : 'https://your-site.on-dply.site'.$samplePath;
 
         $repo = $this->edgeRepoConfigSection('forms');

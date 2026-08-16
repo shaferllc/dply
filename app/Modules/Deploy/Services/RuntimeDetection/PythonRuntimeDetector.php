@@ -208,7 +208,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $deps
+     * @param  list<string> $deps
      * @param  list<string>  $detectedFiles
      * @param  list<string>  $reasons
      */
@@ -348,7 +348,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $deps
+     * @param  list<string> $deps
      * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */

@@ -148,7 +148,7 @@ final class BackupArtifactUploader
         string $contentType,
     ): string {
         $s3 = $this->s3Factory->forConfiguration($configuration);
-        $objectKey = trim((string) ($s3['key_prefix'] ?? ''), '/') !== ''
+        $objectKey = trim((string) $s3['key_prefix'], '/') !== ''
             ? trim((string) $s3['key_prefix'], '/').'/'.ltrim($key, '/')
             : ltrim($key, '/');
 

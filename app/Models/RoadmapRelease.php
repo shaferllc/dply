@@ -23,8 +23,8 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $published_at
  * @property string $slug
  * @property int $sort_order
- * @property string $summary
- * @property string $title
+ * @property string|null $summary
+ * @property string|null $title
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property-read Collection<int, RoadmapItem> $targetItems

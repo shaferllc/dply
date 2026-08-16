@@ -137,7 +137,7 @@ trait ManagesEdgeDashboardBindings
     {
         $previous = EdgeEffectiveBindings::dashboardOverrides($this->site);
 
-        $this->site->mergeEdgeMeta(['bindings_overrides' => array_values($this->dashboard_bindings)]);
+        $this->site->mergeEdgeMeta(['bindings_overrides' => $this->dashboard_bindings]);
         $this->site->save();
 
         audit_log(

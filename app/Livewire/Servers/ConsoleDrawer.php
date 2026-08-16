@@ -58,6 +58,7 @@ class ConsoleDrawer extends Component
      */
     public ?string $watchedActionId = null;
 
+    /** @var array<string, string> */
     protected $listeners = [
         'refresh-server-status' => 'verifyActiveServer',
     ];
@@ -210,7 +211,8 @@ class ConsoleDrawer extends Component
         // Switching servers (incl. landing on a different /servers/{id}/* page)
         // must start with a clean console — otherwise command output from the
         // previously-active server bleeds into the new one's drawer.
-        if ((string) ($this->server?->id ?? '') !== (string) $server->id) {
+        $currentId = $this->server !== null ? (string) $this->server->id : '';
+        if ($currentId !== (string) $server->id) {
             $this->history = [];
             $this->error = null;
             $this->command = '';

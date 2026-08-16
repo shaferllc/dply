@@ -271,10 +271,7 @@ class BuildJourney extends Component
 
         // Only walk the UI back (e.g. BUILDING status + clone-only log →
         // show cloning as current). Never advance past the DB status.
-        $desiredState = $logToState[$latestLogStep] ?? null;
-        if ($desiredState === null) {
-            return $journey;
-        }
+        $desiredState = $logToState[$latestLogStep];
 
         $stepKeys = $journey['stepKeys'];
         $dbIndex = array_search($journey['state'], $stepKeys, true);

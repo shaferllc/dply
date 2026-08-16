@@ -120,7 +120,7 @@ trait ManagesSupervisorPrograms
             return $laravelKeys;
         }
 
-        $language = strtolower((string) ($detection['language'] ?? ''));
+        $language = strtolower($detection['language']);
 
         if ($site->isRailsFrameworkDetected()) {
             return $railsKeys;

@@ -56,7 +56,6 @@ class WorkspaceSshKeys extends Component
 
     public const ACTIVITY_PER_PAGE = 15;
 
-    /** @var 'keys'|'preview'|'advanced'|'activity'|'notifications' */
     #[Url(as: 'tab', except: self::DEFAULT_TAB, history: true)]
     public string $ssh_workspace_tab = self::DEFAULT_TAB;
 

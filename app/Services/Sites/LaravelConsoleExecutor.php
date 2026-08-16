@@ -201,11 +201,11 @@ final class LaravelConsoleExecutor
             return [];
         }
 
-        return array_values(array_slice($parts, 1));
+        return array_slice($parts, 1);
     }
 
     /**
-     * @param  array<string, mixed> $args
+     * @param  list<string> $args
      */
     private function recordRun(Site $site, string $command, array $args, RiskLevel $risk, int $exitCode, string $output, Carbon $startedAt): void
     {
@@ -314,7 +314,7 @@ final class LaravelConsoleExecutor
             $lines = preg_split('/\R/', trim($raw)) ?: [];
             $commands = [];
             foreach ($lines as $line) {
-                if (! is_string($line) || trim($line) === '') {
+                if (trim($line) === '') {
                     continue;
                 }
                 $parts = preg_split('/\s+/', trim($line), 2);
@@ -394,7 +394,7 @@ final class LaravelConsoleExecutor
      */
     private function argvTailToPhpArgv(string $argvTail): array
     {
-        return array_values(array_filter(preg_split('/\s+/', trim($argvTail)) ?: [], fn ($t) => ($t) && $t !== ''));
+        return array_values(array_filter(preg_split('/\s+/', trim($argvTail)) ?: []));
     }
 
     private function captureArtisanLocalK8sArgv(Site $site, string $argvTail, int $timeoutSeconds): string

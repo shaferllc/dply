@@ -21,8 +21,8 @@ use Illuminate\Support\Carbon;
  * @property string $body
  * @property ?string $created_by_user_id
  * @property ?string $updated_by_user_id
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?ServerNote $note
  * @property-read ?User $creator
  * @property-read ?User $editor

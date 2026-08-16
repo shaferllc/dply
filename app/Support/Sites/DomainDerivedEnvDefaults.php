@@ -40,7 +40,7 @@ final class DomainDerivedEnvDefaults
      */
     public static function host(Site $site): ?string
     {
-        $host = trim((string) ($site->primaryDomain()?->hostname ?? ''));
+        $host = trim((string) ($site->primaryDomain()->hostname ?? ''));
         if ($host === '') {
             $host = trim($site->testingHostname());
         }

@@ -16,16 +16,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $error_message
  * @property ?string $hetzner_network_id
  * @property string $load_balancer_type
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $organization_id
- * @property string $private_ip
+ * @property string|null $private_ip
  * @property string $provider
  * @property ?string $provider_credential_id
  * @property ?string $provider_id
- * @property string $public_ipv4
- * @property string $public_ipv6
- * @property string $region
+ * @property string|null $public_ipv4
+ * @property string|null $public_ipv6
+ * @property string|null $region
  * @property ?string $server_id
  * @property string $status
  * @property bool $sticky_sessions
@@ -33,8 +33,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read ?ProviderCredential $providerCredential
  * @property-read Collection<int, LoadBalancerTarget> $targets
  * @property-read Collection<int, LoadBalancerService> $services
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class LoadBalancer extends Model
 {

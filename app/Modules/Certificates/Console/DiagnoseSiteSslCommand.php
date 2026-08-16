@@ -59,9 +59,9 @@ class DiagnoseSiteSslCommand extends Command
 
         $this->line(sprintf('<info>Site</info>     %s  (%s)', $site->id, $site->name ?? '—'));
         $this->line(sprintf('<info>Server</info>   %s  (%s, %s)',
-            $server?->id ?? '—',
-            $server?->name ?? '—',
-            $server?->ip_address ?? 'no IP',
+            $server->id ?? '—',
+            $server->name ?? '—',
+            $server->ip_address ?? 'no IP',
         ));
         $this->line(sprintf('<info>Webserver</info> %s', $site->webserver() ?? '—'));
         $this->newLine();
@@ -86,7 +86,7 @@ class DiagnoseSiteSslCommand extends Command
             return;
         }
 
-        $this->line(sprintf('  Hostname  %s', $preview?->hostname ?? '(unknown)'));
+        $this->line(sprintf('  Hostname  %s', $preview->hostname ?? '(unknown)'));
         $this->line(sprintf('  Zone      %s  →  needs an installed *.%s on the server', $zone, $zone));
 
         $wildcard = ServerWildcardCertificate::query()

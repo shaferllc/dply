@@ -290,7 +290,7 @@ final class EdgeRepoCloner
                     if (! is_string($pattern) || $pattern === '' || str_starts_with($pattern, '!')) {
                         continue;
                     }
-                    $segment = explode('/', ltrim($pattern, './'), 2)[0] ?? '';
+                    $segment = explode('/', ltrim($pattern, './'), 2)[0];
                     $segment = trim($segment, '*');
                     if ($segment !== '' && ! in_array($segment, ['node_modules', '.', '..'], true)) {
                         $roots[] = $segment;

@@ -68,7 +68,7 @@ class CreateManaged extends Component
             && ServerHostingPlatformContext::fromConfig()->configured();
     }
 
-    public function create(StoreManagedServer $store)
+    public function create(StoreManagedServer $store): mixed
     {
         $user = auth()->user();
         $org = $user?->currentOrganization();
@@ -130,7 +130,7 @@ class CreateManaged extends Component
             // Beta context: the box is free (comped until cutover) and pinned to
             // CX22; once the single grant is used the create flow is disabled.
             'isBeta' => $isBeta,
-            'betaGrantUsed' => $isBeta && $org !== null && ! $org->canCreateManagedServer(),
+            'betaGrantUsed' => $isBeta && ! $org->canCreateManagedServer(),
             'emailVerified' => (bool) auth()->user()?->hasVerifiedEmail(),
         ]);
     }

@@ -37,7 +37,11 @@ class WorkspaceActivity extends Component
 
     public string $tab = 'feed';
 
-    /** Cached site IDs for the server to avoid duplicate queries */
+    /**
+     * Cached site IDs for the server to avoid duplicate queries.
+     *
+     * @var list<string>|null
+     */
     private ?array $cachedSiteIds = null;
 
     /**
@@ -145,6 +149,9 @@ class WorkspaceActivity extends Component
      * Apply the active category filter as a set of LIKE predicates.
      * Kept here (not in the model) because category is a UI concept that
      * doesn't exist on the row.
+     *
+     * @param  Builder<AuditLog>  $query
+     * @return Builder<AuditLog>
      */
     protected function applyCategoryFilter(Builder $query, string $category): Builder
     {
@@ -196,11 +203,13 @@ class WorkspaceActivity extends Component
 
     /**
      * Get cached site IDs for this server to avoid duplicate queries.
+     *
+     * @return list<string>
      */
     protected function getSiteIds(): array
     {
         if ($this->cachedSiteIds === null) {
-            $this->cachedSiteIds = $this->server->sites()->pluck('id')->all();
+            $this->cachedSiteIds = array_values($this->server->sites()->pluck('id')->all());
         }
 
         return $this->cachedSiteIds;

@@ -58,7 +58,7 @@ final class UnifiedPreviewCatalog
                 site: $site,
                 product: 'byo',
                 kind: ($domain->is_primary ?? false) ? 'primary' : 'preview',
-                apex: ($domain->zone) && $domain->zone !== '' ? $domain->zone : ($this->hostnames->apexFromHostname($hostname) ?? ''),
+                apex: $domain->zone ? $domain->zone : ($this->hostnames->apexFromHostname($hostname) ?? ''),
                 parentName: null,
             );
         }

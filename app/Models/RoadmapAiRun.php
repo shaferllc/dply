@@ -15,20 +15,20 @@ use Illuminate\Database\Eloquent\Model;
  *                      commit the previous successful run stopped at, so each deploy only reasons
  *                      about commits it hasn't processed yet.
  * @property int $commits_considered
- * @property int $completion_tokens
- * @property string $from_commit
+ * @property int|null $completion_tokens
+ * @property string|null $from_commit
  * @property int $items_created
  * @property int $items_shipped
- * @property int $latency_ms
+ * @property int|null $latency_ms
  * @property ?string $note
- * @property array<string, mixed> $plan
- * @property int $prompt_tokens
+ * @property array<string, mixed>|null $plan
+ * @property int|null $prompt_tokens
  * @property string $status
  * @property int $suggestions_triaged
  * @property int $summaries_updated
- * @property string $to_commit
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property string|null $to_commit
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class RoadmapAiRun extends Model
 {

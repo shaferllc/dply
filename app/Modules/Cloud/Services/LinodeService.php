@@ -51,8 +51,8 @@ class LinodeService
     /**
      * Create a new Linode instance and return its ID.
      *
-     * @param  array<string, mixed> $authorizedKeys  SSH public key strings
-     * @param  array<int, mixed> $tags  Instance tags, e.g. ProviderResourceTags::tags()
+     * @param  list<string>  $authorizedKeys  SSH public key strings
+     * @param  array<int, mixed>  $tags  Instance tags, e.g. ProviderResourceTags::tags()
      */
     public function createInstance(
         string $label,
@@ -124,6 +124,7 @@ class LinodeService
 
     /**
      * Get instance by ID. Returns decoded JSON.
+     *
      * @return array<string, mixed>
      */
     public function getInstance(int $id): array
@@ -142,7 +143,8 @@ class LinodeService
 
     /**
      * Get public IPv4 from instance. Linode may return ipv4 as array of strings or nested.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getPublicIp(array $instance): ?string
     {
@@ -176,7 +178,8 @@ class LinodeService
      * (Linode allocates private IPs from 192.168.128.0/17). Returns null when the
      * Linode has no private networking — same null-safe contract as the other
      * providers' private-IP readers.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getPrivateIp(array $instance): ?string
     {
@@ -214,7 +217,7 @@ class LinodeService
         $candidate = null;
         $candidateSize = -1;
         foreach ($this->getInstanceDisks($instanceId) as $disk) {
-            if (! is_array($disk) || ($disk['filesystem'] ?? '') !== 'ext4') {
+            if (($disk['filesystem'] ?? '') !== 'ext4') {
                 continue;
             }
             $size = (int) ($disk['size'] ?? 0);
@@ -373,10 +376,6 @@ class LinodeService
         }
 
         foreach ($this->getDomains() as $domain) {
-            if (! is_array($domain)) {
-                continue;
-            }
-
             $name = strtolower((string) ($domain['domain'] ?? ''));
             if ($name === $domainName) {
                 return $domain;
@@ -419,10 +418,6 @@ class LinodeService
         $name = self::normalizeRecordName($name, $zoneName);
 
         foreach ($this->getDomainRecords($domainId) as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
-
             if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
                 continue;
             }
@@ -474,7 +469,7 @@ class LinodeService
     /**
      * Create or update a domain record and return the Linode record payload.
      *
-     * @return list<array<mixed, mixed>>
+     * @return array<string, mixed>
      */
     public function upsertDomainRecord(
         string $domainName,
@@ -579,7 +574,7 @@ class LinodeService
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      */
     protected function request(string $method, string $path, array $body = []): Response
     {

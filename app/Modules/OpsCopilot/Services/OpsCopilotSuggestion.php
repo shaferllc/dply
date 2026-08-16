@@ -22,7 +22,7 @@ namespace App\Modules\OpsCopilot\Services;
 final class OpsCopilotSuggestion
 {
     /**
-     * @param  array<string, mixed> $actions
+     * @param  list<array<string, string>> $actions
      */
     public function __construct(
         public readonly string $id,
@@ -61,11 +61,8 @@ final class OpsCopilotSuggestion
 
         $actions = [];
         foreach ($row['actions'] ?? [] as $action) {
-            if (! is_array($action)) {
-                continue;
-            }
-            $label = trim((string) ($action['label'] ?? ''));
-            $url = trim((string) ($action['url'] ?? ''));
+            $label = trim((string) $action['label']);
+            $url = trim((string) $action['url']);
             if ($label === '' || $url === '') {
                 continue;
             }

@@ -190,7 +190,7 @@ final class RepositoryRuntimePlanComposer
     }
 
     /**
-     * @param  array<string, mixed> $commands
+     * @param  list<string> $commands
      */
     private function joinCommandList(array $commands): ?string
     {

@@ -95,7 +95,7 @@ final class ByoRepoConfigLoader
             $schedule = is_string($entry['schedule'] ?? null) ? trim($entry['schedule']) : '';
             $command = is_string($entry['command'] ?? null) ? trim($entry['command']) : '';
             if ($schedule === '' || $command === '') {
-                if ($schedule !== '' && $command === '') {
+                if ($schedule !== '') {
                     $warnings[] = sprintf('%s[%d] needs `command` for BYO %s sync.', $blockKey, $index, $label);
                 }
 

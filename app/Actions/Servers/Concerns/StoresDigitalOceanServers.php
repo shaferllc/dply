@@ -24,8 +24,6 @@ use Illuminate\Validation\ValidationException;
  */
 trait StoresDigitalOceanServers
 {
-
-
     /**
      * @param  list<string>  $scriptKeys
      */
@@ -213,7 +211,7 @@ trait StoresDigitalOceanServers
             // page surfaces the missing-id state and offers a "Try again".
             try {
                 foreach ((new DigitalOceanService($credential))->getKubernetesClusters() as $cluster) {
-                    if (is_array($cluster) && (string) ($cluster['name'] ?? '') === $clusterName) {
+                    if ((string) ($cluster['name'] ?? '') === $clusterName) {
                         $clusterId = (string) ($cluster['id'] ?? '');
                         $clusterRegion = (string) ($cluster['region'] ?? '');
                         break;

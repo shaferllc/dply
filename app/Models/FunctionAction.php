@@ -23,22 +23,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *                      actions and carries an ordered `components` list instead.
  *                      Per-action concerns — runtime, limits, the invocation URL, the scheduled
  *                      trigger, logs — hang off this row rather than `Site.meta.serverless`.
- * @property array<string, mixed> $components
- * @property int $concurrency
+ * @property array<string, mixed>|null $components
+ * @property int|null $concurrency
  * @property string $entrypoint
  * @property string $kind
- * @property int $memory_mb
- * @property array<string, mixed> $meta
+ * @property int|null $memory_mb
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property string $runtime
  * @property ?string $site_id
- * @property int $timeout_ms
- * @property array<string, mixed> $trigger
- * @property string $url
+ * @property int|null $timeout_ms
+ * @property array<string, mixed>|null $trigger
+ * @property string|null $url
  * @property-read ?Site $site
  * @property-read Collection<int, FunctionInvocation> $invocations
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class FunctionAction extends Model
 {

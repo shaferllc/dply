@@ -72,9 +72,6 @@ final class EdgeHostMapAddons
         if ((bool) ($forms['enabled'] ?? false)) {
             $endpoints = [];
             foreach (is_array($forms['endpoints'] ?? null) ? $forms['endpoints'] : [] as $endpoint) {
-                if (! is_array($endpoint)) {
-                    continue;
-                }
                 $path = trim((string) ($endpoint['path'] ?? ''));
                 $toEmail = trim((string) ($endpoint['to_email'] ?? ''));
                 if ($path === '' || $toEmail === '' || ! filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
@@ -117,9 +114,6 @@ final class EdgeHostMapAddons
         if ((bool) ($snippets['enabled'] ?? false)) {
             $items = [];
             foreach (is_array($snippets['items'] ?? null) ? $snippets['items'] : [] as $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
                 $phase = in_array(($item['phase'] ?? ''), ['head', 'body'], true)
                     ? (string) $item['phase']
                     : null;
@@ -143,9 +137,6 @@ final class EdgeHostMapAddons
         if ((bool) ($tags['enabled'] ?? false)) {
             $tools = [];
             foreach (is_array($tags['tools'] ?? null) ? $tags['tools'] : [] as $tool) {
-                if (! is_array($tool)) {
-                    continue;
-                }
                 $src = trim((string) ($tool['src'] ?? ''));
                 if ($src === '' || ! str_starts_with($src, 'https://')) {
                     continue;

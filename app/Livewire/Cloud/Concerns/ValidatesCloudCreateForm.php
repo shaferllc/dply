@@ -13,8 +13,6 @@ use App\Models\CloudDeployTask;
  */
 trait ValidatesCloudCreateForm
 {
-
-
     /**
      * @return array<string, string>
      */
@@ -25,6 +23,9 @@ trait ValidatesCloudCreateForm
         ];
     }
 
+    /**
+     * @return array<string, list<mixed>>
+     */
     public function rules(): array
     {
         $rules = [
@@ -72,7 +73,7 @@ trait ValidatesCloudCreateForm
             $rules['databases.*.env_prefix'] = ['required', 'string', 'regex:/^[A-Z][A-Z0-9_]*$/', 'max:40'];
 
             foreach ($this->databases as $i => $row) {
-                $mode = (string) ($row['mode'] ?? '');
+                $mode = $row['mode'];
                 if ($mode === 'attach') {
                     $rules['databases.'.$i.'.cloud_database_id'] = ['required', 'string'];
                 } elseif ($mode === 'external') {
@@ -93,10 +94,10 @@ trait ValidatesCloudCreateForm
             // Per-site prefix uniqueness — two attachments can't write
             // the same `${PREFIX}_HOST` etc. The error renders inline on
             // each conflicting row.
-            $prefixes = array_map(static fn (array $r): string => strtoupper((string) ($r['env_prefix'] ?? '')), $this->databases);
+            $prefixes = array_map(static fn (array $r): string => strtoupper($r['env_prefix']), $this->databases);
             $duplicates = array_keys(array_filter(array_count_values($prefixes), static fn (int $n): bool => $n > 1));
             foreach ($this->databases as $i => $row) {
-                if (in_array(strtoupper((string) ($row['env_prefix'] ?? '')), $duplicates, true)) {
+                if (in_array(strtoupper($row['env_prefix']), $duplicates, true)) {
                     $rules['databases.'.$i.'.env_prefix'][] = function ($attribute, $value, $fail): void {
                         $fail(__('Each database needs a unique env-var prefix on this app.'));
                     };
@@ -115,10 +116,10 @@ trait ValidatesCloudCreateForm
             // using S3 prefix, for example) are theoretically possible
             // but vanishingly rare given the default prefixes — left
             // for the deploy-time validator to catch if we ever wire it.
-            $prefixes = array_map(static fn (array $r): string => strtoupper((string) ($r['env_prefix'] ?? '')), $this->buckets);
+            $prefixes = array_map(static fn (array $r): string => strtoupper($r['env_prefix']), $this->buckets);
             $duplicates = array_keys(array_filter(array_count_values($prefixes), static fn (int $n): bool => $n > 1));
             foreach ($this->buckets as $i => $row) {
-                if (in_array(strtoupper((string) ($row['env_prefix'] ?? '')), $duplicates, true)) {
+                if (in_array(strtoupper($row['env_prefix']), $duplicates, true)) {
                     $rules['buckets.'.$i.'.env_prefix'][] = function ($attribute, $value, $fail): void {
                         $fail(__('Each bucket needs a unique env-var prefix on this app.'));
                     };

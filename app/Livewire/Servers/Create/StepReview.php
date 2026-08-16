@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Create;
 
 use App\Actions\Servers\StoreServerFromCreateForm;
-use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
 use App\Models\ForgeServer;
 use App\Models\ForgeSite;
 use App\Models\ImportServerMigration;
+use App\Models\Organization;
 use App\Models\PloiServer;
 use App\Models\PloiSite;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Models\User;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Modules\Imports\Services\MigrationPlanner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
@@ -78,7 +80,7 @@ class StepReview extends Component
     protected function hydrateMigrationSelection(): void
     {
         $draft = $this->currentDraft();
-        $payload = is_array($draft?->payload ?? null) ? $draft->payload : [];
+        $payload = $draft !== null ? $draft->payload : [];
 
         // Branch on source. Ploi gets priority if both are somehow set (defensive).
         $ploiSourceId = $payload['_ploi_migration_source_id'] ?? null;
@@ -102,7 +104,7 @@ class StepReview extends Component
     /**
      * @param  array<string, mixed>  $payload
      */
-    protected function hydratePloiMigrationSelection(string $sourceId, array $payload, $org): void
+    protected function hydratePloiMigrationSelection(string $sourceId, array $payload, Organization $org): void
     {
         $ploiServer = PloiServer::query()
             ->with('sites')
@@ -130,7 +132,7 @@ class StepReview extends Component
     /**
      * @param  array<string, mixed>  $payload
      */
-    protected function hydrateForgeMigrationSelection(string $sourceId, array $payload, $org): void
+    protected function hydrateForgeMigrationSelection(string $sourceId, array $payload, Organization $org): void
     {
         $forgeServer = ForgeServer::query()
             ->with('sites')
@@ -162,7 +164,7 @@ class StepReview extends Component
         if ($draft === null) {
             return;
         }
-        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payload = $draft->payload;
         $key = $this->migrationSourceKind === 'forge'
             ? '_forge_migration_site_selection'
             : '_ploi_migration_site_selection';
@@ -241,7 +243,7 @@ class StepReview extends Component
         // both responsibilities have moved to /servers/{id}/sites/create container mode
         // (Phase 3 of the container flow inversion).
         $draft = $this->currentDraft();
-        $draftPayload = is_array($draft?->payload ?? null) ? $draft->payload : [];
+        $draftPayload = $draft !== null ? $draft->payload : [];
         $ploiSourceId = $draftPayload['_ploi_migration_source_id'] ?? null;
         $forgeSourceId = $draftPayload['_forge_migration_source_id'] ?? null;
         $ploiSelection = $draftPayload['_ploi_migration_site_selection'] ?? null;
@@ -302,7 +304,7 @@ class StepReview extends Component
      * @param  array<string, bool>|null  $explicitSelection  Site ulid → selected map
      *                                                       from the wizard. Null falls back to all-eligible-sites default.
      */
-    protected function kickOffPloiMigration(string $migrationSourceId, Server $server, $user, ?array $explicitSelection = null): ?ImportServerMigration
+    protected function kickOffPloiMigration(string $migrationSourceId, Server $server, User $user, ?array $explicitSelection = null): ?ImportServerMigration
     {
         try {
             $org = $user->currentOrganization();
@@ -393,7 +395,7 @@ class StepReview extends Component
      *
      * @param  array<string, bool>|null  $explicitSelection
      */
-    protected function kickOffForgeMigration(string $migrationSourceId, Server $server, $user, ?array $explicitSelection = null): ?ImportServerMigration
+    protected function kickOffForgeMigration(string $migrationSourceId, Server $server, User $user, ?array $explicitSelection = null): ?ImportServerMigration
     {
         try {
             $org = $user->currentOrganization();
@@ -520,7 +522,7 @@ class StepReview extends Component
 
         return view('livewire.servers.create.step-review', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'reachedStep' => $this->currentDraft()?->step ?? 4,
+            'reachedStep' => ($draft = $this->currentDraft()) !== null ? $draft->step : 4,
             'catalog' => $context['catalog'],
             'preflight' => $context['preflight'],
             'canCreateServer' => $context['canCreateServer'],

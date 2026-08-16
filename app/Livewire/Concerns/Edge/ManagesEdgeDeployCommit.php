@@ -258,9 +258,9 @@ trait ManagesEdgeDeployCommit
 
         $branch = trim($this->edge_deploy_ref_branch) !== '' ? trim($this->edge_deploy_ref_branch) : null;
         $result = app(SiteGitCommitsFetcher::class)->fetch($this->site, $user, 40, $branch);
-        if (! ($result['ok'] ?? false)) {
+        if (! $result['ok']) {
             $this->edge_deploy_ref_results = [];
-            $this->edge_deploy_ref_error = (string) ($result['error'] ?? __('Could not load commits.'));
+            $this->edge_deploy_ref_error = (string) $result['error'];
             $this->edge_deploy_ref_needs_provider = $this->detectEdgeDeployRefProviderGap($user, $result);
 
             return;
@@ -269,12 +269,12 @@ trait ManagesEdgeDeployCommit
         $this->edge_deploy_ref_error = null;
         $this->edge_deploy_ref_needs_provider = null;
         $this->edge_deploy_ref_results = $this->filterEdgeDeployRefs(
-            collect($result['commits'] ?? [])
+            collect($result['commits'])
                 ->map(fn (array $commit): array => [
                     'kind' => 'commit',
-                    'label' => (string) ($commit['short_sha'] ?? substr((string) ($commit['sha'] ?? ''), 0, 7)),
-                    'sha' => (string) ($commit['sha'] ?? ''),
-                    'meta' => Str::limit((string) ($commit['message'] ?? ''), 72),
+                    'label' => (string) $commit['short_sha'],
+                    'sha' => (string) $commit['sha'],
+                    'meta' => Str::limit((string) $commit['message'], 72),
                 ])
                 ->all(),
             $search,

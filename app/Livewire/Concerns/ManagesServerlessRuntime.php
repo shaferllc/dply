@@ -203,11 +203,11 @@ trait ManagesServerlessRuntime
 
         $parameters = [];
         foreach ($this->serverless_parameters as $row) {
-            $key = trim((string) ($row['key'] ?? ''));
+            $key = trim((string) $row['key']);
             if ($key === '') {
                 continue;
             }
-            $parameters[$key] = (string) ($row['value'] ?? '');
+            $parameters[$key] = (string) $row['value'];
         }
 
         $serverless['parameters'] = $parameters;

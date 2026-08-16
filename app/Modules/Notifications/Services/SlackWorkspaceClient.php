@@ -58,7 +58,7 @@ class SlackWorkspaceClient
             return self::for($installation)->conversations();
         });
 
-        return is_array($cached) ? $cached : [];
+        return $cached;
     }
 
     public static function forgetChannelCache(SlackInstallation $installation): void

@@ -133,14 +133,6 @@ class PermissionDecorator
             return $user->getPermissionsViaRoles()->pluck('name')->toArray();
         }
 
-        // Guard on the method actually called: this checked hasPermissionTo()
-        // and then invoked getAllPermissions(), so a user object exposing only
-        // the former would fatal here.
-        if (method_exists($user, 'getAllPermissions')) {
-            // For Spatie Permission package
-            return $user->getAllPermissions()->pluck('name')->toArray();
-        }
-
         return [];
     }
 

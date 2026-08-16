@@ -13,7 +13,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property array<string, mixed> $checks
  * @property ?Carbon $finished_at
- * @property string $git_commit
+ * @property string|null $git_commit
  * @property ?string $organization_id
  * @property ?string $parent_site_id
  * @property ?string $preview_deployment_id
@@ -23,13 +23,13 @@ use Illuminate\Support\Carbon;
  * @property ?string $triggered_by_user_id
  * @property ?Carbon $waived_at
  * @property ?string $waived_by_user_id
- * @property string $waiver_reason
+ * @property string|null $waiver_reason
  * @property-read ?Site $parentSite
  * @property-read ?Site $previewSite
  * @property-read ?User $triggeredBy
  * @property-read ?User $waivedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class DeployContractRun extends Model
 {

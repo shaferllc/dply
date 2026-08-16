@@ -18,18 +18,18 @@ use Illuminate\Support\Carbon;
  *                      {@see SocialAccount} (OAuth) behind the {@see GitIdentity} contract so
  *                      the SourceControl service layer treats both kinds the same.
  * @property string $access_token
- * @property string $api_base_url
- * @property string $label
+ * @property string|null $api_base_url
+ * @property string|null $label
  * @property ?Carbon $expires_at
  * @property ?Carbon $last_validated_at
- * @property string $nickname
+ * @property string|null $nickname
  * @property ?string $validation_error
  * @property string $provider
  * @property ?string $provider_id
  * @property ?string $user_id
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class GitProviderToken extends Model implements GitIdentity
 {

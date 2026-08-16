@@ -115,7 +115,7 @@ class CreateDedicatedDatabaseVm
         // Co-locate on the app server's private network so the app dials the DB
         // over a private IP. VPC plumbing is provider-specific.
         if ($appServer->provider === ServerProvider::DigitalOcean) {
-            $vpc = (string) ($appServer->privateNetwork?->provider_id ?? '');
+            $vpc = (string) ($appServer->privateNetwork->provider_id ?? '');
             if ($vpc !== '') {
                 $createForm->do_vpc_uuid = $vpc;
             }

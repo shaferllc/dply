@@ -137,7 +137,7 @@ trait ManagesStorageBindings
         $disk = $this->resolveStorageDisk($site, $params);
 
         $result = $this->bucketProvisioner->create($provider, $region, $key, $secret, $bucket, awaitKeyPropagation: $autoMinted);
-        $endpoint = (string) ($result['endpoint'] ?? '');
+        $endpoint = (string) $result['endpoint'];
 
         $binding = $this->persist($site, 'storage', [
             'mode' => 'provision_new',

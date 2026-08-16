@@ -27,8 +27,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property ?Carbon $finished_at
  * @property-read ?Organization $organization
  * @property-read ?User $triggeredBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class AiAdvisorRun extends Model
 {

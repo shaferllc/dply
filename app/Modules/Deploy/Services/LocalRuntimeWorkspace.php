@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 class LocalRuntimeWorkspace
 {
     /**
-     * @return array{workspace_path: string, repository_path: string, branch: string, revision: ?string}
+     * @return array{workspace_path: string, repository_path: string, working_directory: string, branch: string, revision: ?string}
      */
     public function ensure(Site $site): array
     {
@@ -75,7 +75,7 @@ class LocalRuntimeWorkspace
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function run(array $command, string $workingDirectory): string
     {
@@ -96,7 +96,7 @@ class LocalRuntimeWorkspace
     }
 
     /**
-     * @param  array<string, mixed> $command
+     * @param  array<int, string> $command
      */
     private function timedOutMessage(Process $process, array $command): string
     {

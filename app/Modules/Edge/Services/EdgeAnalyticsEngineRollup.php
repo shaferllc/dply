@@ -62,10 +62,6 @@ final class EdgeAnalyticsEngineRollup
         $written = 0;
 
         foreach ($rows as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
             $siteId = (string) ($row['site_id'] ?? '');
             $site = $sites->get($siteId);
             if (! $site instanceof Site) {

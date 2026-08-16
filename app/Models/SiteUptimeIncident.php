@@ -13,7 +13,7 @@ use Illuminate\Support\Carbon;
  *                      down/degraded transition and closed on recovery (resolved_at set). An
  *                      `outage` counts against uptime %; a `degraded` shows on the timeline but
  *                      still counts as up. SSL expiry warnings are not incidents.
- * @property string $cause
+ * @property string|null $cause
  * @property ?Carbon $resolved_at
  * @property string $severity
  * @property ?string $site_id
@@ -21,8 +21,8 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $started_at
  * @property-read ?SiteUptimeMonitor $monitor
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteUptimeIncident extends Model
 {

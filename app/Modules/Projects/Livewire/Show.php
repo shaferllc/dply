@@ -291,7 +291,7 @@ class Show extends Component
             return;
         }
 
-        $name = $member->user?->name ?? 'member';
+        $name = $member->user->name ?? 'member';
         $member->delete();
 
         audit_log($this->workspace->organization, auth()->user(), 'project.member_removed', $this->workspace, null, [

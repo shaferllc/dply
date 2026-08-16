@@ -202,10 +202,7 @@ trait BuildsProvisionRuntimes
      */
     private function serverRuntimeDefaults(): array
     {
-        $meta = $this->server?->meta ?? [];
-        if (! is_array($meta)) {
-            return [];
-        }
+        $meta = $this->server->meta ?? [];
         $defaults = $meta['runtime_defaults'] ?? null;
         if (! is_array($defaults)) {
             return [];

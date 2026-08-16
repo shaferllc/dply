@@ -46,7 +46,7 @@ class TraefikDynamicConfigInventory
                 continue;
             }
             $basename = (string) $parts[0];
-            $size = (int) ($parts[1] ?? 0);
+            $size = (int) $parts[1];
             $mtime = isset($parts[2]) && is_numeric($parts[2])
                 ? date('c', (int) floor((float) $parts[2]))
                 : null;

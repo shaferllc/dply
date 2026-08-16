@@ -265,7 +265,7 @@ class WebserverConfigDocLinks
             if ($this->ruleMatches($rule, $path)) {
                 $role = $rule['role'] ?? null;
 
-                return is_string($role) && $role !== '' ? $role : null;
+                return is_string($role) ? $role : null;
             }
         }
 

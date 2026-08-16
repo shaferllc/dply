@@ -221,7 +221,7 @@ trait ManagesServerlessCreateGit
                     collect($response->json() ?? [])->map(function (array $c): array {
                         $sha = (string) ($c['sha'] ?? '');
                         $msg = (string) ($c['commit']['message'] ?? '');
-                        $firstLine = explode("\n", $msg, 2)[0] ?? '';
+                        $firstLine = explode("\n", $msg, 2)[0];
 
                         return [
                             'label' => substr($sha, 0, 7),
@@ -294,7 +294,7 @@ trait ManagesServerlessCreateGit
      */
     private function filterRefPickerResults(array $rows): array
     {
-        $rows = array_values(array_filter($rows, fn ($r) => ($r['sha'] ?? '') !== ''));
+        $rows = array_values(array_filter($rows, fn ($r) => ($r['sha']) !== ''));
         $search = mb_strtolower(trim($this->refPickerSearch));
         if ($search === '') {
             return $rows;

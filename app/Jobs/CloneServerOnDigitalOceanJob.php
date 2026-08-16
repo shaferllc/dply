@@ -6,8 +6,8 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Bus\Queueable;
@@ -139,7 +139,7 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
             $doKeyName = 'dply-'.$clone->name.'-'.Str::random(6);
             $doKey = $do->addSshKey($doKeyName, $keys['recovery_public_key']);
             $sshKeyId = $doKey['id'] ?? $doKey['fingerprint'] ?? null;
-            if ($sshKeyId === null) {
+            if (! is_int($sshKeyId) && ! is_string($sshKeyId)) {
                 throw new \RuntimeException('DigitalOcean did not return an SSH key id for the clone.');
             }
         } catch (\Throwable $e) {

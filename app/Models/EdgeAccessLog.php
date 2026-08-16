@@ -12,8 +12,8 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $bytes_egress
- * @property string $cache_status
- * @property string $country
+ * @property string|null $cache_status
+ * @property string|null $country
  * @property ?Carbon $created_at
  * @property string $duration_ms
  * @property ?string $edge_deployment_id
@@ -22,11 +22,11 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $occurred_at
  * @property ?string $organization_id
  * @property string $path
- * @property string $referrer
+ * @property string|null $referrer
  * @property ?string $site_id
  * @property string $source
- * @property string $status_code
- * @property string $user_agent
+ * @property string|null $status_code
+ * @property string|null $user_agent
  * @property-read ?Site $site
  * @property-read ?Organization $organization
  * @property \Illuminate\Support\Carbon $updated_at

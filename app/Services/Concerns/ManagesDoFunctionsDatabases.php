@@ -195,7 +195,7 @@ trait ManagesDoFunctionsDatabases
     public function setDatabaseTrustedSources(string $clusterId, array $rules): void
     {
         $response = $this->request('put', '/databases/'.$clusterId.'/firewall', [
-            'rules' => array_values($rules),
+            'rules' => $rules,
         ]);
         $this->assertSuccess($response, 'set database trusted sources');
     }

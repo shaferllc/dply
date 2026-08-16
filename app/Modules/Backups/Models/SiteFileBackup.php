@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $site_id
  * @property ?string $user_id
  * @property string $status
- * @property string $storage_kind
+ * @property string|null $storage_kind
  * @property ?string $backup_configuration_id
  * @property ?string $disk_path
  * @property ?string $remote_path
@@ -26,8 +26,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Site $site
  * @property-read ?User $user
  * @property-read ?BackupConfiguration $backupConfiguration
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteFileBackup extends Model
 {

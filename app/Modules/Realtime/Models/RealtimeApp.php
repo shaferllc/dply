@@ -28,18 +28,18 @@ use Illuminate\Support\Str;
  * @property string $app_secret
  * @property string $backend
  * @property ?string $error_message
- * @property string $host
+ * @property string|null $host
  * @property ?Carbon $last_stats_at
- * @property int $max_connections
- * @property array<string, mixed> $meta
+ * @property int|null $max_connections
+ * @property array<string, mixed>|null $meta
  * @property string $name
  * @property ?string $organization_id
- * @property int $peak_connections
+ * @property int|null $peak_connections
  * @property string $status
  * @property string $tier
  * @property-read ?Organization $organization
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class RealtimeApp extends Model
 {

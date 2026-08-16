@@ -35,7 +35,7 @@ class SiteDeployLayoutMigrator
         }
 
         $from = (string) ($armed['from'] ?? '');
-        $to = (string) ($armed['to'] ?? '');
+        $to = (string) $armed['to'];
         $base = rtrim($site->effectiveRepositoryPath(), '/');
         $archive = $base.'/.dply-layout-archive-'.$timestamp;
 

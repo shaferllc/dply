@@ -176,7 +176,7 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
                 'name' => $name,
                 'status' => $this->rollupHostStatus($hosts),
                 'servers' => $hosts,
-                'sessions_current' => count(array_filter($hosts, fn (array $h): bool => ($h['status'] ?? '') === 'UP')),
+                'sessions_current' => count(array_filter($hosts, fn (array $h): bool => ($h['status']) === 'UP')),
                 'sessions_total' => count($hosts),
             ];
         }
@@ -267,9 +267,9 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
             $row = $metrics[$clusterName] ?? ['requests' => 0, 'errors_5xx' => 0, 'connections_active' => 0];
             $rows[] = [
                 'name' => $clusterName,
-                'requests' => (int) ($row['requests'] ?? 0),
-                'errors_5xx' => (int) ($row['errors_5xx'] ?? 0),
-                'connections_active' => (int) ($row['connections_active'] ?? 0),
+                'requests' => (int) $row['requests'],
+                'errors_5xx' => (int) $row['errors_5xx'],
+                'connections_active' => (int) $row['connections_active'],
             ];
         }
 
@@ -293,7 +293,7 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
                 continue;
             }
             $metric = $m[1];
-            $labels = $m[3] ?? '';
+            $labels = $m[3];
             $value = str_contains($m[4], '.') ? (int) round((float) $m[4]) : (int) $m[4];
             $cluster = '';
             if ($labels !== '' && preg_match('/cluster_name="([^"]+)"/', $labels, $cm) === 1) {

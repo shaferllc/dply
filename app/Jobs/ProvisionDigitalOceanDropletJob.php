@@ -58,7 +58,7 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
             $keyName = 'dply-'.$this->server->name.'-'.Str::random(6);
             $doKey = $do->addSshKey($keyName, $keys['recovery_public_key']);
             $sshKeyId = $doKey['id'] ?? $doKey['fingerprint'] ?? null;
-            if ($sshKeyId === null) {
+            if (! is_int($sshKeyId) && ! is_string($sshKeyId)) {
                 $this->markFailed('DigitalOcean accepted the SSH key request but returned neither id nor fingerprint — cannot create droplet.');
 
                 return;

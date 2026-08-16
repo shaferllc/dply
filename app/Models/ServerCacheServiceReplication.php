@@ -15,16 +15,16 @@ use Illuminate\Support\Carbon;
  *                      {@see ServerCacheService}. Created by the add-replica wizard; kept fresh by
  *                      {@see App\Console\Commands\PollCacheServiceReplicationCommand}.
  * @property ?string $error_message
- * @property string $last_link_status
- * @property int $last_observed_offset
+ * @property string|null $last_link_status
+ * @property int|null $last_observed_offset
  * @property ?Carbon $last_polled_at
  * @property ?string $master_cache_service_id
  * @property ?string $replica_cache_service_id
  * @property string $status
  * @property-read ?ServerCacheService $masterCacheService
  * @property-read ?ServerCacheService $replicaCacheService
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerCacheServiceReplication extends Model
 {

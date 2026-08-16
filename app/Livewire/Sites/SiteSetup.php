@@ -328,7 +328,7 @@ class SiteSetup extends Component
     {
         $parser = app(DotEnvFileParser::class);
         $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
-        $vars = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+        $vars = $parsed['variables'];
 
         $wantsKey = array_key_exists('APP_KEY', $vars)
             || collect(data_get($this->site->envRequirements(), 'keys', []))
@@ -340,7 +340,7 @@ class SiteSetup extends Component
 
         $vars['APP_KEY'] = $this->freshAppKey();
         $this->site->forceFill([
-            'env_file_content' => app(DotEnvFileWriter::class)->render($vars, $parsed['comments'] ?? []),
+            'env_file_content' => app(DotEnvFileWriter::class)->render($vars, $parsed['comments']),
             'env_cache_origin' => 'local-edit',
         ])->save();
     }

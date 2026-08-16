@@ -21,7 +21,7 @@ class WarmEdgeBuildImagesCommand extends Command
     public function handle(): int
     {
         $images = $this->option('image');
-        if (! is_array($images) || $images === []) {
+        if ($images === []) {
             $images = config('edge.build.warm_images', ['node:20-bookworm', 'node:22-bookworm']);
         }
         $images = array_values(array_unique(array_filter(array_map(

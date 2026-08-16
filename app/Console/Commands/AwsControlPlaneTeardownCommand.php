@@ -73,7 +73,9 @@ class AwsControlPlaneTeardownCommand extends Command
                 return self::SUCCESS;
             }
             foreach ($vpcList as $vpc) {
-                $name = collect($vpc['Tags'] ?? [])->firstWhere('Key', 'Name')['Value'] ?? '(no name)';
+                /** @var list<array{Key?: string, Value?: string}> $tags */
+                $tags = is_array($vpc['Tags'] ?? null) ? $vpc['Tags'] : [];
+                $name = collect($tags)->firstWhere('Key', 'Name')['Value'] ?? '(no name)';
                 $this->line(($vpc['VpcId'] ?? '?')."  {$name}  ".($vpc['CidrBlock'] ?? ''));
             }
             $vpcId = (string) ($vpcList[0]['VpcId'] ?? '');

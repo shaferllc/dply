@@ -70,7 +70,7 @@ final readonly class EdgeIndexRow
             frameworkLabel: ($framework !== '' && strtolower($framework) !== 'unknown')
                 ? (string) str($framework)->replace(['_', '-'], ' ')->title()
                 : null,
-            hostname: is_string($hostname) && $hostname !== '' ? $hostname : null,
+            hostname: is_string($hostname) ? $hostname : null,
             liveUrl: is_string($liveUrl) && $liveUrl !== '' ? $liveUrl : null,
             isPreviewChild: $isPreviewChild,
             previewBranch: isset($edgeMeta['preview_branch']) && is_string($edgeMeta['preview_branch'])

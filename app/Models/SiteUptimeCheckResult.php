@@ -15,9 +15,9 @@ use Illuminate\Support\Carbon;
  *                      mirrors {@see MonitorOperationalState} values.
  * @property ?Carbon $checked_at
  * @property ?string $error
- * @property string $http_status
- * @property string $latency_ms
- * @property string $probe_worker
+ * @property string|null $http_status
+ * @property string|null $latency_ms
+ * @property string|null $probe_worker
  * @property ?string $site_uptime_monitor_id
  * @property string $state
  * @property-read ?SiteUptimeMonitor $monitor

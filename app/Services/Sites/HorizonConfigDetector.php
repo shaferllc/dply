@@ -235,7 +235,7 @@ class HorizonConfigDetector
 
     /**
      * @param  array<string, mixed> $rec
-     * @param  array<string, mixed> $queues
+     * @param  list<string> $queues
      * @return array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}
      */
     private function normalizeRecommended(array $rec, array $queues): array
@@ -256,9 +256,9 @@ class HorizonConfigDetector
     }
 
     /**
-     * @param  array<string, mixed> $names
-     * @param  array<string, mixed> $sources
-     * @return array<string, array{name: string, sources: array<string, mixed>, job_count: 0}>
+     * @param  list<string> $names
+     * @param  array<int, string> $sources
+     * @return list<array{name: string, sources: array<int, string>, job_count: 0}>
      */
     private function queuesFromNames(array $names, array $sources = []): array
     {

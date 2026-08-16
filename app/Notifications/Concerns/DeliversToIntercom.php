@@ -96,14 +96,12 @@ trait DeliversToIntercom
     {
         $channel = $this->intercomChannelFor($notifiable);
 
-        $mail = method_exists($this, 'toMail') ? $this->toMail($notifiable) : null;
-        $subject = $mail instanceof MailMessage && is_string($mail->subject) && $mail->subject !== ''
+        $mail = $this->toMail($notifiable);
+        $subject = $mail->subject !== ''
             ? $mail->subject
             : (string) config('app.name');
 
-        $body = $mail instanceof MailMessage
-            ? $this->intercomBodyFromMail($mail)
-            : $subject;
+        $body = $this->intercomBodyFromMail($mail);
 
         if ($channel instanceof NotificationChannel) {
             // Reuse the model's builder so a notification sent this way is shaped
@@ -128,7 +126,7 @@ trait DeliversToIntercom
             $lines[] = (string) $line;
         }
 
-        if (is_string($mail->actionText) && $mail->actionText !== '' && is_string($mail->actionUrl)) {
+        if ($mail->actionText !== '' && $mail->actionUrl !== '') {
             $lines[] = $mail->actionText.': '.$mail->actionUrl;
         }
 

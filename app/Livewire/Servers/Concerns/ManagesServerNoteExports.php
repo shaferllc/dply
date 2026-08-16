@@ -72,13 +72,13 @@ trait ManagesServerNoteExports
                 'archived_by' => $note->archiver?->name,
                 'created_by' => $note->creator?->name,
                 'updated_by' => $note->editor?->name,
-                'created_at' => $note->created_at?->toIso8601String(),
-                'updated_at' => $note->updated_at?->toIso8601String(),
+                'created_at' => $note->created_at->toIso8601String(),
+                'updated_at' => $note->updated_at->toIso8601String(),
                 'comments' => $note->comments->map(fn ($comment) => [
                     'body' => $comment->body,
                     'created_by' => $comment->creator?->name,
-                    'created_at' => $comment->created_at?->toIso8601String(),
-                    'updated_at' => $comment->updated_at?->toIso8601String(),
+                    'created_at' => $comment->created_at->toIso8601String(),
+                    'updated_at' => $comment->updated_at->toIso8601String(),
                 ])->values()->all(),
             ])->values()->all(),
         ];
@@ -146,9 +146,9 @@ trait ManagesServerNoteExports
             $badges[] = $note->creator
                 ? __('Added by :name on :date', [
                     'name' => $note->creator->name,
-                    'date' => $note->created_at?->toFormattedDateString(),
+                    'date' => $note->created_at->toFormattedDateString(),
                 ])
-                : __('Added on :date', ['date' => $note->created_at?->toFormattedDateString()]);
+                : __('Added on :date', ['date' => $note->created_at->toFormattedDateString()]);
 
             $lines[] = '';
             $lines[] = '_'.implode(' · ', $badges).'_';
@@ -161,8 +161,8 @@ trait ManagesServerNoteExports
                 $lines[] = '';
 
                 foreach ($note->comments as $comment) {
-                    $author = $comment->creator?->name ?? __('Unknown');
-                    $when = $comment->created_at?->toFormattedDateString();
+                    $author = $comment->creator->name;
+                    $when = $comment->created_at->toFormattedDateString();
                     // Indent continuation lines so multi-line comments stay
                     // inside their bullet when the Markdown is rendered.
                     $body = str_replace("\n", "\n  ", trim($comment->body));

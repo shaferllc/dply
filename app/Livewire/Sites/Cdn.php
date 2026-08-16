@@ -111,7 +111,7 @@ class Cdn extends Component
         }
 
         $organization = auth()->user()->currentOrganization();
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::for($organization)->active($flag)) {
             abort(404);
         }
@@ -133,7 +133,7 @@ class Cdn extends Component
         $primary = $this->site->primaryDomain();
         $this->hostname = is_string($cfg['hostname'] ?? null) && $cfg['hostname'] !== ''
             ? (string) $cfg['hostname']
-            : (string) ($primary?->hostname ?? '');
+            : (string) ($primary !== null ? $primary->hostname : '');
         $this->zoneName = is_string($cfg['zone_name'] ?? null) && $cfg['zone_name'] !== ''
             ? (string) $cfg['zone_name']
             : (string) (Site::apexGuessForHostname($this->hostname) ?? '');
@@ -186,7 +186,6 @@ class Cdn extends Component
             return;
         }
         array_splice($this->rules, $index, 1);
-        $this->rules = array_values($this->rules);
     }
 
     /**

@@ -23,19 +23,19 @@ use Illuminate\Support\Carbon;
  *                      traffic is POSTed in by the deployed function handler.
  * @property ?string $activation_id
  * @property bool $cold
- * @property array<string, mixed> $context
- * @property Carbon $created_at
+ * @property array<string, mixed>|null $context
+ * @property Carbon|null $created_at
  * @property int $duration_ms
  * @property ?string $function_action_id
- * @property array<string, mixed> $log_lines
- * @property string $method
- * @property string $path
- * @property string $result_excerpt
+ * @property array<string, mixed>|null $log_lines
+ * @property string|null $method
+ * @property string|null $path
+ * @property string|null $result_excerpt
  * @property ?string $site_id
  * @property string $source
- * @property int $status_code
+ * @property int|null $status_code
  * @property bool $success
- * @property string $task
+ * @property string|null $task
  * @property-read ?Site $site
  * @property \Illuminate\Support\Carbon $updated_at
  */

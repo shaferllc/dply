@@ -191,7 +191,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
             }
 
             if (preg_match('/output\s*:\s*["\']([^"\']+)["\']/i', $contents, $matches) === 1) {
-                $dir = trim((string) ($matches[1] ?? ''));
+                $dir = trim((string) $matches[1]);
                 if ($dir !== '') {
                     return $dir;
                 }

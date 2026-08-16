@@ -191,7 +191,7 @@ class ScaffoldComposerPipeline
         $assignment = $this->placeholderDns->assign($site);
 
         $hostname = $assignment['hostname'];
-        if (! is_string($hostname) || $hostname === '') {
+        if ($hostname === '') {
             throw new \RuntimeException('Placeholder DNS assignment returned no hostname.');
         }
 

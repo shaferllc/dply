@@ -109,7 +109,11 @@ class ServerCreateForm extends Form
 
     public string $do_vpc_uuid = '';
 
-    /** Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs(). */
+    /**
+     * Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs().
+     *
+     * @var list<array{id: string, name: string, region: string, ip_range: string}>
+     */
     public array $do_vpcs = [];
 
     public bool $do_vpcs_loading = false;
@@ -120,7 +124,11 @@ class ServerCreateForm extends Form
     /** Vultr VPC network ID to attach at creation (gives a private IP on that VPC). */
     public string $vultr_vpc_id = '';
 
-    /** Cached VPC list for the Vultr VPC dropdown — populated by loadVultrVpcs(). */
+    /**
+     * Cached VPC list for the Vultr VPC dropdown — populated by loadVultrVpcs().
+     *
+     * @var list<array{id: string, name: string, ip_range: string}>
+     */
     public array $vultr_vpcs = [];
 
     public bool $vultr_vpcs_loading = false;

@@ -215,9 +215,9 @@ class OpenLiteSpeedListenersConfig
         $emit = $emitter ?? new ConsoleEmitter(null);
         $ssh = new SshConnection($server);
 
-        $name = trim($identity['name'] ?? '');
-        $address = trim($identity['address'] ?? '');
-        $secure = trim((string) ($identity['secure'] ?? '0'));
+        $name = trim($identity['name']);
+        $address = trim($identity['address']);
+        $secure = trim((string) $identity['secure']);
         $secure = in_array($secure, ['1', 'true', 'on', 'yes'], true) ? '1' : '0';
 
         if ($name === '' || ! preg_match('/^[A-Za-z0-9_.-]+$/', $name)) {
@@ -472,7 +472,7 @@ class OpenLiteSpeedListenersConfig
             return [];
         }
 
-        return array_values($m[0] ?? []);
+        return $m[0];
     }
 
     private function extractName(string $block): ?string
@@ -502,6 +502,6 @@ class OpenLiteSpeedListenersConfig
             return [];
         }
 
-        return array_values(array_filter(array_map('trim', $matches[1] ?? []), fn (string $v) => $v !== ''));
+        return array_values(array_filter(array_map('trim', $matches[1]), fn (string $v) => $v !== ''));
     }
 }

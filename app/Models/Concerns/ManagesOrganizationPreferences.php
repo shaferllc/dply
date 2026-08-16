@@ -89,7 +89,7 @@ trait ManagesOrganizationPreferences
     }
 
     /**
-     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int, allow_config_mutation?: bool}
      */
     public function mergedInsightsPreferences(): array
     {

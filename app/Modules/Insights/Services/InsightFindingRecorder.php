@@ -14,7 +14,7 @@ class InsightFindingRecorder
     ) {}
 
     /**
-     * @param  array<string, mixed> $candidates
+     * @param  list<\App\Modules\Insights\Services\InsightCandidate> $candidates
      */
     public function syncCandidates(Server $server, ?Site $site, string $insightKey, array $candidates): void
     {

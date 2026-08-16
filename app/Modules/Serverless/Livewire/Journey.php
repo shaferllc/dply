@@ -163,7 +163,7 @@ class Journey extends Component
             return;
         }
 
-        $this->sinceDeploymentId = $this->latestDeployment()?->id ?? '';
+        $this->sinceDeploymentId = $this->latestDeployment()->id ?? '';
         RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
         $this->toastSuccess($toast);
     }
@@ -426,7 +426,7 @@ class Journey extends Component
         // Bridge the gap after a deploy is triggered here: keep polling
         // until a newer deployment row replaces the one we triggered from.
         $bridging = $this->sinceDeploymentId !== null
-            && ($deployment?->id ?? '') === $this->sinceDeploymentId;
+            && ($deployment->id ?? '') === $this->sinceDeploymentId;
         if (! $bridging) {
             $this->sinceDeploymentId = null;
         }
@@ -439,13 +439,13 @@ class Journey extends Component
         // A deploy can be cancelled while its step pipeline is running.
         $cancellable = $deployState === 'active' && $deployStatus === SiteDeployment::STATUS_RUNNING;
         $cancelled = $deployStatus === SiteDeployment::STATUS_FAILED
-            && str_contains(strtolower((string) ($deployment?->log_output ?? '')), 'cancelled by operator');
+            && str_contains(strtolower((string) ($deployment->log_output ?? '')), 'cancelled by operator');
 
         $actionUrl = is_string($config['action_url'] ?? null) ? $config['action_url'] : null;
 
         // Elapsed — anchored on the current deploy's start (falling back to
         // the site's creation before any deploy exists), frozen at finish.
-        $anchor = $deployment?->started_at ?? $site->created_at;
+        $anchor = $deployment->started_at ?? $site->created_at;
         $endpoint = ($deployment?->finished_at && ! $deployRunning) ? $deployment->finished_at : now();
         $elapsedSeconds = $anchor ? max(0, (int) $anchor->diffInSeconds($endpoint)) : 0;
         $elapsedLabel = $live ? __('Deployed in') : __('Elapsed');
@@ -501,7 +501,7 @@ class Journey extends Component
 
         $failedStep = collect($deploySteps)->first(fn (array $step): bool => $step['state'] === 'failed');
         $errorSummary = $this->errorSummary(
-            (string) ($deployment?->log_output ?? ''),
+            (string) ($deployment->log_output ?? ''),
             is_array($failedStep) ? $failedStep : null,
         );
 
@@ -527,7 +527,7 @@ class Journey extends Component
             'namespaceState' => $namespaceState,
             'deployState' => $deployState,
             'actionUrl' => $actionUrl,
-            'log' => $deployment?->log_output ?? '',
+            'log' => $deployment->log_output ?? '',
             'headline' => $headline,
             'title' => $title,
             'percent' => $percent,
@@ -538,7 +538,7 @@ class Journey extends Component
             'deployStartedAt' => $deployment?->started_at,
             'errorSummary' => $errorSummary,
             'repoLabel' => $repoLabel,
-            'failedStepLabel' => is_array($failedStep) ? (string) ($failedStep['label'] ?? '') : '',
+            'failedStepLabel' => is_array($failedStep) ? (string) $failedStep['label'] : '',
         ]);
     }
 

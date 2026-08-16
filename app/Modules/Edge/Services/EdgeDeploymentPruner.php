@@ -84,7 +84,7 @@ class EdgeDeploymentPruner
     private function keepCount(Site $site): int
     {
         $configured = $site->releases_to_keep;
-        $value = is_int($configured) && $configured > 0
+        $value = $configured > 0
             ? $configured
             : (int) config('edge.retention.default_keep', 10);
 
