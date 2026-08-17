@@ -26,6 +26,18 @@ uses(WithFeatures::class);
 
 usesFeatures('workspace.cluster', 'provider.aws', 'provider.aws_eks');
 
+/*
+| Step 2 currently ships VM only — config/server_create.php sets
+| `available_provider_host_kinds` to ['vm'], so chooseProviderHostKind()
+| refuses 'kubernetes' and the form fields under test never move.
+|
+| The Pennant flags above turn the cluster feature on; this turns on the host
+| kind the wizard needs to reach it.
+*/
+beforeEach(function (): void {
+    config(['server_create.available_provider_host_kinds' => ['vm', 'docker', 'kubernetes']]);
+});
+
 test('choosing kubernetes host kind clears type for provider pick', function () {
     // Choosing the K8s host-kind tile sets provider_host_kind=kubernetes
     // but does NOT pin form.type — the user must then click a provider

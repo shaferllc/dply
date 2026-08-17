@@ -131,7 +131,11 @@
                                     @click="showAdvanced = !showAdvanced"
                                     class="text-sm text-blue-600 hover:text-blue-800"
                                 >
-                                    {{ showAdvanced ? 'Hide' : 'Show' }} Advanced Options
+                                    {{-- Alpine state, so the label has to be bound client-side.
+                                         `{{ showAdvanced ? … }}` made Blade evaluate it server-side
+                                         and fatal with `Undefined constant "showAdvanced"`, 500ing
+                                         the whole dashboard. --}}
+                                    <span x-text="showAdvanced ? 'Hide' : 'Show'"></span> Advanced Options
                                 </button>
                                 
                                 <div x-show="showAdvanced" x-collapse class="mt-4 space-y-4">
@@ -337,7 +341,11 @@
 
                     <!-- Task Monitor -->
                     <div class="mt-6">
-                        @livewire('task-runner::task-monitor')
+                        {{-- Livewire aliases are not view-namespaced: the
+                             `task-runner::` prefix never resolved and 500'd this
+                             page. The alias is registered as `task-monitor` in
+                             TaskServiceProvider. --}}
+                        @livewire('task-monitor')
                     </div>
                 </div>
             </div>

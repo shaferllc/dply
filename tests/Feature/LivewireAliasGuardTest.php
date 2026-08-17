@@ -38,14 +38,31 @@ function livewireAliasReferences(): array
 {
     $refs = [];
 
+    /*
+     * Scan the shell's view tree AND every module-owned one
+     * (app/Modules/<X>/resources/views, registered via loadViewsFrom).
+     *
+     * Modules were originally out of scope here, which defeated the guard for
+     * exactly the case it exists to catch: a module component is the one whose
+     * auto-discovery breaks. app/Modules/TaskRunner/resources/views referenced
+     * `task-monitor` with no registration at all, and every route rendering it
+     * 500'd in production unnoticed.
+     */
+    $roots = [resource_path('views')];
+
+    foreach (glob(base_path('app/Modules/*/resources/views'), GLOB_ONLYDIR) ?: [] as $moduleViews) {
+        $roots[] = $moduleViews;
+    }
+
     $finder = (new Finder)
         ->files()
-        ->in(resource_path('views'))
+        ->in($roots)
         ->name('*.blade.php');
 
     foreach ($finder as $file) {
         $contents = $file->getContents();
-        $relative = $file->getRelativePathname();
+        // Relative-to-base keeps module paths distinguishable in failure output.
+        $relative = str_replace(base_path().'/', '', (string) $file->getRealPath());
 
         // <livewire:alias ...>  and  <livewire:alias />
         preg_match_all('/<livewire:([a-z0-9][a-z0-9._:-]*)/i', $contents, $tagMatches);

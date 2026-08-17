@@ -137,6 +137,65 @@ They went uncollected for a long time and rotted (see the comment in
 `phpunit.xml`); they are registered so they can be run and paid down, but stay
 out of the default run until green.
 
+### Fast local runs (Pest TIA)
+
+[Test Impact Analysis](https://pestphp.com/docs/tia) is configured in
+`tests/Pest.php` (`pest()->tia()->locally()`) and records a dependency graph in
+`~/.pest/tia/<key>` — `vendor/bin/pest --baseline` prints the path.
+
+```
+composer test:tia          # full suite, replayed  — ~30s
+composer test:tia:fresh    # re-record the graph   — ~7.5min
+```
+
+Two constraints decide whether TIA engages, and both are easy to trip:
+
+- **It only applies to whole runs.** Any `--group` / `--exclude-group` / path
+  filter prints *"TIA does not apply to partial runs"* and runs normally. That
+  is why `composer test` (which needs `--exclude-group=arch` for CI parity)
+  does not benefit — use `test:tia` while iterating.
+- **Every collected test must be a Pest test.** One PHPUnit class aborts the
+  run with *"Tia mode requires Pest tests"*. `tests/` is 100% Pest as of
+  2026-08-16; keep it that way or `test:tia` breaks for everyone.
+
+`locally()` keeps TIA off in CI, per Pest's guidance — `.github/workflows/tests.yml`
+must keep running the suite in full.
+
+### Measuring coverage
+
+Coverage is **43.5%** of statements as of 2026-08-16 (`app/`, excluding the
+test dirs listed in `phpunit.xml`'s `<source>`) — 100,924 / 231,793.
+
+Adding the `Modules` suite (`--testsuite=Unit,Feature,Modules`) takes it to
+**44.2%**: TaskRunner alone jumps 6.0% → 22.0%, because all 73 module-local
+test files are TaskRunner's and none of them run by default. That is the
+single largest coverage lever left, but it drags in 463 failures — pay those
+down before moving the suite into `defaultTestSuite`.
+
+```
+composer test:coverage:clover   # ~7min, writes coverage.xml (gitignored)
+composer test:coverage          # sequential text table, much slower
+```
+
+**TIA and coverage do not combine** — measured on Pest 5.0.5, three ways:
+
+| command | behaviour | time | number |
+|---|---|---|---|
+| `--tia --coverage-clover` | replays; clover sees only the re-run tests | 1min | **6.0%** ✗ |
+| `--tia --coverage` | prints *"recording a coverage baseline"* and re-runs everything, **every time** — never replays | 6–7min | no table under `--parallel` |
+| `--no-tia --coverage-clover` | plain full run | 6–7min | **43.2%** ✓ |
+
+So there is no fast path to a coverage number, and **a replay-measured
+percentage is not a property of the codebase** — it reports whatever TIA chose
+to re-execute, which on a clean tree is essentially the currently-failing
+tests. Fixing failures drives it toward 0%; it is not a metric to target.
+
+Also: **`--coverage`'s text table does not render under `--parallel`** at all
+(paratest merges worker coverage in the parent and the summary is dropped).
+Use `--coverage-clover` when parallel, or drop `--parallel` — though a
+sequential full run took 19min here and died on a `Premature end of PHP
+process`, so clover is the practical option.
+
 ### Architecture tests
 
 `tests/Arch/ArchTest.php` holds Pest arch rules — enums are enums, Concerns are

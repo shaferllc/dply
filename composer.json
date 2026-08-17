@@ -151,8 +151,20 @@
             "@php artisan config:clear --ansi",
             "@php artisan test --parallel"
         ],
+        "test:tia": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --tia"
+        ],
+        "test:tia:fresh": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --tia --fresh"
+        ],
         "test:coverage": [
             "@php artisan test --coverage"
+        ],
+        "test:coverage:clover": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --no-tia --exclude-group=arch --coverage-clover=coverage.xml"
         ],
         "test:profile": [
             "@php artisan test --profile"

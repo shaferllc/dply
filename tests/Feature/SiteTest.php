@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Symfony\Component\Process\Process;
 
@@ -82,9 +83,12 @@ test('site settings runtime section shows php card with current version and inst
 
     $response->assertOk()
         ->assertSee('PHP')
-        ->assertSee('Current site version')
+        // Fact-row labels were shortened: the card header already says PHP, so
+        // "Current site version"/"Installed on this server" are now
+        // "Site version"/"Installed".
+        ->assertSee('Site version')
         ->assertSee('PHP 8.3')
-        ->assertSee('Installed on this server')
+        ->assertSee('Installed')
         ->assertSee('PHP 8.4')
         ->assertSee('Memory limit')
         ->assertSee('Upload max filesize')
@@ -185,7 +189,7 @@ test('site settings runtime section shows php mismatch state and server php reme
 
     $response->assertOk()
         ->assertSee('PHP version mismatch')
-        ->assertSee('This site references PHP 8.1, but that version is not currently installed on this server.')
+        ->assertSee('This site references PHP 8.1, but that version is not installed on this server.')
         ->assertSee(route('servers.runtime', $server, false), escape: false)
         ->assertDontSee('value="8.1"', escape: false);
 });
@@ -1295,6 +1299,14 @@ test('site show surfaces deployment foundation preflight and resource state', fu
 });
 
 test('site environment section renders keys for serverless sites', function () {
+    // The serverless workspace routes sit behind `feature:surface.serverless`
+    // (Pennant's EnsureFeaturesAreActive, which aborts 400 when inactive).
+    // Scoped to this test rather than the whole file — SiteTest has ~90 tests
+    // and flipping a surface flag file-wide changes what they render.
+    Feature::define('surface.serverless', fn (): bool => true);
+    Feature::purge(['surface.serverless']);
+    Feature::flushCache();
+
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -1309,6 +1321,11 @@ test('site environment section renders keys for serverless sites', function () {
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+        // A functions site that has never deployed is funnelled to the
+        // provisioning journey by SiteWorkspaceController before any section
+        // renders. This test is about the established site's Environment
+        // surface, so put it past the first deploy.
+        'last_deploy_at' => now(),
         'env_file_content' => "APP_KEY=base64:serverless-key\nAPP_NAME=Functions Demo\n",
         'meta' => [
             'runtime_profile' => 'digitalocean_functions_web',
@@ -1327,10 +1344,19 @@ test('site environment section renders keys for serverless sites', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [
-        'server' => $server,
+    // Serverless sites have their own workspace: /settings?section=environment
+    // now redirects to serverless.environment, so assert that funnel holds and
+    // then exercise the real surface.
+    $this->actingAs($user)
+        ->get(route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'environment',
+        ], false))
+        ->assertRedirect(route('serverless.environment', ['site' => $site], false));
+
+    $response = $this->actingAs($user)->get(route('serverless.environment', [
         'site' => $site,
-        'section' => 'environment',
     ], false));
 
     // Functions-backed sites have no host .env, so the cache IS the truth
@@ -1450,8 +1476,11 @@ test('vm site pipeline workspace shows rollout hooks and reference', function ()
     // component's sub-tabs directly.
     $component = Livewire::actingAs($user)->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
 
-    $component->assertSee('Pipeline')
-        ->assertSee('Pipeline steps')
+    // Default sub-tab is Overview; the tab strip is Overview/Steps/Rollout/
+    // Reference (config/site_deploy_pipeline.php). The old "Pipeline steps"
+    // heading is gone.
+    $component->assertSee('Pipeline overview')
+        ->assertSee('Steps')
         ->assertSee('Rollout');
 
     $component->set('pipelineTab', 'rollout')
@@ -1532,7 +1561,9 @@ test('vm site pipeline can save rollout settings', function () {
         ->set('nginx_extra_raw', 'location /health { return 200; }')
         ->call('saveDeploymentSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.', type: 'success');
+        // Toast copy was cut down to a single line when this moved onto the
+        // pipeline Rollout tab.
+        ->assertDispatched('notify', message: 'Rollout settings saved.', type: 'success');
 
     Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
@@ -1603,11 +1634,13 @@ test('site settings section shows project context links', function () {
     $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings'], false));
 
     $response->assertOk()
-        ->assertSee('Current project')
-        ->assertSee('Customer Platform')
-        ->assertSee('Open project resources')
-        ->assertSee('Open project operations')
-        ->assertSee('Open project delivery');
+        // The project block was rewritten: a "rolls up into <name>" sentence
+        // plus bare Resources / Operations / Delivery links, replacing the old
+        // "Current project" heading and "Open project …" link labels.
+        ->assertSee('This site currently rolls up into Customer Platform.')
+        ->assertSee('Resources')
+        ->assertSee('Operations')
+        ->assertSee('Delivery');
 });
 
 test('site settings general section shows site details and notes', function () {
@@ -1702,6 +1735,11 @@ test('site show links to dedicated settings workspace and omits settings forms',
 });
 
 test('site show displays aws lambda runtime target details', function () {
+    // Serverless workspace routes sit behind `feature:surface.serverless`.
+    Feature::define('surface.serverless', fn (): bool => true);
+    Feature::purge(['surface.serverless']);
+    Feature::flushCache();
+
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -1737,6 +1775,12 @@ test('site show displays aws lambda runtime target details', function () {
     // Lambda invocation metadata lives on the serverless Overview dashboard now,
     // not the legacy "Runtime target" panel from Sites\Show.
     // General no longer shows the "Cloud app workspace" hero.
+    // RedirectServerlessByoWorkspace funnels the BYO URL onto /serverless/{site},
+    // so assert that hop and then read the real dashboard.
+    $response->assertRedirect(route('serverless.show', ['site' => $site], false));
+
+    $response = $this->actingAs($user)->get(route('serverless.show', ['site' => $site], false));
+
     $response->assertOk()
         ->assertSee('Overview')
         ->assertSee('Serverless')
@@ -1745,14 +1789,23 @@ test('site show displays aws lambda runtime target details', function () {
         ->assertSee('provided.al2023')
         ->assertSee('Live');
 
+    // Same funnel for the settings sections: /servers/…/sites/…/runtime maps to
+    // /serverless/{site}/runtime (ServerlessWorkspaceUrl::legacyRedirectUrl).
     $this->actingAs($user)->get(route('sites.show', [
         'server' => $server,
         'site' => $site,
         'section' => 'runtime',
     ], false))
+        ->assertRedirect(route('serverless.show', ['site' => $site, 'section' => 'runtime'], false));
+
+    $this->actingAs($user)->get(route('serverless.show', [
+        'site' => $site,
+        'section' => 'runtime',
+    ], false))
         ->assertOk()
         ->assertSee('Execution profile')
-        ->assertSee('Current revision')
+        // Fact-row label shortened to "Revision".
+        ->assertSee('Revision')
         ->assertSee('public/index.php');
 });
 
@@ -1959,7 +2012,9 @@ test('site show exposes orbstack runtime controls and records runtime actions', 
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->assertSee('Container lifecycle')
         ->assertSee('Rebuild')
-        ->assertSee('Refresh Docker details')
+        // Button label shortened to "Refresh Docker" in the settings runtime
+        // partial (the Sites\Show runtime tab calls it "Refresh details").
+        ->assertSee('Refresh Docker')
         ->assertSee('Destroy')
         ->call('runRuntimeAction', 'status')
         ->assertHasNoErrors()
@@ -2078,7 +2133,9 @@ test('site settings runtime section shows docker management and discovery', func
         ->assertDontSee('Certificates')
         ->assertSee('Docker discovery')
         ->assertSee('Container lifecycle')
-        ->assertSee('Refresh Docker details')
+        // Button label shortened to "Refresh Docker" in the settings runtime
+        // partial (the Sites\Show runtime tab calls it "Refresh details").
+        ->assertSee('Refresh Docker')
         ->assertSee('laravel.repo.orb.local')
         ->assertSee('192.168.107.2')
         ->assertSee('laravel.repo');
@@ -2784,13 +2841,18 @@ test('site settings logs section renders site deployments and webhook deliveries
     ]);
 
     // The logs section now renders deployment activity via the activity console
-    // (status, not raw log_output) and links out to server logs; webhook
-    // deliveries moved to the server notifications surface.
+    // (status, not raw log_output); webhook deliveries moved to the server
+    // notifications surface.
+    //
+    // The "Open server logs" hero link is NOT here: settings embeds
+    // <livewire:sites.site-log-viewer :embedded="true">, and that link lives
+    // behind @unless($embedded) — it belongs to the standalone site logs page.
+    // Assert the embedded viewer's own chrome instead.
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'logs'])
         ->assertSee('Logs')
-        ->assertSee('Open server logs')
-        ->assertSee(route('servers.logs', $server, false), escape: false);
+        ->assertSee('Log source')
+        ->assertDontSee('Open server logs');
 });
 
 test('site settings can save web directory and primary hostname from dedicated sections', function () {

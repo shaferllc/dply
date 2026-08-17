@@ -205,7 +205,13 @@ class ServerObserver
             'status' => $server->status,
             'setup_status' => $server->setup_status,
             'ip_address' => $server->ip_address,
-            'provider' => $server->provider->value,
+            // Nullable in memory, not in the database: `servers.provider` is NOT
+            // NULL with a 'digitalocean' default, so a create() that omits it
+            // inserts fine while the in-memory model still has no attribute.
+            // dply Cloud / Edge hosts do exactly that — they have no VM provider
+            // — and the unguarded `->value` fataled the created-observer for
+            // every one of them.
+            'provider' => $server->provider?->value,
             'team_id' => $server->team_id,
             'health_status' => $server->health_status,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),

@@ -366,7 +366,12 @@ trait BuildsProvisionDiagnostics
             $eta = sprintf('Avg %s', $this->formatRunDuration($stepEta['seconds']));
             $etaSamples = $stepEta['samples'];
         } else {
-            $eta = match ($activeStep['key']) {
+            // firstWhere() returns null when no step is currently 'active' —
+            // an active task whose steps are all still pending, or all already
+            // complete. The `eta` lookup above is null-safe via `??`; this one
+            // was not, so that window fataled with "Trying to access array
+            // offset on null". null falls through to the default arm.
+            $eta = match ($activeStep['key'] ?? null) {
                 'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
                 'setup' => 'Usually 5-10 minutes',
                 default => 'Usually a few minutes',

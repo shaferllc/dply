@@ -50,3 +50,6 @@ frankenphp-worker.php
 
 storage/blaze/traces/
 storage/framework/lookout/
+
+# Coverage report from `composer test:coverage:clover`
+coverage.xml

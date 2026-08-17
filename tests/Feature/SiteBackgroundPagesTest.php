@@ -17,6 +17,18 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+/*
+| Every site here is a functions site, so two things apply throughout:
+|
+|   1. RedirectServerlessByoWorkspace funnels the BYO
+|      /servers/{server}/sites/{site}/… URLs onto /serverless/{site}/… . These
+|      tests assert "the page renders", not which URL serves it, so they follow
+|      the redirect rather than restating each product URL.
+|   2. Those product routes sit behind `feature:surface.serverless`, which
+|      aborts 400 (Pennant's EnsureFeaturesAreActive) when inactive.
+*/
+usesFeatures('surface.serverless');
+
 function actingOrgOwner(): User
 {
     $user = User::factory()->create();
@@ -52,7 +64,7 @@ test('schedule route renders', function () {
     [$server, $site] = makeFunctionsSite($user);
 
     $this->actingAs($user)
-        ->get(route('sites.schedule', [$server, $site]))
+        ->followingRedirects()->get(route('sites.schedule', [$server, $site]))
         ->assertOk()
         ->assertSee('Schedule')
         ->assertSee('Run the scheduler every minute');
@@ -62,10 +74,11 @@ test('workers route renders', function () {
     [$server, $site] = makeFunctionsSite($user);
 
     $this->actingAs($user)
-        ->get(route('sites.workers', [$server, $site]))
+        ->followingRedirects()->get(route('sites.workers', [$server, $site]))
         ->assertOk()
         ->assertSee('Workers')
-        ->assertSee('Process queue jobs in background ticks');
+        // Heading trimmed to "Process queue jobs".
+        ->assertSee('Process queue jobs');
 });
 test('schedule toggle flips scheduler independently', function () {
     // Schedule and Workers are now independent. Turning the scheduler on
@@ -143,7 +156,7 @@ test('environment section shows variables workspace', function () {
     $user = actingOrgOwner();
     [$server, $site] = makeFunctionsSite($user);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    $response = $this->actingAs($user)->followingRedirects()->get(route('sites.show', [
         'server' => $server,
         'site' => $site,
         'section' => 'environment',
@@ -180,7 +193,7 @@ test('every sidebar item renders 200 for serverless site', function () {
             ], false);
         }
 
-        $response = $this->actingAs($user)->get($url);
+        $response = $this->actingAs($user)->followingRedirects()->get($url);
         expect($response->status())->toBe(200, "Sidebar item [{$id}] at {$url} returned HTTP {$response->status()}");
     }
 });
@@ -193,7 +206,12 @@ test('section repository url renders the repository workspace', function () {
     $user = actingOrgOwner();
     [$server, $site] = makeFunctionsSite($user);
 
-    $repositoryResponse = $this->actingAs($user)->get(route('sites.repository', [
+    // The Overview/Files/Branches/Connection tab strip only renders once a repo
+    // is connected — without git_repository_url the page shows the "connect a
+    // repository" empty state instead.
+    $site->forceFill(['git_repository_url' => 'https://github.com/acme/laravel-app.git'])->save();
+
+    $repositoryResponse = $this->actingAs($user)->followingRedirects()->get(route('sites.repository', [
         'server' => $server,
         'site' => $site,
     ], false));
@@ -216,7 +234,7 @@ test('sidebar deployments item routes to history list', function () {
 
     expect($items['deploy']['route'] ?? null)->toBe('sites.deployments.index');
 
-    $response = $this->actingAs($user)->get(route('sites.deployments.index', [$server, $site]));
+    $response = $this->actingAs($user)->followingRedirects()->get(route('sites.deployments.index', [$server, $site]));
     $response->assertOk()->assertSee('Deployments');
 });
 
@@ -386,9 +404,10 @@ test('workers page shows dns provisioning failure banner', function () {
     ]);
 
     $this->actingAs($user)
-        ->get(route('sites.workers', [$server, $site]))
+        ->followingRedirects()->get(route('sites.workers', [$server, $site]))
         ->assertOk()
         ->assertSee('DNS provisioning failed')
         ->assertSee('CNAME records cannot share a name with other records')
-        ->assertSee('Verify in the DigitalOcean dashboard, then retry');
+        // Remediation copy now names what to check, not where to look.
+        ->assertSee('Check the zone/token in DigitalOcean, then retry.');
 });

@@ -83,6 +83,28 @@ pest()->group('modules')->in('../app/Modules');
 pest()->group('arch')->in('Arch');
 
 /*
+|--------------------------------------------------------------------------
+| Test Impact Analysis
+|--------------------------------------------------------------------------
+|
+| @see https://pestphp.com/docs/tia
+|
+| The first run records a dependency graph (via pcov, already installed);
+| later runs re-execute only the tests your changes touched and replay the
+| rest from cache. Replayed runs report coverage identically to a full run,
+| which is what makes `--coverage` usable here at all — a cold full-suite
+| coverage run over this codebase takes ~40 minutes.
+|
+| `locally()` keeps it off in CI, per Pest's guidance: the graph is a local
+| development accelerator, and .github/workflows/tests.yml must keep running
+| the suite in full.
+|
+| Re-record after a structural change with:  ./vendor/bin/pest --tia --fresh
+| Storage directory (~/.pest/tia/<key>):     ./vendor/bin/pest --baseline
+*/
+pest()->tia()->locally();
+
+/*
 | Unit tests often skip RefreshDatabase. Pennant's default database store
 | queries the features table before the config resolver — use the in-memory
 | array store so Feature::active works without migrations. Feature tests keep

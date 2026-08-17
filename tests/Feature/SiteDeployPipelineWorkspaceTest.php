@@ -100,10 +100,16 @@ test('pipeline workspace supports creating pipeline and applying template', func
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // Steps has two editors and mounts only one: Script (the default) or
+        // Visual. Everything asserted below is Visual-editor chrome, so select
+        // it explicitly rather than relying on the default.
+        ->call('setStepsMode', 'visual')
         ->assertSee('Pipelines')
         ->assertSee('Steps only (advanced)')
         ->assertSee('Hook types')
-        ->assertSee('Browse all steps')
+        // Button label was shortened to "Browse all" (it sits next to a
+        // "Custom command" button and links to the Reference subtab).
+        ->assertSee('Browse all')
         ->set('new_pipeline_name', 'Quick deploy')
         ->call('createDeployPipeline')
         ->assertHasNoErrors();
@@ -135,6 +141,9 @@ test('duplicate pipeline step opens confirmation before adding', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // The pipeline modals are included from the Visual branch of _tab-steps,
+        // so Script mode (the default) sets the flag but renders no markup.
+        ->call('setStepsMode', 'visual')
         ->set('editingPipelineId', (string) $pipeline->id)
         ->call('addDeployPipelineStepFromPalette', SiteDeployStep::TYPE_COMPOSER_INSTALL)
         ->assertSet('show_duplicate_pipeline_step_modal', true)
@@ -174,6 +183,9 @@ test('adding custom command via step form refreshes pipeline timeline', function
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // Timeline rendering lives in the Visual editor; Script mode renders
+        // the DeployScript component instead.
+        ->call('setStepsMode', 'visual')
         ->set('editingPipelineId', (string) $pipeline->id)
         ->call('openAddPipelineStepForm', 'custom', 'build')
         ->set('new_deploy_step_command', 'npm run build')
@@ -210,6 +222,8 @@ test('pipeline workspace can edit custom deploy step', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // Step editing form + Save bar are Visual-editor surfaces.
+        ->call('setStepsMode', 'visual')
         ->set('editingPipelineId', (string) $pipeline->id)
         ->call('openEditPipelineStep', $step->id)
         ->assertSet('editing_deploy_step_id', $step->id)
@@ -429,7 +443,8 @@ test('pipeline reference tab shows full step catalog', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'reference')
-        ->assertSee('Step catalog')
+        // The catalog heading is "All pipeline steps"; the older "Step catalog"
+        // wording no longer appears anywhere in the view tree.
         ->assertSee('All pipeline steps')
         ->assertSee('Built-in step types')
         ->assertSee('Migrate');
@@ -467,6 +482,9 @@ test('pipeline workspace shows advisor when configuration is risky', function ()
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // render() only computes the advisor for Overview or Visual Steps
+        // ($needsAdvisor), so Script mode shows no review panel at all.
+        ->call('setStepsMode', 'visual')
         ->assertSee('Pipeline review')
         ->assertSee('Migrate');
 });
@@ -554,6 +572,9 @@ test('pipeline workspace applies laravel safety bundle', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // Both pipelineSafetyBundles and pipelineSafetyBundleVisible are gated
+        // on $stepsVisual in render(), so Script mode never shows the bundle.
+        ->call('setStepsMode', 'visual')
         ->set('editingPipelineId', (string) $pipeline->id)
         ->call('applyLaravelSafetyPresetBundle')
         ->assertHasNoErrors()
@@ -588,6 +609,8 @@ test('pipeline workspace shows starter pipelines for laravel site', function () 
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // Starter pipelines render in the Visual editor only.
+        ->call('setStepsMode', 'visual')
         ->assertSee('Starter pipelines')
         ->assertSee('Laravel · zero downtime')
         ->assertSee('Simple deploy');
@@ -741,6 +764,11 @@ test('pipeline workspace shows share pipeline section', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        ->call('setStepsMode', 'visual')
+        // Share is no longer an inline section — it moved to a modal opened
+        // from the pipeline header. The markup renders with the Visual editor
+        // (Alpine controls visibility), so the copy is assertable either way.
+        ->call('openPipelineShareModal')
         ->assertSee('Share pipeline')
         ->assertSee('Quick commands')
         ->assertSee('Copy full script');
@@ -771,7 +799,9 @@ test('pipeline overview counts reflect the pipeline being edited', function () {
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('editingPipelineId', (string) $staging->id)
         ->set('pipelineTab', 'overview')
-        ->assertSee('2 steps')
+        // Overview renders counts as stat tiles (<dt>Steps</dt><dd>2</dd>), not
+        // the old inline "2 steps" phrase — assert the value the view is handed.
+        ->assertViewHas('pipelineOverviewStepCount', 2)
         ->assertSee('Staging build')
         ->assertSee(__('Counts below are for “:name”—not the pipeline marked Deploy.', ['name' => 'Staging build']));
 });
@@ -830,6 +860,9 @@ test('pipeline workspace json import opens modal on non-empty pipeline', functio
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        // _pipeline-modals is included from the Visual branch, so Script mode
+        // flips the flag but renders no modal markup.
+        ->call('setStepsMode', 'visual')
         ->set('pipeline_import_file', $file)
         ->assertSet('show_import_pipeline_modal', true)
         ->assertSee('Import pipeline?')

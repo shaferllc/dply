@@ -103,7 +103,9 @@
                                     @click="showAdvanced = !showAdvanced"
                                     class="text-sm text-blue-600 hover:text-blue-800"
                                 >
-                                    {{ showAdvanced ? 'Hide' : 'Show' }} Advanced Options
+                                    {{-- Alpine state — must be bound client-side. See the same fix
+                                         in task-dashboard.blade.php. --}}
+                                    <span x-text="showAdvanced ? 'Hide' : 'Show'"></span> Advanced Options
                                 </button>
                                 
                                 <div x-show="showAdvanced" x-collapse class="mt-4 space-y-4">

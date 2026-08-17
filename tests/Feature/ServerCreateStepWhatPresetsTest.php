@@ -14,6 +14,20 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+/*
+| Only 'laravel' and 'wordpress' ship today — config/server_create.php's
+| `available_presets` gates the rest, and applyPreset() refuses an unavailable
+| id with a ":name is coming soon." toast before touching the form.
+|
+| These tests cover the preset → form mapping, which is live code regardless of
+| which tiles are currently switched on, so enable the full catalog here. Note
+| the refusal itself is asserted separately by the coming-soon test below,
+| which sets its own narrower config.
+*/
+beforeEach(function (): void {
+    config(['server_create.available_presets' => \App\Services\Servers\ServerCreatePresetCatalog::DEFAULT_AVAILABLE_IDS]);
+});
+
 test('apply preset for laravel pins php 84 mysql redis', function () {
     $user = seedUserWithDraft();
 

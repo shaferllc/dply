@@ -12,12 +12,14 @@ use App\Modules\TaskRunner\Commands\TaskShowCommand;
 use App\Modules\TaskRunner\Components\TaskShellDefaultsComponent;
 use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Contracts\TaskDispatcherInterface;
+use App\Modules\TaskRunner\Livewire\TaskMonitor;
 use App\Modules\TaskRunner\Services\BackgroundTaskTracker;
 use App\Modules\TaskRunner\Services\CallbackService;
 use App\Modules\TaskRunner\Services\ConditionalStreamingService;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class TaskServiceProvider extends ServiceProvider
 {
@@ -101,6 +103,19 @@ class TaskServiceProvider extends ServiceProvider
 
         Blade::anonymousComponentPath(__DIR__.'/resources/views/components', 'task-runner');
         Blade::component('task-shell-defaults', TaskShellDefaultsComponent::class);
+
+        // Livewire auto-discovery only covers app/Livewire, so a module-owned
+        // component has to register its alias here or every Blade reference to
+        // it 500s with "Unable to find component" (see the ADR + CLAUDE.md).
+        // monitor.blade.php references it as `task-monitor`.
+        //
+        // NOTE: task-dashboard.blade.php instead writes
+        // `@livewire('task-runner::task-monitor')`. Livewire aliases are not
+        // view-namespaced, so that reference cannot resolve and the dashboard
+        // still 500s; registering the `::` spelling here does not help (tried —
+        // Livewire does not accept it as an alias). The Blade reference is what
+        // needs changing.
+        Livewire::component('task-monitor', TaskMonitor::class);
 
         $this->publishes([
             __DIR__.'/resources/views' => resource_path('views/vendor/task-runner'),
