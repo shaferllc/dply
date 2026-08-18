@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
+use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
-use App\Models\ServerFirewallRule;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Servers\ServerFirewallProvisioner;
+use App\Services\Servers\ManagedFirewallPort;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\ServerNetworkPeers;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -17,6 +21,7 @@ use Illuminate\Support\Str;
 class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
 {
     use Queueable;
+    use WritesConsoleAction;
 
     public int $timeout = 300;
 
@@ -24,11 +29,19 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
 
     public int $backoff = 10;
 
+    /**
+     * @param  list<string>  $peerServerIds  Servers picked from the network to admit.
+     *                                       When non-empty each gets its own /32 rule and
+     *                                       $allowedCidr is only the recorded summary;
+     *                                       when empty $allowedCidr is opened as a single
+     *                                       rule (the hand-typed path).
+     */
     public function __construct(
         public string $serverDatabaseEngineId,
         public bool $enable,
         public string $allowedCidr,
         public ?string $userId = null,
+        public array $peerServerIds = [],
     ) {
         $q = config('server_database.install_queue');
         if (is_string($q) && $q !== '') {
@@ -36,14 +49,42 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
         }
     }
 
+    protected function consoleSubject(): Model
+    {
+        return ServerDatabaseEngine::query()->findOrFail($this->serverDatabaseEngineId);
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'db_engine_remote_access';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
+    }
+
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
-        ServerFirewallProvisioner $firewall,
+        ManagedFirewallPort $ports,
     ): void {
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
         if (! $row || ! $row->server) {
             return;
         }
+
+        // The component seeds a QUEUED ConsoleAction so the banner appears the
+        // instant the button is clicked, but nothing here ever moved it on — so a
+        // job that ran fine still read "Queued — waiting for worker" until the
+        // 10-minute stale sweeper dismissed it. Drive it like the install jobs do.
+        $emit = $this->beginConsoleAction();
+        $emit(
+            $this->enable
+                ? 'Enabling remote access for '.$row->engine.' …'
+                : 'Disabling remote access for '.$row->engine.' …',
+            ConsoleAction::LEVEL_INFO,
+            'remote-access',
+        );
 
         $script = $this->enable
             ? DatabaseEngineInstallScripts::enableRemoteAccessScript($row->engine, $this->allowedCidr)
@@ -68,6 +109,8 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
                 'allowed_from' => $this->enable ? null : $row->allowed_from,
             ]);
 
+            $this->failConsoleAction($e->getMessage());
+
             throw $e;
         }
 
@@ -82,6 +125,8 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
                 'allowed_from' => $this->enable ? null : $row->allowed_from,
             ]);
 
+            $this->failConsoleAction(Str::limit(trim($output->buffer), 500) ?: 'The remote-access script failed on the server.');
+
             return;
         }
 
@@ -90,58 +135,86 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
             'allowed_from' => $this->enable ? $this->allowedCidr : null,
         ]);
 
-        $this->syncFirewallRule($row, $firewall);
+        $this->syncFirewallRule($row, $ports);
+
+        $emit(
+            $this->enable
+                ? 'Remote access enabled — '.($row->allowed_from ?: 'no source recorded')
+                : 'Remote access disabled — port closed.',
+            ConsoleAction::LEVEL_INFO,
+            'remote-access',
+        );
+
+        $this->completeConsoleAction();
     }
 
-    private function syncFirewallRule(ServerDatabaseEngine $row, ServerFirewallProvisioner $firewall): void
+    /**
+     * Keep the managed UFW rule in step with the engine's remote-access state.
+     * The reconciliation this used to do inline now lives in
+     * {@see ManagedFirewallPort}, shared with the dply Logs aggregator.
+     */
+    private function syncFirewallRule(ServerDatabaseEngine $row, ManagedFirewallPort $ports): void
     {
-        $tag = 'dply-db-remote-'.$row->engine;
         $server = $row->server;
-
-        $existing = ServerFirewallRule::query()
-            ->where('server_id', $server->id)
-            ->whereJsonContains('tags', $tag)
-            ->first();
+        $tag = 'dply-db-remote-'.$row->engine;
+        $port = (int) $row->port;
+        $engineLabel = ucfirst($row->engine);
 
         if (! $this->enable) {
-            if ($existing) {
-                try {
-                    $firewall->removeFromHost($server, $existing);
-                } catch (\Throwable) {
-                }
-                $existing->delete();
-            }
+            // Close both shapes: the selection may have been made either way, and
+            // a stale rule from the other path would keep the port open.
+            $ports->close($server, $tag);
+            $ports->closeAll($server, $tag);
 
             return;
         }
 
-        if ($existing) {
-            if ($existing->source !== $this->allowedCidr) {
-                $existing->update(['source' => $this->allowedCidr]);
-                try {
-                    $firewall->applyRule($server, $existing);
-                } catch (\Throwable) {
-                }
-            }
+        if ($this->peerServerIds !== []) {
+            // One /32 per selected server. A covering CIDR would be shorter and
+            // would also admit every other host in that range.
+            $peers = Server::query()
+                ->whereIn('id', $this->peerServerIds)
+                ->get()
+                ->mapWithKeys(function (Server $peer) {
+                    $cidr = ServerNetworkPeers::hostCidr($peer);
+
+                    return $cidr === null ? [] : [$peer->id => $cidr];
+                })
+                ->all();
+
+            $names = Server::query()
+                ->whereIn('id', array_keys($peers))
+                ->pluck('name', 'id');
+
+            // A single-source rule may be left over from the hand-typed path.
+            $ports->close($server, $tag);
+
+            $ports->openGroup(
+                server: $server,
+                groupTag: $tag,
+                port: $port,
+                sourcesByKey: $peers,
+                nameFor: fn (string $key, string $cidr): string => sprintf(
+                    'Database · %s remote · %s',
+                    $engineLabel,
+                    $names[$key] ?? $cidr,
+                ),
+                extraTags: ['dply-database'],
+            );
 
             return;
         }
 
-        $rule = ServerFirewallRule::query()->create([
-            'server_id' => $server->id,
-            'name' => sprintf('Database · %s remote', ucfirst($row->engine)),
-            'port' => (int) $row->port,
-            'protocol' => 'tcp',
-            'source' => $this->allowedCidr,
-            'action' => 'allow',
-            'enabled' => true,
-            'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
-            'tags' => ['dply-database', $tag],
-        ]);
+        // Hand-typed CIDR: a group rule set may be left over from the picker.
+        $ports->closeAll($server, $tag);
 
-        try {
-            $firewall->applyRule($server, $rule);
-        } catch (\Throwable) {
-        }
+        $ports->open(
+            server: $server,
+            tag: $tag,
+            port: $port,
+            source: $this->allowedCidr,
+            name: sprintf('Database · %s remote', $engineLabel),
+            extraTags: ['dply-database'],
+        );
     }
 }

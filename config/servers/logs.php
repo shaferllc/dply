@@ -184,7 +184,10 @@ return [
      * (ClickHouse Cloud / Altinity / Aiven). See docs/SERVER_LOGS_ADDON.md.
      */
     'clickhouse' => [
-        'host' => env('CLICKHOUSE_HOST', '127.0.0.1'),
+        // Empty = resolve from the running log server (see LogStoreConnection).
+        // Set CLICKHOUSE_HOST explicitly for a TLS proxy, a managed store, or a
+        // local docker-compose ClickHouse — an explicit value always wins.
+        'host' => env('CLICKHOUSE_HOST', ''),
         'http_port' => 8123,
         'scheme' => env('CLICKHOUSE_SCHEME', 'http'), // 'https' for managed
         'database' => env('CLICKHOUSE_DATABASE', 'dply_logs'),

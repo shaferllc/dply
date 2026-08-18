@@ -65,6 +65,7 @@
                     .(! $aggStale && $aggregator->isRunning() ? ' · '.__('up to date') : ' → v'.$aggCurrent);
             @endphp
             <x-workspace-panel-head
+                dense
                 icon="heroicon-o-inbox-arrow-down"
                 :title="__('This server is the dply Logs ingest tier')"
                 :note="$aggNote"
@@ -92,6 +93,7 @@
         {{-- "ADD-ON" over "dply Logs" said the same thing as the tab; the status
              chip keeps its place in the head's actions slot. --}}
         <x-workspace-panel-head
+            dense
             icon="heroicon-o-paper-airplane"
             :title="__('dply Logs')"
             :note="__('Run a lightweight agent (Vector) on this server to ship system + service logs to dply for persistent, searchable storage — beyond the live SSH tail. Hard-capped so it never competes with your app.')"
@@ -123,9 +125,26 @@
                 </div>
             @endif
 
+            {{-- Stale SINK: the agent was configured before the current aggregator
+                 existed, so its rendered config points at the blackhole sink and it
+                 is discarding every line — while reporting running, no error, and a
+                 current config version. Strictly worse than a version-stale config,
+                 so it wins the slot and is coloured as a fault, not a nudge. --}}
+            @if ($agent?->needsAggregatorResync())
+                <div class="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-800 ring-1 ring-inset ring-rose-200">
+                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <p class="min-w-0 flex-1">
+                        {{ __('This agent was configured before the current log aggregator, so it is shipping to nowhere and no logs are being stored. Re-sync to point it at the aggregator.') }}
+                    </p>
+                    <button type="button" wire:click="resyncLogShipping" wire:loading.attr="disabled"
+                        @disabled($busy)
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                        {{ $busy ? __('Re-syncing…') : __('Re-sync agent') }}
+                    </button>
+                </div>
             {{-- Stale edge config: this build of dply renders a newer agent config than
                  the box is running. Re-sync (same action as a source change) to apply it. --}}
-            @if ($agent?->isConfigStale())
+            @elseif ($agent?->isConfigStale())
                 <div class="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" aria-hidden="true" />
                     <p class="min-w-0 flex-1">
@@ -263,6 +282,7 @@
     @if ($sub === 'activity')
         <section class="border-b border-brand-ink/10">
             <x-workspace-panel-head
+                dense
                 icon="heroicon-o-clipboard-document-list"
                 :title="__('Agent activity')"
                 :note="__('Install output and the current state of the shipping agent on this server.')"
@@ -315,7 +335,11 @@
 
     {{-- Correlation histogram: log volume over time + deploy/error/incident overlay --}}
     @if ($agent?->isRunning())
-        @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null)
+        {{-- Skip the histogram entirely when the store is unreachable. It rendered
+             a whole card whose only content was a second copy of the "Log store
+             unavailable" line already shown by the explorer below — two panels,
+             two borders, one fact. --}}
+        @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null && ($logHistogram['available'] ?? false))
             <x-logs-correlation-chart :histogram="$logHistogram" />
         @elseif (! ($logCorrelationEnabled ?? true))
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-2 sm:px-6">
@@ -335,6 +359,7 @@
     @if ($logExplorer !== null)
         <section class="border-b border-brand-ink/10">
             <x-workspace-panel-head
+                dense
                 icon="heroicon-o-magnifying-glass"
                 :title="__('Shipped logs')"
                 :note="__('Searchable, persisted logs from this server (newest first).')"
@@ -365,10 +390,17 @@
             @endif
 
             @if (! ($logExplorer['available'] ?? false))
-                <div class="px-5 py-5 text-center text-xs text-brand-moss sm:px-6">
-                    <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-ink/30" aria-hidden="true" />
-                    <p class="mt-2 font-medium text-brand-ink">{{ __('Log store unavailable') }}</p>
-                    <p class="mt-0.5">{{ __('Could not reach the dply Logs store.') }}</p>
+                {{-- One row, not a centred hero. "Unavailable" on its own sent
+                     operators hunting the agent, which is usually fine — the
+                     reader is a separate connection (CLICKHOUSE_* on the control
+                     plane) from the shipping path, so name it here. --}}
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-5 py-2 text-xs text-brand-moss sm:px-6">
+                    <x-heroicon-o-signal-slash class="h-3.5 w-3.5 shrink-0 text-brand-ink/40" aria-hidden="true" />
+                    <span class="font-medium text-brand-ink">{{ __('Log store unavailable') }}</span>
+                    <span class="text-brand-mist">·</span>
+                    <span>{{ __('dply could not reach ClickHouse at :host — this is the read path, separate from shipping.', [
+                        'host' => \App\Modules\Logs\Services\LogStoreConnection::describe(),
+                    ]) }}</span>
                 </div>
             @else
                 {{-- Pinned-window banner (arrived via a correlation deep-link, e.g. error → logs) --}}

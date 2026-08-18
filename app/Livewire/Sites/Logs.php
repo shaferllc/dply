@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Servers\Concerns\ManagesLogNotifications;
+use App\Livewire\Servers\Concerns\ManagesServerLogAlerts;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Models\Server;
@@ -22,16 +25,21 @@ use Livewire\Component;
  * source catalog is limited to this site's vhost access/error, app log, Horizon
  * log, and platform activity (see {@see ManagesServerSystemLogs::availableLogSources()}
  * when scopedSite is set). Server-wide sources and Vector shipping stay on the
- * server logs workspace, one click away. Mirrors {@see WorkspaceLogs}.
+ * server logs workspace, one click away. Alerts and Notifications match the
+ * server Logs pairing: paid threshold rules plus a free channel matrix for
+ * `server.logs.alert_triggered`. Mirrors {@see WorkspaceLogs}.
  */
 #[Layout('layouts.app')]
 class Logs extends Component
 {
+    use CreatesNotificationChannelInline;
     use DispatchesToastNotifications;
+    use ManagesLogNotifications;
+    use ManagesServerLogAlerts;
     use ManagesServerSystemLogs;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'alerts', 'notifications'];
 
     public Server $server;
 
@@ -51,8 +59,21 @@ class Logs extends Component
 
         $this->server = $server;
         $this->scopedSite = $site;
+        $this->server->loadMissing(['organization', 'logAgent']);
         $this->bootServerLogs();
         $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to Notifications and re-seed the matrix so the
+     * new channel is ticked without a remount.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId = ''): void
+    {
+        $this->logsTab = 'notifications';
+        $this->reloadFeatureNotificationMatrix();
     }
 
     public function setLogsWorkspaceTab(string $tab): void
@@ -140,6 +161,7 @@ class Logs extends Component
         // already current at render time — refreshing again only doubled the
         // `select * from servers` this page issues.
         $site = $this->scopedSite;
+        $this->server->loadMissing(['organization', 'logAgent']);
         $logSources = $this->availableLogSources();
         $runtimeMode = $site->runtimeTargetMode();
 
@@ -174,6 +196,10 @@ class Logs extends Component
             'section' => 'logs',
             'runtimeMode' => $runtimeMode,
             'hasDplyRealtime' => $hasDplyRealtime,
+            'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
+            'logAlertingAvailable' => $this->logAlertingAvailable,
+            'notifSubscriptions' => $this->logsTab === 'notifications' ? $this->logNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->logsTab === 'notifications' ? $this->logEventLabels() : [],
         ]);
     }
 }

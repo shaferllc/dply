@@ -78,6 +78,22 @@
                                 <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
                             @endif
                         </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-alerts"
+                            icon="heroicon-o-bell-alert"
+                            :active="$logsTab === 'alerts'"
+                            wire:click="setLogsWorkspaceTab('alerts')"
+                        >
+                            {{ __('Alerts') }}
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-notifications"
+                            icon="heroicon-o-bell"
+                            :active="$logsTab === 'notifications'"
+                            wire:click="setLogsWorkspaceTab('notifications')"
+                        >
+                            {{ __('Notifications') }}
+                        </x-server-workspace-tab>
                     </x-server-workspace-tablist>
                 </div>
 
@@ -111,6 +127,22 @@
                             'server' => $server,
                         ])
                     @endif
+
+                    @if ($logsTab === 'alerts')
+                        @include('livewire.servers.partials.logs._tab-alerts', [
+                            'server' => $server,
+                            'rules' => $logAlertRules,
+                            'alertingAvailable' => $logAlertingAvailable,
+                        ])
+                    @endif
+
+                    @if ($logsTab === 'notifications')
+                        @include('livewire.servers.partials.logs._tab-notifications', [
+                            'server' => $server,
+                            'notifSubscriptions' => $notifSubscriptions,
+                            'notifEventLabels' => $notifEventLabels,
+                        ])
+                    @endif
                 </div>
 
                 {{-- Machine-wide logs live on the server logs workspace. --}}
@@ -136,6 +168,8 @@
                     ]" />
                 </div>
             </section>
+
+            @include('livewire.partials.create-notification-channel-modal')
         </div>
     </div>
 </div>

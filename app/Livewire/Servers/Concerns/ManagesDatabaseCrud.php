@@ -296,6 +296,15 @@ trait ManagesDatabaseCrud
             $this->new_db_user_mode = 'new';
         }
 
+        // Same guard for a server with nothing to reuse. The form hides the
+        // mode when there are no candidate users, but a snapshot taken while
+        // one still existed (last MySQL database dropped in another tab) would
+        // otherwise submit 'existing' and fail on a dropdown the operator has
+        // no way to populate.
+        if ($this->new_db_user_mode === 'existing' && $this->existingMysqlUserOptions() === []) {
+            $this->new_db_user_mode = 'new';
+        }
+
         $existingMysqlUser = null;
         if ($this->new_db_user_mode === 'existing') {
             if (! DatabaseWorkspaceEngines::isMysqlFamily($this->new_db_engine)) {

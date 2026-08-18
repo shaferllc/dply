@@ -8,7 +8,6 @@ use App\Models\NotificationInboxItem;
 use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\RedirectResponse;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -77,22 +76,24 @@ class Index extends Component
     }
 
     /** Mark-read-on-click, then navigate to the item's deep link. */
-    public function openItem(string $itemId): ?RedirectResponse
+    public function openItem(string $itemId): void
     {
         if (! $this->notificationTablesReady()) {
-            return null;
+            return;
         }
 
         $item = $this->base()->whereKey($itemId)->first();
         if ($item === null) {
-            return null;
+            return;
         }
 
         if ($item->read_at === null) {
             $item->forceFill(['read_at' => now()])->save();
         }
 
-        return redirect()->to($item->ctaUrl() ?: route('notifications.index'));
+        // Livewire's redirect() returns Redirector, not RedirectResponse — do
+        // not type the return as the HTTP class or PHP 8 fatals on click.
+        $this->redirect($item->ctaUrl() ?: route('notifications.index'));
     }
 
     /** Toggle the "save to remember" star — orthogonal to read state. */

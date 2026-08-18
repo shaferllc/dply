@@ -16,6 +16,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Support\Servers\DatabaseEngineAvailability;
+use App\Support\Servers\ServerNetworkPeers;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\RemoteCidr;
@@ -44,7 +45,15 @@ trait ManagesDatabaseEngineLifecycle
 
     public string $remote_access_engine = '';
 
-    public string $remote_access_allowed_from = '0.0.0.0/0';
+    public string $remote_access_allowed_from = '';
+
+    /**
+     * Servers picked off this server's private network to admit, by id. Each
+     * becomes its own /32 firewall rule; see ToggleDatabaseEngineRemoteAccessJob.
+     *
+     * @var list<string>
+     */
+    public array $engine_remote_server_ids = [];
 
     /** Keyed by database ID — the CIDR input value for each row's networking form. */
     /** @var array<string, string> */
@@ -372,13 +381,332 @@ trait ManagesDatabaseEngineLifecycle
             return;
         }
 
-        $allowedFrom = $enable ? trim($this->remote_access_allowed_from) : '';
+        // Two ways to say who may connect, and they ADD rather than replace.
+        // Treating them as either/or meant admitting a laptop's public IP
+        // silently revoked the app server that was already ticked — the two
+        // inputs describe different sources, so both belong in the rule set.
+        //
+        // Servers picked off the private network each become their own /32, so
+        // the operator never has to reason about mask arithmetic to admit two
+        // hosts. The CIDR field covers sources dply has no server record of (an
+        // office range, an off-VPC customer edge, a laptop).
+        $peerIds = $enable ? $this->selectedRemoteAccessPeerIds() : [];
+        $typedCidr = $enable ? trim($this->remote_access_allowed_from) : '';
+        $extraCidrs = [];
+        $allowedParts = [];
 
         if ($enable) {
+            if ($peerIds !== []) {
+                $peerCidrs = ServerNetworkPeers::for($this->server)
+                    ->whereIn('id', $peerIds)
+                    ->map(fn ($peer) => ServerNetworkPeers::hostCidr($peer))
+                    ->filter()
+                    ->values();
+
+                if ($peerCidrs->isEmpty()) {
+                    $this->addError('engine_remote_server_ids', __('Those servers have no private address on this network — pick different servers or enter a CIDR.'));
+
+                    return;
+                }
+
+                $allowedParts = $peerCidrs->all();
+            }
+
+            if ($typedCidr !== '') {
+                // Basic CIDR sanity — must look like x.x.x.x/n or x::/n.
+                if (! $this->isValidRemoteCidr($typedCidr)) {
+                    $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 10.0.0.0/8, 203.0.113.5/32).'));
+
+                    return;
+                }
+
+                $extraCidrs[] = $typedCidr;
+                $allowedParts[] = $typedCidr;
+            }
+
+            // Never silently open the engine port to the whole internet.
+            if ($allowedParts === []) {
+                $this->addError('remote_access_allowed_from', __('Pick at least one server, or enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32).'));
+
+                return;
+            }
+        }
+
+        // Recorded for display; the firewall rules are one per source.
+        $allowedFrom = implode(', ', array_values(array_unique($allowedParts)));
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_install',
+            __('Installing :engine on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
+
+        InstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+        $this->toastSuccess(__('Installing :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Operator escape hatch when a database-engine install has stalled. Mirrors
+     * the webserver-switch and cache-install Stop & revert patterns: marks the
+     * pending/installing row FAILED with an "operator-aborted" reason, then
+     * dispatches {@see UninstallDatabaseEngineJob} to apt-purge whatever the
+     * install partially landed (idempotent — the uninstall script tolerates
+     * "not actually installed" too).
+     *
+     * The install job's success-path update (`status = running`) is keyed by
+     * row id; once it finishes its long SSH bash it'll find the row in FAILED
+     * state and the uninstall will already be queued behind it on the
+     * server_database.install_queue, so the two serialise rather than race.
+     */
+    public function stopAndRevertDatabaseEngineInstall(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = strtolower(trim($engine));
+        if (! in_array($engine, DatabaseEngineInstallScripts::supportedEngines(), true)) {
+            $this->toastError(__('Unsupported database engine.'));
+
+            return;
+        }
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if ($row === null) {
+            $this->toastError(__('No :engine install to stop.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! in_array($row->status, [
+            ServerDatabaseEngine::STATUS_PENDING,
+            ServerDatabaseEngine::STATUS_INSTALLING,
+        ], true)) {
+            $this->toastError(__(':engine is not currently installing (status: :status).', [
+                'engine' => $engine,
+                'status' => $row->status,
+            ]));
+
+            return;
+        }
+
+        $row->update([
+            'status' => ServerDatabaseEngine::STATUS_FAILED,
+            'error_message' => __('Stopped by operator — reverting partial install.'),
+        ]);
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_uninstall',
+            __('Reverting :engine install on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
+
+        UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+
+        $this->toastSuccess(__('Stopping :engine install and reverting — progress shows in the banner above.', [
+            'engine' => $engineLabel,
+        ]));
+    }
+
+    /**
+     * Queue an uninstall for the engine identified by tab name. Tracks the underlying row by
+     * engine + server so memcached-style swaps don't accidentally drop the wrong row.
+     */
+    public function uninstallDatabaseEngine(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine to uninstall.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_uninstall',
+            __('Uninstalling :engine on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
+
+        UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+        $this->toastSuccess(__('Uninstalling :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Activate (start + enable at boot) or deactivate (stop + disable at boot) an
+     * installed database engine. Dispatches {@see ToggleDatabaseEngineActivationJob}
+     * which runs the systemctl change over SSH and flips the row to RUNNING/STOPPED.
+     * The daemon stays installed — data and binaries are untouched.
+     */
+    public function setDatabaseEngineActivation(string $engine, bool $activate): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        // Only toggle between the two resting states — never interrupt an install,
+        // uninstall, or a failed row (those have their own recovery actions).
+        if (! in_array($row->status, [ServerDatabaseEngine::STATUS_RUNNING, ServerDatabaseEngine::STATUS_STOPPED], true)) {
+            $this->toastError(__(':engine is busy — wait for the current operation to finish.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_activation',
+            $activate
+                ? __('Activating :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name])
+                : __('Deactivating :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name]),
+        );
+
+        // Optimistically flip the pill so the UI reflects intent immediately; the
+        // job confirms (or reverts via its failure path) once SSH completes.
+        $row->update([
+            'status' => $activate ? ServerDatabaseEngine::STATUS_RUNNING : ServerDatabaseEngine::STATUS_STOPPED,
+        ]);
+
+        ToggleDatabaseEngineActivationJob::dispatch($row->id, $activate, auth()->id());
+
+        $this->toastSuccess(
+            $activate
+                ? __('Activating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+                : __('Deactivating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+        );
+    }
+
+    /**
+     * Make this engine the server's primary/default. Exactly one engine row per
+     * server carries {@see ServerDatabaseEngine::$is_default}; new sites default
+     * their `database_engine` to it ({@see \App\Models\Server::defaultDatabaseEngine()}).
+     * Pure metadata — no SSH — so it applies immediately.
+     */
+    public function setPrimaryEngine(string $engine, ServerDatabaseAuditLogger $auditLogger): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if ($row->is_default) {
+            return;
+        }
+
+        DB::transaction(function () use ($row): void {
+            ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_default', true)
+                ->update(['is_default' => false]);
+
+            $row->update(['is_default' => true]);
+        });
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+
+        $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DEFAULT_ENGINE_CHANGED, [
+            'engine' => $engine,
+        ], auth()->user());
+
+        $this->toastSuccess(__(':engine is now the primary database engine for this server.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Enable or disable remote access (public/CIDR-gated port exposure) for a
+     * database engine. Dispatches {@see ToggleDatabaseEngineRemoteAccessJob} which
+     * updates listen_addresses / pg_hba / bind-address over SSH, restarts the
+     * service, and syncs the UFW-backed firewall rule.
+     */
+    public function toggleDatabaseEngineRemoteAccess(string $engine, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! DatabaseEngineInstallScripts::supportsRemoteAccess($engine)) {
+            $this->toastError(__('Remote access configuration is not supported for :engine.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('status', ServerDatabaseEngine::STATUS_RUNNING)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__(':engine is not running on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        // Two ways to say who may connect. Picking servers off the private
+        // network is the safe, common one — each becomes its own /32, so the
+        // operator never has to reason about mask arithmetic to admit two hosts.
+        // The CIDR field stays for sources dply does not know about (an office
+        // range, an off-VPC edge).
+        $peerIds = $enable ? $this->selectedRemoteAccessPeerIds() : [];
+        $allowedFrom = $enable ? trim($this->remote_access_allowed_from) : '';
+
+        if ($enable && $peerIds !== []) {
+            $peerCidrs = ServerNetworkPeers::for($this->server)
+                ->whereIn('id', $peerIds)
+                ->map(fn ($peer) => ServerNetworkPeers::hostCidr($peer))
+                ->filter()
+                ->values();
+
+            if ($peerCidrs->isEmpty()) {
+                $this->addError('engine_remote_server_ids', __('Those servers have no private address on this network — pick different servers or enter a CIDR.'));
+
+                return;
+            }
+
+            // Recorded for display; the firewall rules are per-server.
+            $allowedFrom = $peerCidrs->implode(', ');
+        } elseif ($enable) {
             // Require an explicit trusted source — never silently open the engine
             // port to the whole internet on a blank field.
             if ($allowedFrom === '') {
-                $this->addError('remote_access_allowed_from', __('Enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32). Leave remote access off to keep the port closed.'));
+                $this->addError('remote_access_allowed_from', __('Pick at least one server, or enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32).'));
 
                 return;
             }
@@ -407,7 +735,7 @@ trait ManagesDatabaseEngineLifecycle
             'allowed_from' => $enable ? $allowedFrom : null,
         ]);
 
-        ToggleDatabaseEngineRemoteAccessJob::dispatch($row->id, $enable, $allowedFrom, auth()->id());
+        ToggleDatabaseEngineRemoteAccessJob::dispatch($row->id, $enable, $allowedFrom, auth()->id(), $peerIds, $extraCidrs);
 
         $this->toastSuccess(
             $enable
@@ -615,5 +943,30 @@ trait ManagesDatabaseEngineLifecycle
         $this->drift_loaded = true;
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DRIFT_CHECK, [], auth()->user());
         $this->toastSuccess(__('Drift analysis updated.'));
+    }
+
+    /**
+     * Selected peer ids, filtered to servers actually on this server's private
+     * network. A stale Livewire snapshot (peer detached, or moved networks since
+     * the page loaded) must not be able to open a port to an arbitrary host id.
+     *
+     * @return list<string>
+     */
+    protected function selectedRemoteAccessPeerIds(): array
+    {
+        $selected = array_values(array_filter(array_map(
+            static fn ($id): string => is_string($id) ? $id : '',
+            $this->engine_remote_server_ids,
+        )));
+
+        if ($selected === []) {
+            return [];
+        }
+
+        return ServerNetworkPeers::for($this->server)
+            ->whereIn('id', $selected)
+            ->pluck('id')
+            ->values()
+            ->all();
     }
 }

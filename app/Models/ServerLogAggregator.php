@@ -8,6 +8,7 @@ use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
 use App\Support\Servers\VectorLogAgentInstallScripts;
 use App\Support\Servers\VectorLogAggregatorInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use App\Jobs\CloseManagedFirewallPortJob;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -85,6 +86,31 @@ class ServerLogAggregator extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
+    /**
+     * Revoke the aggregator's managed firewall rule when the row goes away.
+     *
+     * There is no uninstall job yet, so nothing else would ever call closeAll()
+     * — the mTLS listener port would stay open on a box that no longer runs an
+     * aggregator. Hooking `deleted` means any removal path, present or future,
+     * reclaims the port without having to remember to.
+     *
+     * Queued because closeAll() reaches the box over SSH, which must not happen
+     * on the request path.
+     */
+    protected static function booted(): void
+    {
+        static::deleted(function (self $aggregator): void {
+            if (blank($aggregator->server_id)) {
+                return;
+            }
+
+            CloseManagedFirewallPortJob::dispatch(
+                (string) $aggregator->server_id,
+                InstallLogAggregatorJob::FIREWALL_TAG,
+            );
+        });
+    }
+
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);

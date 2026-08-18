@@ -41,6 +41,7 @@
     @endphp
 
     <x-workspace-panel-head
+        dense
         icon="heroicon-o-document-text"
         :title="$overviewTitle"
         :note="$overviewNote"

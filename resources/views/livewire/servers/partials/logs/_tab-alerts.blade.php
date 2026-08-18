@@ -11,9 +11,10 @@
         {{-- The "ADD-ON" eyebrow said nothing the tab label didn't; rule count
              moves to the head's pill. --}}
         <x-workspace-panel-head
+            dense
             icon="heroicon-o-bell-alert"
             :title="__('Log alerts')"
-            :note="__('Get notified when shipped logs cross a threshold — “more than N error lines in 5 minutes”, or “a line matching OOMKilled appeared”. Routed through your configured notification channels.')"
+            :note="__('Get notified when shipped logs cross a threshold — “more than N error lines in 5 minutes”, or “a line matching OOMKilled appeared”. Route those alerts to email or chat on the Notifications tab.')"
             :count="$rules->count() ?: null"
             class="border-b border-brand-ink/10"
         >
@@ -50,7 +51,9 @@
                 {{-- Shipping prerequisite hint --}}
                 @unless ($agentRunning)
                     <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
-                        {{ __('This server is not shipping logs yet, so alerts have nothing to evaluate. Enable log shipping on the dply Logs tab first.') }}
+                        {{ __('This server is not shipping logs yet, so alerts have nothing to evaluate.') }}
+                        <a href="{{ route('servers.logs', ['server' => $server, 'tab' => 'shipping']) }}" wire:navigate class="font-semibold text-amber-950 underline decoration-amber-300 underline-offset-2 hover:decoration-amber-500">{{ __('Enable log shipping') }}</a>
+                        {{ __('on the server’s dply Logs tab first.') }}
                     </div>
                 @endunless
 

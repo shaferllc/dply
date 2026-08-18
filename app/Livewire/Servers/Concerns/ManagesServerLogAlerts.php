@@ -16,8 +16,8 @@ use Illuminate\Support\Collection;
  * mutation is gated on the org's `alerting_enabled` entitlement; the rules
  * themselves are evaluated out-of-band by the scheduled evaluator, never here.
  *
- * Requires the host component to also use {@see DispatchesToastNotifications}
- * and {@see InteractsWithServerWorkspace} (provides $server + authorize()).
+ * Requires the host to use {@see DispatchesToastNotifications} and expose
+ * `$server` plus `authorize()` (server workspace or site Logs).
  *
  * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
  * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,

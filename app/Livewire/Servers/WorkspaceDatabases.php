@@ -325,6 +325,10 @@ class WorkspaceDatabases extends Component
                 'backupS3Destinations' => $backupS3Destinations,
                 'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
                 'existingMysqlUserOptions' => $needsBasics ? $this->existingMysqlUserOptions() : [],
+                // Servers this box can actually reach privately — the pick-list for
+                // engine-level remote access. Same rule the Networking workspace
+                // map uses, so the two can't disagree about who is a peer.
+                'engineRemotePeers' => \App\Support\Servers\ServerNetworkPeers::for($this->server),
                 'recentBackupsByEngine' => $recentBackupsByEngine,
                 'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
                 'databaseImportMaxBytes' => $databaseImportMaxBytes,

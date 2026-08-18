@@ -463,6 +463,13 @@
                                     $jumpHosts = $dbRemote
                                         ? \App\Support\Servers\DatabaseJumpHostAccess::eligibleJumpHosts($db, $server, $peerServers)
                                         : collect();
+                                    // Per-database exposure needs a way to scope one database+user to a
+                                    // CIDR (pg_hba line / host-specific GRANT). ClickHouse and Mongo have
+                                    // no such concept — they expose at the server level only — so the
+                                    // handler rejects them. Don't render a control that can only toast
+                                    // "Per-database remote access is not supported"; point at the
+                                    // engine-level toggle instead.
+                                    $supportsPerDb = \App\Support\Servers\DatabaseEngineInstallScripts::supportsPerDatabaseRemoteAccess($db->engine);
                                 @endphp
                                 <div class="px-6 py-4 sm:px-7" wire:key="net-db-{{ $db->id }}">
                                   <div class="flex flex-wrap items-center justify-between gap-4">
@@ -485,7 +492,12 @@
                                         @endif
                                     </div>
 
-                                    @if ($dbRemote)
+                                    @if (! $supportsPerDb)
+                                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/40 px-3 py-1.5 text-xs font-medium text-brand-moss">
+                                            <x-heroicon-o-information-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Exposure is set for the whole :engine engine, on its Networking tab.', ['engine' => ucfirst($db->engine)]) }}
+                                        </span>
+                                    @elseif ($dbRemote)
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('toggleDatabaseNetworking', ['{{ $db->id }}', false], @js(__('Disable remote access for :name?', ['name' => $db->name])), @js(__('The pg_hba rule (or MySQL GRANT) for this database will be removed.')), @js(__('Disable')), true)"

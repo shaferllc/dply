@@ -123,12 +123,24 @@ return [
         // MySQL and MariaDB are the generally-available relational engines;
         // MariaDB graduated out of this gate (see DatabaseEngineAvailability).
         // Off below means HIDDEN, not "Soon" — see the cache note above.
-        // NOTE: clickhouse backs the dply Logs add-on. Parking it only removes
-        // it from the Databases tab strip and the create-server picker; an
-        // existing ClickHouse install keeps working and stays manageable. A NEW
-        // logs store can no longer be installed from the UI while this is off.
         'mongodb' => false,
-        'clickhouse' => false,
+        // ClickHouse graduated out of the gate: a dedicated ClickHouse host is
+        // offered in the server-create database picker and the engine shows in
+        // the Databases tab without a Soon badge.
+        //
+        // The provision path is not a stub — BuildsProvisionDatabaseStack routes
+        // it through DatabaseEngineInstallScripts::installScript(), the same
+        // source of truth the on-demand add-engine flow uses, and the operate
+        // side (capability probing in ServerDatabaseRemoteExec, database/user
+        // creation in ServerDatabaseProvisioner, ServerDatabaseDriftAnalyzer,
+        // and the `systemctl is-active clickhouse-server` health check) all
+        // already handle the engine.
+        //
+        // ClickHouse also backs the dply Logs add-on. Turning this back off
+        // hides the engine from the tab strip and create picker and blocks a
+        // NEW logs store being installed from the UI; existing installs keep
+        // working and stay manageable either way.
+        'clickhouse' => true,
     ],
 
     /*
@@ -301,7 +313,7 @@ return [
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
         'deploy_contract' => env('FEATURE_GLOBAL_DEPLOY_CONTRACT', true),
-        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
+        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', false),
         'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
         'edge_delivery_enabled' => env('FEATURE_GLOBAL_EDGE_DELIVERY_ENABLED', true),

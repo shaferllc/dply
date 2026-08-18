@@ -6,7 +6,7 @@
     Feed/Trends switch, a filter row, a trend bar, then event rows), so the
     generic stub bore no relation to it and the panel resized on arrival.
 
-    Receives: $tab (viewer|overview|sources|shipping|alerts|activity).
+    Receives: $tab (viewer|overview|sources|shipping|alerts|notifications|activity).
 --}}
 @php
     $tab = $tab ?? 'overview';
@@ -103,7 +103,7 @@
             @endforeach
         </div>
     @else
-        {{-- Sources / shipping / alerts: a row per configured entry. --}}
+        {{-- Sources / shipping / alerts / notifications: a row per configured entry. --}}
         <div class="space-y-2 px-4 py-3.5 sm:px-5">
             @foreach (range(1, 5) as $row)
                 <div class="flex items-center gap-3 rounded-lg border border-brand-ink/8 bg-white px-3 py-2">

@@ -51,7 +51,11 @@ test('the workspace tab holds the value it is set to', function (): void {
         ->call('setLogsWorkspaceTab', 'sources')
         ->assertSet('logsTab', 'sources')
         ->call('setLogsWorkspaceTab', 'overview')
-        ->assertSet('logsTab', 'overview');
+        ->assertSet('logsTab', 'overview')
+        ->call('setLogsWorkspaceTab', 'alerts')
+        ->assertSet('logsTab', 'alerts')
+        ->call('setLogsWorkspaceTab', 'notifications')
+        ->assertSet('logsTab', 'notifications');
 });
 
 test('an unknown tab falls back to the viewer instead of rendering nothing', function (): void {
@@ -70,4 +74,14 @@ test('mount honours a tab supplied by the url binding', function (): void {
         ->withQueryParams(['tab' => 'sources'])
         ->test(Logs::class, ['server' => $server, 'site' => $site])
         ->assertSet('logsTab', 'sources');
+});
+
+test('mount honours the notifications tab from the url binding', function (): void {
+    [$user, $server, $site] = logsTabFixtures();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'notifications'])
+        ->test(Logs::class, ['server' => $server, 'site' => $site])
+        ->assertSet('logsTab', 'notifications')
+        ->assertSee(__('Log notifications'));
 });

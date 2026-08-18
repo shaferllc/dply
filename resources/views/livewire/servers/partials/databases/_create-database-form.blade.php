@@ -3,6 +3,17 @@
     $showExplainer = $showExplainer ?? true;
     $effectiveEngine = $lockEngine ?? $new_db_engine;
     $isMysqlFamily = \App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($effectiveEngine);
+    // Reusing an existing user only makes sense when there is one to reuse.
+    // With no MySQL databases on the box yet, offering the mode led to an
+    // "Existing MySQL/MariaDB user" dropdown whose only entry was the
+    // "Select an existing user…" placeholder — a dead end the operator had
+    // to back out of. Hide the mode (and the whole picker) in that case.
+    $existingMysqlUserOptions = $existingMysqlUserOptions ?? [];
+    $canUseExistingUser = $isMysqlFamily && $existingMysqlUserOptions !== [];
+    // Guard the render against a stale mode too: the component coerces this
+    // server-side on submit, but a snapshot taken while users still existed
+    // would otherwise render the empty picker until the next round trip.
+    $usingExistingUser = $canUseExistingUser && $new_db_user_mode === 'existing';
 @endphp
 
 @if ($showExplainer)
@@ -53,18 +64,26 @@
     @endif
     @if ($effectiveEngine !== 'sqlite')
         @if (! $lockEngine)
-            <div>
-                <x-input-label for="new_db_user_mode" value="{{ __('Database user') }}" />
-                <select id="new_db_user_mode" wire:model.live="new_db_user_mode" @disabled(! $isMysqlFamily) wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:bg-brand-sand/40">
-                    <option value="new">{{ __('Create a new user') }}</option>
-                    <option value="existing">{{ __('Use an existing MySQL/MariaDB user') }}</option>
-                </select>
-                @if (! $isMysqlFamily)
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Existing-user reuse is available for MySQL and MariaDB only.') }}</p>
-                @endif
-                <x-input-error :messages="$errors->get('new_db_user_mode')" class="mt-1" />
-            </div>
-        @elseif ($isMysqlFamily)
+            {{-- Non-MySQL engines still render the (disabled) select so the
+                 hint below can explain why reuse is unavailable. A MySQL box
+                 with no reusable users has nothing to explain and only one
+                 possible choice, so the select is dropped entirely. --}}
+            @if ($canUseExistingUser || ! $isMysqlFamily)
+                <div>
+                    <x-input-label for="new_db_user_mode" value="{{ __('Database user') }}" />
+                    <select id="new_db_user_mode" wire:model.live="new_db_user_mode" @disabled(! $isMysqlFamily) wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:bg-brand-sand/40">
+                        <option value="new">{{ __('Create a new user') }}</option>
+                        @if ($canUseExistingUser)
+                            <option value="existing">{{ __('Use an existing MySQL/MariaDB user') }}</option>
+                        @endif
+                    </select>
+                    @if (! $isMysqlFamily)
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Existing-user reuse is available for MySQL and MariaDB only.') }}</p>
+                    @endif
+                    <x-input-error :messages="$errors->get('new_db_user_mode')" class="mt-1" />
+                </div>
+            @endif
+        @elseif ($canUseExistingUser)
             <div>
                 <x-input-label for="new_db_user_mode" value="{{ __('Database user') }}" />
                 <select id="new_db_user_mode" wire:model.live="new_db_user_mode" wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
@@ -74,14 +93,14 @@
                 <x-input-error :messages="$errors->get('new_db_user_mode')" class="mt-1" />
             </div>
         @endif
-        @if (! ($isMysqlFamily && $new_db_user_mode === 'existing'))
+        @if (! $usingExistingUser)
             <div @class(['sm:col-span-2' => $lockEngine && ! $isMysqlFamily])>
                 <x-input-label for="new_db_username" value="{{ __('User (optional)') }}" />
                 <x-text-input id="new_db_username" wire:model="new_db_username" autocomplete="off" class="mt-1 block w-full font-mono text-sm" wire:loading.attr="disabled" wire:target="createDatabase" placeholder="{{ __('Auto-generated if empty') }}" />
                 <x-input-error :messages="$errors->get('new_db_username')" class="mt-1" />
             </div>
         @endif
-        @if ($isMysqlFamily && $new_db_user_mode === 'existing')
+        @if ($usingExistingUser)
             <div class="sm:col-span-2">
                 <x-input-label for="new_db_existing_user_reference" value="{{ __('Existing MySQL/MariaDB user') }}" />
                 <select id="new_db_existing_user_reference" wire:model="new_db_existing_user_reference" wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
@@ -94,7 +113,7 @@
                 <x-input-error :messages="$errors->get('new_db_existing_user_reference')" class="mt-1" />
             </div>
         @endif
-        @if (! ($isMysqlFamily && $new_db_user_mode === 'existing'))
+        @if (! $usingExistingUser)
             <div @class(['sm:col-span-2' => $lockEngine && ! $isMysqlFamily])>
                 <x-password-field
                     id="new_db_password"

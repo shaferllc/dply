@@ -34,6 +34,7 @@
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
         <x-workspace-panel-head
+            dense
             icon="heroicon-o-document-text"
             :title="__('Logs')"
             :note="__('Dply activity and system log tailing for this server — live SSH reads.')"
@@ -107,6 +108,14 @@
                     {{ __('Alerts') }}
                 </x-server-workspace-tab>
                 <x-server-workspace-tab
+                    id="logs-tab-notifications"
+                    icon="heroicon-o-bell"
+                    :active="$logsTab === 'notifications'"
+                    wire:click="setLogsWorkspaceTab('notifications')"
+                >
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab
                     id="logs-tab-activity"
                     icon="heroicon-o-clipboard-document-list"
                     :active="$logsTab === 'activity'"
@@ -121,7 +130,7 @@
              shared generic list stub: Activity arrives as an audit timeline
              (filters + trend bars + event feed) and Viewer as a dark tail pane,
              so a single stub resized on arrival for both. --}}
-        @foreach (['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity'] as $skeletonTab)
+        @foreach (['viewer', 'overview', 'sources', 'shipping', 'alerts', 'notifications', 'activity'] as $skeletonTab)
             <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
                 <span class="sr-only">{{ __('Loading section…') }}</span>
                 @include('livewire.servers.partials.logs._tab-skeleton', ['tab' => $skeletonTab])
@@ -168,6 +177,14 @@
                 ])
             @endif
 
+            @if ($logsTab === 'notifications')
+                @include('livewire.servers.partials.logs._tab-notifications', [
+                    'server' => $server,
+                    'notifSubscriptions' => $notifSubscriptions,
+                    'notifEventLabels' => $notifEventLabels,
+                ])
+            @endif
+
             {{-- Activity is the server audit timeline (DB-backed, no SSH). Rendered only
                  while its tab is active so the AuditLog/trends queries stay deferred on
                  ordinary Logs hits; the nested component owns its own filter URL state. --}}
@@ -180,6 +197,7 @@
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
+        @include('livewire.partials.create-notification-channel-modal')
 
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,

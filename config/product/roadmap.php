@@ -41,7 +41,7 @@ return [
      |
      | The post-deploy AI updater reads recent git history, the user-suggestion
      | inbox, the docs/*roadmap*.md files, and the existing roadmap items, then
-     | asks the configured LLM (see config/dply_ai.php) to flip shipped items,
+     | asks the configured LLM (see config/product/ai.php) to flip shipped items,
      | draft new ones, triage suggestions, and refresh summaries.
      |
      | It is OFF by default — the whole pipeline no-ops unless `enabled` is true
@@ -51,8 +51,8 @@ return [
      |
      */
     'ai' => [
-        'enabled' => filter_var(env('ROADMAP_AI_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
-        'auto_publish' => filter_var(env('ROADMAP_AI_AUTO_PUBLISH', true), FILTER_VALIDATE_BOOLEAN),
+        'enabled' => env('ROADMAP_AI_ENABLED', false),
+        'auto_publish' => env('ROADMAP_AI_AUTO_PUBLISH', true),
 
         // Explicit git directory to read history from. Null = auto-detect:
         // a local checkout's .git, else the atomic-release bare repo at
@@ -60,9 +60,9 @@ return [
         'git_dir' => env('ROADMAP_AI_GIT_DIR'),
 
         // Caps to bound prompt size and blast radius per run.
-        'max_commits' => (int) env('ROADMAP_AI_MAX_COMMITS', 200),
-        'max_new_items' => (int) env('ROADMAP_AI_MAX_NEW_ITEMS', 8),
-        'max_doc_chars' => (int) env('ROADMAP_AI_MAX_DOC_CHARS', 12000),
+        'max_commits' => env('ROADMAP_AI_MAX_COMMITS', 200),
+        'max_new_items' => env('ROADMAP_AI_MAX_NEW_ITEMS', 8),
+        'max_doc_chars' => env('ROADMAP_AI_MAX_DOC_CHARS', 12000),
     ],
 
 ];

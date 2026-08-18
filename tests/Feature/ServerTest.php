@@ -2122,6 +2122,8 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Viewer'))
         ->assertSee(__('Overview'))
         ->assertSee(__('Sources'))
+        ->assertSee(__('Alerts'))
+        ->assertSee(__('Notifications'))
         ->assertSee('Log source')
         ->assertSee('Dply activity')
         ->assertSee(__('Options'))
@@ -2142,7 +2144,7 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Reset filter'))
         ->assertSee(__('Clear display'))
         ->call('setLogsWorkspaceTab', 'overview')
-        ->assertSee(__('Log viewer'))
+        ->assertSee(__('Background activity'))
         ->call('setLogsWorkspaceTab', 'sources')
         ->assertSee(__('Available sources'));
 });

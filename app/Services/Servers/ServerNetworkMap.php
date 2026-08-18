@@ -91,7 +91,7 @@ final class ServerNetworkMap
 
             foreach ($engines as $eng) {
                 $id = 'svc:'.$s->id.':eng:'.$eng->engine;
-                [$exposed, $detail, $title] = $this->engineExposure($dbs, (string) $eng->engine);
+                [$exposed, $detail, $title] = $this->engineExposure($dbs, (string) $eng->engine, $eng);
                 $serviceY[$id] = $this->centerY($row);
                 $serviceServer[$id] = $s->id;
                 $serviceExposed[$id] = $exposed;
@@ -237,16 +237,44 @@ final class ServerNetworkMap
     }
 
     /**
-     * Exposure of a database engine: exposed when any of its databases accepts
-     * remote connections. The "why" is the distinct allowed-from source(s).
+     * Exposure of a database engine.
+     *
+     * Two ways an engine can be reachable, and reading only the first reported a
+     * dedicated ClickHouse host as localhost-only while its port was open:
+     *
+     *   per-database — postgres/mysql/mariadb scope access with a pg_hba line or
+     *                  a host-specific GRANT, so exposure lives on the database.
+     *   engine-level — ClickHouse (and Mongo) have no per-database grant; the
+     *                  whole listener opens and the firewall is the boundary, so
+     *                  exposure lives on the ServerDatabaseEngine row.
      *
      * @param  Collection<int, mixed>  $dbs
+     * @param  mixed  $engineRow  ServerDatabaseEngine, when the caller has it.
      * @return array{0: bool, 1: ?string, 2: string}  [exposed, detail line, tooltip]
      */
-    private function engineExposure(Collection $dbs, string $engine): array
+    private function engineExposure(Collection $dbs, string $engine, mixed $engineRow = null): array
     {
         $engineDbs = $dbs->where('engine', $engine);
         $exposedDbs = $engineDbs->where('remote_access', true);
+
+        if ($exposedDbs->isEmpty() && (bool) ($engineRow->remote_access ?? false)) {
+            $source = trim((string) ($engineRow->allowed_from ?? ''));
+            $sources = collect(explode(',', $source))->map(fn ($s) => trim($s))->filter()->values();
+
+            return [
+                true,
+                match (true) {
+                    $sources->isEmpty() => __('open to any source'),
+                    $sources->count() === 1 => __('open to :cidr', ['cidr' => $sources->first()]),
+                    default => __('open to :count sources', ['count' => $sources->count()]),
+                },
+                __('The whole :engine listener is open (:sources) — this engine has no per-database scoping.', [
+                    'engine' => DatabaseEngineInfo::for($engine)['label'] ?? ucfirst($engine),
+                    'sources' => $sources->isEmpty() ? __('any source') : $sources->implode(', '),
+                ]),
+            ];
+        }
+
         if ($exposedDbs->isEmpty()) {
             return [false, null, __('Bound to localhost — no database accepts remote connections.')];
         }

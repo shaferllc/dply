@@ -57,6 +57,22 @@ class WorkspaceNetworking extends Component
     /** @var list<string> */
     public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
 
+    /**
+     * Database engines the network map and per-database panels account for.
+     *
+     * ClickHouse is included: a dedicated logs-store host runs nothing else, so
+     * leaving it out made the map report "No tracked services" for a server that
+     * is very much running one. Its exposure is engine-level only — the
+     * per-database panel renders a pointer to the engine's Networking tab rather
+     * than a toggle (see DatabaseEngineInstallScripts::supportsPerDatabaseRemoteAccess).
+     *
+     * MongoDB stays out: still feature-gated, and supportsRemoteAccess() has no
+     * path for it, so there would be nothing to show or act on.
+     *
+     * @var list<string>
+     */
+    private const NETWORK_MAP_ENGINES = ['postgres', 'mysql', 'mariadb', 'clickhouse'];
+
     #[Url(as: 'tab', except: 'servers', history: true)]
     public string $networking_tab = 'servers';
 
@@ -613,13 +629,13 @@ class WorkspaceNetworking extends Component
         $databaseEnginesByServer = ServerDatabaseEngine::query()
             ->whereIn('server_id', $allServerIds)
             ->where('status', ServerDatabaseEngine::STATUS_RUNNING)
-            ->whereIn('engine', ['postgres', 'mysql', 'mariadb'])
+            ->whereIn('engine', self::NETWORK_MAP_ENGINES)
             ->get()
             ->groupBy('server_id');
 
         $databasesByServer = ServerDatabase::query()
             ->whereIn('server_id', $allServerIds)
-            ->whereIn('engine', ['postgres', 'mysql', 'mariadb'])
+            ->whereIn('engine', self::NETWORK_MAP_ENGINES)
             ->get()
             ->groupBy('server_id');
 

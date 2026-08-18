@@ -21,18 +21,16 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-        <div class="flex items-center gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Events vs logs') }}</h3>
-                <p class="text-xs text-brand-moss">{{ __('Log volume over time with deploys, errors and incidents overlaid.') }}</p>
-            </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
+    {{-- Dense head, matching the workspace panels elsewhere: title and note on one
+         line instead of a 5rem-tall icon-badge block above a two-line stack. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__('Events vs logs')"
+        :note="__('Log volume over time with deploys, errors and incidents overlaid.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             @if ($focused)
                 <button type="button" wire:click="resetLogHistogram" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/30">
                     <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Zoom out') }}
@@ -51,13 +49,17 @@
             <button type="button" wire:click="toggleLogCorrelation" title="{{ __('Hide graph') }}" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/30">
                 <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Hide') }}
             </button>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-5 sm:px-7">
+    <div @class(['px-6 sm:px-7', 'py-5' => $available, 'py-2.5' => ! $available])>
         @unless ($available)
-            <div class="flex h-44 items-center justify-center rounded-xl bg-brand-sand/30 text-sm text-brand-mist">
-                {{ __('Log store unavailable — no histogram to show.') }}
+            {{-- Was an h-44 block reserving chart-sized space for a one-line
+                 message. Nothing is going to fill it while the store is
+                 unreachable, so collapse to a single row. --}}
+            <div class="flex items-center gap-2 rounded-lg bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
+                <x-heroicon-o-signal-slash class="h-3.5 w-3.5 shrink-0 text-brand-ink/40" aria-hidden="true" />
+                <span>{{ __('Log store unavailable — no histogram to show.') }}</span>
             </div>
         @else
             <div x-data="{ tip: null }" class="relative">

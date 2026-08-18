@@ -10,6 +10,7 @@
          directly under a tab already labelled Sources. Row count moves to the
          head's pill. --}}
     <x-workspace-panel-head
+        dense
         icon="heroicon-o-queue-list"
         :title="__('Available sources')"
         :note="__('Catalog filtered by installed services and sites on this server. Click a row to open it in the viewer.')"

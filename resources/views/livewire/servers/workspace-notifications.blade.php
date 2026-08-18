@@ -55,11 +55,15 @@
                     labelled-by="notif-tab-subscriptions"
                     panel-class="min-w-0"
                 >
+                    @php
+                        $routedCount = collect($channelEventSelections)->sum(fn ($keys) => count((array) $keys));
+                    @endphp
                     <x-workspace-panel-head
                         dense
                         icon="heroicon-o-bell-alert"
                         :title="__('Server event subscriptions')"
                         :note="__('Subscribe notification channels to server events. Dply delivers in-app notifications and routes to the channels you select here.')"
+                        :count="trans_choice('{0} none routed|{1} :count route|[2,*] :count routes', $routedCount, ['count' => $routedCount])"
                         class="border-b border-brand-ink/10"
                     >
                         <x-slot:actions>
@@ -82,6 +86,18 @@
                             @endif
                         </x-slot:actions>
                     </x-workspace-panel-head>
+
+                    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-4 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-5">
+                        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry for server events — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}</p>
+                    </div>
+
+                    @if ($routedCount === 0)
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
+                            <x-heroicon-m-bell-slash class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                            {{ __('No external channels are routed for this server yet — tick events on a channel below to get an email or chat message when something fires.') }}
+                        </p>
+                    @endif
 
                     <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
                         @include('livewire.partials.notification-channel-matrix', [

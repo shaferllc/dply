@@ -135,6 +135,7 @@ use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
+use App\Support\Config\ConfigDirectoryAliases;
 use App\Support\Debug\SshCallRecorder;
 use App\Support\Debug\SshCallsCollector;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
@@ -169,6 +170,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        ConfigDirectoryAliases::apply();
+
         // WordPress advisory feed (Q20 — Wordfence Intelligence default).
         // Singleton because it caches per-request lookups in process.
         $this->app->singleton(AdvisoryProvider::class, WordfenceIntelligenceProvider::class);

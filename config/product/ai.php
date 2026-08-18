@@ -13,7 +13,7 @@
 return [
 
     'llm' => [
-        'enabled' => filter_var(env('DPLY_AI_LLM_ENABLED', env('DPLY_OPS_COPILOT_LLM_ENABLED', false)), FILTER_VALIDATE_BOOL),
+        'enabled' => env('DPLY_AI_LLM_ENABLED', env('DPLY_OPS_COPILOT_LLM_ENABLED', false)),
         // 'claude' (or 'claude-cli') routes completions through the local `claude` CLI
         // — no API key needed; anything else hits an OpenAI-compatible HTTP endpoint.
         'provider' => env('DPLY_AI_LLM_PROVIDER', env('DPLY_OPS_COPILOT_LLM_PROVIDER', 'openai')),
@@ -25,13 +25,13 @@ return [
     ],
 
     'features' => [
-        'ops_copilot' => filter_var(env('DPLY_AI_OPS_COPILOT_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'shared_host' => filter_var(env('DPLY_AI_SHARED_HOST_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'docs_ask' => filter_var(env('DPLY_AI_DOCS_ASK_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'ops_copilot' => env('DPLY_AI_OPS_COPILOT_ENABLED', true),
+        'shared_host' => env('DPLY_AI_SHARED_HOST_ENABLED', true),
+        'docs_ask' => env('DPLY_AI_DOCS_ASK_ENABLED', true),
     ],
 
     'rate_limits' => [
-        'per_org_per_hour' => (int) env('DPLY_AI_RATE_LIMIT_ORG_HOUR', 30),
+        'per_org_per_hour' => env('DPLY_AI_RATE_LIMIT_ORG_HOUR', 30),
     ],
 
 ];

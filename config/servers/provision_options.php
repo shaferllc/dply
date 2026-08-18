@@ -298,8 +298,12 @@ return [
         // (DatabaseEngineAvailability::familyForProvisionOption maps the id → flag),
         // so they're hidden from the picker until the flag is on. ClickHouse is the
         // store for the dply logs add-on.
+        //
+        // NOTE: `enabled` is a SECOND, independent gate — FilterServerProvisionOptionsForCreateForm
+        // ::rowIsEnabled() drops the row before the Pennant check ever runs. An engine needs
+        // BOTH `enabled => true` here and its database.* flag active to reach the picker.
         ['id' => 'mongodb', 'enabled' => false, 'label' => 'MongoDB 7.0', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'clickhouse', 'enabled' => false, 'label' => 'ClickHouse (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'clickhouse', 'enabled' => true, 'label' => 'ClickHouse (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         // Same broadening as php_versions — Static-host preset is role
         // 'static' with no DB; the role list shouldn't gate that.
         ['id' => 'none', 'label' => 'None (external or not on this host)'],

@@ -170,4 +170,42 @@ class ServerLogAgent extends Model
 
         return ($this->config_version ?? 0) < self::currentConfigVersion();
     }
+
+    /**
+     * True when this agent was configured before the current aggregator existed
+     * (or before it was last re-installed), so the sink baked into its config is
+     * stale — most damagingly the blackhole sink an edge renders when no
+     * aggregator was available:
+     *
+     *   `# no aggregator endpoint configured — edge ships to blackhole`
+     *
+     * Such an agent reports status=running, no error, and a current
+     * config_version — isConfigStale() cannot see it, because the config VERSION
+     * tracks the template's shape, not whether the endpoint it points at is real.
+     * That combination silently discarded every log line for whoever enabled
+     * shipping before standing the aggregator up.
+     *
+     * InstallLogAggregatorJob now re-syncs running edges automatically, so this
+     * is the backstop for the cases it cannot cover: an agent that was failed or
+     * installing at the time, or one whose re-sync did not land.
+     */
+    public function needsAggregatorResync(): bool
+    {
+        if (! $this->isRunning()) {
+            return false;
+        }
+
+        $aggregator = ServerLogAggregator::query()
+            ->where('status', ServerLogAggregator::STATUS_RUNNING)
+            ->whereNotNull('endpoint')
+            ->where('server_id', '!=', $this->server_id)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($aggregator === null || $this->updated_at === null || $aggregator->updated_at === null) {
+            return false;
+        }
+
+        return $this->updated_at->lt($aggregator->updated_at);
+    }
 }

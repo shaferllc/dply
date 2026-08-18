@@ -3,9 +3,11 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesLogNotifications;
 use App\Livewire\Servers\Concerns\ManagesServerLogAlerts;
 use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
 use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
@@ -26,9 +28,11 @@ use Livewire\Component;
 class WorkspaceLogs extends Component
 {
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesLogNotifications;
     use ManagesServerLogAlerts;
     use ManagesServerLogExplorer;
     use ManagesServerLogShipping;
@@ -36,7 +40,7 @@ class WorkspaceLogs extends Component
     use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'notifications', 'activity'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
@@ -138,6 +142,18 @@ class WorkspaceLogs extends Component
         $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
     }
 
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to Notifications and re-seed the matrix so the
+     * new channel is ticked without a remount.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId = ''): void
+    {
+        $this->logsTab = 'notifications';
+        $this->reloadFeatureNotificationMatrix();
+    }
+
     #[On('server-workspace-log-snapshot')]
     public function onServerWorkspaceLogSnapshot(mixed $payload = []): void
     {
@@ -192,6 +208,8 @@ class WorkspaceLogs extends Component
             // Alert rules + entitlement, only while the Alerts tab is open.
             'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
             'logAlertingAvailable' => $this->logAlertingAvailable,
+            'notifSubscriptions' => $this->logsTab === 'notifications' ? $this->logNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->logsTab === 'notifications' ? $this->logEventLabels() : [],
         ]);
     }
 }
