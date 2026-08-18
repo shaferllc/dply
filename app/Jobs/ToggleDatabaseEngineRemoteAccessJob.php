@@ -42,6 +42,7 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
         public string $allowedCidr,
         public ?string $userId = null,
         public array $peerServerIds = [],
+        public array $extraCidrs = [],
     ) {
         $q = config('server_database.install_queue');
         if (is_string($q) && $q !== '') {
@@ -169,7 +170,7 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
             return;
         }
 
-        if ($this->peerServerIds !== []) {
+        if ($this->peerServerIds !== [] || $this->extraCidrs !== []) {
             // One /32 per selected server. A covering CIDR would be shorter and
             // would also admit every other host in that range.
             $peers = Server::query()
@@ -184,10 +185,23 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
 
             $names = Server::query()
                 ->whereIn('id', array_keys($peers))
-                ->pluck('name', 'id');
+                ->pluck('name', 'id')
+                ->all();
 
-            // A single-source rule may be left over from the hand-typed path.
-            $ports->close($server, $tag);
+            // Hand-typed sources join the same group rather than replacing it —
+            // admitting a laptop should not revoke the app server. Keyed by the
+            // CIDR itself so the key is stable across reconciles.
+            foreach ($this->extraCidrs as $cidr) {
+                $cidr = trim((string) $cidr);
+                if ($cidr !== '') {
+                    $peers['cidr:'.$cidr] = $cidr;
+                }
+            }
+
+            // A pre-group single rule may be left over. close() cannot be used:
+            // group members carry the group tag too, so it would delete one of
+            // them at random. closeUngrouped() targets only the non-member.
+            $ports->closeUngrouped($server, $tag);
 
             $ports->openGroup(
                 server: $server,

@@ -1,7 +1,5 @@
 <?php
 
-use App\Modules\Edge\Support\EdgeTestingDomains;
-
 return [
 
     /*
@@ -230,21 +228,9 @@ return [
     ],
 
     /*
-    | Edge delivery hostnames — on-dply.* by default (e.g. on-dply.site).
-    | Override with DPLY_EDGE_TESTING_DOMAINS; when unset, on-dply.* entries
-    | from DPLY_TESTING_DOMAINS are preferred over generic BYO testing domains.
+    | Edge delivery hostnames — from config/product/testing_domains.php.
     */
-    'testing_domains' => (static function (): array {
-        $explicit = trim((string) env('DPLY_EDGE_TESTING_DOMAINS', ''));
-        if ($explicit !== '') {
-            return array_values(array_filter(array_map(
-                static fn (string $value): string => strtolower(trim($value)),
-                explode(',', $explicit),
-            )));
-        }
-
-        return EdgeTestingDomains::defaultFromPool();
-    })(),
+    'testing_domains' => (require __DIR__.'/testing_domains.php')['edge'] ?? ['on-dply.site'],
 
     /*
     | DNS target for Edge delivery hostnames on DO-managed on-dply zones when

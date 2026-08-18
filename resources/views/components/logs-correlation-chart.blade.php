@@ -20,7 +20,11 @@
     ];
 @endphp
 
-<section class="dply-card overflow-hidden">
+{{-- Flush section, not a dply-card. Sibling panels in the Logs workspace
+     (Shipped logs, dply Logs, the aggregator block) are plain
+     `border-b` sections; the card's radius + shadow made this one float
+     out of the stack. --}}
+<section class="overflow-hidden border-b border-brand-ink/10">
     {{-- Dense head, matching the workspace panels elsewhere: title and note on one
          line instead of a 5rem-tall icon-badge block above a two-line stack. --}}
     <x-workspace-panel-head
@@ -52,7 +56,7 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    <div @class(['px-6 sm:px-7', 'py-5' => $available, 'py-2.5' => ! $available])>
+    <div @class(['px-6 sm:px-7', 'py-3' => $available, 'py-2.5' => ! $available])>
         @unless ($available)
             {{-- Was an h-44 block reserving chart-sized space for a one-line
                  message. Nothing is going to fill it while the store is
@@ -64,7 +68,7 @@
         @else
             <div x-data="{ tip: null }" class="relative">
                 {{-- Chart area --}}
-                <div class="relative h-48 rounded-xl bg-brand-sand/20 px-2 pt-3">
+                <div class="relative h-28 rounded-xl bg-brand-sand/20 px-2 pt-2">
                     {{-- Event markers (vertical guides + dots along the top) --}}
                     <div class="pointer-events-none absolute inset-x-2 top-3 bottom-6">
                         @foreach ($events as $event)
@@ -135,19 +139,21 @@
                 </div>
 
                 {{-- Legend + hint --}}
-                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-brand-moss">
+                {{-- Legend and the interaction hint share one row: the hint was a third
+                     stacked block under an already-tall chart. --}}
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-brand-moss">
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-brand-sage/70"></span>{{ __('Logs') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-amber-400"></span>{{ __('Warnings') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-rose-500"></span>{{ __('Errors') }}</span>
                     <span class="ml-1 inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-brand-forest ring-2 ring-white"></span>{{ __('Deploy') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>{{ __('Error') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white"></span>{{ __('Incident') }}</span>
+                    <span class="ml-auto text-brand-mist">
+                        {{ $isLeaf
+                            ? __('Click a minute to load its log lines below.')
+                            : __('Click a bar to zoom in (:grain → finer). Hover a dot for the event.', ['grain' => $grains[$gran] ?? $gran]) }}
+                    </span>
                 </div>
-                <p class="mt-2 text-xs text-brand-mist">
-                    {{ $isLeaf
-                        ? __('Click a minute to load its log lines below.')
-                        : __('Click a bar to zoom in (:grain → finer). Hover a dot for the event.', ['grain' => $grains[$gran] ?? $gran]) }}
-                </p>
             </div>
         @endunless
     </div>

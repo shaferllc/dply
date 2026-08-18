@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
+use App\Enums\QuotaSurface;
 use App\Livewire\Cloud\Concerns\ManagesCloudCostBackend;
 use App\Livewire\Cloud\Concerns\ManagesCloudRepository;
 use App\Livewire\Cloud\Concerns\ManagesCloudResources;
@@ -326,8 +327,8 @@ class Create extends Component
 
         $this->validate();
 
-        if (! $org->canCreateSite()) {
-            $this->toastError($org->siteLimitMessage());
+        if (! $org->canCreateOnSurface(QuotaSurface::Cloud)) {
+            $this->toastError($org->quotaLimitMessage(QuotaSurface::Cloud));
 
             return;
         }

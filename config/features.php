@@ -16,7 +16,7 @@
 |   ServerProviderGate            | Org can add creds / create server?   | catalog AND provider.* when mapped in PENNANT_FLAGS
 |   server_workspace.php          | Global engine UI not ready yet?      | webserver_coming_soon / edge_proxy_coming_soon (not Pennant)
 |   server_workspace.php nav      | Show sidebar row for this server?    | requires_any_tags, except_host_kinds, requires_min_sites (not Pennant)
-|   subscription / billing        | Org within plan limits?            | Organization::canCreateSite(), SubscriptionPlanResolver
+|   subscription / billing        | Org within plan limits?            | Organization::canCreateOnSurface(QuotaSurface) (per-surface ceilings), SubscriptionPlanResolver
 |   dply.php, edge.php, …         | Ops / runtime behavior?              | DPLY_* env (not product rollout)
 |
 | Pennant resolution: FeatureServiceProvider registers every leaf below as

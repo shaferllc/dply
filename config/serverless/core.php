@@ -1,7 +1,5 @@
 <?php
 
-use App\Modules\Serverless\Support\ServerlessTestingDomains;
-
 return [
     'provisioner' => env('SERVERLESS_PROVISIONER', 'local'),
 
@@ -97,17 +95,7 @@ return [
     | Override with DPLY_SERVERLESS_TESTING_DOMAINS (comma-separated) for local
     | or staging apexes.
     */
-    'testing_domains' => (static function (): array {
-        $configured = trim((string) env('DPLY_SERVERLESS_TESTING_DOMAINS', ''));
-        if ($configured === '') {
-            return [ServerlessTestingDomains::DEFAULT_APEX];
-        }
-
-        return array_values(array_filter(array_map(
-            static fn (string $value): string => strtolower(trim($value)),
-            explode(',', $configured),
-        )));
-    })(),
+    'testing_domains' => (require dirname(__DIR__).'/product/testing_domains.php')['serverless'] ?? ['dply-serverless.cloud'],
 
     /*
     | DNS target for a function's friendly hostname. An IP becomes an A record;

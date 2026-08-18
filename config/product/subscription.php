@@ -49,14 +49,30 @@ return [
         // Ordered cheapest → most expensive. `max_servers` is the inclusive
         // server-count ceiling for the plan; null means unlimited. The resolver
         // picks the cheapest plan whose ceiling covers the org's server count.
-        // `max_sites` is the inclusive ceiling on how many sites an org on this
-        // plan may run (null = unlimited). Enforced as a hard block at site
-        // creation; the plan tier itself is still chosen by server count.
+        //
+        // The four `max_*` app ceilings are PER SURFACE and independent — see
+        // App\Enums\QuotaSurface. Each is the inclusive ceiling on how many of
+        // that thing an org on this plan may run (null = unlimited), enforced as
+        // a hard block at creation. The plan tier itself is still chosen by
+        // server count alone.
+        //
+        //   max_sites       sites on real machines (VM + Docker/Kubernetes)
+        //   max_cloud_apps  dply Cloud container apps
+        //   max_edge_apps   dply Edge static/SSG/hybrid sites
+        //   max_functions   serverless functions
+        //
+        // These were ONE shared ceiling until 2026-08-18, which meant a Free org
+        // with two Edge sites and a function was locked out of its first VM site
+        // ("3 / 1" on an empty server). The managed surfaces are billed a la
+        // carte per app anyway (edge_cents / cloud_cents / serverless_cents), so
+        // their ceilings are abuse bounds rather than revenue levers and are set
+        // generously. Every value here is >= the old shared ceiling, so the split
+        // cannot newly block an org that was previously within its limit.
         'plans' => [
-            'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1],
-            'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10],
-            'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30],
-            'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null],
+            'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3, 'max_functions' => 3],
+            'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10, 'max_cloud_apps' => 10, 'max_edge_apps' => 25, 'max_functions' => 25],
+            'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30, 'max_cloud_apps' => 30, 'max_edge_apps' => 100, 'max_functions' => 100],
+            'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null, 'max_functions' => null],
         ],
         // Flat per-function fee for serverless (FaaS) targets. A serverless
         // function has no vCPU/RAM, so it isn't spec-tiered — it's its own
@@ -107,7 +123,8 @@ return [
         // suppressed, and these caps replace the plan ceilings until the global
         // cutover. `byo_servers` is generous-but-bounded (a leaked invite can't
         // provision hundreds of boxes on a stolen cloud key via dply);
-        // `managed_servers` is the single free CX22 grant; `sites` is roomy.
+        // `managed_servers` is the single free CX22 grant; the four app caps are
+        // roomy and mirror the per-surface plan ceilings (see `plans` above).
         // `cutover_at` is the global beta end date (Y-m-d or full datetime, null
         // = no end set yet). At cutover beta orgs fall to the normal trial and
         // the free CX22's comped_until expires. `managed_size` pins the free box.
@@ -115,6 +132,9 @@ return [
             'byo_servers' => (int) env('SUBSCRIPTION_BETA_BYO_SERVERS', 5),
             'managed_servers' => (int) env('SUBSCRIPTION_BETA_MANAGED_SERVERS', 1),
             'sites' => (int) env('SUBSCRIPTION_BETA_SITES', 25),
+            'cloud_apps' => (int) env('SUBSCRIPTION_BETA_CLOUD_APPS', 10),
+            'edge_apps' => (int) env('SUBSCRIPTION_BETA_EDGE_APPS', 25),
+            'functions' => (int) env('SUBSCRIPTION_BETA_FUNCTIONS', 25),
             'managed_size' => env('SUBSCRIPTION_BETA_MANAGED_SIZE', 'cx22'),
             'cutover_at' => env('SUBSCRIPTION_BETA_CUTOVER_AT'),
             'invite_expiry_days' => (int) env('SUBSCRIPTION_BETA_INVITE_EXPIRY_DAYS', 30),

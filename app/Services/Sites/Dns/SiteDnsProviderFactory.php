@@ -3,8 +3,9 @@
 namespace App\Services\Sites\Dns;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\AzureDnsService;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Cloud\Services\AzureDnsService;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Cloud\Services\GcpDnsService;
 use App\Modules\Cloud\Services\HetznerService;
@@ -23,10 +24,11 @@ final class SiteDnsProviderFactory
             'vultr' => new VultrDnsProvider(new VultrService($credential)),
             'azure' => new AzureDnsProvider(new AzureDnsService($credential)),
             'cloudflare' => new CloudflareDnsProvider(new CloudflareDnsService($credential)),
+            'namecheap' => new NamecheapDnsProvider(NamecheapDnsService::fromCredential($credential)),
             'aws' => new Route53DnsProvider(new Route53Service($credential)),
             'gcp' => new GcpDnsProvider(new GcpDnsService($credential)),
             default => throw new \RuntimeException(
-                __('DNS automation is not available for this provider yet. Choose DigitalOcean, Hetzner, Linode, Vultr, Azure, Cloudflare, AWS (Route53), or Google Cloud DNS.')
+                __('DNS automation is not available for this provider yet. Choose DigitalOcean, Hetzner, Linode, Vultr, Azure, Cloudflare, Namecheap, AWS (Route53), or Google Cloud DNS.')
             ),
         };
     }
@@ -34,5 +36,15 @@ final class SiteDnsProviderFactory
     public static function forDigitalOceanAppConfigToken(string $token): DnsProvider
     {
         return new DigitalOceanDnsProvider(new DigitalOceanService($token));
+    }
+
+    public static function forCloudflareAppConfigToken(string $token): DnsProvider
+    {
+        return new CloudflareDnsProvider(new CloudflareDnsService($token));
+    }
+
+    public static function forNamecheapAppConfig(): DnsProvider
+    {
+        return new NamecheapDnsProvider(NamecheapDnsService::fromAppConfig());
     }
 }

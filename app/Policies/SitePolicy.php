@@ -40,6 +40,9 @@ class SitePolicy
             return false;
         }
 
+        // Machine-site ceiling: every authorize('create', Site::class) caller
+        // is a VM / container create path. Edge, Cloud and function creates
+        // have their own ceilings and gate at their own create components.
         return $org->canCreateSite();
     }
 

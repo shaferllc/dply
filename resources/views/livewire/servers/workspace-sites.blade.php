@@ -81,11 +81,72 @@
                 </x-slot:actions>
             </x-workspace-panel-head>
 
+            {{-- The blocker used to be a thin tinted line that read as chrome and
+                 got skipped, which is worse for a quota block than for any other
+                 reason: the ceiling is ORG-wide, so it fires on a server showing
+                 "No sites yet" and looks like a bug. Full-bleed callout, where the
+                 usage actually is, and a route out. --}}
             @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
-                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>{{ $this->addSiteBlockedReason }}</span>
-                </p>
+                @php
+                    $quotaBlock = $this->siteQuotaBlock;
+                    $blockOrg = auth()->user()?->currentOrganization();
+                @endphp
+                <div class="border-b border-amber-300 bg-amber-50 px-4 py-3.5 sm:px-5" role="alert">
+                    <div class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700 ring-1 ring-amber-300">
+                            <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-amber-950">
+                                @if ($quotaBlock)
+                                    {{ __(':plan plan :noun limit reached — :used of :max used', [
+                                        'plan' => $quotaBlock['plan'],
+                                        'noun' => $quotaBlock['noun'],
+                                        'used' => $quotaBlock['used'],
+                                        'max' => $quotaBlock['limit'] ?? __('unlimited'),
+                                    ]) }}
+                                @else
+                                    {{ $isContainerHost ? __('Cannot add a container app') : __('Cannot add a site') }}
+                                @endif
+                            </p>
+                            <p class="mt-1 text-xs leading-relaxed text-amber-900">{{ $this->addSiteBlockedReason }}</p>
+
+                            @if ($quotaBlock && $quotaBlock['elsewhere'] > 0)
+                                <p class="mt-1.5 text-xs leading-relaxed text-amber-900/90">
+                                    {{ trans_choice(
+                                        '{1} The limit is org-wide, not per server — :count of them is on another server.'
+                                            .'|[2,*] The limit is org-wide, not per server — :count of them are on other servers.',
+                                        $quotaBlock['elsewhere'],
+                                        ['count' => $quotaBlock['elsewhere']],
+                                    ) }}
+                                </p>
+                            @endif
+
+                            @if ($quotaBlock)
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                    @if ($blockOrg !== null)
+                                        <a
+                                            href="{{ route('subscription.show', $blockOrg) }}"
+                                            wire:navigate
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                                        >
+                                            <x-heroicon-m-arrow-up-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Upgrade plan') }}
+                                        </a>
+                                    @endif
+                                    <a
+                                        href="{{ route($quotaBlock['index_route']) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100/70"
+                                    >
+                                        <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Review all :nouns', ['nouns' => $quotaBlock['noun_plural']]) }}
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
             @endif
 
             <div class="border-b border-brand-ink/10 px-4 py-2 sm:px-5">
@@ -170,7 +231,11 @@
                         @endif
                     </span>
                     <p class="mt-4 text-sm font-semibold text-brand-ink">{{ $emptyHeadline }}</p>
-                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ $emptyLead }}</p>
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                        {{-- "Add a site to…" next to a disabled Add button reads as a
+                             broken page; point at the callout above instead. --}}
+                        {{ $this->canAddSite ? $emptyLead : $this->addSiteBlockedReason }}
+                    </p>
                     @if ($this->canAddSite)
                         <button
                             type="button"

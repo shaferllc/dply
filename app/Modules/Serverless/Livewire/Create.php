@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Livewire;
 
-use App\Modules\Serverless\Actions\CreateServerlessFunction;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -12,10 +11,12 @@ use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Models\ProviderCredential;
 use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
 use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
+use App\Modules\Serverless\Actions\CreateServerlessFunction;
 use App\Modules\Serverless\Livewire\Concerns\ManagesServerlessCreateGit;
 use App\Modules\Serverless\Services\ServerlessCostEstimator;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
@@ -397,7 +398,7 @@ class Create extends Component
         $this->toastSuccess(__('Serverless app created — deploying now.'));
 
         return $this->redirect(
-            \App\Support\Serverless\ServerlessWorkspaceUrl::journey($site),
+            ServerlessWorkspaceUrl::journey($site),
             navigate: true,
         );
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites\Clone;
 
+use App\Enums\QuotaSurface;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -33,8 +34,12 @@ final class SiteCloneDestinationValidator
             throw new \RuntimeException(__('The destination server must be ready with SSH.'));
         }
 
-        if (! $org->canCreateSite()) {
-            throw new \RuntimeException(__('Your organization has reached the site limit for the current plan.'));
+        // Ceilings are per surface, so ask the one the destination host feeds.
+        $surface = QuotaSurface::forServer($destServer);
+        if (! $org->canCreateOnSurface($surface)) {
+            throw new \RuntimeException(__('Your organization has reached the :noun limit for the current plan.', [
+                'noun' => $surface->label(),
+            ]));
         }
 
         $host = strtolower(trim($primaryHostname));

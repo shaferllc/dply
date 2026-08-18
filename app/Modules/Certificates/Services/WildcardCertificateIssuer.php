@@ -2,9 +2,11 @@
 
 namespace App\Modules\Certificates\Services;
 
+use App\Http\Controllers\AcmeDnsHookController;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Models\ServerWildcardCertificate;
+use App\Modules\Cloud\Namecheap\NamecheapDnsService;
 use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\SshConnection;
 use Illuminate\Support\Carbon;
@@ -45,17 +47,25 @@ class WildcardCertificateIssuer
         }
 
         $provider = strtolower(trim((string) $wildcard->provider));
-        if (! in_array($provider, ['digitalocean', 'hetzner', 'cloudflare'], true)) {
+        if (! in_array($provider, ['digitalocean', 'hetzner', 'cloudflare', 'namecheap'], true)) {
             throw new \RuntimeException("DNS-01 wildcard issuance is not implemented for provider [{$provider}].");
         }
 
         $token = $wildcard->providerCredential?->getApiToken();
         if (! is_string($token) || trim($token) === '') {
-            $token = $provider === 'digitalocean'
-                ? trim((string) config('services.digitalocean.token'))
-                : '';
+            $token = match ($provider) {
+                'digitalocean' => trim((string) config('services.digitalocean.token')),
+                'namecheap' => trim((string) config('services.namecheap.api_key', '')),
+                'cloudflare' => \App\Support\TestingDomains::cloudflareApiToken(),
+                default => '',
+            };
         }
-        if (trim($token) === '') {
+        if ($provider === 'namecheap') {
+            if (! NamecheapDnsService::isConfigured()) {
+                throw new \RuntimeException("No Namecheap API credentials available to issue *.{$zone}.");
+            }
+            $token = $token !== '' ? $token : 'namecheap';
+        } elseif (trim($token) === '') {
             throw new \RuntimeException("No DNS API token available for provider [{$provider}] to issue *.{$zone}.");
         }
 
@@ -159,6 +169,8 @@ class WildcardCertificateIssuer
             'DPLY_ACME_PROVIDER='.escapeshellarg($provider),
             'DPLY_ACME_TOKEN='.escapeshellarg($token),
             'DPLY_ACME_ZONE='.escapeshellarg($zone),
+            'DPLY_ACME_HOOK_URL='.escapeshellarg(AcmeDnsHookController::hookUrl()),
+            'DPLY_ACME_HOOK_SECRET='.escapeshellarg(AcmeDnsHookController::hookSecret()),
             '',
         ]);
     }
@@ -179,6 +191,14 @@ set -uo pipefail
 RECORD_NAME="_acme-challenge"
 FQDN="${RECORD_NAME}.${DPLY_ACME_ZONE}"
 VALUE="${CERTBOT_VALIDATION:-}"
+
+namecheap_callback() {
+  action="$1"
+  body=$(printf '{"action":"%s","zone":"%s","name":"%s","value":"%s"}' "$action" "$DPLY_ACME_ZONE" "$RECORD_NAME" "$VALUE")
+  sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$DPLY_ACME_HOOK_SECRET" | awk '{print $NF}')
+  curl -sS -X POST -H "Content-Type: application/json" -H "X-Dply-Signature: ${sig}" \
+    -d "$body" "${DPLY_ACME_HOOK_URL}" >/dev/null
+}
 
 cf_zone_id() {
   curl -sS -H "Authorization: Bearer ${DPLY_ACME_TOKEN}" \
@@ -210,6 +230,9 @@ clear_txt() {
       curl -sS -X DELETE -H "Authorization: Bearer ${DPLY_ACME_TOKEN}" \
         "https://api.hetzner.cloud/v1/zones/${DPLY_ACME_ZONE}/rrsets/${RECORD_NAME}/TXT" >/dev/null || true
       ;;
+    namecheap)
+      namecheap_callback clear
+      ;;
   esac
 }
 
@@ -231,6 +254,9 @@ create_txt() {
       curl -sS -X POST -H "Authorization: Bearer ${DPLY_ACME_TOKEN}" -H "Content-Type: application/json" \
         -d "{\"name\":\"${RECORD_NAME}\",\"type\":\"TXT\",\"ttl\":60,\"records\":[{\"value\":\"\\\"${VALUE}\\\"\"}]}" \
         "https://api.hetzner.cloud/v1/zones/${DPLY_ACME_ZONE}/rrsets" >/dev/null
+      ;;
+    namecheap)
+      namecheap_callback set
       ;;
   esac
 }

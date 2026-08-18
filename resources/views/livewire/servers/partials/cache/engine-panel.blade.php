@@ -247,10 +247,13 @@
                             :note="__('Live state from the last SSH probe — service status, reachability, version, and bind address.')"
                             class="border-b border-brand-ink/10"
                         />
-                        <dl class="grid gap-3 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
-                            <div>
+                        {{-- Was a 2-col grid of stacked label/value pairs: four short facts spread over
+                             two tall rows with a dead right-hand column. One wrapping row of
+                             inline label + value says the same in a third of the height. --}}
+                        <dl class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:px-5">
+                            <div class="flex items-center gap-2">
                                 <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                                <dd class="mt-1">
+                                <dd>
                                     @switch($row->status)
                                         @case(\App\Models\ServerCacheService::STATUS_RUNNING)
                                             <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
@@ -266,9 +269,9 @@
                                     @endswitch
                                 </dd>
                             </div>
-                            <div>
+                            <div class="flex items-center gap-2">
                                 <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
-                                <dd class="mt-1">
+                                <dd>
                                     {{-- Three-state badge. "Status: Running, Probe: Not reachable"
                                          used to surface because the SSH-probe couldn't get a PONG
                                          back (AUTH password mismatch, port firewalled from inside,
@@ -290,9 +293,9 @@
                                     @endif
                                 </dd>
                             </div>
-                            <div>
+                            <div class="flex items-center gap-2">
                                 <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
-                                <dd class="mt-1 flex flex-wrap items-center gap-2 font-mono text-sm text-brand-ink">
+                                <dd class="flex flex-wrap items-center gap-2 font-mono text-sm text-brand-ink">
                                     <span>{{ $row->version ?: '—' }}</span>
                                     @if (! $row->version && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
                                         <button
@@ -310,9 +313,9 @@
                                     @endif
                                 </dd>
                             </div>
-                            <div>
+                            <div class="flex items-center gap-2">
                                 <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
-                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
+                                <dd class="font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
                             </div>
                         </dl>
 
@@ -380,8 +383,12 @@
                             $btnDanger = 'inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50';
                             $btnDebug = 'inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50';
                             $btnMuted = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-mist hover:bg-brand-sand/40';
-                            $groupShell = 'rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3';
-                            $groupLabel = 'mb-2 text-2xs font-semibold uppercase tracking-wide text-brand-mist';
+                            // Groups were boxed cards in a 3-col grid: three borders, three
+                            // backgrounds and a full row of padding wrapped around what is really
+                            // one toolbar. Label sits inline with its buttons now, and the groups
+                            // flow on one line until they need to wrap.
+                            $groupShell = 'flex flex-wrap items-center gap-x-2 gap-y-1.5';
+                            $groupLabel = 'text-2xs font-semibold uppercase tracking-wide text-brand-mist';
                             $groupButtons = 'flex flex-wrap gap-1.5';
                         @endphp
 
@@ -391,7 +398,7 @@
                              (PENDING/INSTALLING/UNINSTALLING — see the busy banner up top for
                              those). Force remove row is always visible in Cleanup so orphaned
                              rows can be cleared without an SSH round-trip. --}}
-                        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                        <div class="mt-1 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-brand-ink/10 px-4 py-2.5 sm:px-5">
                             <div class="{{ $groupShell }}">
                                 <p class="{{ $groupLabel }}">{{ __('Diagnose') }}</p>
                                 <div class="{{ $groupButtons }}">

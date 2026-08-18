@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Support;
 
+use App\Support\TestingDomains;
+
 /**
  * Edge delivery hostnames use the on-dply.* pool (e.g. on-dply.site), separate
  * from BYO/serverless testing domains and Cloud provider URLs.
@@ -15,10 +17,12 @@ final class EdgeTestingDomains
      */
     public static function all(): array
     {
-        return array_values(array_filter(array_map(
+        $configured = array_values(array_filter(array_map(
             static fn (string $value): string => strtolower(trim($value)),
             (array) config('edge.testing_domains', []),
         )));
+
+        return $configured !== [] ? $configured : TestingDomains::edge();
     }
 
     private const PREFERRED_APEX = 'on-dply.site';

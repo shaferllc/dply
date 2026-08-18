@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns;
 
+use App\Enums\QuotaSurface;
 use App\Models\Server;
-use App\Models\Site;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,16 +23,130 @@ trait ManagesOrganizationQuotas
     private ?Collection $serverIdsMemo = null;
 
     /**
-     * The org's current plan site ceiling, or null when unlimited.
+     * The org's ceiling for one product surface, or null when unlimited.
+     * Beta orgs use the beta envelope instead of the plan tier.
+     *
+     * Each surface has its own ceiling — see {@see QuotaSurface}. Filling up on
+     * Edge apps must not block a VM site.
+     */
+    public function quotaLimit(QuotaSurface $surface): ?int
+    {
+        if ($this->isBeta()) {
+            return max(1, (int) config(
+                'subscription.standard.beta.'.$surface->betaConfigKey(),
+                $surface->betaDefault(),
+            ));
+        }
+
+        return $this->currentSubscriptionPlan()[$surface->planConfigKey()];
+    }
+
+    /**
+     * How much of every surface's ceiling the org is currently consuming,
+     * keyed by {@see QuotaSurface} value. Preview deployments (Edge/Cloud) are
+     * scratch clones of a parent and never consume quota.
+     *
+     * Deliberately un-memoized: callers routinely create a site and re-ask in
+     * the same request (and tests do it around ->refresh()), so a cached tally
+     * would answer with the pre-write count.
+     *
+     * @return array<string, int>
+     */
+    public function quotaUsageBySurface(): array
+    {
+        $tally = [];
+        foreach (QuotaSurface::cases() as $surface) {
+            $tally[$surface->value] = 0;
+        }
+
+        foreach ($this->sites()->with('server')->get() as $site) {
+            if ($site->isEdgePreview() || $site->isCloudPreview()) {
+                continue;
+            }
+
+            $tally[QuotaSurface::forSite($site)->value]++;
+        }
+
+        return $tally;
+    }
+
+    /**
+     * Count consuming one surface's ceiling.
+     */
+    public function quotaUsage(QuotaSurface $surface): int
+    {
+        return $this->quotaUsageBySurface()[$surface->value];
+    }
+
+    /**
+     * True when the org has reached the ceiling for this surface.
+     */
+    public function quotaReached(QuotaSurface $surface): bool
+    {
+        $limit = $this->quotaLimit($surface);
+
+        return $limit !== null && $this->quotaUsage($surface) >= $limit;
+    }
+
+    /**
+     * Whether the org may create another thing on this surface.
+     */
+    public function canCreateOnSurface(QuotaSurface $surface): bool
+    {
+        return ! $this->quotaReached($surface);
+    }
+
+    /**
+     * Human-readable ceiling for a surface (e.g. "10", "Unlimited").
+     */
+    public function quotaLimitDisplay(QuotaSurface $surface): string
+    {
+        $limit = $this->quotaLimit($surface);
+
+        return $limit === null ? 'Unlimited' : (string) $limit;
+    }
+
+    /**
+     * Friendly upgrade prompt shown when a surface's ceiling is blocking.
+     *
+     * Reads the effective ceiling rather than the raw plan value, so a beta org
+     * is told its actual beta envelope instead of the plan number it is not
+     * currently subject to.
+     */
+    public function quotaLimitMessage(QuotaSurface $surface): string
+    {
+        $limit = $this->quotaLimit($surface);
+
+        if ($limit === null) {
+            return '';
+        }
+
+        if ($this->isBeta()) {
+            return sprintf(
+                'The closed beta allows %d %s per organization. Contact us to raise your limit.',
+                $limit,
+                trans_choice($surface->nounKey(), $limit),
+            );
+        }
+
+        return sprintf(
+            'Your %s plan includes %d %s. Add a server to move up to the next plan, or contact us to raise your limit.',
+            $this->currentSubscriptionPlan()['label'],
+            $limit,
+            trans_choice($surface->nounKey(), $limit),
+        );
+    }
+
+    /**
+     * The org's machine-site ceiling, or null when unlimited.
+     *
+     * Machine sites only (VM + Docker/Kubernetes) since the 2026-08-18 split —
+     * Edge, Cloud and functions have their own ceilings. Kept as a named method
+     * because plan-summary surfaces read "sites" specifically.
      */
     public function planSiteLimit(): ?int
     {
-        // Beta orgs use the roomy beta site ceiling instead of the plan tier.
-        if ($this->isBeta()) {
-            return max(1, (int) config('subscription.standard.beta.sites', 25));
-        }
-
-        return $this->currentSubscriptionPlan()['max_sites'];
+        return $this->quotaLimit(QuotaSurface::Site);
     }
 
     /**
@@ -52,26 +166,19 @@ trait ManagesOrganizationQuotas
     }
 
     /**
-     * Number of sites that count against the plan's site ceiling. Preview
-     * deployments (Edge/Cloud) are scratch clones of a parent and never
-     * consume quota.
+     * Number of machine sites counting against the site ceiling.
      */
     public function quotaCountedSiteCount(): int
     {
-        return $this->sites()
-            ->get()
-            ->reject(fn (Site $site) => $site->isEdgePreview() || $site->isCloudPreview())
-            ->count();
+        return $this->quotaUsage(QuotaSurface::Site);
     }
 
     /**
-     * True when the org has reached its plan's site ceiling.
+     * True when the org has reached its machine-site ceiling.
      */
     public function siteLimitReached(): bool
     {
-        $limit = $this->planSiteLimit();
-
-        return $limit !== null && $this->quotaCountedSiteCount() >= $limit;
+        return $this->quotaReached(QuotaSurface::Site);
     }
 
     /**
@@ -79,19 +186,7 @@ trait ManagesOrganizationQuotas
      */
     public function siteLimitMessage(): string
     {
-        $plan = $this->currentSubscriptionPlan();
-        $limit = $plan['max_sites'];
-
-        if ($limit === null) {
-            return '';
-        }
-
-        return sprintf(
-            'Your %s plan includes %d %s. Add a server to move up to the next plan, or contact us to raise your limit.',
-            $plan['label'],
-            $limit,
-            $limit === 1 ? 'site' : 'sites',
-        );
+        return $this->quotaLimitMessage(QuotaSurface::Site);
     }
 
     /**
@@ -155,8 +250,9 @@ trait ManagesOrganizationQuotas
     }
 
     /**
-     * Maximum sites allowed on the org's current plan. Returns PHP_INT_MAX for
-     * the unlimited (Business / null) ceiling so callers can compare numerically.
+     * Maximum machine sites allowed on the org's current plan. Returns
+     * PHP_INT_MAX for the unlimited (Business / null) ceiling so callers can
+     * compare numerically.
      */
     public function maxSites(): int
     {
@@ -178,13 +274,13 @@ trait ManagesOrganizationQuotas
     }
 
     /**
-     * Whether the organization can create another site under its current
-     * plan's site ceiling. Preview deployments don't consume quota — see
-     * {@see quotaCountedSiteCount()}.
+     * Whether the organization can create another site on a real machine.
+     * Edge / Cloud / function ceilings are separate — ask
+     * {@see canCreateOnSurface()} with the matching {@see QuotaSurface}.
      */
     public function canCreateSite(): bool
     {
-        return ! $this->siteLimitReached();
+        return $this->canCreateOnSurface(QuotaSurface::Site);
     }
 
     /**
@@ -198,12 +294,11 @@ trait ManagesOrganizationQuotas
     }
 
     /**
-     * Human-readable site cap for the current plan (e.g. "10", "Unlimited").
+     * Human-readable machine-site cap for the current plan (e.g. "10",
+     * "Unlimited").
      */
     public function maxSitesDisplay(): string
     {
-        $m = $this->maxSites();
-
-        return $m >= PHP_INT_MAX ? 'Unlimited' : (string) $m;
+        return $this->quotaLimitDisplay(QuotaSurface::Site);
     }
 }

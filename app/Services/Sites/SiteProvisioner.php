@@ -3,11 +3,11 @@
 namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
-use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
@@ -196,7 +196,7 @@ class SiteProvisioner
             $detail = (string) ($testingHostnameMeta['error'] ?? '');
 
             throw new \RuntimeException(match ($reason) {
-                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable DigitalOcean testing hostnames and configure at least one testing domain.',
+                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable testing hostnames and configure Namecheap plus at least one zone in config/product/testing_domains.php.',
                 'missing_server_ip' => 'Testing hostname creation requires a server IP address before provisioning can continue.',
                 default => $detail !== ''
                     ? 'Testing hostname creation failed before provisioning could continue: '.$detail
@@ -577,7 +577,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function updateProvisioning(Site $site, array $payload): void
     {
@@ -600,7 +600,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     public function appendLog(Site $site, string $level, string $step, string $message, array $context = []): void
     {
@@ -625,7 +625,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function filterLogContext(array $context): array
@@ -674,7 +674,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     private function queueAutomaticPreviewSsl(Site $site, string $step, string $message, array $context = []): void
     {

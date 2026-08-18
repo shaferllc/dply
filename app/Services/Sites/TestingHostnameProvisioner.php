@@ -7,12 +7,13 @@ use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentRevisionTracker;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Services\Sites\Dns\DnsProvider;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Support\Preview\UnifiedPreviewHostname;
+use App\Support\TestingDomains;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
@@ -45,10 +46,8 @@ class TestingHostnameProvisioner
             return null;
         }
 
-        // Testing hostnames live on Dply-managed zones. Pick a pool that
-        // matches a DNS provider the org already has connected so the
-        // record stays inside the operator's existing DNS account; fall
-        // back to the DigitalOcean pool when nothing matches.
+        // Testing hostnames live on Dply-owned Namecheap zones
+        // (config/product/testing_domains.php).
         $routing = $this->resolveTestingProviderForSite($site);
         $dnsProviderKey = $routing['provider'];
         $dnsProvider = $routing['dns_provider'];
@@ -57,6 +56,14 @@ class TestingHostnameProvisioner
         $zone = $this->chooseZoneFromPool($site, $pool);
         $hostname = $this->buildHostname($site, $zone);
         $recordName = $this->relativeRecordName($hostname, $zone);
+
+        if ($dnsProviderKey === 'cloudflare') {
+            $token = TestingDomains::cloudflareApiTokenForZone($zone);
+            if ($token === '') {
+                throw new \RuntimeException('Dply has no Cloudflare API token that can see zone ['.$zone.'].');
+            }
+            $dnsProvider = SiteDnsProviderFactory::forCloudflareAppConfigToken($token);
+        }
 
         try {
             $record = $dnsProvider->upsertRecord($zone, 'A', $recordName, $serverIp);
@@ -161,6 +168,14 @@ class TestingHostnameProvisioner
         $zone = $this->chooseZoneFromPool($site, $pool);
         $hostname = $this->buildAdditionalHostname($site, $zone);
         $recordName = $this->relativeRecordName($hostname, $zone);
+
+        if ($dnsProviderKey === 'cloudflare') {
+            $token = TestingDomains::cloudflareApiTokenForZone($zone);
+            if ($token === '') {
+                return null;
+            }
+            $dnsProvider = SiteDnsProviderFactory::forCloudflareAppConfigToken($token);
+        }
 
         try {
             $record = $dnsProvider->upsertRecord($zone, 'A', $recordName, $serverIp);
@@ -345,7 +360,7 @@ class TestingHostnameProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function storeTenantResult(SiteTenantDomain $tenant, array $payload): void
     {
@@ -418,13 +433,7 @@ class TestingHostnameProvisioner
         }
 
         // True if any provider pool has at least one zone configured.
-        foreach (['digitalocean', 'hetzner', 'cloudflare'] as $providerKey) {
-            if ($this->configuredDomainsForProvider($providerKey) !== []) {
-                return true;
-            }
-        }
-
-        return false;
+        return TestingDomains::vm() !== [];
     }
 
     public function delete(Site $site): void
@@ -465,7 +474,16 @@ class TestingHostnameProvisioner
             ? $previewRow->provider_type
             : ($site->dnsAutomationCredential()->provider ?? 'digitalocean');
 
-        if ($providerType === 'cloudflare') {
+        if ($providerType === 'namecheap') {
+            $recordId = (string) ($testingMeta['record_id'] ?? '');
+            if ($recordId === '' || $recordId === '0') {
+                $recordId = (string) ($previewRow->provider_record_id ?? '');
+            }
+            if ($recordId === '' || ! NamecheapDnsService::isConfigured()) {
+                return;
+            }
+            NamecheapDnsService::fromAppConfig()->deleteDnsRecord($zone, $recordId);
+        } elseif ($providerType === 'cloudflare') {
             $site->loadMissing('dnsProviderCredential');
             $credential = $site->dnsProviderCredential;
             if ($credential === null || $credential->provider !== 'cloudflare') {
@@ -475,13 +493,6 @@ class TestingHostnameProvisioner
                     ->latest('updated_at')
                     ->first();
             }
-            if ($credential === null) {
-                return;
-            }
-            // Prefer the preview row's stored provider_record_id: the meta
-            // record_id was historically int-cast to 0 for string-id providers
-            // (Hetzner/Cloudflare), so trust it only when it's a non-empty,
-            // non-"0" value and otherwise fall back to the row.
             $recordId = (string) ($testingMeta['record_id'] ?? '');
             if ($recordId === '' || $recordId === '0') {
                 $recordId = (string) ($previewRow->provider_record_id ?? '');
@@ -489,7 +500,11 @@ class TestingHostnameProvisioner
             if ($recordId === '') {
                 return;
             }
-            (new CloudflareDnsService($credential))->deleteDnsRecord($zone, $recordId);
+            $cloudflareAuth = $credential ?? TestingDomains::cloudflareApiToken();
+            if ($cloudflareAuth === '' || $cloudflareAuth === null) {
+                return;
+            }
+            (new CloudflareDnsService($cloudflareAuth))->deleteDnsRecord($zone, $recordId);
         } elseif (in_array($providerType, ['hetzner', 'linode', 'vultr', 'aws', 'gcp', 'azure'], true)) {
             $credential = $site->dnsAutomationCredential();
             if ($credential === null || $credential->provider !== $providerType) {
@@ -532,14 +547,16 @@ class TestingHostnameProvisioner
     /** @return array<int, string> */
     public function configuredDomains(): array
     {
-        $domains = config('services.digitalocean.testing_domains', []);
+        $domains = config('services.digitalocean.testing_domains', TestingDomains::vm());
 
-        return collect(is_array($domains) ? $domains : [])
+        $normalized = collect(is_array($domains) ? $domains : [])
             ->filter(fn (mixed $domain): bool => is_string($domain) && trim($domain) !== '')
             ->map(fn (string $domain): string => strtolower(trim($domain)))
             ->unique()
             ->values()
             ->all();
+
+        return $normalized !== [] ? $normalized : TestingDomains::vm();
     }
 
     private function relativeRecordName(string $hostname, string $zone): string
@@ -561,7 +578,6 @@ class TestingHostnameProvisioner
      * credential resolution in {@see resolveTestingProviderForSite()} and folds
      * in the app-level DigitalOcean token fallback so callers always get a
      * usable token when one is available.
-     *
      */
     public function testingDnsRoutingForSite(Site $site): array
     {
@@ -572,67 +588,74 @@ class TestingHostnameProvisioner
 
         $token = $credential?->getApiToken();
         if (! is_string($token) || trim($token) === '') {
-            $token = $routing['provider'] === 'digitalocean'
-                ? trim((string) config('services.digitalocean.token'))
-                : '';
+            $token = match ($routing['provider']) {
+                'digitalocean' => trim((string) config('services.digitalocean.token')),
+                'namecheap' => trim((string) config('services.namecheap.api_key', '')),
+                'cloudflare' => TestingDomains::cloudflareApiToken(),
+                default => '',
+            };
         }
 
         return [
             'provider' => $routing['provider'],
             'credential' => $credential,
-            'token' => (trim($token) ),
+            'token' => (trim($token)),
         ];
     }
 
     /**
-     * Decide which DNS provider + zone pool to use for a site's testing
-     * hostname. Preference order:
-     *   1) The org has a credential for a provider that has a non-empty
-     *      configured pool (services.dply.testing_domains.<provider>).
-     *      Use that credential + that pool.
-     *   2) Otherwise fall back to DigitalOcean — an org-level DO credential
-     *      if one is connected, else the app-level services.digitalocean.token.
-     *
-     * Throws when DO fallback is also unavailable.
-     *
-     * The shape covers all three return sites: the first branch returns whichever
-     * of hetzner/cloudflare/digitalocean matched, with its credential; only the
-     * final app-token fallback has a null credential.
-     *
+     * Testing hostnames mint on dply-owned zones from
+     * config/product/testing_domains.php. Customer DNS credentials cannot
+     * write those zones — Hetzner/Vultr org tokens used to steal the write
+     * and create a non-authoritative zone. Cloudflare is first; Namecheap
+     * and DigitalOcean remain fallbacks.
      */
     private function resolveTestingProviderForSite(Site $site): array
     {
-        $providers = ['hetzner', 'cloudflare', 'digitalocean'];
-        if ($site->organization_id !== null) {
-            foreach ($providers as $providerKey) {
-                $pool = $this->configuredDomainsForProvider($providerKey);
-                if ($pool === []) {
-                    continue;
-                }
-
-                $credential = ProviderCredential::query()
-                    ->where('organization_id', $site->organization_id)
-                    ->where('provider', $providerKey)
-                    ->latest('updated_at')
-                    ->first();
-                if ($credential === null) {
-                    continue;
-                }
-
-                return [
-                    'provider' => $providerKey,
-                    'dns_provider' => SiteDnsProviderFactory::forCredential($credential),
-                    'pool' => $pool,
-                    'credential' => $credential,
-                ];
-            }
+        $pool = TestingDomains::vm();
+        if ($pool === []) {
+            throw new \RuntimeException('Dply has no testing-hostname zones configured. Add them to config/product/testing_domains.php.');
         }
 
-        // Fallback: DigitalOcean. Use the org's DO credential if present,
-        // else the app-level token.
+        $cloudflareToken = TestingDomains::cloudflareApiToken();
+        if ($cloudflareToken !== '') {
+            return [
+                'provider' => 'cloudflare',
+                'dns_provider' => SiteDnsProviderFactory::forCloudflareAppConfigToken($cloudflareToken),
+                'pool' => $pool,
+                'credential' => null,
+            ];
+        }
+
+        $cloudflareCredential = $site->organization_id
+            ? ProviderCredential::query()
+                ->where('organization_id', $site->organization_id)
+                ->where('provider', 'cloudflare')
+                ->latest('updated_at')
+                ->first()
+            : null;
+
+        if ($cloudflareCredential !== null) {
+            return [
+                'provider' => 'cloudflare',
+                'dns_provider' => SiteDnsProviderFactory::forCredential($cloudflareCredential),
+                'pool' => $pool,
+                'credential' => $cloudflareCredential,
+            ];
+        }
+
+        if (NamecheapDnsService::isConfigured()) {
+            return [
+                'provider' => 'namecheap',
+                'dns_provider' => SiteDnsProviderFactory::forNamecheapAppConfig(),
+                'pool' => $pool,
+                'credential' => null,
+            ];
+        }
+
         $doPool = $this->configuredDomainsForProvider('digitalocean');
         if ($doPool === []) {
-            throw new \RuntimeException('Dply has no testing-hostname zones configured. Set DPLY_TESTING_DOMAINS (or the per-provider variants) in your environment.');
+            $doPool = $pool;
         }
 
         $doCredential = $site->organization_id
@@ -693,12 +716,17 @@ class TestingHostnameProvisioner
      * Same selection strategy as {@see chooseZone()} but against an arbitrary
      * zone list — used after the per-provider pool is resolved.
      *
-     * @param  list<string> $pool
+     * @param  list<string>  $pool
      */
     private function chooseZoneFromPool(Site $site, array $pool): string
     {
         if ($pool === []) {
             throw new \RuntimeException('No testing zones configured for the resolved DNS provider.');
+        }
+
+        $preferred = TestingDomains::vmApex();
+        if ($preferred !== '' && in_array($preferred, $pool, true)) {
+            return $preferred;
         }
 
         $ordered = app(UnifiedPreviewHostname::class)->orderedTestingZones($pool);
@@ -712,17 +740,11 @@ class TestingHostnameProvisioner
 
     private function configuredZoneForHostname(string $hostname): ?string
     {
-        foreach ($this->configuredDomains() as $domain) {
-            if ($hostname === $domain || str_ends_with($hostname, '.'.$domain)) {
-                return $domain;
-            }
-        }
-
-        return null;
+        return TestingDomains::zoneForHost($hostname);
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function storeResult(Site $site, array $payload): void
     {
@@ -735,6 +757,10 @@ class TestingHostnameProvisioner
 
     private function hasAvailableToken(): bool
     {
+        if (TestingDomains::cloudflareIsConfigured() || NamecheapDnsService::isConfigured()) {
+            return true;
+        }
+
         if (trim((string) config('services.digitalocean.token')) !== '') {
             return true;
         }
@@ -768,9 +794,12 @@ class TestingHostnameProvisioner
 
     private function credentialSourceForSite(Site $site): string
     {
-        $credential = $site->dnsAutomationCredential();
-        if ($credential === null) {
-            return trim((string) config('services.digitalocean.token')) !== '' ? 'app_config' : 'none';
+        $routing = $this->resolveTestingProviderForSite($site);
+        $credential = $routing['credential'] ?? null;
+        if (! $credential instanceof ProviderCredential) {
+            return TestingDomains::cloudflareIsConfigured() || NamecheapDnsService::isConfigured() || trim((string) config('services.digitalocean.token')) !== ''
+                ? 'app_config'
+                : 'none';
         }
 
         if ($site->dns_provider_credential_id && $credential->id === $site->dns_provider_credential_id) {

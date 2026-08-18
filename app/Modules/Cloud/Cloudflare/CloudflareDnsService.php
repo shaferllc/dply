@@ -55,13 +55,11 @@ class CloudflareDnsService
             return null;
         }
 
-        $response = $this->request('get', '/zones', [
-            'name' => $zoneName,
-            'status' => 'active',
-        ]);
-        $this->assertApiSuccess($response, 'list Cloudflare zones');
-        $results = $response->json('result');
-        if (! is_array($results) || $results === []) {
+        $results = $this->zonesNamed($zoneName, activeOnly: true);
+        if ($results === []) {
+            $results = $this->zonesNamed($zoneName, activeOnly: false);
+        }
+        if ($results === []) {
             return null;
         }
 
@@ -72,13 +70,47 @@ class CloudflareDnsService
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    private function zonesNamed(string $zoneName, bool $activeOnly): array
+    {
+        $query = ['name' => $zoneName, 'per_page' => 5];
+        if ($activeOnly) {
+            $query['status'] = 'active';
+        }
+
+        $response = $this->request('get', '/zones', $query);
+        $this->assertApiSuccess($response, 'list Cloudflare zones');
+        $results = $response->json('result');
+
+        return is_array($results) ? array_values(array_filter($results, 'is_array')) : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listZoneNames(): array
+    {
+        $response = $this->request('get', '/zones', ['per_page' => 50]);
+        $this->assertApiSuccess($response, 'list Cloudflare zones');
+        $names = [];
+        foreach ((array) $response->json('result') as $row) {
+            if (is_array($row) && is_string($row['name'] ?? null) && $row['name'] !== '') {
+                $names[] = strtolower($row['name']);
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function upsertARecord(string $zoneName, string $relativeRecordName, string $ipv4): array
     {
         $zoneId = $this->findZoneId($zoneName);
         if ($zoneId === null) {
-            throw new \RuntimeException('Zone not found in this Cloudflare account.');
+            throw new \RuntimeException('Zone ['.$zoneName.'] was not found in this Cloudflare account. Add it to the API token’s Zone Resources, or use a token from the account that owns that zone.');
         }
 
         $fqdn = $this->fqdn($zoneName, $relativeRecordName);
@@ -141,7 +173,7 @@ class CloudflareDnsService
     {
         $zoneId = $this->findZoneId($zoneName);
         if ($zoneId === null) {
-            throw new \RuntimeException('Zone not found in this Cloudflare account.');
+            throw new \RuntimeException('Zone ['.$zoneName.'] was not found in this Cloudflare account. Add it to the API token’s Zone Resources, or use a token from the account that owns that zone.');
         }
 
         $fqdn = $this->fqdn($zoneName, $relativeRecordName);

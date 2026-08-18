@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Livewire\Concerns;
 
-use App\Modules\Edge\Actions\CreateEdgeSite;
+use App\Enums\QuotaSurface;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Modules\Edge\Support\EdgeEligibility;
 use App\Modules\Edge\Support\EdgeSsrDetection;
 
@@ -38,8 +39,8 @@ trait ManagesEdgeDeploy
 
         $this->validateCreateForm();
 
-        if (! $org->canCreateSite()) {
-            $this->toastError($org->siteLimitMessage());
+        if (! $org->canCreateOnSurface(QuotaSurface::Edge)) {
+            $this->toastError($org->quotaLimitMessage(QuotaSurface::Edge));
 
             return;
         }

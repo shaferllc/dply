@@ -18,6 +18,10 @@
         'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
         default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
     };
+    // The blocked callout is a tall band on the real page. Reserve its height
+    // here when the gate is already closed, or the panel visibly jumps down as
+    // the hydrate response lands. Same assess() the component uses.
+    $skeletonBlocked = ! \App\Support\Sites\SiteCreateAccess::canCreate($server);
     $skeletonSitesIcon = match ($skeletonSiteType) {
         'container' => 'heroicon-o-cube-transparent',
         'php' => 'heroicon-o-code-bracket',
@@ -44,6 +48,19 @@
             :note="$skeletonSitesNote"
             class="border-b border-brand-ink/10"
         />
+
+        @if ($skeletonBlocked)
+            <div class="border-b border-amber-300 bg-amber-50 px-4 py-3.5 sm:px-5" aria-hidden="true">
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 h-8 w-8 shrink-0 animate-pulse rounded-xl bg-amber-200/70"></span>
+                    <div class="min-w-0 flex-1 space-y-2">
+                        <div class="h-3.5 w-64 max-w-full animate-pulse rounded bg-amber-200/70"></div>
+                        <div class="h-2.5 w-80 max-w-full animate-pulse rounded bg-amber-200/60"></div>
+                        <div class="h-6 w-44 animate-pulse rounded-lg bg-amber-200/60"></div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="border-b border-brand-ink/10 px-4 py-2 sm:px-5" aria-hidden="true">
             <div class="flex items-center gap-2">

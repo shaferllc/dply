@@ -165,19 +165,7 @@ final class SiteShowViewData
             || $site->usesDockerRuntime()
             || $site->usesKubernetesRuntime();
 
-        $statusSteps = [
-            'queued' => __('Queued'),
-            'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
-            'configuring_publication' => __('Preparing publication target'),
-            'provisioning_testing_hostname' => __('Assigning testing hostname'),
-            'writing_site_config' => __('Writing site config'),
-            'waiting_for_http' => __('Checking reachability'),
-        ];
-        if ($entersFirstDeployState) {
-            $statusSteps['awaiting_first_deploy'] = __('Waiting for first deploy');
-        }
-        $statusSteps['ready'] = __('Site available');
-        $statusSteps['failed'] = __('Needs attention');
+        $statusSteps = self::byoStatusSteps($site, $provisioningState, $entersFirstDeployState);
         /** @var list<string> $stepKeys */
         $stepKeys = array_keys($statusSteps);
         $currentStepIndex = array_search($provisioningState, $stepKeys, true);
@@ -483,6 +471,69 @@ final class SiteShowViewData
         }
 
         return null;
+    }
+
+    /**
+     * Ordered BYO provision-journey keys + labels (including failed).
+     * Wildcard TLS sits between the testing hostname and writing vhost — the
+     * same place {@see \App\Services\Sites\SiteProvisioner} pauses — so the
+     * progress bar does not fall through to 0 when state is
+     * `waiting_for_wildcard_tls`.
+     *
+     * @return array<string, string>
+     */
+    public static function byoStatusSteps(Site $site, string $provisioningState, bool $entersFirstDeployState): array
+    {
+        $statusSteps = [
+            'queued' => __('Queued'),
+            'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
+            'configuring_publication' => __('Preparing publication target'),
+            'provisioning_testing_hostname' => __('Assigning testing hostname'),
+        ];
+
+        if (self::showsWildcardTlsStep($site, $provisioningState)) {
+            $statusSteps['waiting_for_wildcard_tls'] = __('Issuing wildcard TLS');
+        }
+
+        $statusSteps['writing_site_config'] = __('Writing site config');
+        $statusSteps['waiting_for_http'] = __('Checking reachability');
+
+        if ($entersFirstDeployState) {
+            $statusSteps['awaiting_first_deploy'] = __('Waiting for first deploy');
+        }
+
+        $statusSteps['ready'] = __('Site available');
+        $statusSteps['failed'] = __('Needs attention');
+
+        return $statusSteps;
+    }
+
+    /**
+     * Show the wildcard step whenever this site will (or already did) wait
+     * on a shared per-server cert — not only while the state key is live.
+     * That keeps the step count stable from queued through ready.
+     */
+    private static function showsWildcardTlsStep(Site $site, string $provisioningState): bool
+    {
+        if ($provisioningState === 'waiting_for_wildcard_tls') {
+            return true;
+        }
+
+        if (! (bool) config('sites.wildcard_testing_ssl', true)) {
+            return false;
+        }
+
+        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime() || $site->usesEdgeRuntime()) {
+            return false;
+        }
+
+        $webserver = $site->webserver();
+
+        if ($webserver === 'caddy' && ! ($site->server?->hasEdgeProxy() ?? false)) {
+            return false;
+        }
+
+        return in_array($webserver, ['nginx', 'caddy', 'openlitespeed', 'apache'], true);
     }
 
     /**

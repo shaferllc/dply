@@ -10,6 +10,30 @@ use App\Models\SitePreviewDomain;
 use App\Services\Sites\TestingHostnameProvisioner;
 use Illuminate\Support\Collection;
 
+test('vm testing hostnames prefer cloudflare when a platform token exists', function () {
+    config([
+        'testing_domains.provider' => 'cloudflare',
+        'testing_domains.vm_apex' => 'on-dply.cc',
+        'testing_domains.vm' => ['on-dply.cc', 'dply.host'],
+        'testing_domains.cloudflare_api_token' => 'cf-dns-token',
+        'services.namecheap.api_user' => 'tshafer',
+        'services.namecheap.api_key' => 'nc-key',
+        'services.namecheap.client_ip' => '1.2.3.4',
+        'services.digitalocean.token' => 'do-token',
+    ]);
+
+    $site = new Site([
+        'name' => 'Marketing API',
+        'slug' => 'marketing-api',
+    ]);
+
+    $routing = app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($site);
+
+    expect($routing['provider'])->toBe('cloudflare');
+    expect($routing['token'])->toBe('cf-dns-token');
+    expect($routing['credential'])->toBeNull();
+});
+
 test('it chooses a domain from the owned pool deterministically', function () {
     config([
         'services.digitalocean.testing_domains' => ['dply.cc', 'dply.host', 'dply.io'],
@@ -58,6 +82,31 @@ test('ssl hostnames prefer the testing hostname when present', function () {
 
     expect($site->sslDomainHostnames()->all())->toBe(['preview-app.dply.cc']);
 });
+test('vm testing hostnames fall back to digitalocean without cloudflare or namecheap credentials', function () {
+    config([
+        'testing_domains.vm' => ['dply.host'],
+        'testing_domains.cloudflare_api_token' => '',
+        'services.cloudflare.key' => '',
+        'edge.cloudflare.api_token' => '',
+        'serverless.testing_dns.cloudflare_api_token' => '',
+        'services.namecheap.api_user' => '',
+        'services.namecheap.api_key' => '',
+        'services.namecheap.client_ip' => '',
+        'services.digitalocean.token' => 'do_token',
+        'services.digitalocean.testing_domains' => ['dply.host'],
+    ]);
+
+    $site = new Site([
+        'name' => 'Marketing API',
+        'slug' => 'marketing-api',
+    ]);
+
+    $routing = app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($site);
+
+    expect($routing['provider'])->toBe('digitalocean');
+    expect($routing['token'])->toBe('do_token');
+});
+
 test('testing hostname prefers primary preview domain over legacy meta', function () {
     $site = new Site([
         'meta' => [

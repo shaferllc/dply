@@ -27,7 +27,13 @@
                 'label' => $plan['label'] ?? ucfirst($key),
                 'price' => (int) ($plan['price_cents'] ?? 0) / 100,
                 'max' => $plan['max_servers'] ?? null,
+                // Per-surface ceilings — see App\Enums\QuotaSurface. They are
+                // independent, so the card lists the managed ones separately
+                // rather than folding them into one "sites" number.
                 'max_sites' => $plan['max_sites'] ?? null,
+                'max_cloud_apps' => $plan['max_cloud_apps'] ?? null,
+                'max_edge_apps' => $plan['max_edge_apps'] ?? null,
+                'max_functions' => $plan['max_functions'] ?? null,
             ])
             ->values();
 
@@ -137,8 +143,24 @@
                             ? 'Unlimited servers'
                             : ($plan['max'] === 1 ? '1 server' : 'Up to ' . $plan['max'] . ' servers');
                         $siteCeiling = $plan['max_sites'] === null
-                            ? 'Unlimited sites'
-                            : ($plan['max_sites'] === 1 ? '1 site' : 'Up to ' . $plan['max_sites'] . ' sites');
+                            ? 'Unlimited sites on your servers'
+                            : ($plan['max_sites'] === 1 ? '1 site on your server' : 'Up to ' . $plan['max_sites'] . ' sites on your servers');
+
+                        // Managed surfaces each carry their own ceiling and are
+                        // billed per app on top of the plan, so they read as a
+                        // separate allowance rather than eating the site count.
+                        $managedCeilings = collect([
+                            ['n' => $plan['max_cloud_apps'], 'one' => 'Cloud app', 'many' => 'Cloud apps'],
+                            ['n' => $plan['max_edge_apps'], 'one' => 'Edge site', 'many' => 'Edge sites'],
+                            ['n' => $plan['max_functions'], 'one' => 'function', 'many' => 'functions'],
+                        ]);
+                        $managedCeiling = $managedCeilings->every(fn ($c) => $c['n'] === null)
+                            ? 'Unlimited Cloud apps, Edge sites &amp; functions'
+                            : $managedCeilings
+                                ->map(fn ($c) => $c['n'] === null
+                                    ? 'unlimited ' . $c['many']
+                                    : $c['n'] . ' ' . ($c['n'] === 1 ? $c['one'] : $c['many']))
+                                ->join(', ', ' &amp; ');
                     @endphp
                     <div @class([
                         'relative flex flex-col rounded-2xl p-8 transition',
@@ -165,6 +187,10 @@
                             <li class="flex items-start gap-2.5">
                                 <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 {{ $siteCeiling }}, unlimited deploys &amp; team members
+                            </li>
+                            <li class="flex items-start gap-2.5">
+                                <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>{!! $managedCeiling !!} — each billed per app</span>
                             </li>
                             <li class="flex items-start gap-2.5">
                                 <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />

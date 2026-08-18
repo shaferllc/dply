@@ -2,6 +2,7 @@
 
 namespace App\Modules\Projects\Livewire;
 
+use App\Enums\QuotaSurface;
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -740,7 +741,14 @@ class Show extends Component
         $serversUnlimited = $serverCap === null;
         $sitesUnlimited = $siteCap === null;
         $serversRemaining = $serversUnlimited ? null : max(0, $serverCap - $workspace->servers->count());
-        $sitesRemaining = $sitesUnlimited ? null : max(0, $siteCap - $workspace->sites->count());
+
+        // Headroom must compare like with like: planSiteLimit() is the MACHINE-site
+        // ceiling since the per-surface split, so an Edge app or function in this
+        // workspace must not be subtracted from it. Org-wide usage, because the
+        // ceiling is org-wide — the workspace count alone would overstate headroom.
+        $sitesRemaining = $sitesUnlimited
+            ? null
+            : max(0, $siteCap - $workspace->organization->quotaUsage(QuotaSurface::Site));
 
         $costSummary = [
             'servers_used' => $workspace->servers->count(),

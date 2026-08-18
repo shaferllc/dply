@@ -33,6 +33,8 @@ test('legacy call sites still resolve after the folder move', function () {
     expect(config('notifications.retention_days'))->toBeInt();
     expect(config('deploy.health_check_default'))->not->toBeNull();
     expect(config('serverless'))->toBeArray();
+    expect(config('testing_domains.vm_apex'))->toBeString()->not->toBeEmpty();
+    expect(config('testing_domains.vm'))->toBeArray()->not->toBeEmpty();
 });
 
 test('config root only keeps Laravel, packages, and Pennant landmines', function () {

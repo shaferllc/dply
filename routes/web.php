@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AcmeDnsHookController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
@@ -322,6 +323,10 @@ Route::post('/hooks/edge/{site}/forms', EdgeFormIngestController::class)
 Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.edge.logpush');
+
+Route::post('/hooks/acme-dns', AcmeDnsHookController::class)
+    ->middleware(['throttle:60,1'])
+    ->name('hooks.acme-dns');
 
 // Per-site deploy hooks (P10b). Match POST + GET so CMSes that only
 // emit GET pings (Sanity, some Webflow integrations) still work.

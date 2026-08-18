@@ -25,7 +25,7 @@ class SubscriptionPlanResolver
     /**
      * Resolve the plan that covers the given billable server count.
      *
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
      */
     public function resolveForServerCount(int $serverCount): array
     {
@@ -49,7 +49,7 @@ class SubscriptionPlanResolver
     /**
      * Resolve a plan by its key (e.g. 'free', 'pro').
      *
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
      */
     public function resolveByKey(string $key): array
     {
@@ -87,7 +87,7 @@ class SubscriptionPlanResolver
     /**
      * All configured plans, normalized, cheapest first.
      *
-     * @return list<array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}>
+     * @return list<array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}>
      */
     public function all(): array
     {
@@ -100,7 +100,7 @@ class SubscriptionPlanResolver
     }
 
     /**
-     * @return array<string, array{label?: string, price_cents?: int, max_servers?: int|null, max_sites?: int|null}>
+     * @return array<string, array<string, mixed>>
      */
     private function plans(): array
     {
@@ -108,20 +108,27 @@ class SubscriptionPlanResolver
     }
 
     /**
-     * @param  array{label?: string, price_cents?: int, max_servers?: ?int, max_sites?: ?int}  $plan
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}
+     * @param  array<string, mixed>  $plan
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
      */
     private function normalize(string $key, array $plan): array
     {
-        $maxServers = $plan['max_servers'] ?? null;
-        $maxSites = $plan['max_sites'] ?? null;
+        $ceiling = static function (mixed $value): ?int {
+            return $value === null ? null : (int) $value;
+        };
 
         return [
             'key' => $key,
             'label' => (string) ($plan['label'] ?? ucfirst($key)),
             'price_cents' => (int) ($plan['price_cents'] ?? 0),
-            'max_servers' => $maxServers === null ? null : (int) $maxServers,
-            'max_sites' => $maxSites === null ? null : (int) $maxSites,
+            'max_servers' => $ceiling($plan['max_servers'] ?? null),
+            // Per-surface app ceilings ({@see \App\Enums\QuotaSurface}). A key
+            // absent from config means unlimited for that surface, which is the
+            // right default for a plan authored before the split.
+            'max_sites' => $ceiling($plan['max_sites'] ?? null),
+            'max_cloud_apps' => $ceiling($plan['max_cloud_apps'] ?? null),
+            'max_edge_apps' => $ceiling($plan['max_edge_apps'] ?? null),
+            'max_functions' => $ceiling($plan['max_functions'] ?? null),
         ];
     }
 }

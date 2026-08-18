@@ -272,35 +272,35 @@
                          <aside>: site summary + testing URL + DNS readiness.
                          Sticky on lg so it stays in view while the journey
                          scrolls. --}}
-                    <aside class="w-full space-y-6 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
-                        <section class="dply-card overflow-hidden">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <aside class="w-full space-y-3 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
+                        <section class="dply-card overflow-hidden p-0">
+                            <div class="flex items-center gap-2.5 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
                                 <x-icon-badge>
                                     <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
                                 </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
                                 </div>
                             </div>
-                            <div class="px-6 py-6 sm:px-7">
-                            <dl class="grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
-                                <div class="sm:col-span-2">
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                                    <dd class="mt-0.5 font-semibold capitalize text-brand-ink">{{ $site->statusLabel() }}</dd>
+
+                            <dl class="grid grid-cols-2 divide-y divide-brand-ink/10 text-xs">
+                                <div class="col-span-2 flex items-baseline justify-between gap-3 px-4 py-2">
+                                    <dt class="shrink-0 text-brand-mist">{{ __('Status') }}</dt>
+                                    <dd class="min-w-0 truncate font-semibold capitalize text-brand-ink">{{ $site->statusLabel() }}</dd>
                                 </div>
-                                <div>
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Type') }}</dt>
-                                    <dd class="mt-0.5 font-medium capitalize text-brand-ink">{{ $site->type->label() }}</dd>
+                                <div class="flex items-baseline justify-between gap-2 px-4 py-2">
+                                    <dt class="shrink-0 text-brand-mist">{{ __('Type') }}</dt>
+                                    <dd class="min-w-0 truncate font-medium capitalize text-brand-ink">{{ $site->type->label() }}</dd>
                                 </div>
-                                <div>
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Web server') }}</dt>
-                                    <dd class="mt-0.5 font-medium capitalize text-brand-ink">{{ $site->webserver() }}</dd>
+                                <div class="flex items-baseline justify-between gap-2 border-l border-brand-ink/10 px-4 py-2">
+                                    <dt class="shrink-0 text-brand-mist">{{ __('Web server') }}</dt>
+                                    <dd class="min-w-0 truncate font-medium capitalize text-brand-ink">{{ $site->webserver() }}</dd>
                                 </div>
                                 @if ($site->runtimeKey())
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Runtime') }}</dt>
-                                        <dd class="mt-0.5 font-medium text-brand-ink">
+                                    <div class="flex items-baseline justify-between gap-2 px-4 py-2">
+                                        <dt class="shrink-0 text-brand-mist">{{ __('Runtime') }}</dt>
+                                        <dd class="min-w-0 truncate font-medium text-brand-ink">
                                             <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
                                                 <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
                                             @endif
@@ -308,65 +308,95 @@
                                     </div>
                                 @endif
                                 @if ($site->internal_port)
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Internal port') }}</dt>
-                                        <dd class="mt-0.5 font-mono text-brand-ink">{{ $site->internal_port }}</dd>
+                                    <div class="flex items-baseline justify-between gap-2 border-l border-brand-ink/10 px-4 py-2">
+                                        <dt class="shrink-0 text-brand-mist">{{ __('Port') }}</dt>
+                                        <dd class="min-w-0 truncate font-mono text-brand-ink">{{ $site->internal_port }}</dd>
                                     </div>
                                 @endif
                                 @if (filled($site->build_command))
-                                    <div class="sm:col-span-2">
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt>
-                                        <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $site->build_command }}</dd>
+                                    <div class="col-span-2 flex items-baseline justify-between gap-3 px-4 py-2">
+                                        <dt class="shrink-0 text-brand-mist">{{ __('Build') }}</dt>
+                                        <dd class="min-w-0 truncate font-mono text-brand-ink" title="{{ $site->build_command }}">{{ $site->build_command }}</dd>
                                     </div>
                                 @endif
                                 @if (filled($site->start_command))
-                                    <div class="sm:col-span-2">
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Start command') }}</dt>
-                                        <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $site->start_command }}</dd>
+                                    <div class="col-span-2 flex items-baseline justify-between gap-3 px-4 py-2">
+                                        <dt class="shrink-0 text-brand-mist">{{ __('Start') }}</dt>
+                                        <dd class="min-w-0 truncate font-mono text-brand-ink" title="{{ $site->start_command }}">{{ $site->start_command }}</dd>
                                     </div>
                                 @endif
-                                <div class="sm:col-span-2">
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Primary domain') }}</dt>
-                                    <dd class="mt-0.5 break-all font-mono text-xs font-medium text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
+                                <div class="col-span-2 flex items-baseline justify-between gap-3 px-4 py-2">
+                                    <dt class="shrink-0 text-brand-mist">{{ __('Domain') }}</dt>
+                                    <dd class="min-w-0 truncate font-mono font-medium text-brand-ink">{{ optional($site->primaryDomain())->hostname ?? '—' }}</dd>
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Current step') }}</dt>
-                                    <dd class="mt-0.5 font-medium text-brand-ink">{{ $siteCurrentLabel }}</dd>
+                                <div class="col-span-2 flex items-baseline justify-between gap-3 px-4 py-2">
+                                    <dt class="shrink-0 text-brand-mist">{{ __('Step') }}</dt>
+                                    <dd class="min-w-0 truncate font-medium text-brand-ink">{{ $siteCurrentLabel }}</dd>
                                 </div>
                             </dl>
+
                             @if ($targetUrl)
                                 <div
                                     x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($targetUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
-                                    class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4"
+                                    class="flex items-center gap-2 border-t border-brand-ink/10 bg-emerald-50/80 px-4 py-2"
                                 >
-                                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Testing URL') }}</p>
-                                    <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-xs text-emerald-950">
-                                        <span
-                                            class="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap"
-                                            title="{{ $targetUrl }}"
-                                        >{{ $targetUrl }}</span>
-                                        <a
-                                            href="{{ $targetUrl }}"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title="{{ __('Open URL') }}"
-                                            class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
-                                        >
-                                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-                                        </a>
-                                        <button
-                                            type="button"
-                                            x-on:click.stop="copy()"
-                                            :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
-                                            class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
-                                        >
-                                            <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
-                                            <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-                                        </button>
-                                    </div>
-                                    <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
+                                    <p class="shrink-0 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Testing URL') }}</p>
+                                    <span class="min-w-0 flex-1 truncate font-mono text-xs text-emerald-950" title="{{ $targetUrl }}">{{ $targetUrl }}</span>
+                                    <a
+                                        href="{{ $targetUrl }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="{{ __('Open URL') }}"
+                                        class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
+                                    >
+                                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+                                    </a>
+                                    <button
+                                        type="button"
+                                        x-on:click.stop="copy()"
+                                        :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
+                                        class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
+                                    >
+                                        <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
+                                        <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                                    </button>
                                 </div>
                             @endif
+
+                            <div class="border-t border-brand-ink/10 px-4 py-3">
+                                <div class="flex items-baseline justify-between gap-3">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS readiness') }}</p>
+                                    <p class="min-w-0 truncate text-xs text-brand-moss">{{ __('Either URL can finish setup.') }}</p>
+                                </div>
+
+                                @if (($testingHostnameMeta['status'] ?? null) === 'failed')
+                                    <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+                                        <p class="font-medium">{{ __('Temporary hostname could not be created') }}</p>
+                                        <p class="mt-0.5">{{ $testingHostnameMeta['error'] ?? __('Check the global DigitalOcean token and the configured testing domains.') }}</p>
+                                    </div>
+                                @endif
+
+                                @if ($hostChecks->isNotEmpty())
+                                    <ul class="mt-2 space-y-1.5">
+                                        @foreach ($hostChecks as $check)
+                                            <li class="flex items-center justify-between gap-2 rounded-lg border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} px-2.5 py-1.5">
+                                                <div class="min-w-0">
+                                                    <p class="truncate font-mono text-xs font-medium text-brand-ink">{{ $check['hostname'] }}</p>
+                                                    <p class="truncate text-xs {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
+                                                        {{ ($check['ok'] ?? false) ? __('Reachable — can finish the install.') : ($check['error'] ?? __('Not reachable yet.')) }}
+                                                    </p>
+                                                </div>
+                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                                    {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
+                                                </span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="mt-2 text-xs text-brand-moss">
+                                        {{ __('No hostname checks yet — polling starts after the web server config is written.') }}
+                                    </p>
+                                @endif
                             </div>
                         </section>
 
@@ -374,58 +404,10 @@
                             <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
                         @endif
 
-                        <section class="dply-card overflow-hidden">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <x-icon-badge>
-                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS readiness') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply checks both URLs and moves on as soon as one responds.') }}</p>
-                                </div>
-                            </div>
-                            <div class="px-6 py-6 sm:px-7">
-
-                            @if (($testingHostnameMeta['status'] ?? null) === 'failed')
-                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                                    <p class="font-medium">{{ __('Temporary hostname could not be created') }}</p>
-                                    <p class="mt-1">{{ $testingHostnameMeta['error'] ?? __('Check the global DigitalOcean token and the configured testing domains.') }}</p>
-                                </div>
-                            @endif
-
-                            @if ($hostChecks->isNotEmpty())
-                                <ul class="mt-4 space-y-2">
-                                    @foreach ($hostChecks as $check)
-                                        <li class="rounded-xl border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-3">
-                                            <div class="flex items-start justify-between gap-2">
-                                                <div class="min-w-0">
-                                                    <p class="break-all font-mono text-xs font-medium text-brand-ink">{{ $check['hostname'] }}</p>
-                                                    <p class="mt-1 text-xs leading-snug {{ ($check['ok'] ?? false) ? 'text-emerald-800' : 'text-amber-900' }}">
-                                                        {{ ($check['ok'] ?? false) ? __('Reachable — can finish the install.') : ($check['error'] ?? __('Not reachable yet.')) }}
-                                                    </p>
-                                                </div>
-                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
-                                                    {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
-                                                </span>
-                                            </div>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @else
-                                <p class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-white/60 p-3 text-xs text-brand-moss">
-                                    {{ __('No hostname checks yet — Dply will start polling once the web server config is written.') }}
-                                </p>
-                            @endif
-                            </div>
-                        </section>
-
                         @can('delete', $site)
-                            <section class="dply-card overflow-hidden p-5 sm:p-6">
-                                <p class="text-xs leading-relaxed text-brand-moss">
-                                    {{ __('If the install is stuck or you want to abandon it, cancel provisioning to remove the temporary DNS record and clean up the generated server config.') }}
-                                </p>
-                            </section>
+                            <p class="px-1 text-xs leading-relaxed text-brand-moss">
+                                {{ __('If the install is stuck, cancel provisioning to remove the temporary DNS record and generated server config.') }}
+                            </p>
                         @endcan
                     </aside>
                 </div>

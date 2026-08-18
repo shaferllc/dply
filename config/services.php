@@ -183,14 +183,10 @@ return [
         'token' => env('DIGITALOCEAN_TOKEN'),
         'auto_testing_hostname_enabled' => true,
         /*
-         * Universal testing-zone pool (DO). Legacy callers still read from
-         * here — the provider-routing logic in TestingHostnameProvisioner
-         * folds these into services.dply.testing_domains.digitalocean.
+         * Legacy alias of the VM testing-zone pool. The list lives in
+         * config/product/testing_domains.php — not DPLY_TESTING_DOMAINS.
          */
-        'testing_domains' => array_values(array_filter(array_map(
-            static fn (string $value): string => trim($value),
-            explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
-        ))),
+        'testing_domains' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
         'testing_domain_strategy' => 'deterministic',
         /*
          * DNS target for a deployed serverless function's friendly hostname
@@ -285,6 +281,14 @@ return [
         'token' => env('VULTR_TOKEN'),
     ],
 
+    'namecheap' => [
+        'api_user' => env('NAMECHEAP_API_USER'),
+        'api_key' => env('NAMECHEAP_API_KEY'),
+        'api_username' => env('NAMECHEAP_API_USERNAME', env('NAMECHEAP_API_USER')),
+        'client_ip' => env('NAMECHEAP_CLIENT_IP'),
+        'sandbox' => filter_var(env('NAMECHEAP_SANDBOX', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
     'upcloud' => [
         'default_template' => env('UPCLOUD_DEFAULT_TEMPLATE', '01000000-0000-4000-8000-000030200100'), // Ubuntu 22.04
         'ssh_user' => env('UPCLOUD_SSH_USER', 'root'),
@@ -357,16 +361,9 @@ return [
     | Dply testing-hostname pools by DNS provider
     |--------------------------------------------------------------------------
     |
-    | Per-provider lists of Dply-owned zones used to mint testing URLs for
-    | newly provisioned sites. When an organization has a credential for one
-    | of these providers connected, TestingHostnameProvisioner will use that
-    | provider's pool + credential so the testing record lives where the
-    | operator's existing DNS already is. Falls back to the digitalocean
-    | pool (services.digitalocean.token or an org-level DO credential) when
-    | no provider-specific match is available.
-    |
-    | Each env var is a comma-separated list of zones Dply controls on the
-    | given provider, e.g. DPLY_TESTING_DOMAINS_HETZNER="dply.forum".
+    | Dply-owned testing zones live in config/product/testing_domains.php
+    | and are written through Namecheap (services.namecheap). Legacy
+    | per-provider env lists (DPLY_TESTING_DOMAINS_*) are no longer read.
     |
     */
     /*
@@ -395,18 +392,8 @@ return [
 
     'dply' => [
         'testing_domains' => [
-            'digitalocean' => array_values(array_unique(array_filter(array_merge(
-                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))),
-                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS_DIGITALOCEAN', ''))),
-            )))),
-            'hetzner' => array_values(array_filter(array_map(
-                static fn (string $v): string => strtolower(trim($v)),
-                explode(',', (string) env('DPLY_TESTING_DOMAINS_HETZNER', ''))
-            ))),
-            'cloudflare' => array_values(array_filter(array_map(
-                static fn (string $v): string => strtolower(trim($v)),
-                explode(',', (string) env('DPLY_TESTING_DOMAINS_CLOUDFLARE', ''))
-            ))),
+            'cloudflare' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
+            'namecheap' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
         ],
     ],
 

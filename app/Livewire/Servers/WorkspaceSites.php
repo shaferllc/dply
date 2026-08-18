@@ -38,7 +38,8 @@ use Livewire\Component;
  *
  * @property-read bool $canAddSite
  * @property-read array{redeploy_count: int, renewable_count: int, site_names: list<string>} $selectedBulkPreview
- * @property-read array{blocked_reason: string, can_create: bool} $siteCreateAccess
+ * @property-read array{blocked_reason: string, blocked_by: string, can_create: bool, quota: array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null} $siteCreateAccess
+ * @property-read array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null $siteQuotaBlock
  * @property-read bool $supportsQuickAdd
  */
 #[Layout('layouts.app')]
@@ -70,7 +71,7 @@ class WorkspaceSites extends Component
     public array $phpVersions = [];
 
     /**
-     * @return array{blocked_reason: string, can_create: bool}
+     * @return array{blocked_reason: string, blocked_by: string, can_create: bool, quota: array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null}
      */
     #[Computed]
     public function siteCreateAccess(): array
@@ -93,6 +94,19 @@ class WorkspaceSites extends Component
     public function addSiteBlockedReason(): string
     {
         return $this->siteCreateAccess['blocked_reason'];
+    }
+
+    /**
+     * The plan-cap numbers when the block is a quota block, else null. Drives
+     * the callout that says WHERE the usage is — the count is org-wide, so a
+     * full quota reads as nonsense on an empty server without it.
+     *
+     * @return array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null
+     */
+    #[Computed]
+    public function siteQuotaBlock(): ?array
+    {
+        return $this->siteCreateAccess['quota'];
     }
 
     #[Computed]
