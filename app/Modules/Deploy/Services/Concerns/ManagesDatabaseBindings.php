@@ -13,6 +13,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionDockerDatabaseJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
@@ -20,6 +21,9 @@ use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\ManagedDatabaseRegionCatalog;
+use App\Support\Servers\ManagedDatabaseSizeCatalog;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -367,7 +371,7 @@ trait ManagesDatabaseBindings
     private function provisionDockerDatabase(Site $site, Server $server, array $params): SiteBinding
     {
         if (! $server->dockerEnginePresent()) {
-            throw new RuntimeException(__('Docker is not installed on this server — install it from Server → Manage → Tools first.'));
+            throw new RuntimeException(__('Docker is not installed on this server — install it from this modal first.'));
         }
 
         $engine = strtolower(trim((string) ($params['engine'] ?? 'mysql')));
@@ -447,6 +451,10 @@ trait ManagesDatabaseBindings
         // BYO serverless vendors (Neon …) aren't co-located with the server —
         // they take their own credential + region rather than the server's.
         if (ServerlessDatabaseVendors::isServerless($placement)) {
+            if (! ServerlessDatabaseVendors::isEnabled($placement)) {
+                throw new InvalidArgumentException(__('That serverless database vendor is not available yet.'));
+            }
+
             return $this->provisionServerlessDatabase($site, $placement, $params);
         }
 
@@ -466,11 +474,6 @@ trait ManagesDatabaseBindings
             throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
         }
 
-        $region = $backend->regionForServer($server);
-        if ($region === null) {
-            throw new RuntimeException(__('Could not determine a managed database region for this server.'));
-        }
-
         $credential = $this->resolveManagedDatabaseCredential($site, $server);
         if ($credential === null) {
             throw new RuntimeException(__('No :provider credential is connected for this server.', [
@@ -478,16 +481,37 @@ trait ManagesDatabaseBindings
             ]));
         }
 
-        $size = strtolower(trim((string) ($params['size'] ?? 'small')));
-        if (! array_key_exists($size, CloudDatabase::SIZE_TIERS)) {
-            $size = 'small';
+        $rejected = is_array($params['rejected_regions'] ?? null) ? $params['rejected_regions'] : [];
+        $available = ManagedDatabaseRegionCatalog::slugs($server, $engine, $credential, $rejected);
+        $region = ProviderManagedDatabaseRegion::resolve(
+            $server->provider->value,
+            isset($params['region']) ? (string) $params['region'] : null,
+            $backend->regionForServer($server),
+            $available,
+        );
+        if ($region === null || ($available !== [] && ! in_array($region, $available, true))) {
+            throw new RuntimeException(__('Pick a region DigitalOcean offers for this managed database.'));
+        }
+
+        $size = ManagedDatabaseSizeCatalog::resolve($server, $engine, isset($params['size']) ? (string) $params['size'] : null, $credential);
+        if ($size === null) {
+            throw new RuntimeException(__('Could not load managed-database plans from the provider.'));
+        }
+
+        $version = trim((string) ($params['version'] ?? ''));
+        if ($version === '') {
+            try {
+                $version = (new DigitalOceanService($credential))->getDatabaseEngineDefaultVersion($engine) ?? '';
+            } catch (\Throwable) {
+                $version = '';
+            }
         }
 
         $database = CloudDatabase::query()->create([
             'organization_id' => $site->organization_id,
             'name' => $name,
             'engine' => $engine,
-            'version' => trim((string) ($params['version'] ?? '')),
+            'version' => $version,
             'size' => $size,
             'region' => $region,
             'backend' => $backend->key(),
@@ -500,6 +524,9 @@ trait ManagesDatabaseBindings
         // binding starts with an empty injected_env; the job fills it in. A
         // managed cluster is provisioned as the PRIMARY database (the modal
         // offers no connection name), superseding any existing primary.
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+        $previousTargetId = $this->previousCloudDatabaseTargetId($site, $editingId);
+
         $binding = $this->persistDatabaseBinding($site, [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
@@ -517,13 +544,15 @@ trait ManagesDatabaseBindings
                 'size' => $size,
             ],
             'last_error' => null,
-        ], true, '');
+        ], true, $editingId);
 
         ProvisionManagedDatabaseJob::dispatch(
             (string) $database->id,
             (string) $binding->id,
             (string) $server->id,
         );
+
+        $this->forgetReplacedCloudDatabase($previousTargetId, (string) $database->id);
 
         return $binding;
     }

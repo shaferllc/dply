@@ -12,13 +12,15 @@
     @if (method_exists($this, 'openBindingModal'))
     @php
         $siteBindings = app(\App\Modules\Deploy\Services\SiteResourceBindingResolver::class)->forSite($site);
+        $hasRedisDriver = \App\Support\Sites\SiteBindingCatalog::hasAttachedType($site->bindings, 'redis');
+        $hasDatabaseDriver = \App\Support\Sites\SiteBindingCatalog::hasAttachedType($site->bindings, 'database');
         $bindingStatusBadge = [
             'configured' => 'bg-emerald-100 text-emerald-800',
             'pending' => 'bg-amber-100 text-amber-900',
         ];
         $bindingTypeLabels = [
             'database' => __('Database'),
-            'redis' => __('Redis'),
+            'redis' => __('Redis / Valkey'),
             'queue' => __('Queue'),
             'cache' => __('Cache'),
             'session' => __('Sessions'),
@@ -107,6 +109,12 @@
                                 <x-heroicon-o-x-mark class="h-4 w-4" />
                                 {{ __('Detach') }}
                             </button>
+                            @if (method_exists($this, 'openDetachAndDeleteBindingConfirmModal') && $this->site->bindings->firstWhere('id', $binding->bindingId)?->canOfferDeleteOnDetach())
+                                <button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $binding->bindingId), @js($binding->type))" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50">
+                                    <x-heroicon-o-trash class="h-4 w-4" />
+                                    {{ __('Detach & delete') }}
+                                </button>
+                            @endif
                         @elseif ($binding->manageable)
                             @if ($binding->type === 'database')
                                 <button type="button" wire:click="openBindingModal('database', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
@@ -144,7 +152,7 @@
     <x-modal name="binding-info-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
         @php $bi = $bindingInfo ?? null; @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection details') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] {{ (is_array($bi) && ($bi['provision']['failed'] ?? false)) ? 'text-rose-700' : ((is_array($bi) && ($bi['provision']['active'] ?? false)) ? 'text-sky-700' : 'text-brand-sage') }}">{{ (is_array($bi) && ($bi['provision']['failed'] ?? false)) ? __('Provision failed') : ((is_array($bi) && ($bi['provision']['active'] ?? false)) ? __('Provisioning status') : __('Connection details')) }}</p>
             <h2 class="mt-2 flex flex-wrap items-center gap-2 text-xl font-semibold text-brand-ink">
                 {{ $bi ? ($bindingTypeLabels[$bi['type']] ?? str($bi['type'])->replace('_', ' ')->title()) : __('Binding') }}
                 @if ($bi && $bi['name'])
@@ -158,9 +166,162 @@
 
         @if ($bi)
             <div class="space-y-5 px-6 py-6">
+                @php $prov = is_array($bi['provision'] ?? null) ? $bi['provision'] : []; @endphp
+                @if (! empty($prov['failed']))
+                    <div class="rounded-xl border border-rose-200/80 bg-rose-50/80 p-4">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200">
+                                <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
+                                {{ $bi['status'] }}
+                            </span>
+                            @if (! empty($prov['placement_label']))
+                                <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-rose-900 ring-1 ring-inset ring-rose-200/70">{{ $prov['placement_label'] }}</span>
+                            @endif
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-rose-950">{{ $prov['error'] ?: __('Provisioning failed.') }}</p>
+                        @if (! empty($prov['can_pick_region']))
+                            <div class="mt-3">
+                                <x-input-label for="binding_repair_region" :value="__('Choose a region')" />
+                                <select id="binding_repair_region" wire:model.live="bindingForm.region" class="dply-input mt-1 bg-white">
+                                    @foreach ($prov['regions'] ?? [] as $region)
+                                        <option value="{{ $region['value'] }}">{{ $region['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-xs text-rose-900/80">{{ __('The last attempt used :region. Pick another datacenter, or change the placement entirely.', ['region' => $prov['region'] ?: __('unknown')]) }}</p>
+                            </div>
+                        @endif
+                        @if (! empty($prov['server_name']))
+                            <p class="mt-3 text-xs text-rose-900">
+                                <span class="font-semibold">{{ $prov['server_name'] }}</span>
+                                @if (! empty($prov['server_status']))
+                                    <span class="text-rose-800/80"> · {{ $prov['server_status'] }}</span>
+                                @endif
+                                @if (! empty($prov['setup_status']))
+                                    <span class="text-rose-800/80"> · {{ __('setup :status', ['status' => $prov['setup_status']]) }}</span>
+                                @endif
+                            </p>
+                        @endif
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @if (! empty($prov['can_retry']) && method_exists($this, 'retryFailedBindingProvision') && filled($bi['id'] ?? null))
+                                <button type="button" wire:click="retryFailedBindingProvision(@js((string) $bi['id']))"
+                                    wire:loading.attr="disabled" wire:target="retryFailedBindingProvision"
+                                    class="inline-flex items-center gap-1 rounded-md bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-60">
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="retryFailedBindingProvision" />
+                                    {{ __('Retry provision') }}
+                                </button>
+                            @endif
+                            @if (! empty($prov['can_change_placement']) && method_exists($this, 'openFailedBindingRepair') && filled($bi['id'] ?? null))
+                                <button type="button" wire:click="openFailedBindingRepair(@js((string) $bi['id']))"
+                                    class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-900 hover:bg-rose-50">
+                                    <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" />
+                                    {{ __('Change placement') }}
+                                </button>
+                            @endif
+                            @if (! empty($prov['can_fix_connectivity']) && method_exists($this, 'startFixBinding') && filled($bi['id'] ?? null))
+                                <button type="button" wire:click="startFixBinding(@js((string) $bi['id']))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')"
+                                    class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-900 hover:bg-rose-50">
+                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                                    {{ __('Fix access') }}
+                                </button>
+                            @endif
+                            @if (! empty($prov['journey_url']))
+                                <a href="{{ $prov['journey_url'] }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-900 hover:bg-rose-50">
+                                    {{ __('Open journey') }}
+                                    <x-heroicon-m-arrow-right class="h-3 w-3" />
+                                </a>
+                            @endif
+                            @if (! empty($prov['server_url']))
+                                <a href="{{ $prov['server_url'] }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-900 hover:bg-rose-50">
+                                    {{ __('View server') }}
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                @if (! empty($prov['active']))
+                    <div class="rounded-xl border border-sky-200/80 bg-sky-50/80 p-4">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75"></span>
+                                    <span class="relative inline-flex h-2 w-2 rounded-full bg-sky-500"></span>
+                                </span>
+                                {{ $bi['status'] }}
+                            </span>
+                            @if (! empty($prov['placement_label']))
+                                <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-sky-900 ring-1 ring-inset ring-sky-200/70">{{ $prov['placement_label'] }}</span>
+                            @endif
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-sky-950">{{ $prov['hint'] }}</p>
+                        @if (! empty($prov['digest_phase']) || ! empty($prov['digest_step']))
+                            <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-sky-900">
+                                @if (! empty($prov['digest_phase']))
+                                    <span class="font-semibold">{{ $prov['digest_phase'] }}</span>
+                                @endif
+                                @if (! empty($prov['digest_step']))
+                                    <span>{{ $prov['digest_step'] }}</span>
+                                @endif
+                                @if (! empty($prov['digest_step_index']) && ! empty($prov['digest_step_total']))
+                                    <span class="tabular-nums text-sky-800/80">{{ __('Step :i of :t', ['i' => $prov['digest_step_index'], 't' => $prov['digest_step_total']]) }}</span>
+                                @endif
+                                @if (! empty($prov['digest_elapsed']))
+                                    <span class="tabular-nums text-sky-800/80">{{ __(':elapsed elapsed', ['elapsed' => $prov['digest_elapsed']]) }}</span>
+                                @endif
+                            </div>
+                            @if (! empty($prov['digest_percent']))
+                                <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sky-200/70">
+                                    <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ (int) $prov['digest_percent'] }}%"></div>
+                                </div>
+                            @endif
+                        @endif
+                        @if (! empty($prov['server_name']))
+                            <p class="mt-3 text-xs text-sky-900">
+                                <span class="font-semibold">{{ $prov['server_name'] }}</span>
+                                @if (! empty($prov['server_status']))
+                                    <span class="text-sky-800/80"> · {{ $prov['server_status'] }}</span>
+                                @endif
+                                @if (! empty($prov['setup_status']))
+                                    <span class="text-sky-800/80"> · {{ __('setup :status', ['status' => $prov['setup_status']]) }}</span>
+                                @endif
+                            </p>
+                        @endif
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @if (! empty($prov['journey_url']))
+                                <a href="{{ $prov['journey_url'] }}" wire:navigate class="inline-flex items-center gap-1 rounded-md bg-sky-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
+                                    {{ __('Open journey') }}
+                                    <x-heroicon-m-arrow-right class="h-3 w-3" />
+                                </a>
+                            @endif
+                            @if (! empty($prov['server_url']))
+                                <a href="{{ $prov['server_url'] }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-sky-900 hover:bg-sky-50">
+                                    {{ __('View server') }}
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                @php
+                    $provisionRun = ! empty($prov['console_run_id'])
+                        ? \App\Models\ConsoleAction::query()->find($prov['console_run_id'])
+                        : null;
+                @endphp
+                @if ($provisionRun && method_exists($this, 'dismissConsoleActionRun'))
+                    <div class="mt-1">
+                        @include('livewire.partials.console-action-banner-static', [
+                            'run' => $provisionRun,
+                            'kindLabels' => (array) config('console_actions.kinds', []),
+                            'embedded' => true,
+                        ])
+                    </div>
+                @endif
+
                 {{-- Status / reachability summary --}}
                 <div class="flex flex-wrap items-center gap-2">
+                    @if (empty($prov['active']) && empty($prov['failed']))
                     <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $bi['status'] }}</span>
+                    @endif
                     @if ($bi['provider'])
                         <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 ring-1 ring-inset ring-sky-200/70">{{ $bi['provider'] }}</span>
                     @endif
@@ -177,7 +338,7 @@
                 @if ($bi['needs_remote_access'])
                     <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ __('Remote access is off on the source — enable it (and allow this server\'s private IP) or the deploy will fail to connect.') }}</p>
                 @endif
-                @if ($bi['last_error'])
+                @if ($bi['last_error'] && empty($prov['failed']))
                     <p class="rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700 ring-1 ring-inset ring-rose-200/70">{{ $bi['last_error'] }}</p>
                 @endif
 
@@ -211,6 +372,16 @@
         @endif
 
         <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+            @if (is_array($bi) && filled($bi['id'] ?? null) && method_exists($this, 'openDetachBindingConfirmModal'))
+                @if (! empty($bi['can_delete_resource']) && method_exists($this, 'openDetachAndDeleteBindingConfirmModal'))
+                    <x-danger-button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $bi['id']))" x-on:click="$dispatch('close')">
+                        {{ __('Detach & delete') }}
+                    </x-danger-button>
+                @endif
+                <x-secondary-button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $bi['id']))" x-on:click="$dispatch('close')">
+                    {{ __('Detach') }}
+                </x-secondary-button>
+            @endif
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
         </div>
     </x-modal>
@@ -224,15 +395,15 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth']) ? __('Configure') : __('Attach existing')) }}</p>
-            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalLabel ?: __('Binding') }}</h2>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'edit' ? __('Edit') : ($bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth']) ? __('Configure') : __('Attach existing'))) }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalMode === 'edit' && $bindingModalType === 'redis' ? __('Edit Redis / Valkey') : ($bindingModalLabel ?: __('Binding')) }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
             </button>
         </div>
 
         <div class="space-y-4 px-6 py-6">
-            @if (in_array($bindingModalType, ['storage', 'database'], true))
+            @if (in_array($bindingModalType, ['storage', 'database', 'redis'], true) && $bindingModalMode !== 'edit')
                 {{-- One entry, two modes: attach an existing resource or have dply
                      provision a fresh one. Switching re-seeds the form server-side
                      (see setBindingMode). Shown for both storage and database since
@@ -254,8 +425,8 @@
                  field; provider-keyed types (ai/oauth/sms/captcha) instead key
                  on the provider picked in their form, so they skip this. --}}
             @if (
-                ($bindingModalType === 'database')
-                || (in_array($bindingModalType, ['redis', 'mail'], true) && $bindingModalMode !== 'provision')
+                ($bindingModalType === 'database' && $bindingModalMode !== 'edit')
+                || (in_array($bindingModalType, ['redis', 'mail'], true) && $bindingModalMode === 'attach')
             )
                 @php
                     $miType = $bindingModalType;
@@ -304,7 +475,103 @@
                     @endif
                 </div>
             @endif
-            @if ($bindingModalType === 'database' && $bindingModalMode === 'attach')
+            @if (in_array($bindingModalType, ['database', 'redis'], true) && $bindingModalMode === 'edit')
+                @php $edit = is_array($bindingEdit ?? null) ? $bindingEdit : []; @endphp
+                <div class="space-y-4">
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $edit['status'] ?? '' }}</span>
+                            @if (! empty($edit['placement_label']))
+                                <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $edit['placement_label'] }}</span>
+                            @endif
+                        </div>
+                        @if (! empty($edit['service']))
+                            <p class="mt-2 text-sm font-medium text-brand-ink">{{ $edit['service'] }}</p>
+                        @endif
+                        @if (! empty($edit['region']) || ! empty($edit['size']))
+                            <p class="mt-1 text-xs text-brand-moss">
+                                @if (! empty($edit['region']))
+                                    <span>{{ $edit['region'] }}</span>
+                                @endif
+                                @if (! empty($edit['size']))
+                                    <span>{{ ! empty($edit['region']) ? ' · ' : '' }}{{ \App\Support\Servers\ManagedDatabaseSizeCatalog::label((string) $edit['size']) }}</span>
+                                @endif
+                            </p>
+                        @endif
+                    </div>
+
+                    @if (! empty($edit['can_resize']) || ! empty($edit['resizing_to']))
+                        <div class="space-y-3">
+                            @include('livewire.sites.settings.partials.environment._placement-managed-size', [
+                                'managedSizeDisabled' => ! empty($edit['resizing_to']),
+                            ])
+                            @if (! empty($edit['resizing_to']))
+                                <p class="text-xs font-medium text-brand-moss">{{ __('Resizing to :size. Watch the console for DigitalOcean progress.', ['size' => \App\Support\Servers\ManagedDatabaseSizeCatalog::label((string) $edit['resizing_to'])]) }}</p>
+                            @else
+                                <button type="button" wire:click="openResizeManagedBindingConfirmModal" wire:loading.attr="disabled" wire:target="openResizeManagedBindingConfirmModal"
+                                    class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                    <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5" />
+                                    {{ __('Resize cluster') }}
+                                </button>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div>
+                        <x-input-label for="binding_edit_connection" :value="__('Connection name (optional)')" />
+                        <x-text-input id="binding_edit_connection" wire:model.live.debounce.400ms="bindingForm.connection" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('primary') }}" />
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Leave blank for the primary connection.') }}</p>
+                    </div>
+
+                    @if ($bindingModalType === 'redis')
+                        <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                            <input type="checkbox" wire:model="bindingForm.use_for_drivers" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                            <span>
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Use Redis for cache, sessions, and the queue') }}</span>
+                                {{ __('Sets CACHE_STORE, SESSION_DRIVER, and QUEUE_CONNECTION to redis. Existing driver bindings are left untouched.') }}
+                            </span>
+                        </label>
+                    @endif
+
+                    <div class="flex flex-wrap gap-2">
+                        @if (! empty($edit['id']) && method_exists($this, 'openBindingInfoModal'))
+                            <button type="button" wire:click="openBindingInfoModal(@js((string) $edit['id']))" x-on:click="$dispatch('close-modal', 'site-binding-modal')"
+                                class="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100">
+                                <x-heroicon-o-information-circle class="h-3.5 w-3.5" />
+                                {{ ($edit['status'] ?? '') === \App\Models\SiteBinding::STATUS_PROVISIONING ? __('View status') : __('View details') }}
+                            </button>
+                        @endif
+                        @if (! empty($edit['can_test']) && method_exists($this, 'verifyBinding') && ! empty($edit['id']))
+                            <button type="button" wire:click="verifyBinding(@js((string) $edit['id']))" wire:loading.attr="disabled" wire:target="verifyBinding"
+                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-signal class="h-3.5 w-3.5" />
+                                {{ __('Test') }}
+                            </button>
+                        @endif
+                        @if (! empty($edit['can_retry']) && method_exists($this, 'openFailedBindingRepair') && ! empty($edit['id']))
+                            <button type="button" wire:click="openFailedBindingRepair(@js((string) $edit['id']))"
+                                class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50">
+                                <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" />
+                                {{ __('Change placement') }}
+                            </button>
+                        @endif
+                        @if (! empty($edit['id']) && method_exists($this, 'openDetachBindingConfirmModal'))
+                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $edit['id']))" x-on:click="$dispatch('close-modal', 'site-binding-modal')"
+                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                                {{ __('Detach') }}
+                            </button>
+                        @endif
+                        @if (! empty($edit['can_delete']) && method_exists($this, 'openDetachAndDeleteBindingConfirmModal') && ! empty($edit['id']))
+                            <button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $edit['id']))" x-on:click="$dispatch('close-modal', 'site-binding-modal')"
+                                class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50">
+                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                {{ __('Detach & delete') }}
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            @elseif ($bindingModalType === 'database' && $bindingModalMode === 'attach')
                 @php
                     // Derive the selected engine from the targets list so we can gate
                     // engine-specific advanced fields without a separate round-trip.
@@ -514,37 +781,16 @@
             @elseif ($bindingModalType === 'database' && $bindingModalMode === 'provision')
                 @php
                     $dbPlacements = $this->databasePlacements();
+                    $placementRegion = $this->dedicatedVmRegion ?? $site->server?->region;
+                    $placementRegionOriginal = $this->dedicatedVmRequestedRegion ?? $site->server?->region;
+                    $chosenPlacement = (string) ($bindingForm['placement'] ?? '');
+                    $chosenEngine = (string) ($bindingForm['engine'] ?? '');
                 @endphp
-                <div
-                    x-data="{
-                        engine: $wire.entangle('bindingForm.engine'),
-                        placement: $wire.entangle('bindingForm.placement'),
-                        placements: @js(collect($dbPlacements)->mapWithKeys(fn ($p) => [$p['key'] => ['engines' => $p['engines'], 'available' => $p['available']]])),
-                        {{-- Engine compatibility only. `available` is deliberately NOT part
-                             of this test: it depends on dedicatedVmSizes, which loads
-                             asynchronously after the modal opens, while `placements` is a
-                             @js snapshot frozen when Alpine initialises and never refreshed
-                             across Livewire morphs. Filtering on the stale flag silently
-                             bounced operators off a placement they had legitimately picked
-                             (choose "Dedicated Docker database server", get a native VM). --}}
-                        validFor(eng) {
-                            return Object.keys(this.placements).filter((k) => this.placements[k].engines.includes(eng));
-                        },
-                    }"
-                    {{-- Only rewrite the choice when the engine genuinely cannot live
-                         there, and prefer an available target when we do. --}}
-                    x-effect="
-                        const compatible = validFor(engine);
-                        if (compatible.length && !compatible.includes(placement)) {
-                            placement = compatible.find((k) => placements[k].available) ?? compatible[0];
-                        }
-                    "
-                    class="space-y-4"
-                >
+                <div class="space-y-4">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div class="min-w-0">
                             <x-input-label for="binding_db_engine" :value="__('Engine')" />
-                            <select id="binding_db_engine" x-model="engine" class="dply-input">
+                            <select id="binding_db_engine" wire:model.live="bindingForm.engine" class="dply-input">
                                 <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
                                 <option value="postgres">{{ __('PostgreSQL') }}</option>
                                 {{-- ClickHouse provisions on the server (engine must be installed
@@ -587,20 +833,24 @@
                         <x-input-label :value="__('Where should it live?')" />
                         <div class="mt-2 space-y-2">
                             @foreach ($dbPlacements as $p)
+                                @continue(! in_array($chosenEngine, $p['engines'] ?? [], true))
                                 <label
-                                    x-show="@js($p['engines']).includes($wire.bindingForm.engine)"
+                                    @if (! empty($p['installing'])) wire:poll.3s="syncDockerInstallProgress" @endif
                                     @class([
-                                        'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
-                                        'border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
-                                        'cursor-not-allowed border-brand-ink/10 opacity-60' => ! $p['available'],
+                                        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
+                                        'cursor-pointer border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
+                                        'cursor-not-allowed border-brand-ink/10 opacity-60' => ! $p['available'] && empty($p['install_action']),
+                                        'border-brand-ink/15' => ! $p['available'] && ! empty($p['install_action']),
+                                        'border-brand-ink ring-1 ring-brand-ink bg-brand-sand/30' => $chosenPlacement === $p['key'],
                                     ])
-                                    :class="$wire.bindingForm.placement === '{{ $p['key'] }}' ? 'border-brand-ink ring-1 ring-brand-ink bg-brand-sand/30' : ''"
                                 >
-                                    <input type="radio" x-model="placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
+                                    <input type="radio" wire:model.live="bindingForm.placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
                                     <span class="min-w-0">
                                         <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
                                         <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
-                                        @if ($p['note'])
+                                        @if (($p['key'] ?? '') === 'docker' && ! $p['available'])
+                                            @include('livewire.sites.settings.partials.environment._placement-docker-install', ['p' => $p])
+                                        @elseif ($p['note'])
                                             <span class="mt-0.5 block text-xs font-medium text-amber-700">{{ $p['note'] }}</span>
                                         @endif
                                     </span>
@@ -609,31 +859,37 @@
                         </div>
                     </div>
 
-                    {{-- Managed clusters are sized; on-box databases just share the host. --}}
-                    <div x-show="$wire.bindingForm.placement === 'managed'" x-cloak>
-                        <x-input-label for="binding_db_size" :value="__('Cluster size')" />
-                        <select id="binding_db_size" wire:model="bindingForm.size" class="dply-input">
-                            <option value="small">{{ __('Small — 1 vCPU / 1 GB · ~$15/mo') }}</option>
-                            <option value="medium">{{ __('Medium — 1 vCPU / 2 GB · ~$30/mo') }}</option>
-                            <option value="large">{{ __('Large — 2 vCPU / 4 GB · ~$60/mo') }}</option>
-                        </select>
-                    </div>
+                    @if ($chosenPlacement === 'managed')
+                        <div class="space-y-3">
+                            @include('livewire.sites.settings.partials.environment._placement-managed-region', ['placementRegion' => $placementRegion, 'placementRegionOriginal' => $placementRegionOriginal])
+                            @include('livewire.sites.settings.partials.environment._placement-managed-size')
+                        </div>
+                    @endif
 
-                    {{-- Dedicated VM: a real server sized from the provider's catalog. --}}
-                    <div x-show="['dedicated_vm', 'docker_vm'].includes($wire.bindingForm.placement)" x-cloak>
-                        <x-input-label for="binding_db_vm_size" :value="__('Server size')" />
-                        <select id="binding_db_vm_size" wire:model="bindingForm.vm_size" class="dply-input">
-                            @forelse ($dedicatedVmSizes as $s)
-                                <option value="{{ $s['value'] }}">{{ $s['label'] }}</option>
-                            @empty
-                                <option value="">{{ __('No sizes available for this provider/region') }}</option>
-                            @endforelse
-                        </select>
-                    </div>
+                    @if (in_array($chosenPlacement, ['dedicated_vm', 'docker_vm', 'cache_vm'], true))
+                        <div class="space-y-3">
+                            @if (filled($placementRegion))
+                                <p class="text-xs text-brand-moss">{{ ($placementRegionOriginal && $placementRegion && $placementRegion !== $placementRegionOriginal) ? __('Region: :region · :original is not available, using the current :metro datacenter', ['region' => $placementRegion, 'original' => $placementRegionOriginal, 'metro' => $placementRegion]) : __('Region: :region · same as this server', ['region' => $placementRegion]) }}</p>
+                            @endif
+                            <div>
+                                <x-input-label for="binding_db_vm_size" :value="__('Server size')" />
+                                <select id="binding_db_vm_size" wire:model="bindingForm.vm_size" class="dply-input">
+                                    @forelse ($dedicatedVmSizes as $s)
+                                        <option value="{{ $s['value'] }}">{{ $s['label'] }}</option>
+                                    @empty
+                                        <option value="">{{ __('No sizes available for this provider/region') }}</option>
+                                    @endforelse
+                                </select>
+                                @if ($dedicatedVmSizes === [] && filled($dedicatedVmSizeError))
+                                    <p class="mt-2 text-xs font-medium text-amber-700">{{ $dedicatedVmSizeError }}</p>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
 
-                    {{-- BYO serverless vendors: pick a vendor region + connect an API key. --}}
                     @foreach (collect($dbPlacements)->where('serverless', true) as $sv)
-                        <div x-show="$wire.bindingForm.placement === '{{ $sv['key'] }}'" x-cloak class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                        @continue($chosenPlacement !== $sv['key'] || empty($sv['available']))
+                        <div class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
                             <div>
                                 <x-input-label for="binding_db_vendor_region_{{ $sv['key'] }}" :value="__(':vendor region', ['vendor' => $sv['label']])" />
                                 <select id="binding_db_vendor_region_{{ $sv['key'] }}" wire:model="bindingForm.vendor_region" class="dply-input">
@@ -656,32 +912,40 @@
                         </div>
                     @endforeach
 
-                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'on_box'">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
-                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker'" x-cloak>{{ __('Starts an isolated Docker container on this server, maps it to loopback, and injects the connection variables once the container is ready.') }}</p>
-                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker_vm'" x-cloak>{{ __('Provisions a new Docker host on your connected provider (same region + private network), starts the database in a container, and attaches it once ready (several minutes). Redeploy to apply.') }}</p>
-                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'managed'" x-cloak>{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
-                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'dedicated_vm'" x-cloak>{{ __('Provisions a new server on your connected provider (same region + private network), installs the engine, and attaches the database once it\'s ready (several minutes). Redeploy to apply.') }}</p>
+                    @if ($chosenPlacement === 'on_box')
+                        <p class="text-xs text-brand-moss">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
+                    @elseif ($chosenPlacement === 'docker')
+                        <p class="text-xs text-brand-moss">{{ __('Starts an isolated Docker container on this server, maps it to loopback, and injects the connection variables once the container is ready.') }}</p>
+                    @elseif ($chosenPlacement === 'docker_vm')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions a new Docker host on your connected provider (same region + private network), starts the database in a container, and attaches it once ready (several minutes). Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'managed')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'dedicated_vm')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions a new server on your connected provider (same region + private network), installs the engine, and attaches the database once it\'s ready (several minutes). Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'cache_vm')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions a new Redis-only server on your connected provider (same region + private network) and injects REDIS_HOST / REDIS_PORT / REDIS_PASSWORD once it\'s ready. Redeploy to apply.') }}</p>
+                    @endif
                 </div>
             @elseif ($bindingModalType === 'queue')
                 <div>
                     <x-input-label for="binding_queue_driver" :value="__('Queue driver')" />
                     <select id="binding_queue_driver" wire:model="bindingForm.driver" class="dply-input">
-                        <option value="database">{{ __('Database') }}</option>
-                        <option value="redis">{{ __('Redis') }}</option>
+                        <option value="database" @disabled(! $hasDatabaseDriver)>{{ __('Database') }}</option>
+                        <option value="redis" @disabled(! $hasRedisDriver)>{{ __('Redis') }}</option>
                     </select>
-                    <p class="mt-2 text-xs text-brand-moss">{{ __('Sets QUEUE_CONNECTION. Redis requires the Redis binding to be attached too.') }}</p>
+                    <p class="mt-2 text-xs text-brand-moss">{{ __('Sets QUEUE_CONNECTION. Database and Redis stay disabled until those resources are attached.') }}</p>
                 </div>
             @elseif ($bindingModalType === 'cache')
                 <div class="space-y-4">
                     <div>
                         <x-input-label for="binding_cache_driver" :value="__('Cache store')" />
                         <select id="binding_cache_driver" wire:model="bindingForm.driver" class="dply-input">
-                            <option value="database">{{ __('Database') }}</option>
-                            <option value="redis">{{ __('Redis') }}</option>
+                            <option value="database" @disabled(! $hasDatabaseDriver)>{{ __('Database') }}</option>
+                            <option value="redis" @disabled(! $hasRedisDriver)>{{ __('Redis') }}</option>
                             <option value="file">{{ __('File') }}</option>
                             <option value="array">{{ __('Array (no shared cache)') }}</option>
                         </select>
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Sets CACHE_STORE. Redis requires the Redis binding to be attached too; database uses the app database.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Sets CACHE_STORE. Database and Redis stay disabled until those resources are attached; file and array always work.') }}</p>
                     </div>
                     <div>
                         <x-input-label for="binding_cache_prefix" :value="__('Cache prefix (optional)')" />
@@ -696,11 +960,11 @@
                     <div>
                         <x-input-label for="binding_session_driver" :value="__('Driver')" />
                         <select id="binding_session_driver" wire:model="bindingForm.driver" class="dply-input">
-                            <option value="">{{ __('Use default (database)') }}</option>
-                            <option value="database">{{ __('Database') }}</option>
+                            <option value="">{{ $hasDatabaseDriver ? __('Use default (database)') : __('Use default (file)') }}</option>
+                            <option value="database" @disabled(! $hasDatabaseDriver)>{{ __('Database') }}</option>
                             <option value="file">{{ __('File') }}</option>
                             <option value="cookie">{{ __('Cookie') }}</option>
-                            <option value="redis">{{ __('Redis') }}</option>
+                            <option value="redis" @disabled(! $hasRedisDriver)>{{ __('Redis') }}</option>
                             <option value="memcached">{{ __('Memcached') }}</option>
                             <option value="array">{{ __('Array (no persistence)') }}</option>
                         </select>
@@ -1189,13 +1453,128 @@
                     </div>
                     <p class="text-xs text-brand-moss">{{ __('Injects :p_CLIENT_ID, :p_CLIENT_SECRET and :p_REDIRECT_URI at deploy.', ['p' => strtoupper($oauthProvider)]) }}</p>
                 </div>
-            @elseif ($bindingModalType === 'redis')
+            @elseif ($bindingModalType === 'redis' && $bindingModalMode === 'provision')
+                @php
+                    $redisPlacements = collect($this->databasePlacements())
+                        ->filter(fn ($p) => in_array('redis', $p['engines'] ?? [], true))
+                        ->values();
+                    $placementRegion = $this->dedicatedVmRegion ?? $site->server?->region;
+                    $placementRegionOriginal = $this->dedicatedVmRequestedRegion ?? $site->server?->region;
+                    $chosenPlacement = (string) ($bindingForm['placement'] ?? '');
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_redis_name" :value="__('Cluster name')" />
+                        <x-text-input id="binding_redis_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_redis" />
+                        <x-input-error :messages="$errors->get('bindingForm.name')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label :value="__('Where should it live?')" />
+                        <div class="mt-2 space-y-2">
+                            @forelse ($redisPlacements as $p)
+                                <label
+                                    @if (! empty($p['installing'])) wire:poll.3s="syncDockerInstallProgress" @endif
+                                    @class([
+                                        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
+                                        'cursor-pointer border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
+                                        'cursor-not-allowed border-brand-ink/10 opacity-60' => ! $p['available'] && empty($p['install_action']),
+                                        'border-brand-ink/15' => ! $p['available'] && ! empty($p['install_action']),
+                                        'border-brand-ink ring-1 ring-brand-ink bg-brand-sand/30' => $chosenPlacement === $p['key'],
+                                    ])
+                                >
+                                    <input type="radio" wire:model.live="bindingForm.placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                        <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
+                                        @if (($p['key'] ?? '') === 'docker' && ! $p['available'])
+                                            @include('livewire.sites.settings.partials.environment._placement-docker-install', ['p' => $p])
+                                        @elseif ($p['note'])
+                                            <span class="mt-0.5 block text-xs font-medium text-amber-700">{{ $p['note'] }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @empty
+                                <p class="text-xs text-brand-moss">{{ __('This server\'s provider has no managed cache option. Connect a DigitalOcean or Vultr credential, or use Upstash.') }}</p>
+                            @endforelse
+                        </div>
+                    </div>
+                    @if ($chosenPlacement === 'managed')
+                        <div class="space-y-3">
+                            @include('livewire.sites.settings.partials.environment._placement-managed-region', ['placementRegion' => $placementRegion, 'placementRegionOriginal' => $placementRegionOriginal])
+                            @include('livewire.sites.settings.partials.environment._placement-managed-size')
+                        </div>
+                    @endif
+                    @if (in_array($chosenPlacement, ['dedicated_vm', 'docker_vm', 'cache_vm'], true))
+                        <div class="space-y-3">
+                            @if (filled($placementRegion))
+                                <p class="text-xs text-brand-moss">{{ ($placementRegionOriginal && $placementRegion && $placementRegion !== $placementRegionOriginal) ? __('Region: :region · :original is not available, using the current :metro datacenter', ['region' => $placementRegion, 'original' => $placementRegionOriginal, 'metro' => $placementRegion]) : __('Region: :region · same as this server', ['region' => $placementRegion]) }}</p>
+                            @endif
+                            <div>
+                                <x-input-label for="binding_redis_vm_size" :value="__('Server size')" />
+                                <select id="binding_redis_vm_size" wire:model="bindingForm.vm_size" class="dply-input">
+                                    @forelse ($dedicatedVmSizes as $s)
+                                        <option value="{{ $s['value'] }}">{{ $s['label'] }}</option>
+                                    @empty
+                                        <option value="">{{ __('No sizes available for this provider/region') }}</option>
+                                    @endforelse
+                                </select>
+                                @if ($dedicatedVmSizes === [] && filled($dedicatedVmSizeError))
+                                    <p class="mt-2 text-xs font-medium text-amber-700">{{ $dedicatedVmSizeError }}</p>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                    @foreach ($redisPlacements->where('serverless', true) as $sv)
+                        @continue($chosenPlacement !== $sv['key'] || empty($sv['available']))
+                        <div class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                            <div>
+                                <x-input-label for="binding_redis_vendor_region_{{ $sv['key'] }}" :value="__(':vendor region', ['vendor' => $sv['label']])" />
+                                <select id="binding_redis_vendor_region_{{ $sv['key'] }}" wire:model="bindingForm.vendor_region" class="dply-input">
+                                    @foreach ($sv['regions'] ?? [] as $r)
+                                        <option value="{{ $r['value'] }}">{{ $r['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @if (! empty($sv['account_label']))
+                                <div>
+                                    <x-input-label for="binding_redis_vendor_account_{{ $sv['key'] }}" :value="$sv['account_label']" />
+                                    <x-text-input id="binding_redis_vendor_account_{{ $sv['key'] }}" wire:model="bindingForm.vendor_account" class="mt-1 block w-full font-mono text-sm" placeholder="{{ $sv['account_label'] }}" />
+                                </div>
+                            @endif
+                            <div>
+                                <x-input-label for="binding_redis_vendor_key_{{ $sv['key'] }}" :value="__(':vendor API key', ['vendor' => $sv['label']])" />
+                                <x-text-input type="password" id="binding_redis_vendor_key_{{ $sv['key'] }}" wire:model="bindingForm.vendor_api_key" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('paste your :vendor API key', ['vendor' => $sv['label']]) }}" autocomplete="new-password" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Stored encrypted. Leave blank to reuse a key you\'ve already connected.') }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                    @if ($chosenPlacement === 'docker')
+                        <p class="text-xs text-brand-moss">{{ __('Starts an isolated Redis container on this server, maps it to loopback, and injects REDIS_HOST / REDIS_PORT / REDIS_PASSWORD once it\'s ready. Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'docker_vm')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions a new Docker host on your connected provider (same region + private network), starts Redis in a container, and attaches it once ready (several minutes). Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'cache_vm')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions a new Redis-only server on your connected provider (same region + private network) and injects REDIS_HOST / REDIS_PORT / REDIS_PASSWORD once it\'s ready. Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === 'managed')
+                        <p class="text-xs text-brand-moss">{{ __('Provisions DigitalOcean Managed Valkey (Redis-compatible) and injects REDIS_HOST / REDIS_PORT / REDIS_PASSWORD once it\'s online. Redeploy to apply.') }}</p>
+                    @elseif ($chosenPlacement === \App\Models\CloudDatabase::BACKEND_UPSTASH)
+                        <p class="text-xs text-brand-moss">{{ __('Creates a serverless Redis database on your Upstash account and injects REDIS_HOST / REDIS_PORT / REDIS_PASSWORD once it\'s online. Redeploy to apply.') }}</p>
+                    @endif
+                    <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                        <input type="checkbox" wire:model="bindingForm.use_for_drivers" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                        <span>
+                            <span class="block text-sm font-medium text-brand-ink">{{ __('Use Redis for cache, sessions, and the queue') }}</span>
+                            {{ __('Sets CACHE_STORE, SESSION_DRIVER, and QUEUE_CONNECTION to redis.') }}
+                        </span>
+                    </label>
+                </div>
+            @elseif ($bindingModalType === 'redis' && $bindingModalMode !== 'edit')
                 @php
                     $existingCacheService = \App\Models\ServerCacheService::query()
                         ->where('server_id', $site->server_id)
                         ->whereIn('engine', ['redis', 'valkey', 'keydb', 'dragonfly'])
                         ->first();
                     $valkeyAvailable = \App\Support\Servers\CacheEngineAvailability::isAvailable('valkey');
+                    $hasManagedRedis = collect($bindingTargets)->contains(fn ($t) => ($t['group'] ?? '') === 'managed');
                 @endphp
                 <div>
                     <x-input-label for="binding_redis_target" :value="__('Redis service')" />
@@ -1207,7 +1586,7 @@
                         :placeholder="__('Choose a Redis service…')"
                     />
                     @if ($bindingTargets === [])
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('No Redis-compatible service is reachable on this server or its private network peers.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('No Redis-compatible service is reachable on this server, its private network peers, or a dedicated cache server in this organization.') }}</p>
                         @if ($existingCacheService === null)
                             {{-- Nothing installed — offer to install. --}}
                             <div class="mt-3 flex flex-wrap gap-2">
@@ -1237,7 +1616,10 @@
                             </div>
                         @endif
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: Redis-family services on this server (loopback) and on private-network peers (private IP). Each option shows how many other apps already use it — sharing one instance means a shared keyspace, so set a prefix to isolate this app. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('On-server Redis, private-network peers, dedicated cache VMs, and managed Redis clusters in this organization. Each option shows how many other apps already use it — sharing one instance means a shared keyspace, so set a prefix to isolate this app. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy.') }}</p>
+                        @if (! $hasManagedRedis)
+                            <p class="mt-2 text-xs text-brand-moss">{{ __('No managed cache cluster in this organization yet — use Provision new to create DigitalOcean Valkey, Vultr Valkey, or Upstash Redis.') }}</p>
+                        @endif
                         @if ($existingCacheService !== null && in_array($existingCacheService->engine, ['redis', 'valkey'], true))
                             <div class="mt-3 border-t border-brand-ink/10 pt-3">
                                 <p class="text-xs text-brand-mist">{{ __('Want a different engine?') }}</p>
@@ -1557,7 +1939,7 @@
         <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
-                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalType === 'redis' && $bindingTargets === [] ? __('Install & connect') : ($bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach'))) }}</span>
+                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'edit' ? __('Save') : ($bindingModalMode === 'provision' ? __('Provision') : ($bindingModalType === 'redis' && $bindingTargets === [] ? __('Install & connect') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach')))) }}</span>
                 <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>

@@ -271,11 +271,11 @@ class SiteGitDeployer
         if ($server->hostCapabilities()->supportsEnvPushToHost()) {
             $envOverride = trim((string) ($site->env_file_path ?? ''));
             if ($envOverride !== '') {
-                app(SiteEnvPusher::class)->push($site, $envOverride);
+                app(SiteEnvPusher::class)->push($site, $envOverride, includeSharedSecrets: true);
                 $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($path.'/.env')), 30);
                 $log .= sprintf("\n[dply] ENV → external env_file_path %s; symlinked %s/.env → it\n", $envOverride, $path);
             } else {
-                app(SiteEnvPusher::class)->push($site, $path.'/.env');
+                app(SiteEnvPusher::class)->push($site, $path.'/.env', includeSharedSecrets: true);
                 $log .= "\n[dply] ENV → composed .env (cache + connected resources) written to ".$path."/.env\n";
             }
         }

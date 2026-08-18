@@ -260,6 +260,20 @@ class Server extends Model
     }
 
     /**
+     * Dedicated Redis/Valkey box (role or redis_server profile) — including
+     * dply-hosted managed cache VMs. Broader than {@see isRedisServer()}:
+     * valkey-role hosts and profile-only rows count too.
+     */
+    public function isDedicatedCacheHost(): bool
+    {
+        $meta = $this->meta ?? [];
+        $role = $meta['server_role'] ?? null;
+
+        return in_array($role, ['redis', 'valkey'], true)
+            || ($meta['install_profile'] ?? null) === 'redis_server';
+    }
+
+    /**
      * A worker host is provisioned for background/queue-style workloads and
      * always runs Caddy (it attaches testing URLs but isn't a public web
      * front). Caching + CDN/edge tabs don't apply to these sites.
@@ -856,7 +870,7 @@ class Server extends Model
      * Edge apps, function namespaces, and Cloud containers are all backed by
      * placeholder host rows so their Sites can share the workspace URL shape.
      * They aren't machines: you don't provision, SSH into, or spec-tier them,
-     * and {@see \App\Livewire\Servers\WorkspaceOverview} bounces you to /edge,
+     * and {@see WorkspaceOverview} bounces you to /edge,
      * /serverless or /cloud if you open one. Listing them made "8 servers"
      * count two Edge apps, each with a "Provisioning…" label and an empty
      * metrics row that will never fill in.

@@ -1,9 +1,7 @@
 {{--
     Attach-existing resource picker shared by the database / redis / broadcasting
-    binding modals. Splits options into "This server" vs "Private-network peers"
-    optgroups (when the targets carry a local/peer group), shows a per-option
-    "used by N apps" suffix baked into the label, and surfaces a shared-use
-    caution when the selected resource is already bound by other sites.
+    binding modals. Splits options into "This server", "Private-network peers",
+    "Dedicated cache servers", and "Managed Redis" optgroups when present.
 
     Props:
       targets     list<array{id,label,group?,consumers?}> from SiteBindingManager::attachableTargets()
@@ -26,8 +24,10 @@
     $targets = collect($targets);
     $local = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'local')->values();
     $peers = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'peer')->values();
-    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer'], true))->values();
-    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty();
+    $dedicated = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'dedicated')->values();
+    $managed = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'managed')->values();
+    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer', 'dedicated', 'managed'], true))->values();
+    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty() || $dedicated->isNotEmpty() || $managed->isNotEmpty();
     $consumerMap = $targets->mapWithKeys(fn ($t) => [(string) $t['id'] => (int) ($t['consumers'] ?? 0)])->all();
     $placeholder ??= __('Choose a service…');
 @endphp
@@ -46,6 +46,20 @@
             @if ($peers->isNotEmpty())
                 <optgroup label="{{ __('Private-network peers') }}">
                     @foreach ($peers as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
+            @if ($dedicated->isNotEmpty())
+                <optgroup label="{{ __('Dedicated cache servers') }}">
+                    @foreach ($dedicated as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
+            @if ($managed->isNotEmpty())
+                <optgroup label="{{ __('Managed Redis') }}">
+                    @foreach ($managed as $t)
                         <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
                     @endforeach
                 </optgroup>

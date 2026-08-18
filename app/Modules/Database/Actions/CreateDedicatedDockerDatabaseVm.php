@@ -14,6 +14,8 @@ use App\Models\User;
 use App\Modules\Database\Jobs\ProvisionDedicatedDockerDatabaseVmJob;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
 use App\Modules\Database\Support\DockerDatabase;
+use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Support\Servers\DedicatedVmPlacement;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Component;
@@ -38,7 +40,7 @@ class CreateDedicatedDockerDatabaseVm
             throw new RuntimeException(__('A dedicated Docker database server needs a connected cloud provider on this server.'));
         }
 
-        $manager = app(\App\Modules\Deploy\Services\SiteBindingManager::class);
+        $manager = app(SiteBindingManager::class);
         $connection = $manager->resolveInstanceConnectionName($site, 'database', ['connection' => $form['connection'] ?? '']);
         $isPrimary = $connection === '';
         if ($isPrimary) {
@@ -72,13 +74,15 @@ class CreateDedicatedDockerDatabaseVm
         $username = Str::limit(Str::slug($name, '_') ?: 'db', 28, '').'_'.Str::lower(Str::random(4));
         $password = Str::password(24, symbols: false);
         $allowedFrom = (string) ($appServer->private_ip_address ?: $appServer->ip_address ?: '');
+        $placement = DedicatedVmPlacement::for($appServer, $org);
+        DedicatedVmPlacement::assertSizeAvailable($size, $placement['sizes'], $placement['region']);
 
         $createForm = new ServerCreateForm($component, 'dedicatedDockerDbForm');
         $createForm->mode = 'provider';
         $createForm->type = $appServer->provider->value;
         $createForm->provider_credential_id = (string) $appServer->provider_credential_id;
         $createForm->name = Str::limit(($site->slug ?: 'site').'-docker-db', 60, '');
-        $createForm->region = (string) $appServer->region;
+        $createForm->region = $placement['region'];
         $createForm->size = $size;
         $createForm->server_role = 'docker';
         $createForm->install_profile = 'static_app_host';

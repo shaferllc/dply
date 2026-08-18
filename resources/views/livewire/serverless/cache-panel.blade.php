@@ -4,7 +4,7 @@
         dense
         icon="heroicon-o-bolt"
         :title="__('Cache')"
-        :note="__('A DigitalOcean Managed Redis cluster, wired in as this function\'s cache store.')"
+        :note="__('A DigitalOcean Managed Valkey cluster (Redis-compatible), wired in as this function\'s cache store.')"
     >
         @if ($state !== '')
             <x-slot:actions>

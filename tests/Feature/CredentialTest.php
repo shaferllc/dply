@@ -132,6 +132,29 @@ test('credentials can be destroyed by owner', function () {
     $this->assertModelMissing($cred);
 });
 
+test('credentials destroy returns 403 for ordinary org member', function () {
+    $owner = userWithOrganization();
+    $org = $owner->currentOrganization();
+    $member = User::factory()->create();
+    $org->users()->attach($member->id, ['role' => 'member']);
+    $cred = ProviderCredential::factory()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+    ]);
+
+    session(['current_organization_id' => $org->id]);
+
+    try {
+        Livewire::actingAs($member)
+            ->test(CredentialsIndex::class, ['organization' => $org])
+            ->call('destroy', $cred->id);
+    } catch (AuthorizationException) {
+        // Livewire may surface the policy deny as an exception.
+    }
+
+    $this->assertDatabaseHas('provider_credentials', ['id' => $cred->id]);
+});
+
 test('credentials destroy returns 403 for non member', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();

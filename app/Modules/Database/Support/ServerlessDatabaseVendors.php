@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Database\Support;
 
 use App\Models\CloudDatabase;
+use App\Modules\Database\Backends\DatabaseRouter;
+use Laravel\Pennant\Feature;
 
 /**
  * Registry of BYO serverless-database vendors surfaced in the provision modal.
@@ -12,7 +14,7 @@ use App\Models\CloudDatabase;
  * Each entry is region-agnostic (the customer connects their own vendor API
  * key and picks from the vendor's regions). The `key` doubles as the placement
  * key in the modal and the CloudDatabase.backend value, so it resolves through
- * {@see \App\Modules\Database\Backends\DatabaseRouter::backend()}. `provider`
+ * {@see DatabaseRouter::backend()}. `provider`
  * is the ProviderCredential.provider string the API key is stored under.
  *
  * `account_label` (when set) makes the modal render a second credential input —
@@ -109,6 +111,19 @@ final class ServerlessDatabaseVendors
     public static function isServerless(string $key): bool
     {
         return in_array($key, self::keys(), true);
+    }
+
+    /**
+     * Whether this vendor may be provisioned. Ungated vendors are always on;
+     * Upstash is behind {@see Feature} `database.upstash`.
+     */
+    public static function isEnabled(string $key): bool
+    {
+        if ($key === CloudDatabase::BACKEND_UPSTASH) {
+            return Feature::active('database.upstash');
+        }
+
+        return true;
     }
 
     /**

@@ -343,12 +343,14 @@ class SiteProvisioner
             'error' => null,
         ]);
 
-        // Dispatch only when idle (pending/failed) — an in-flight 'issuing' run
-        // holds the lock, so re-dispatching every probe would just no-op.
+        // Dispatch when idle (pending/failed). A live `issuing` run holds the
+        // cache lock, so re-dispatching every probe would just no-op — but a
+        // killed/timed-out worker leaves the row `issuing` forever. Retry
+        // those once the issuer job timeout has elapsed.
         if (in_array($wildcard->status, [
             ServerWildcardCertificate::STATUS_PENDING,
             ServerWildcardCertificate::STATUS_FAILED,
-        ], true)) {
+        ], true) || $wildcard->issuanceIsStale()) {
             $this->appendLog($site, 'info', 'waiting_for_wildcard_tls', 'Issuing wildcard TLS certificate for the testing zone.', [
                 'zone' => $zone,
                 'provider' => $routing['provider'],

@@ -1,5 +1,9 @@
 # Customer-Facing Secrets Vault — Product Design
 
+> **Not the shipping vault.** Shared, Laravel Cloud–style org secrets are
+> specified in [`ORG_SHARED_SECRETS.md`](./ORG_SHARED_SECRETS.md). This draft is
+> site `.env` Time Machine (backup/restore) and stays out of v1.
+
 Status: **DRAFT for review.** No code yet. This is the review the seam comments in
 `OrgEnvBundleSource` / `SiteEnvBundleSource` explicitly defer to ("gathering and
 re-exporting customer secrets is sensitive and gets its own review with the

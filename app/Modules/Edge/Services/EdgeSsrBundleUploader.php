@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeDeployment;
-use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeDeliveryContext;
 use App\Modules\Edge\Support\EdgeEffectiveCrons;
@@ -300,14 +299,11 @@ class EdgeSsrBundleUploader
         // RESERVED_NAMES on the model blocks platform-injected names.
         $site = $deployment->site;
         if ($site !== null) {
-            foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
-                    continue;
-                }
+            foreach (app(EdgeProductionEnv::class)->forSite($site) as $key => $value) {
                 $bindings[] = [
-                    'name' => $envVar->key,
+                    'name' => $key,
                     'type' => 'secret_text',
-                    'text' => (string) $envVar->value,
+                    'text' => $value,
                 ];
             }
         }

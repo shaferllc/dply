@@ -36,7 +36,7 @@ final class SiteBindingCatalog
      * Edge adopts a curated subset). `env` is an illustrative hint of the keys
      * the binding injects (the real keys live on each binding's injected_env).
      *
-     * @return array<string, array{group: string, label: string, icon: string, purpose: string, env: list<string>, runtimes: list<string>, needs?: list<string>}>
+     * @return array<string, array{group: string, label: string, icon: string, purpose: string, env: list<string>, runtimes: list<string>, needs?: list<string>, needsAny?: list<string>}>
      */
     public static function types(): array
     {
@@ -48,8 +48,8 @@ final class SiteBindingCatalog
                 'runtimes' => ['vm'],
             ],
             'redis' => [
-                'group' => 'data', 'label' => 'Redis', 'icon' => 'heroicon-o-bolt',
-                'purpose' => 'In-memory store for cache, queues and sessions.',
+                'group' => 'data', 'label' => 'Redis / Valkey', 'icon' => 'heroicon-o-bolt',
+                'purpose' => 'In-memory store for cache, queues and sessions (Redis protocol).',
                 'env' => ['REDIS_HOST', 'REDIS_PORT', 'REDIS_PASSWORD'],
                 'runtimes' => ['vm'],
             ],
@@ -57,19 +57,19 @@ final class SiteBindingCatalog
                 'group' => 'data', 'label' => 'Cache', 'icon' => 'heroicon-o-square-3-stack-3d',
                 'purpose' => 'Choose the cache store Laravel uses.',
                 'env' => ['CACHE_STORE'],
-                'runtimes' => ['vm'], 'needs' => ['redis'],
+                'runtimes' => ['vm'], 'needsAny' => ['redis', 'database'],
             ],
             'queue' => [
                 'group' => 'data', 'label' => 'Queue', 'icon' => 'heroicon-o-queue-list',
                 'purpose' => 'Choose the queue connection for background jobs.',
                 'env' => ['QUEUE_CONNECTION'],
-                'runtimes' => ['vm'], 'needs' => ['redis'],
+                'runtimes' => ['vm'], 'needsAny' => ['redis', 'database'],
             ],
             'session' => [
                 'group' => 'data', 'label' => 'Sessions', 'icon' => 'heroicon-o-key',
                 'purpose' => 'Where sessions are stored, plus cookie behaviour.',
                 'env' => ['SESSION_DRIVER'],
-                'runtimes' => ['vm'], 'needs' => ['redis'],
+                'runtimes' => ['vm'], 'needsAny' => ['redis', 'database'],
             ],
             'storage' => [
                 'group' => 'data', 'label' => 'Object storage', 'icon' => 'heroicon-o-archive-box',
@@ -184,6 +184,7 @@ final class SiteBindingCatalog
                 'purpose' => $meta['purpose'],
                 'env' => $meta['env'],
                 'needs' => $meta['needs'] ?? [],
+                'needsAny' => $meta['needsAny'] ?? [],
                 'binding' => $binding,
                 'attached' => $binding instanceof SiteBinding,
                 // Multi-instance types (storage, database, …) can hold several
@@ -198,5 +199,46 @@ final class SiteBindingCatalog
 
         // Drop groups that ended up empty for this runtime.
         return array_filter($out, fn ($g) => $g['types'] !== []);
+    }
+
+    /** Whether the site already has an attached binding of this type. */
+    public static function hasAttachedType(Collection $bindings, string $type): bool
+    {
+        return $bindings->contains(fn (SiteBinding $b) => $b->type === $type);
+    }
+
+    /**
+     * True when a type that declares `needsAny` is missing every listed
+     * dependency (e.g. queue with neither Redis nor a database).
+     *
+     * @param  list<string>  $needsAny
+     */
+    public static function missingNeedsAny(Collection $bindings, array $needsAny): bool
+    {
+        if ($needsAny === []) {
+            return false;
+        }
+
+        foreach ($needsAny as $need) {
+            if (self::hasAttachedType($bindings, $need)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether a Laravel driver option (redis / database) has a matching
+     * attached resource. File, cookie, array, and other local stores are
+     * always available.
+     */
+    public static function driverStoreAvailable(Collection $bindings, string $driver): bool
+    {
+        return match ($driver) {
+            'redis' => self::hasAttachedType($bindings, 'redis'),
+            'database' => self::hasAttachedType($bindings, 'database'),
+            default => true,
+        };
     }
 }

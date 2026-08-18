@@ -114,6 +114,28 @@ return [
             'failed' => 'The relay could not be reached — see the error output.',
             'stale' => 'Broadcasting test did not finish.',
         ],
+        'install_docker' => [
+            'running' => 'Installing Docker Engine on :host …',
+            'completed' => 'Docker Engine is installed.',
+            'failed' => 'Docker Engine install failed.',
+            'stale' => 'Docker Engine install did not finish.',
+        ],
+        'managed_db_provision' => [
+            'running' => 'Provisioning the managed cluster …',
+            'completed' => 'Managed cluster is online.',
+            'failed' => 'Managed cluster provision failed.',
+            'stale' => 'Managed cluster provision did not finish.',
+            // Poll loop is ~13 min (40 × 20s). Stay above that so the banner
+            // does not flip to stale while DigitalOcean is still creating.
+            'stale_seconds' => 900,
+        ],
+        'managed_db_resize' => [
+            'running' => 'Resizing the managed cluster …',
+            'completed' => 'Managed cluster resize finished.',
+            'failed' => 'Managed cluster resize failed.',
+            'stale' => 'Managed cluster resize did not finish.',
+            'stale_seconds' => 900,
+        ],
         'disk_usage_measure' => [
             'running' => 'Measuring :host disk usage …',
             'completed' => 'Disk usage updated.',
@@ -394,8 +416,8 @@ return [
         // without these kinds the run has nowhere to show on this page (the
         // in-partial console-banner suppresses itself when section ===
         // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate'],
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'managed_db_provision', 'managed_db_resize'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'managed_db_provision', 'managed_db_resize'],
     ],
 
     /*

@@ -17,3 +17,9 @@ test('application server role still includes redis cache options', function () {
 
     expect(collect($options['cache_services'])->pluck('id')->all())->toContain('redis', 'none');
 });
+
+test('dedicated cache server role can validate redis as the cache engine', function () {
+    $options = FilterServerProvisionOptionsForCreateForm::run('digitalocean', true, 'redis');
+
+    expect(collect($options['cache_services'])->pluck('id')->all())->toContain('redis', 'none');
+});

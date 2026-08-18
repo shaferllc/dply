@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\Site;
+use App\Support\Http\PublicOutboundUrl;
+use App\Support\Http\UnsafeOutboundUrlException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Throwable;
 
@@ -18,6 +20,10 @@ use Throwable;
  * site's auth secret as `X-Dply-Origin-Auth`, and accepts any 2xx /
  * 3xx response — origins commonly redirect or return cached HTML at
  * the root, neither of which means "unhealthy".
+ *
+ * Operator-controlled origin URLs are resolved and rejected when they
+ * point at private, loopback, link-local, or metadata addresses, and
+ * the fetch never follows redirects.
  */
 class OriginHealthcheckRunner
 {
@@ -47,6 +53,16 @@ class OriginHealthcheckRunner
         }
         $target = rtrim($originUrl, '/').$path;
 
+        try {
+            $safe = PublicOutboundUrl::parse($target);
+        } catch (UnsafeOutboundUrlException) {
+            return [
+                'ok' => false,
+                'status' => 0,
+                'message' => 'Origin URL is not allowed.',
+            ];
+        }
+
         $timeout = (int) config('edge.origin_healthcheck.timeout_seconds', 10);
         $tries = max(1, (int) config('edge.origin_healthcheck.retries', 3));
         $waitMs = max(0, (int) config('edge.origin_healthcheck.retry_wait_ms', 1500));
@@ -65,7 +81,8 @@ class OriginHealthcheckRunner
                 ->withHeaders($headers)
                 ->timeout($timeout)
                 ->retry($tries, $waitMs, throw: false)
-                ->get($target);
+                ->withOptions($safe->httpClientOptions())
+                ->get($safe->url);
         } catch (Throwable $e) {
             return [
                 'ok' => false,

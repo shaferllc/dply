@@ -7,6 +7,7 @@ namespace App\Modules\Cloud\Backends\Concerns;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
+use App\Support\Sites\LinkedOrganizationSecrets;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -15,8 +16,6 @@ use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
  */
 trait ManagesDoAppDomainsEnv
 {
-
-
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -46,7 +45,10 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteEnvVars(Site $site): array
     {
-        return $this->parseEnvLines((string) ($site->env_file_content ?? ''));
+        return app(LinkedOrganizationSecrets::class)->mergeUnder(
+            $this->parseEnvLines((string) ($site->env_file_content ?? '')),
+            $site,
+        );
     }
 
     /**

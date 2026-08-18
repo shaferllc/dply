@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -33,8 +34,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $version
  * @property-read ?Organization $organization
  * @property-read ?ProviderCredential $providerCredential
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class CloudDatabase extends Model
 {
@@ -148,21 +149,57 @@ class CloudDatabase extends Model
      */
     public function backendSizeSlug(): string
     {
-        return self::SIZE_TIERS[$this->size] ?? self::SIZE_TIERS['small'];
+        return self::resolveSizeSlug((string) $this->size);
     }
 
     /**
-     * DigitalOcean's engine slug for this database (their API uses `pg`
-     * for Postgres; `mysql` and `redis` are passed through unchanged).
+     * Portable tier (small/medium/large) or an already-provider slug
+     * (`db-s-4vcpu-8gb`) from the live catalog.
+     */
+    public static function resolveSizeSlug(string $size): string
+    {
+        $size = strtolower(trim($size));
+        if ($size !== '' && isset(self::SIZE_TIERS[$size])) {
+            return self::SIZE_TIERS[$size];
+        }
+
+        if ($size !== '' && preg_match('/^(db-s-|db-intel-|db-amd-|m-|gd-|so)/', $size) === 1) {
+            return $size;
+        }
+
+        return self::SIZE_TIERS['small'];
+    }
+
+    /**
+     * Provider engine slug for create. DigitalOcean's API uses `pg` for
+     * Postgres. Managed Redis was discontinued 30 June 2025 — new DO
+     * clusters must be `valkey` (wire-compatible; we still store `redis`
+     * so the site gets REDIS_* env vars).
      */
     public function backendEngineSlug(): string
     {
         return match ($this->engine) {
             self::ENGINE_POSTGRES => 'pg',
             self::ENGINE_MYSQL => 'mysql',
-            self::ENGINE_REDIS => 'redis',
+            self::ENGINE_REDIS => $this->backend === self::BACKEND_DIGITALOCEAN ? 'valkey' : 'redis',
             default => 'pg',
         };
+    }
+
+    /**
+     * Version to send on create. Valkey is 8; a leftover Redis 7 pin would
+     * 400 against the Valkey engine.
+     */
+    public function backendEngineVersion(): ?string
+    {
+        $version = trim((string) $this->version);
+        if ($this->engine === self::ENGINE_REDIS && $this->backend === self::BACKEND_DIGITALOCEAN) {
+            if ($version === '' || $version === '7' || str_starts_with($version, '7.')) {
+                return '8';
+            }
+        }
+
+        return $version !== '' ? $version : null;
     }
 
     /**

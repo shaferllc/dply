@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Jobs;
 
 use App\Models\EdgeDeployment;
-use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Modules\Edge\Services\EdgeArtifactPublisher;
 use App\Modules\Edge\Services\EdgeBuildRunner;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Services\EdgeProductionEnv;
 use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Notifications\Services\NotificationPublisher;
@@ -98,13 +98,7 @@ class BuildEdgeSiteJob implements ShouldQueue
             // through the encrypted accessor and filtered against the
             // model's RESERVED_NAMES so customer code can't shadow
             // platform bindings like HOST_MAP / ASSETS / DEPLOYMENT_ID.
-            $buildEnv = [];
-            foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
-                    continue;
-                }
-                $buildEnv[$envVar->key] = (string) $envVar->value;
-            }
+            $buildEnv = app(EdgeProductionEnv::class)->forSite($site);
 
             $buildResult = $runner->build(
                 $deployment,

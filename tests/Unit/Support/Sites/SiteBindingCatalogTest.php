@@ -39,8 +39,8 @@ test('every type declares the metadata the hub renders and points at a real grou
             ->and($meta['env'])->toBeArray()
             ->and($meta['runtimes'])->toBeArray()->not->toBeEmpty();
 
-        // `needs` is optional, but when present must reference declared types.
-        foreach ($meta['needs'] ?? [] as $need) {
+        // `needs` / `needsAny` are optional, but when present must reference declared types.
+        foreach ([...($meta['needs'] ?? []), ...($meta['needsAny'] ?? [])] as $need) {
             expect($need)->toBeIn(array_keys(SiteBindingCatalog::types()));
         }
 
@@ -114,12 +114,37 @@ test('grouped exposes needs so the hub can gate dependent types', function () {
         ->flatMap(fn ($g) => $g['types'])
         ->keyBy('type');
 
-    // `cache` is declared as needing `redis`; every entry carries a list.
-    expect($entries['cache']['needs'])->toContain('redis');
+    expect($entries['cache']['needsAny'])->toContain('redis')
+        ->and($entries['cache']['needsAny'])->toContain('database');
 
     foreach ($entries as $entry) {
-        expect($entry['needs'])->toBeArray();
+        expect($entry['needs'])->toBeArray()
+            ->and($entry['needsAny'])->toBeArray();
     }
+});
+
+test('missingNeedsAny is true only when none of the required types are attached', function () {
+    $empty = collect();
+    $redis = bindingsOfType(['redis']);
+    $database = bindingsOfType(['database']);
+
+    expect(SiteBindingCatalog::missingNeedsAny($empty, ['redis', 'database']))->toBeTrue()
+        ->and(SiteBindingCatalog::missingNeedsAny($redis, ['redis', 'database']))->toBeFalse()
+        ->and(SiteBindingCatalog::missingNeedsAny($database, ['redis', 'database']))->toBeFalse()
+        ->and(SiteBindingCatalog::missingNeedsAny($empty, []))->toBeFalse();
+});
+
+test('driverStoreAvailable gates redis and database on the matching binding', function () {
+    $empty = collect();
+    $redis = bindingsOfType(['redis']);
+    $database = bindingsOfType(['database']);
+
+    expect(SiteBindingCatalog::driverStoreAvailable($empty, 'redis'))->toBeFalse()
+        ->and(SiteBindingCatalog::driverStoreAvailable($empty, 'database'))->toBeFalse()
+        ->and(SiteBindingCatalog::driverStoreAvailable($empty, 'file'))->toBeTrue()
+        ->and(SiteBindingCatalog::driverStoreAvailable($redis, 'redis'))->toBeTrue()
+        ->and(SiteBindingCatalog::driverStoreAvailable($redis, 'database'))->toBeFalse()
+        ->and(SiteBindingCatalog::driverStoreAvailable($database, 'database'))->toBeTrue();
 });
 
 test('every catalog type is exposed by grouped for the vm runtime', function () {

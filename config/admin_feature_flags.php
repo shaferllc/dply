@@ -127,6 +127,7 @@ return [
                 'Database engines' => [
                     'database.mongodb' => 'MongoDB',
                     'database.clickhouse' => 'ClickHouse',
+                    'database.upstash' => 'Upstash Redis',
                 ],
             ], $serverWorkspaceSections),
         ],

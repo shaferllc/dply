@@ -15,6 +15,8 @@ use App\Models\Site;
 use App\Modules\Edge\Services\EdgeImageUrlSigner;
 use App\Modules\Edge\Support\EdgeEffectiveImages;
 use App\Modules\Edge\Support\EdgeEffectiveOrigin;
+use App\Support\Http\PublicOutboundUrl;
+use App\Support\Http\UnsafeOutboundUrlException;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Http;
@@ -83,12 +85,26 @@ class Delivery extends Component
             $headers['X-Dply-Origin-Auth'] = $effOrigin['auth_secret'];
         }
 
+        try {
+            $safe = PublicOutboundUrl::parse($target);
+        } catch (UnsafeOutboundUrlException) {
+            $this->originProbe = [
+                'ok' => false,
+                'error' => __('Origin URL is not allowed.'),
+                'sample_path' => $samplePath,
+                'target' => $target,
+                'has_auth_header' => isset($headers['X-Dply-Origin-Auth']),
+            ];
+
+            return;
+        }
+
         $startedAt = microtime(true);
         try {
             $response = Http::withHeaders($headers)
                 ->timeout(8)
-                ->withOptions(['allow_redirects' => false])
-                ->get($target);
+                ->withOptions($safe->httpClientOptions())
+                ->get($safe->url);
             $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
             $this->originProbe = [
                 'ok' => $response->status() < 500,

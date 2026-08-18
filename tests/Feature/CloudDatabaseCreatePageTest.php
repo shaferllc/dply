@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseCreatePageTest;
 
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -51,11 +52,14 @@ test('page warns when no digitalocean credential', function () {
         ->assertSee('No DigitalOcean credential connected');
 });
 test('page hides warning when credential connected', function () {
+    fakeDoDatabaseOptions();
     $user = ownerWithOrg();
     connectDoCredential($user);
 
     $this->actingAs($user)->get(route('cloud.databases.create'))
-        ->assertDontSee('No DigitalOcean credential connected');
+        ->assertDontSee('No DigitalOcean credential connected')
+        ->assertSee('San Francisco · sfo2')
+        ->assertSee('db-s-4vcpu-8gb');
 });
 test('create validates required fields', function () {
     $user = ownerWithOrg();
@@ -67,17 +71,21 @@ test('create validates required fields', function () {
         ->assertHasErrors(['name']);
 });
 test('changing engine resets version to newest supported', function () {
+    fakeDoDatabaseOptions();
     $user = ownerWithOrg();
+    connectDoCredential($user);
 
     Livewire::actingAs($user)
         ->test(CloudDatabaseCreate::class)
+        ->assertSet('version', '16')
         ->set('engine', 'redis')
-        ->assertSet('version', '7')
+        ->assertSet('version', '8')
         ->set('engine', 'mysql')
         ->assertSet('version', '8');
 });
 test('create dispatches provision job and redirects', function () {
     Queue::fake();
+    fakeDoDatabaseOptions();
     $user = ownerWithOrg();
     connectDoCredential($user);
 
@@ -86,7 +94,7 @@ test('create dispatches provision job and redirects', function () {
         ->set('name', 'acme-primary')
         ->set('engine', 'postgres')
         ->set('version', '16')
-        ->set('size', 'small')
+        ->set('size', 'db-s-1vcpu-1gb')
         ->set('region', 'nyc1')
         ->call('create')
         ->assertHasNoErrors()
@@ -97,7 +105,7 @@ test('create dispatches provision job and redirects', function () {
     $database = CloudDatabase::query()->where('name', 'acme-primary')->firstOrFail();
     expect($database->engine)->toBe('postgres');
     expect($database->version)->toBe('16');
-    expect($database->size)->toBe('small');
+    expect($database->size)->toBe('db-s-1vcpu-1gb');
     expect($database->region)->toBe('nyc1');
     expect($database->status)->toBe(CloudDatabase::STATUS_PROVISIONING);
     expect($database->organization_id)->toBe($user->currentOrganization()->id);
@@ -119,6 +127,39 @@ test('create without credential shows toast error', function () {
     Queue::assertNotPushed(ProvisionCloudDatabaseJob::class);
     $this->assertDatabaseMissing('cloud_databases', ['name' => 'lonely-db']);
 });
+function fakeDoDatabaseOptions(): void
+{
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases/options*' => Http::response([
+            'options' => [
+                'pg' => [
+                    'regions' => ['nyc1', 'nyc3', 'sfo2', 'sfo3', 'ams3'],
+                    'versions' => ['16', '15', '14', '13'],
+                    'default_version' => '16',
+                    'layouts' => [
+                        ['num_nodes' => 1, 'sizes' => ['db-s-1vcpu-1gb', 'db-s-1vcpu-2gb', 'db-s-2vcpu-4gb', 'db-s-4vcpu-8gb']],
+                    ],
+                ],
+                'mysql' => [
+                    'regions' => ['nyc1', 'nyc3'],
+                    'versions' => ['8'],
+                    'default_version' => '8',
+                    'layouts' => [
+                        ['num_nodes' => 1, 'sizes' => ['db-s-1vcpu-1gb']],
+                    ],
+                ],
+                'valkey' => [
+                    'regions' => ['nyc1', 'sfo2', 'sfo3', 'ams3', 'atl1', 'ric1'],
+                    'versions' => ['8'],
+                    'default_version' => '8',
+                    'layouts' => [
+                        ['num_nodes' => 1, 'sizes' => ['db-s-1vcpu-1gb', 'db-s-4vcpu-8gb', 'm-2vcpu-16gb']],
+                    ],
+                ],
+            ],
+        ], 200),
+    ]);
+}
 function connectDoCredential(User $user): void
 {
     ProviderCredential::query()->create([

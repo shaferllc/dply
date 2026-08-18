@@ -6,6 +6,7 @@ namespace App\Modules\Database\Backends;
 
 use App\Models\CloudDatabase;
 use App\Models\Server;
+use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
 use App\Modules\Database\Services\NeonService;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -21,6 +22,8 @@ use RuntimeException;
  */
 class NeonBackend implements DatabaseBackend
 {
+    use CannotResizeManagedDatabase;
+
     public function key(): string
     {
         return CloudDatabase::BACKEND_NEON;

@@ -426,17 +426,20 @@ class Show extends Component
             'variableValue' => 'nullable|string|max:5000',
         ]);
 
+        $existing = $this->workspace->variables()->where('env_key', strtoupper($this->variableKey))->first();
+
         $this->workspace->variables()->updateOrCreate(
             ['env_key' => strtoupper($this->variableKey)],
             [
                 'env_value' => $this->variableValue !== '' ? $this->variableValue : null,
-                'is_secret' => $this->variableIsSecret,
+                // New project secrets are frozen — use org Secrets and link
+                // them onto sites. Existing is_secret flags keep working.
+                'is_secret' => (bool) ($existing?->is_secret ?? false),
             ]
         );
 
         $this->toastSuccess(__('Project variable saved.'));
         $this->reset('variableKey', 'variableValue');
-        $this->variableIsSecret = true;
     }
 
     public function deleteVariable(string $variableId): void

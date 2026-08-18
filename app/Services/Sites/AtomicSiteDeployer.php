@@ -283,7 +283,7 @@ class AtomicSiteDeployer
                 // <release>/.env, which resolves to the unservable external
                 // file. Never copy the secret into the docroot.
                 $log .= sprintf("\n[dply] ENV → external env_file_path; writing %s and symlinking %s → it\n", $envOverride, $releaseEnv);
-                app(SiteEnvPusher::class)->push($site, $envOverride);
+                app(SiteEnvPusher::class)->push($site, $envOverride, includeSharedSecrets: true);
                 $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($releaseEnv)), 30);
                 $resolved = trim($ssh->exec(sprintf('readlink -f %s 2>/dev/null || echo "(unresolved)"', escapeshellarg($releaseEnv)), 30));
                 $log .= sprintf("[dply] ENV → %s/.env → %s\n", basename($newRelease), $resolved);
@@ -292,7 +292,7 @@ class AtomicSiteDeployer
                 // into the release dir (which `current` flips to), so this
                 // release is self-contained.
                 $log .= sprintf("\n[dply] ENV → writing composed .env to %s\n", $releaseEnv);
-                app(SiteEnvPusher::class)->push($site, $releaseEnv);
+                app(SiteEnvPusher::class)->push($site, $releaseEnv, includeSharedSecrets: true);
                 $log .= "[dply] ENV → .env written\n";
             }
         } else {

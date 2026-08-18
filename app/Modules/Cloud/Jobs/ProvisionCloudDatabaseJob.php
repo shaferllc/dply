@@ -69,6 +69,7 @@ class ProvisionCloudDatabaseJob implements ShouldQueue
                     $database->region !== '' ? $database->region : 'nyc1',
                     $database->backendSizeSlug(),
                     $this->clusterName($database),
+                    $database->backendEngineVersion(),
                 );
                 $database->forceFill(['backend_id' => $cluster['id']])->save();
             } else {

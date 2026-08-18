@@ -141,6 +141,10 @@ return [
         // NEW logs store being installed from the UI; existing installs keep
         // working and stay manageable either way.
         'clickhouse' => true,
+        // Upstash serverless Redis in the site binding provision picker.
+        // Off = visible Coming soon card (no connect fields). Flip per-org
+        // from /admin/flags or set FEATURE_DATABASE_UPSTASH=true.
+        'upstash' => filter_var(env('FEATURE_DATABASE_UPSTASH', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*

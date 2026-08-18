@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use Illuminate\Support\Facades\Cache;
@@ -14,7 +15,7 @@ use Illuminate\Support\Str;
  * Queues a Manage script (install / services task) to run over SSH in the
  * background, and returns the remote-task id callers poll for output.
  *
- * Extracted from {@see \App\Livewire\Servers\Concerns\RunsServerPackageInstalls}
+ * Extracted from {@see RunsServerPackageInstalls}
  * so the REST surface can queue the *same* task the workspace queues — the
  * concern keeps only its Livewire-specific bits (stream meta, banner copy) and
  * delegates the cache seeding / activity row / dispatch to this class.
@@ -25,6 +26,7 @@ final class ServerManageScriptQueuer
      * Seed the polling cache, record an activity row, and dispatch the job.
      *
      * @param  ?string  $userId  Attributed operator ULID; null for system-initiated runs.
+     * @param  ?string  $consoleActionId  Optional ConsoleAction row the job streams into.
      * @return string The remote-task id to poll (ServerManageRemoteSshJob::cacheKey).
      */
     public function queue(
@@ -35,6 +37,7 @@ final class ServerManageScriptQueuer
         ?string $flashSuccess = null,
         ?string $label = null,
         ?string $userId = null,
+        ?string $consoleActionId = null,
     ): string {
         $id = (string) Str::uuid();
         $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);
@@ -75,6 +78,8 @@ final class ServerManageScriptQueuer
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
             $logRow->id,
+            null,
+            $consoleActionId,
         );
 
         return $id;

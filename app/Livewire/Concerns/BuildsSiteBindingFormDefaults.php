@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\ObjectStorageCredential;
-use App\Support\Servers\DatabaseNameGenerator;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Deploy\Services\DeploymentSecretInventory;
+use App\Modules\Realtime\Models\RealtimeApp;
+use App\Support\Servers\DatabaseNameGenerator;
+use App\Support\Sites\SiteBindingCatalog;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -16,8 +17,6 @@ use App\Modules\Deploy\Services\DeploymentSecretInventory;
  */
 trait BuildsSiteBindingFormDefaults
 {
-
-
     /**
      * @return array<string, mixed>
      */
@@ -26,13 +25,27 @@ trait BuildsSiteBindingFormDefaults
         return match (true) {
             // name: seeded from the site so the field is never blank (the
             // Regenerate button next to it swaps in a random adjective_noun).
-            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => DatabaseNameGenerator::suggest($this->site->name), 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
+            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => DatabaseNameGenerator::suggest($this->site->name), 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'region' => '', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
             $type === 'database' => $this->defaultDatabaseAttachBindingForm(),
             // use_for_drivers: also wire cache/sessions/queue at this Redis in one
             // step (default on — it's why you attach Redis). Existing driver
             // bindings are preserved by the manager.
+            $type === 'redis' && $mode === 'provision' => [
+                'engine' => 'redis',
+                'name' => DatabaseNameGenerator::suggest($this->site->name).'_redis',
+                // Empty until the operator picks a card — size / vendor fields
+                // must not appear before that choice.
+                'placement' => '',
+                'size' => 'small',
+                'region' => '',
+                'vm_size' => '',
+                'use_for_drivers' => true,
+                'vendor_api_key' => '',
+                'vendor_account' => '',
+                'vendor_region' => '',
+            ],
             $type === 'redis' => ['target_id' => '', 'use_for_drivers' => true],
-            $type === 'queue' => ['driver' => 'database'],
+            $type === 'queue' => ['driver' => $this->defaultQueueBindingDriver()],
             $type === 'cache' => $this->defaultCacheBindingForm(),
             $type === 'session' => $this->defaultSessionBindingForm(),
             $type === 'storage' => $this->defaultStorageBindingForm($mode),
@@ -246,9 +259,31 @@ trait BuildsSiteBindingFormDefaults
         }
 
         return [
-            'driver' => $driver,
+            'driver' => $this->coalesceDriverToAvailable($driver, 'file'),
             'prefix' => $prefix,
         ];
+    }
+
+    private function defaultQueueBindingDriver(): string
+    {
+        if (SiteBindingCatalog::hasAttachedType($this->site->bindings, 'database')) {
+            return 'database';
+        }
+        if (SiteBindingCatalog::hasAttachedType($this->site->bindings, 'redis')) {
+            return 'redis';
+        }
+
+        return 'database';
+    }
+
+    /** If the preferred driver needs a missing Redis/database binding, use $fallback. */
+    private function coalesceDriverToAvailable(string $driver, string $fallback): string
+    {
+        if (SiteBindingCatalog::driverStoreAvailable($this->site->bindings, $driver)) {
+            return $driver;
+        }
+
+        return $fallback;
     }
 
     private function defaultSessionBindingForm(): array
@@ -259,7 +294,7 @@ trait BuildsSiteBindingFormDefaults
         return [
             // Every field is optional — blank means "use the framework default",
             // which attach materializes into the injected config.
-            'driver' => (string) ($cfg['driver'] ?? ''),
+            'driver' => $this->coalesceDriverToAvailable((string) ($cfg['driver'] ?? ''), ''),
             'lifetime' => (string) ($cfg['lifetime'] ?? ''),
             'encrypt' => (string) ($cfg['encrypt'] ?? ''),
             'path' => (string) ($cfg['path'] ?? ''),

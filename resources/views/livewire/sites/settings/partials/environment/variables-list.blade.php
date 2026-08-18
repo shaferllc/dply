@@ -305,6 +305,12 @@
                                                 <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
                                                 {{ __('Detach') }}
                                             </button>
+                                            @if (method_exists($this, 'openDetachAndDeleteBindingConfirmModal') && $this->site->bindings->firstWhere('id', $gBindingId)?->canOfferDeleteOnDetach())
+                                                <button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $gBindingId), @js($gTypeLabel))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-rose-800 hover:bg-rose-50">
+                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                                    {{ __('Detach & delete') }}
+                                                </button>
+                                            @endif
                                         @endif
                                     </x-overflow-menu>
                                 @endif

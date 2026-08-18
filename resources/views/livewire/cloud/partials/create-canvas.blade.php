@@ -1008,7 +1008,7 @@
                             ? [
                                 ['engine' => 'postgres', 'label' => __('Add Postgres'), 'desc' => __('Managed Postgres cluster')],
                                 ['engine' => 'mysql', 'label' => __('Add MySQL'), 'desc' => __('Managed MySQL cluster')],
-                                ['engine' => 'redis', 'label' => __('Add Redis'), 'desc' => __('Managed Redis cluster')],
+                                ['engine' => 'redis', 'label' => __('Add Redis'), 'desc' => __('Managed Valkey (Redis-compatible)')],
                             ]
                             : [
                                 ['engine' => 'postgres', 'label' => __('Connect Postgres'), 'desc' => __('External Postgres / RDS / Neon')],

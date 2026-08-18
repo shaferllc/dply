@@ -31,6 +31,7 @@ final class ResolveServerCreateCatalog
      *     sizes: list<array{value: string, label: string, price_monthly?: float|null, price_hourly?: float|null, pricing_source?: string|null, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>,
      *     region_label: string,
      *     size_label: string,
+     *     error?: string|null,
      *     kubernetes_clusters?: list<array<string, mixed>>
      * }
      */
@@ -39,6 +40,7 @@ final class ResolveServerCreateCatalog
         string $type,
         string $providerCredentialId,
         string $selectedRegion,
+        bool $fallbackToGlobalCatalog = false,
     ): array {
         $empty = [
             'credentials' => collect(),
@@ -46,6 +48,7 @@ final class ResolveServerCreateCatalog
             'sizes' => [],
             'region_label' => __('Region'),
             'size_label' => __('Plan / size'),
+            'error' => null,
         ];
 
         if ($type === 'custom') {
@@ -61,8 +64,20 @@ final class ResolveServerCreateCatalog
             ? $credentials->firstWhere('id', $providerCredentialId)
             : null;
 
-        if ($credentials->isNotEmpty() && $providerCredentialId !== '' && $providerCredentialId !== '0' && ! $credential) {
-            return array_merge($empty, ['credentials' => $credentials]);
+        $staleCredentialId = $credentials->isNotEmpty()
+            && $providerCredentialId !== ''
+            && $providerCredentialId !== '0'
+            && ! $credential;
+
+        if ($staleCredentialId && ! $fallbackToGlobalCatalog) {
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => __('The selected provider credential is no longer available.'),
+            ]);
+        }
+
+        if ($staleCredentialId && $fallbackToGlobalCatalog) {
+            $credential = $credentials->first();
         }
 
         if (! $credential) {
@@ -78,10 +93,13 @@ final class ResolveServerCreateCatalog
                 return $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'));
             }
 
-            return array_merge($empty, ['credentials' => $credentials]);
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => $this->missingCatalogCredentialError($type, $fallbackToGlobalCatalog),
+            ]);
         }
 
-        return match ($type) {
+        $catalog = match ($type) {
             'digitalocean' => $this->catalogDigitalOcean($credentials, $credential, $selectedRegion),
             'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
             'hetzner' => $this->catalogHetzner($credentials, $credential, $selectedRegion),
@@ -98,6 +116,56 @@ final class ResolveServerCreateCatalog
             'oracle' => $this->catalogOracle($credentials, $credential),
             default => array_merge($empty, ['credentials' => $credentials]),
         };
+
+        if ($fallbackToGlobalCatalog && ($catalog['sizes'] ?? []) === []) {
+            $global = $this->catalogFromGlobalToken($type, $credentials, $selectedRegion);
+            if ($global !== null && ($global['sizes'] ?? []) !== []) {
+                return $global;
+            }
+
+            if ($global !== null && empty($catalog['error']) && ! empty($global['error'])) {
+                $catalog['error'] = $global['error'];
+            }
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array<string, mixed>>, sizes: list<array<string, mixed>>, region_label: string, size_label: string, error?: string|null}|null
+     */
+    private function catalogFromGlobalToken(string $type, Collection $credentials, string $selectedRegion): ?array
+    {
+        return match ($type) {
+            'digitalocean' => filled((string) config('services.digitalocean.token'))
+                ? $this->catalogDigitalOcean($credentials, null, $selectedRegion)
+                : null,
+            'vultr' => filled((string) config('services.vultr.token'))
+                ? $this->catalogVultr($credentials, null, $selectedRegion)
+                : null,
+            'linode' => filled((string) config('services.linode.token'))
+                ? $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'))
+                : null,
+            default => null,
+        };
+    }
+
+    private function missingCatalogCredentialError(string $type, bool $wantedGlobalFallback): ?string
+    {
+        if (! $wantedGlobalFallback) {
+            return null;
+        }
+
+        $provider = match ($type) {
+            'digitalocean', 'digitalocean_kubernetes', 'digitalocean_functions' => __('DigitalOcean'),
+            'vultr' => __('Vultr'),
+            'linode' => __('Linode'),
+            'hetzner' => __('Hetzner'),
+            default => $type,
+        };
+
+        return __('No :provider credential or platform catalog token is available.', ['provider' => $provider]);
     }
 
     /**
@@ -108,6 +176,7 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
             $token = config('services.digitalocean.token');
@@ -177,8 +246,12 @@ final class ResolveServerCreateCatalog
             }
 
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+        }
+
+        if ($sizes === [] && $error === null && $selectedRegion !== '') {
+            $error = __('DigitalOcean returned no droplet sizes for :region.', ['region' => $selectedRegion]);
         }
 
         return [
@@ -187,6 +260,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Droplet size'),
+            'error' => $error,
         ];
     }
 

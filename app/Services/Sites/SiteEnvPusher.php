@@ -5,6 +5,7 @@ namespace App\Services\Sites;
 use App\Models\Site;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
+use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Support\Str;
 
 class SiteEnvPusher
@@ -38,8 +39,11 @@ class SiteEnvPusher
      *                                     deployer to seed a fresh release directory's `.env` (the git checkout
      *                                     has none) BEFORE build/release steps run — otherwise artisan reads
      *                                     Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
+     * @param  bool  $includeSharedSecrets  Deploy path only. Standalone env push
+     *                                      must leave org vault secrets off the box
+     *                                      until the next deploy.
      */
-    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null): string
+    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null, bool $includeSharedSecrets = false): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -67,9 +71,10 @@ class SiteEnvPusher
         // written AND what we validate — a binding-supplied DB_HOST/REDIS_HOST
         // shouldn't read as "missing".
         $bindingEnv = $this->bindingEnv($site);
-        $mergedVars = $bindingEnv !== []
-            ? array_merge($parsed['variables'], $bindingEnv)
-            : $parsed['variables'];
+        $secretEnv = $includeSharedSecrets
+            ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
+            : [];
+        $mergedVars = array_merge($secretEnv, $parsed['variables'], $bindingEnv);
 
         // Resolve any non-resident secrets (escrowed / external references) to
         // their real values just-in-time. The loose blob only carries
@@ -123,6 +128,28 @@ class SiteEnvPusher
                 // ignore — cleanup is best-effort
             }
         }
+    }
+
+    /**
+     * Layers used when writing .env: optional org vault secrets, then the
+     * site cache, then binding connection vars (bindings still win, matching
+     * the historic pusher). Used by tests; {@see push()} applies the same merge.
+     *
+     * @return array<string, string>
+     */
+    public function composeVariables(Site $site, bool $includeSharedSecrets = false): array
+    {
+        $content = $site->effectiveEnvFileContent();
+        $parsed = $this->parser->parse($content);
+        if ($parsed['errors'] !== []) {
+            throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
+        }
+
+        $secretEnv = $includeSharedSecrets
+            ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
+            : [];
+
+        return array_merge($secretEnv, $parsed['variables'], $this->bindingEnv($site));
     }
 
     /**
@@ -224,7 +251,7 @@ class SiteEnvPusher
      * reach this. Enabling on-box is a deliberate step that must be validated on
      * a real server (the shim needs jq + curl / the AWS CLI present).
      *
-     * @param  array<string, mixed> $mergedVars
+     * @param  array<string, mixed>  $mergedVars
      */
     private function resolveOnBoxSecrets(SshConnection $ssh, Site $site, string $envPath, array $mergedVars): void
     {

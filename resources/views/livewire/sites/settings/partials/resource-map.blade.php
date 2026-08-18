@@ -27,6 +27,9 @@
         'provisioning' => 'bg-sky-500',
         'error' => 'bg-rose-500',
     ];
+    $provisionDigests = $provisionDigests ?? [];
+    $provisionServers = $provisionServers ?? collect();
+    $hasProvisioningBindings = $hasProvisioningBindings ?? false;
     $sectionUrl = fn (string $s) => route('sites.show', ['server' => $server, 'site' => $site, 'section' => $s]);
 
     // Roll-up counts for the header chip.
@@ -93,7 +96,8 @@
 @endphp
 
 {{-- Nested inside Settings Resources merged card — toolbar + strips, no second page card. --}}
-<div class="min-w-0">
+<div class="min-w-0" @if (! empty($hasProvisioningBindings) || (! empty($sectionConsoleActionRun) && $sectionConsoleActionRun->isInFlight())) wire:poll.5s @endif>
+    @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
     {{-- Toolbar: actions + status (page title lives in the outer sand identity). --}}
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
         <p class="text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
@@ -130,6 +134,11 @@
                                         'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
                                         default => null,
                                     };
+                                    // Queue has no local store (file/array). Cache and
+                                    // sessions still open — Redis/Database options are
+                                    // disabled in the modal until those resources exist.
+                                    $atNeedsStore = $atType === 'queue'
+                                        && SiteBindingCatalog::missingNeedsAny($hubBindings, $at['needsAny'] ?? []);
                                 @endphp
                                 @if ($atRuntimeUrl)
                                     <a href="{{ $atRuntimeUrl }}" wire:navigate
@@ -142,6 +151,16 @@
                                             <span class="block truncate text-xs leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
                                         </span>
                                     </a>
+                                @elseif ($atNeedsStore)
+                                    <div class="flex w-full cursor-not-allowed items-start gap-2.5 px-3 py-2 text-left opacity-50" title="{{ __('Attach Redis or a database first') }}">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ __('Attach Redis or a database first.') }}</span>
+                                        </span>
+                                    </div>
                                 @else
                                     <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')"
                                         class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/40">
@@ -312,16 +331,20 @@
                     const frag = document.createDocumentFragment();
                     let i = 0;
                     const addEdge = (d, kind, n) => {
-                        const base = mk('path', { d, fill: 'none', 'stroke-width': kind === 'trunk' ? 2.5 : 2, 'stroke-linecap': 'round', 'class': kind === 'idle' ? 'dply-edge-idle' : 'dply-edge-flow' },
-                            { stroke: kind === 'idle' ? INK : FOREST, opacity: kind === 'idle' ? 0.16 : (kind === 'trunk' ? 0.7 : 0.55) });
+                        const isProv = kind === 'provisioning';
+                        const isErr = kind === 'error';
+                        const baseClass = kind === 'idle' ? 'dply-edge-idle' : (isProv ? 'dply-edge-provisioning' : (isErr ? 'dply-edge-error' : 'dply-edge-flow'));
+                        const stroke = kind === 'idle' ? INK : (isProv ? '#0ea5e9' : (isErr ? '#f43f5e' : FOREST));
+                        const base = mk('path', { d, fill: 'none', 'stroke-width': kind === 'trunk' ? 2.5 : 2, 'stroke-linecap': 'round', 'class': baseClass },
+                            { stroke, opacity: kind === 'idle' ? 0.16 : (kind === 'trunk' ? 0.7 : 0.55) });
                         frag.appendChild(base);
                         if (kind !== 'idle') {
-                            frag.appendChild(mk('path', { d, fill: 'none', pathLength: '100', 'stroke-width': 3.5, 'stroke-linecap': 'round', filter: 'url(#dplyGlow)', 'class': 'dply-pulse' },
-                                { stroke: '#6ee7b7', animationDelay: (n * 0.22) + 's' }));
+                            frag.appendChild(mk('path', { d, fill: 'none', pathLength: '100', 'stroke-width': 3.5, 'stroke-linecap': 'round', filter: 'url(#dplyGlow)', 'class': isProv ? 'dply-pulse-provisioning' : (isErr ? 'dply-pulse-error' : 'dply-pulse') },
+                                { stroke: isProv ? '#7dd3fc' : (isErr ? '#fda4af' : '#6ee7b7'), animationDelay: (n * 0.22) + 's' }));
                         }
                     };
                     const addDot = (p, kind) => frag.appendChild(mk('circle', { cx: p.x, cy: p.y, r: 3.5 },
-                        { fill: kind === 'idle' ? INK : FOREST, opacity: kind === 'idle' ? 0.3 : 1 }));
+                        { fill: kind === 'idle' ? INK : (kind === 'provisioning' ? '#0ea5e9' : (kind === 'error' ? '#f43f5e' : FOREST)), opacity: kind === 'idle' ? 0.3 : 1 }));
 
                     // Inbound routing (bottom) flows down into the site (top) —
                     // the front door of the request path. Animates only when the
@@ -350,7 +373,10 @@
                         const from = hubBottom[node.dataset.group];
                         if (! from) return;
                         const to = this.point(node.getBoundingClientRect(), wrap, 'left');
-                        const kind = node.dataset.attached === '1' ? 'attached' : 'idle';
+                        const kind = node.dataset.attached !== '1'
+                            ? 'idle'
+                            : (node.dataset.status === 'provisioning' ? 'provisioning'
+                                : (node.dataset.status === 'error' ? 'error' : 'attached'));
                         addEdge(this.curve(from, DOWN, to, LEFT), kind, i++);
                         addDot(to, kind);
                     });
@@ -479,8 +505,8 @@
                             $canProvision = in_array($type, $provisionTypes, true);
                             $canConfig = in_array($type, $configTypes, true);
                             $isLogging = $type === 'logging';
-                            $needsRedis = in_array('redis', $t['needs'] ?? [], true)
-                                && ! $hubBindings->contains(fn ($b) => $b->type === 'redis');
+                            $needsRedis = $type === 'queue'
+                                && SiteBindingCatalog::missingNeedsAny($hubBindings, $t['needsAny'] ?? []);
                             $hasAction = $isLogging || $canProvision || $canConfig;
                             $conn = $attached && is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
                             $reachTarget = $attached ? BindingReachability::target($binding) : null;
@@ -515,10 +541,13 @@
                                 // Managed databases provision asynchronously: the cluster takes a few
                                 // minutes, then its connection vars land on the binding. They apply at
                                 // the next deploy, so a configured managed DB prompts a redeploy.
-                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
-                                $attached && in_array($cfg['placement'] ?? '', ['docker', 'docker_vm'], true) && $binding->status === 'provisioning' => match ($cfg['placement'] ?? '') {
+                                $attached && ($cfg['managed'] ?? false) && $binding->isProvisioning() => __('Provisioning the managed cluster — this takes a few minutes.'),
+                                $attached && $binding->isProvisioning() => match ($cfg['placement'] ?? '') {
+                                    'cache_vm' => __('Provisioning the dedicated Redis server — this can take several minutes.'),
+                                    'dedicated_vm' => __('Provisioning the dedicated database server — this can take several minutes.'),
                                     'docker_vm' => __('Provisioning the Docker database server and starting the container — this can take several minutes.'),
-                                    default => __('Starting the Docker database container — this usually takes under a minute.'),
+                                    'docker' => __('Starting the Docker database container — this usually takes under a minute.'),
+                                    default => __('Provisioning this resource — click the card for live status.'),
                                 },
                                 $needsRedeploy => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
@@ -527,22 +556,32 @@
                                 default => __('Not attached yet.'),
                             };
 
-                            // A dedicated-VM database binding owns its own server. Let the status
-                            // badge deep-link to that server — servers.show redirects to the live
-                            // provisioning journey while it's still coming up, then to the server
-                            // workspace once it's ready.
-                            $dbVmServerId = in_array($cfg['placement'] ?? null, ['dedicated_vm', 'docker_vm'], true) ? ($cfg['db_vm_server_id'] ?? null) : null;
-                            $dbVmServerUrl = $attached && filled($dbVmServerId) ? route('servers.show', $dbVmServerId) : null;
+                            $isProvisioning = $attached && $binding->isProvisioning();
+                            $isErrored = $attached && $binding->isErrored();
+                            $canOpenStatus = ($isProvisioning || $isErrored) && method_exists($this, 'openBindingInfoModal');
+                            $vmServerId = $attached ? $binding->provisionServerId() : null;
+                            $vmServer = filled($vmServerId) ? ($provisionServers[$vmServerId] ?? null) : null;
+                            $dbVmServerUrl = $attached && filled($vmServerId) && ! $isProvisioning && ! $isErrored
+                                ? route('servers.show', $vmServerId)
+                                : null;
+                            $digest = filled($vmServerId) ? ($provisionDigests[$vmServerId] ?? null) : null;
+                            $displayError = $isErrored ? $binding->displayError($vmServer instanceof \App\Models\Server ? $vmServer : null) : null;
+                            $canRetryProvision = $attached
+                                && method_exists($this, 'canRetryBindingProvision')
+                                && $this->canRetryBindingProvision($binding);
                         @endphp
                         <div
                             wire:key="res-{{ $type }}-{{ $attached ? $binding->id : 'new' }}"
                             data-resource-node="{{ $type }}{{ $attached ? '-'.$binding->id : '' }}"
                             data-group="{{ $groupKey }}"
                             data-attached="{{ $attached ? '1' : '0' }}"
+                            data-status="{{ $attached ? $binding->status : '' }}"
                             x-data="{ open: false }"
                             @class([
                                 'group/node relative w-full rounded-xl border bg-white p-3 pr-9 shadow-sm transition',
-                                'border-brand-forest/30 ring-1 ring-brand-forest/10' => $attached,
+                                'dply-provisioning-card border-sky-300/80 ring-1 ring-sky-200/80' => $isProvisioning,
+                                'border-rose-300/90 ring-1 ring-rose-200/80' => $isErrored,
+                                'border-brand-forest/30 ring-1 ring-brand-forest/10' => $attached && ! $isProvisioning && ! $isErrored,
                                 'border-brand-ink/10 border-dashed hover:border-brand-forest/40 hover:shadow-md' => ! $attached,
                             ])
                         >
@@ -562,6 +601,13 @@
                                     </button>
                                 @endif
                                 @if ($attached && ! $isLogging)
+                                    @if ($binding->canOfferDeleteOnDetach())
+                                        <button type="button" title="{{ __('Detach & delete') }}"
+                                            wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
+                                            class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
+                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                        </button>
+                                    @endif
                                     <button type="button" title="{{ __('Detach') }}"
                                         wire:click="openDetachBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
                                         class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
@@ -570,18 +616,44 @@
                                 @endif
                             </div>
 
-                            <div class="flex items-start gap-2.5">
-                                <span class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ $attached ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/50 text-brand-moss' }}">
-                                    <x-dynamic-component :component="$t['icon']" class="h-5 w-5" />
+                            @php $identityTag = $canOpenStatus ? 'button' : 'div'; @endphp
+                            <{{ $identityTag }}
+                                @if ($canOpenStatus)
+                                    type="button"
+                                    wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                    title="{{ $isErrored ? __('View error and fix options') : __('View provisioning status') }}"
+                                @endif
+                                @class([
+                                    'flex min-w-0 w-full items-start gap-2.5 rounded-lg text-left',
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70' => $canOpenStatus && $isErrored,
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70' => $canOpenStatus && ! $isErrored,
+                                ])
+                            >
+                                <span @class([
+                                    'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                                    'bg-sky-50 text-sky-700' => $isProvisioning,
+                                    'bg-rose-50 text-rose-700' => $isErrored,
+                                    'bg-brand-forest/10 text-brand-forest' => $attached && ! $isProvisioning && ! $isErrored,
+                                    'bg-brand-sand/50 text-brand-moss' => ! $attached,
+                                ])>
+                                    @if ($isProvisioning)
+                                        <span class="pointer-events-none absolute inset-0 animate-spin rounded-lg border-2 border-sky-200 border-t-sky-500" aria-hidden="true"></span>
+                                    @endif
+                                    <x-dynamic-component :component="$t['icon']" class="relative h-5 w-5" />
                                     @if ($attached)
-                                        <span title="{{ $statusHint }}" class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
+                                        <span title="{{ $statusHint }}" class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                                            @if ($isProvisioning)
+                                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75"></span>
+                                            @endif
+                                            <span class="relative inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
+                                        </span>
                                     @endif
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5">
                                         <h3 class="truncate text-sm font-semibold text-brand-ink">{{ $t['label'] }}</h3>
                                         @if ($needsRedis)
-                                            <span title="{{ __('Attach Redis first to use the redis driver') }}" class="inline-flex shrink-0 items-center text-amber-500">
+                                            <span title="{{ __('Attach Redis or a database first') }}" class="inline-flex shrink-0 items-center text-amber-500">
                                                 <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />
                                             </span>
                                         @endif
@@ -589,9 +661,21 @@
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="truncate font-mono text-xs font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
-                                            @if ($dbVmServerUrl)
+                                            @if ($isProvisioning)
+                                                <span class="dply-provisioning-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-sky-900">
+                                                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-600"></span>
+                                                    {{ $binding->status }}
+                                                </span>
+                                                <span class="text-xs font-semibold text-sky-700">{{ __('View status') }}</span>
+                                            @elseif ($isErrored)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-rose-800">
+                                                    <x-heroicon-m-exclamation-triangle class="h-2.5 w-2.5" />
+                                                    {{ $binding->status }}
+                                                </span>
+                                                <span class="text-xs font-semibold text-rose-700">{{ __('View error') }}</span>
+                                            @elseif ($dbVmServerUrl)
                                                 <a href="{{ $dbVmServerUrl }}" wire:navigate
-                                                    title="{{ $binding->status === 'provisioning' ? __('View provisioning status') : __('View database server') }}"
+                                                    title="{{ __('View database server') }}"
                                                     class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
                                             @else
                                                 <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
@@ -604,6 +688,18 @@
                                                 </a>
                                             @endif
                                         </div>
+                                        @if ($isProvisioning && $digest)
+                                            <p class="mt-1 truncate text-xs text-sky-800">
+                                                <span class="font-semibold">{{ $digest->phaseLabel }}</span>
+                                                <span class="text-sky-700/80"> · {{ $digest->stepLabel }}</span>
+                                                @if ($digest->elapsedHuman())
+                                                    <span class="text-sky-700/70"> · {{ __(':elapsed elapsed', ['elapsed' => $digest->elapsedHuman()]) }}</span>
+                                                @endif
+                                            </p>
+                                        @endif
+                                        @if ($isErrored && filled($displayError))
+                                            <p class="mt-1 line-clamp-2 text-xs leading-snug text-rose-800">{{ $displayError }}</p>
+                                        @endif
                                         @if ($conn !== null)
                                             @php
                                                 $reachOk = (bool) ($conn['ok'] ?? false);
@@ -622,7 +718,7 @@
                                         <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
                                     @endif
                                 </div>
-                            </div>
+                            </{{ $identityTag }}>
 
                             {{-- injected variables: collapsed summary, expands to full list --}}
                             @if ($attached && $envKeys !== [])
@@ -679,22 +775,44 @@
 
                             {{-- Actions --}}
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-                                @if ($isUnreachable && method_exists($this, 'fixBindingConnectivity'))
-                                    {{-- Highlighted remediation when the server can't reach the resource.
-                                         database/redis get the server-side auto-fix modal; logging links to
-                                         the Logs editor; everything else opens the reconfigure modal. --}}
-                                    @if (in_array($type, ['database', 'redis'], true))
+                                @if ($canRetryProvision && method_exists($this, 'retryFailedBindingProvision'))
+                                    <button type="button" wire:click="retryFailedBindingProvision(@js((string) $binding->id))"
+                                        wire:loading.attr="disabled" wire:target="retryFailedBindingProvision"
+                                        title="{{ __('Retry provisioning this resource.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md bg-rose-700 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-800 disabled:opacity-60">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="retryFailedBindingProvision" /> {{ __('Retry') }}
+                                    </button>
+                                @endif
+                                @if ($canRetryProvision && in_array($type, ['database', 'redis'], true) && method_exists($this, 'openFailedBindingRepair'))
+                                    <button type="button" wire:click="openFailedBindingRepair(@js((string) $binding->id))"
+                                        title="{{ __('Pick a different region or placement and remake this resource.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" /> {{ __('Change placement') }}
+                                    </button>
+                                @endif
+                                @if (($isUnreachable || $isErrored) && method_exists($this, 'fixBindingConnectivity'))
+                                    {{-- Highlighted remediation when the server can't reach the resource
+                                         or provision failed. database/redis get the server-side auto-fix
+                                         modal; logging links to the Logs editor; everything else opens
+                                         the reconfigure modal. --}}
+                                    @if (in_array($type, ['database', 'redis'], true) && $isUnreachable)
                                         <button type="button" wire:click="startFixBinding(@js((string) $binding->id))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')"
                                             title="{{ __('Fix the private-network connectivity for this resource.') }}"
                                             class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
-                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix access') }}
                                         </button>
                                     @elseif ($isLogging)
                                         <a href="{{ $sectionUrl('logs') }}" wire:navigate
                                             class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </a>
-                                    @else
+                                    @elseif ($isErrored && ! $canRetryProvision)
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
+                                            title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                        </button>
+                                    @elseif ($isUnreachable)
                                         <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
                                             title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
                                             class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
@@ -742,9 +860,14 @@
                                 @endif
                                 @if ($attached && method_exists($this, 'openBindingInfoModal'))
                                     <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
-                                        title="{{ __('View this connection\'s details (injected variables + reachability).') }}"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ __('Info') }}
+                                        title="{{ $isErrored ? __('View the error and fix options') : ($isProvisioning ? __('View live provisioning status') : __('View this connection\'s details (injected variables + reachability).')) }}"
+                                        @class([
+                                            'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm',
+                                            'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100' => $isErrored,
+                                            'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100' => $isProvisioning && ! $isErrored,
+                                            'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isProvisioning && ! $isErrored,
+                                        ])>
+                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ $isErrored ? __('Error') : ($isProvisioning ? __('Status') : __('Info')) }}
                                     </button>
                                 @endif
                                 {{-- Jump from a managed broadcasting binding to the relay app's own page
@@ -902,11 +1025,27 @@
             [x-cloak] { display: none !important; }
             @keyframes dplyEdgeFlow { to { stroke-dashoffset: -28; } }
             @keyframes dplyPulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+            @keyframes dplyProvisionShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+            @keyframes dplyProvisionGlow {
+                0%, 100% { box-shadow: 0 0 0 0 rgb(14 165 233 / 0.28); }
+                50% { box-shadow: 0 0 0 7px rgb(14 165 233 / 0); }
+            }
             .dply-edge-flow { stroke-dasharray: 5 7; animation: dplyEdgeFlow 1.1s linear infinite; }
+            .dply-edge-provisioning { stroke-dasharray: 3 6; animation: dplyEdgeFlow 0.65s linear infinite; }
+            .dply-edge-error { stroke-dasharray: 4 6; }
             .dply-edge-idle { stroke-dasharray: 4 7; }
             .dply-pulse { stroke-dasharray: 1.5 98.5; animation: dplyPulse 2.6s linear infinite; }
+            .dply-pulse-provisioning { stroke-dasharray: 4 96; animation: dplyPulse 1.4s linear infinite; }
+            .dply-pulse-error { stroke-dasharray: 6 94; animation: dplyPulse 2s linear infinite; }
+            .dply-provisioning-card { animation: dplyProvisionGlow 2s ease-in-out infinite; }
+            .dply-provisioning-badge {
+                background-image: linear-gradient(90deg, #e0f2fe, #7dd3fc, #e0f2fe);
+                background-size: 200% 100%;
+                animation: dplyProvisionShimmer 1.6s linear infinite;
+            }
             @media (prefers-reduced-motion: reduce) {
-                .dply-edge-flow, .dply-pulse { animation: none; }
+                .dply-edge-flow, .dply-edge-provisioning, .dply-pulse, .dply-pulse-provisioning,
+                .dply-pulse-error, .dply-provisioning-card, .dply-provisioning-badge { animation: none; }
             }
         </style>
     @endverbatim

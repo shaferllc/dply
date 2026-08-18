@@ -113,15 +113,16 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalToggle = false;
     }
 
-    public function confirmActionModal(): mixed
+    public function confirmActionModal(?bool $forceToggle = null): mixed
     {
         $method = $this->confirmActionModalMethod;
         $arguments = $this->confirmActionModalArguments;
 
         // A rendered toggle appends its boolean as the trailing argument, so the
         // confirmed method opts into the extra behaviour (e.g. delete-resource).
+        // Footer shortcuts may force the toggle on/off without touching the box.
         if ($this->confirmActionModalToggleLabel !== null) {
-            $arguments[] = $this->confirmActionModalToggle;
+            $arguments[] = $forceToggle ?? $this->confirmActionModalToggle;
         }
 
         $this->closeConfirmActionModal();

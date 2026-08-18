@@ -1,10 +1,10 @@
 {{-- Shared body for a resource-palette card on the Resources hub. Expects (from
      the parent @foreach scope): $t, $attached, $binding, $envKeys, $statusBadge.
-     A "needs Redis" hint shows when a driver-style type depends on Redis that
-     isn't attached yet (matches SiteBindingManager::assertDriverDependency). --}}
+     Queue has no file/array fallback — show a hint until Redis or a database
+     is attached (matches SiteBindingManager::assertDriverDependency). --}}
 @php
-    $needsRedis = in_array('redis', $t['needs'] ?? [], true)
-        && ! $hubBindings->contains(fn ($b) => $b->type === 'redis');
+    $needsRedis = ($t['type'] ?? '') === 'queue'
+        && \App\Support\Sites\SiteBindingCatalog::missingNeedsAny($hubBindings, $t['needsAny'] ?? []);
 @endphp
 <div class="flex items-start justify-between gap-2">
     <div class="flex items-center gap-2">
@@ -32,6 +32,6 @@
 
 @if ($needsRedis)
     <p class="inline-flex w-fit items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
-        <x-heroicon-o-exclamation-triangle class="h-3 w-3" /> {{ __('needs Redis') }}
+        <x-heroicon-o-exclamation-triangle class="h-3 w-3" /> {{ __('needs Redis or a database') }}
     </p>
 @endif

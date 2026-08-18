@@ -9,6 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
+use App\Livewire\Sites\Concerns\ManagesLinkedOrganizationSecrets;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
@@ -21,6 +22,7 @@ class Environment extends Component
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesEdgeBuildSettings;
+    use ManagesLinkedOrganizationSecrets;
     use MountsEdgeWorkspaceSection;
 
     public EdgeBuildSettingsForm $buildForm;

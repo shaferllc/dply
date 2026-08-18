@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\FixSiteBindingConnectivityJob;
+use App\Jobs\RunSetupScriptJob;
+use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
+use App\Models\CloudDatabase;
+use App\Models\ConsoleAction;
 use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
 use App\Models\OauthCredential;
@@ -15,21 +18,38 @@ use App\Models\ObjectStorageCredential;
 use App\Models\PaymentCredential;
 use App\Models\ProviderCredential;
 use App\Models\SearchCredential;
+use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
+use App\Models\ServerManageAction;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
 use App\Modules\Database\Actions\CreateDedicatedDockerDatabaseVm;
+use App\Modules\Database\Actions\CreateDedicatedRedisVm;
 use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Jobs\ProvisionDedicatedDatabaseVmJob;
+use App\Modules\Database\Jobs\ProvisionDedicatedDockerDatabaseVmJob;
+use App\Modules\Database\Jobs\ProvisionDedicatedRedisVmJob;
+use App\Modules\Database\Jobs\ResizeManagedDatabaseJob;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
 use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Services\Servers\ServerManageScriptQueuer;
 use App\Support\Servers\DatabaseNameGenerator;
+use App\Support\Servers\DedicatedVmPlacement;
+use App\Support\Servers\ManagedDatabaseRegionCatalog;
+use App\Support\Servers\ManagedDatabaseSizeCatalog;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
+use App\Support\Servers\ProvisioningDigest;
+use App\Support\Sites\ManagedDatabaseProvisionConsole;
+use App\Support\Sites\SiteBindingCatalog;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -38,32 +58,52 @@ use Illuminate\Support\Str;
  *
  * @method \App\Models\ConsoleAction seedQueuedConsoleAction(string $kind, ?string $label = null)
  * @method void watchConsoleAction(\App\Models\ConsoleAction $run, string $successToast, ?string $failureToast = null)
+ * @method void toastError(string|\Stringable $message)
+ * @method void toastSuccess(string|\Stringable $message)
+ * @method void openConfirmActionModal(string $method, mixed $arguments = [], string $title = 'Confirm action', string $message = 'Are you sure?', string $confirmLabel = 'Confirm', bool $destructive = false)
  */
 trait ManagesSiteBindingActions
 {
+    /** Site-scoped console run while Docker Engine is installing from the binding modal. */
+    public ?string $dockerInstallRunId = null;
+
     public function openBindingModal(string $type, string $mode = 'attach', ?string $bindingId = null): void
     {
         Gate::authorize('update', $this->site);
+
+        if ($type === 'queue'
+            && SiteBindingCatalog::missingNeedsAny($this->site->bindings, ['redis', 'database'])) {
+            $this->toastError(__('Attach Redis or a database before configuring the queue.'));
+
+            return;
+        }
 
         $this->resetErrorBag();
         $this->bindingModalType = $type;
         $this->bindingModalMode = $mode === 'provision' ? 'provision' : 'attach';
         $this->bindingModalBindingId = null;
-        $this->bindingForm = $this->defaultBindingForm($type, $this->bindingModalMode);
+        $this->bindingEdit = null;
+        $this->bindingForm = $this->defaultBindingForm($type, $this->bindingModalMode === 'provision' ? 'provision' : 'attach');
 
         // Editing a specific existing binding (multi-instance types like storage):
         // pre-fill the non-secret fields from that row. Secrets are never echoed,
         // so the operator re-supplies keys (or reuses a saved credential).
+        // Remake/repair still opens as provision; every other id-bearing open
+        // is an edit of that row — not a fresh attach/provision wizard.
         if ($bindingId !== null) {
             $this->seedBindingFormForEdit($type, $bindingId);
+            if ($this->bindingModalMode !== 'provision') {
+                $this->bindingModalMode = 'edit';
+            }
         }
 
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $type);
 
         // A dedicated-DB-VM placement needs a size list (provider/region
-        // specific); fetch it up front so the modal can render the picker.
+        // specific); fetch it up front so the picker is ready after they choose.
         $this->dedicatedVmSizes = [];
-        if ($type === 'database' && $this->bindingModalMode === 'provision') {
+        $this->dedicatedVmSizeError = null;
+        if (in_array($type, ['database', 'redis'], true) && $this->bindingModalMode === 'provision') {
             $this->loadDedicatedVmSizes();
         }
 
@@ -84,41 +124,65 @@ trait ManagesSiteBindingActions
     }
 
     /**
+     * Changing engine can make the current placement illegal (e.g. on-box
+     * after switching to Redis). Clear it so the operator picks again — size
+     * and vendor fields must not linger from the previous card.
+     */
+    public function updatedBindingFormEngine(mixed $value): void
+    {
+        if ($this->bindingModalType !== 'database' || $this->bindingModalMode !== 'provision') {
+            return;
+        }
+
+        $engine = strtolower(trim((string) $value));
+        $placement = (string) ($this->bindingForm['placement'] ?? '');
+        $compatible = collect($this->databasePlacements())
+            ->filter(fn (array $p): bool => $engine === '' || in_array($engine, $p['engines'] ?? [], true))
+            ->pluck('key')
+            ->all();
+
+        if ($placement !== '' && $compatible !== [] && ! in_array($placement, $compatible, true)) {
+            $this->bindingForm['placement'] = '';
+        }
+    }
+
+    /**
      * Populate {@see $dedicatedVmSizes} from the customer-connected create
-     * catalog for the app server's provider + region. Best-effort: a provider
-     * API failure just leaves the list empty (the dedicated card shows
-     * unavailable) rather than breaking the modal.
+     * catalog for the app server's provider + region. A stale/missing
+     * credential falls back to any org credential, then the platform catalog
+     * token. Failures surface in the size picker after that placement is chosen.
      */
     private function loadDedicatedVmSizes(): void
     {
+        $this->dedicatedVmSizeError = null;
+        $this->dedicatedVmRegion = null;
+        $this->dedicatedVmRequestedRegion = null;
         $server = $this->site->server;
         if ($server === null || ! DedicatedDatabaseVm::eligible($server) || $this->site->organization === null) {
             return;
         }
 
         try {
-            $catalog = app(ResolveServerCreateCatalog::class)->handle(
-                $this->site->organization,
-                $server->provider->value,
-                (string) $server->provider_credential_id,
-                (string) $server->region,
-            );
-            $this->dedicatedVmSizes = collect($catalog['sizes'])
-                ->map(fn ($s): array => [
-                    'value' => (string) $s['value'],
-                    'label' => (string) $s['label'],
-                ])
-                ->filter(fn (array $s): bool => $s['value'] !== '')
-                ->values()
-                ->all();
+            $placement = DedicatedVmPlacement::for($server, $this->site->organization);
+            $this->dedicatedVmSizes = $placement['sizes'];
+            $this->dedicatedVmRegion = $placement['region'] !== '' ? $placement['region'] : null;
+            $this->dedicatedVmRequestedRegion = $placement['requested_region'] !== ''
+                ? $placement['requested_region']
+                : null;
 
             // Preselect the first size so the dedicated card has a valid value
             // the moment it's chosen (the field is shared via bindingForm).
             if ($this->dedicatedVmSizes !== [] && ($this->bindingForm['vm_size'] ?? '') === '') {
                 $this->bindingForm['vm_size'] = $this->dedicatedVmSizes[0]['value'];
             }
-        } catch (\Throwable $e) {
+
+            if ($this->dedicatedVmSizes === []) {
+                $this->dedicatedVmSizeError = $placement['error']
+                    ?: __('No sizes available for this provider/region.');
+            }
+        } catch (Throwable $e) {
             $this->dedicatedVmSizes = [];
+            $this->dedicatedVmSizeError = $e->getMessage();
         }
     }
 
@@ -130,10 +194,11 @@ trait ManagesSiteBindingActions
     public function provisionDedicatedDatabaseVm(): void
     {
         Gate::authorize('update', $this->site);
+        $this->releaseFailedBindingBeforeReplace();
 
         try {
             app(CreateDedicatedDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
@@ -147,10 +212,11 @@ trait ManagesSiteBindingActions
     public function provisionDedicatedDockerDatabaseVm(): void
     {
         Gate::authorize('update', $this->site);
+        $this->releaseFailedBindingBeforeReplace();
 
         try {
             app(CreateDedicatedDockerDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
@@ -161,15 +227,169 @@ trait ManagesSiteBindingActions
         $this->toastSuccess(__('Provisioning a dedicated Docker database server — this can take several minutes.'));
     }
 
+    public function provisionDedicatedRedisVm(): void
+    {
+        Gate::authorize('update', $this->site);
+        $this->releaseFailedBindingBeforeReplace();
+
+        try {
+            app(CreateDedicatedRedisVm::class)->handle($this, $this->site, $this->bindingForm);
+        } catch (Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Provisioning a dedicated Redis server — this can take several minutes.'));
+    }
+
+    /**
+     * Confirm before installing Docker Engine from the binding placement picker.
+     */
+    public function confirmInstallDockerOnServer(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $def = config('server_manage.service_actions.install_docker', []);
+        $this->openConfirmActionModal(
+            'installDockerOnServer',
+            [],
+            (string) ($def['label'] ?? __('Install Docker Engine')),
+            (string) ($def['confirm'] ?? __('Install Docker Engine on this server?')),
+            __('Install Docker'),
+            false,
+        );
+    }
+
+    /**
+     * Queue the same Manage → Tools Docker install without leaving the binding modal.
+     */
+    public function installDockerOnServer(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $user = auth()->user();
+        if ($user !== null && ($user->currentOrganization()?->userIsDeployer($user) ?? false)) {
+            $this->toastError(__('Deployers cannot install packages on servers.'));
+
+            return;
+        }
+
+        $server = $this->site->server;
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        $server->refresh();
+        $this->syncBindingServer($server);
+
+        if ($server->dockerEnginePresent()) {
+            $this->bindingForm['placement'] = 'docker';
+            $this->toastSuccess(__('Docker Engine is already installed on this server.'));
+
+            return;
+        }
+
+        if ($this->dockerInstallIsInFlight($server)) {
+            $this->toastSuccess(__('Docker Engine is already installing on this server.'));
+
+            return;
+        }
+
+        if (! $server->isReady() || ! filled($server->ip_address) || ! filled($server->ssh_private_key)) {
+            $this->toastError(__('Provisioning and SSH must be ready before installing Docker.'));
+
+            return;
+        }
+
+        $def = config('server_manage.service_actions.install_docker');
+        if (! is_array($def) || empty($def['script'])) {
+            $this->toastError(__('Unknown action.'));
+
+            return;
+        }
+
+        $label = (string) ($def['label'] ?? __('Install Docker Engine'));
+        $run = $this->seedBindingConsoleAction('install_docker', __('Installing Docker Engine'));
+
+        app(ServerManageScriptQueuer::class)->queue(
+            $server,
+            'manage-action:install_docker',
+            (string) $def['script'],
+            isset($def['timeout']) ? (int) $def['timeout'] : 600,
+            $label.' '.__('finished.'),
+            $label,
+            $user?->id !== null ? (string) $user->id : null,
+            (string) $run->id,
+        );
+
+        $this->dockerInstallRunId = (string) $run->id;
+
+        if (method_exists($this, 'watchConsoleAction')) {
+            $this->watchConsoleAction(
+                $run,
+                __('Docker Engine is installed — you can select this option now.'),
+                __('Docker Engine install failed.'),
+            );
+        }
+
+        $this->toastSuccess(__('Installing Docker Engine on this server — this page stays open until it finishes.'));
+    }
+
+    /**
+     * Poll target while Docker Engine is installing from the placement picker.
+     */
+    public function syncDockerInstallProgress(): void
+    {
+        if (method_exists($this, 'resolveWatchedConsoleAction')) {
+            $this->resolveWatchedConsoleAction();
+        }
+
+        $server = $this->site->server;
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        $server->refresh();
+        $this->syncBindingServer($server);
+
+        if ($this->dockerInstallRunId === null && ! $this->dockerInstallIsInFlight($server)) {
+            return;
+        }
+
+        $latest = ServerManageAction::query()
+            ->where('server_id', $server->id)
+            ->where('task_name', 'manage-action:install_docker')
+            ->latest('created_at')
+            ->first();
+
+        if ($latest?->status === ServerManageAction::STATUS_FINISHED) {
+            if (! $server->dockerEnginePresent()) {
+                $this->markDockerEnginePresent($server);
+            }
+            $this->bindingForm['placement'] = 'docker';
+            $this->dockerInstallRunId = null;
+
+            return;
+        }
+
+        if ($latest?->status === ServerManageAction::STATUS_FAILED) {
+            $this->dockerInstallRunId = null;
+        }
+    }
+
     /**
      * Placement options for the "Provision new database" modal: always
      * on-box, plus a co-located managed cluster when the server's provider
      * offers one (DigitalOcean today). Each option carries the engines it
      * supports so the modal can filter as the operator picks an engine, and
      * an `available` flag (false when the managed backend exists but no
-     * provider credential is connected). Region/cost are display-only.
+     * provider credential is connected). Region and cost stay off the cards
+     * until the operator picks that placement.
      *
-     * @return list<array{key: string, label: string, sublabel: string, available: bool, note: ?string, engines: list<string>}>
+     * @return list<array{key: string, label: string, sublabel: string, available: bool, note: ?string, engines: list<string>, installing?: bool, install_action?: bool, serverless?: bool, regions?: list<array{value: string, label: string}>, account_label?: ?string, account_required?: bool, estimated_monthly_cost?: int|null}>
      */
     public function databasePlacements(): array
     {
@@ -187,15 +407,22 @@ trait ManagesSiteBindingActions
             return $options;
         }
 
+        $dockerPresent = $server->dockerEnginePresent();
+        $dockerInstalling = ! $dockerPresent && $this->dockerInstallIsInFlight($server);
+
         $options[] = [
             'key' => 'docker',
             'label' => __('Docker container on this server'),
             'sublabel' => __('Isolated · uses Docker Engine'),
-            'available' => $server->dockerEnginePresent(),
-            'note' => $server->dockerEnginePresent()
+            'available' => $dockerPresent,
+            'note' => $dockerPresent
                 ? null
-                : __('Install Docker from Server → Manage → Tools first.'),
+                : ($dockerInstalling
+                    ? __('Installing Docker Engine…')
+                    : __('Docker Engine is not installed on this server yet.')),
             'engines' => DockerDatabase::supportedEngines(),
+            'installing' => $dockerInstalling,
+            'install_action' => ! $dockerPresent,
         ];
 
         // Co-located managed cluster — only when the server's provider offers
@@ -211,61 +438,67 @@ trait ManagesSiteBindingActions
                     ->where('provider', $server->provider->value)
                     ->exists();
 
-            $sublabel = implode(' · ', array_filter([
-                $region,
-                $cost !== null ? '~$'.$cost.'/mo' : null,
-                __('isolated, billed by :provider', ['provider' => $server->provider->label()]),
-            ]));
+            $isCache = $this->bindingModalType === 'redis'
+                || in_array((string) ($this->bindingForm['engine'] ?? ''), ['redis', 'valkey'], true);
 
             $options[] = [
                 'key' => 'managed',
-                'label' => $server->provider->label().' '.__('Managed'),
-                'sublabel' => $sublabel,
+                'label' => $server->provider->label().' '.($isCache ? __('Managed Valkey') : __('Managed')),
+                'sublabel' => $isCache
+                    ? __('Isolated · billed by :provider · Redis-compatible', ['provider' => $server->provider->label()])
+                    : __('Isolated · billed by :provider', ['provider' => $server->provider->label()]),
                 'available' => $hasCredential && $region !== null,
                 'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
                 'engines' => $backend->supportedEngines(),
+                'estimated_monthly_cost' => $cost,
             ];
         }
 
         // Dedicated DB VM: a brand-new server on the customer's provider whose
-        // only job is this database. Needs a size list (loaded on modal open).
+        // only job is this database. Size / catalog errors belong in the picker
+        // after the card is chosen — not on every unselected row.
         if (DedicatedDatabaseVm::eligible($server)) {
-            $sizesReady = $this->dedicatedVmSizes !== [];
             $options[] = [
                 'key' => 'dedicated_vm',
                 'label' => __('Dedicated database server'),
-                'sublabel' => implode(' · ', array_filter([
-                    (string) $server->region,
-                    __('new :provider VM · isolated host', ['provider' => $server->provider->label()]),
-                ])),
-                'available' => $sizesReady,
-                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'sublabel' => __('New :provider VM · isolated host', ['provider' => $server->provider->label()]),
+                'available' => true,
+                'note' => null,
                 'engines' => DedicatedDatabaseVm::supportedEngines(),
             ];
             $options[] = [
                 'key' => 'docker_vm',
                 'label' => __('Dedicated Docker database server'),
-                'sublabel' => implode(' · ', array_filter([
-                    (string) $server->region,
-                    __('new :provider VM · Docker container', ['provider' => $server->provider->label()]),
-                ])),
-                'available' => $sizesReady,
-                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'sublabel' => __('New :provider VM · Docker container', ['provider' => $server->provider->label()]),
+                'available' => true,
+                'note' => null,
                 'engines' => DockerDatabase::supportedEngines(),
+            ];
+            $options[] = [
+                'key' => 'cache_vm',
+                'label' => __('Dedicated Redis server'),
+                'sublabel' => __('New :provider VM · Redis only', ['provider' => $server->provider->label()]),
+                'available' => true,
+                'note' => null,
+                'engines' => ['redis'],
             ];
         }
 
-        // BYO serverless vendors (Neon …): region-agnostic, always offered.
+        // BYO serverless vendors (Neon …): region-agnostic. Upstash stays
+        // visible when its flag is off — Coming soon, not hidden.
         foreach (ServerlessDatabaseVendors::all() as $vendor) {
+            $enabled = ServerlessDatabaseVendors::isEnabled($vendor['key']);
             $options[] = [
                 'key' => $vendor['key'],
                 'label' => $vendor['label'],
                 'sublabel' => __('serverless · bring your own account'),
-                'available' => true,
-                'note' => null,
+                'available' => $enabled,
+                'note' => $enabled ? null : __('Coming soon'),
                 'engines' => $vendor['engines'],
                 'serverless' => true,
                 'regions' => $vendor['regions'],
+                'account_label' => $vendor['account_label'],
+                'account_required' => $vendor['account_required'],
             ];
         }
 
@@ -291,6 +524,30 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingModalBindingId = (string) $binding->id;
+        $config = (array) $binding->config;
+        $cluster = $binding->target_type === 'cloud_database' && filled($binding->target_id)
+            ? CloudDatabase::query()->find($binding->target_id)
+            : null;
+        $size = $cluster instanceof CloudDatabase
+            ? $cluster->backendSizeSlug()
+            : (string) ($config['size'] ?? $config['vm_size'] ?? '');
+        $resizingTo = (string) ($config['resizing_to'] ?? '');
+
+        $this->bindingEdit = [
+            'id' => (string) $binding->id,
+            'status' => (string) $binding->status,
+            'placement_label' => $this->bindingPlacementLabel($config),
+            'provisioned' => $binding->wasProvisionedByDply(),
+            'can_retry' => $this->canRetryBindingProvision($binding),
+            'can_delete' => $binding->canOfferDeleteOnDetach(),
+            'can_test' => $binding->status === SiteBinding::STATUS_CONFIGURED,
+            'can_resize' => $this->canResizeManagedBinding($binding, $cluster),
+            'resizing_to' => $resizingTo,
+            'region' => (string) ($config['region'] ?? ($cluster?->region ?? '')),
+            'size' => $size,
+            'service' => (string) ($config['service'] ?? $binding->name ?? ''),
+        ];
+        $this->bindingForm['use_for_drivers'] = ! empty($config['use_for_drivers']);
 
         // Multi-instance types (database, redis, …; not storage) re-select the
         // underlying target + the connection name so the form opens on the exact
@@ -313,6 +570,34 @@ trait ManagesSiteBindingActions
                 if (($config[$k] ?? '') !== '') {
                     $this->bindingForm[$k] = (string) $config[$k];
                 }
+            }
+        }
+
+        if (in_array($type, ['database', 'redis'], true)) {
+            $config = (array) $binding->config;
+            if (($config['placement'] ?? '') !== '') {
+                $this->bindingForm['placement'] = (string) $config['placement'];
+            }
+            $clusterName = $this->bindingClusterName($binding, $config);
+            if ($clusterName !== '') {
+                $this->bindingForm['name'] = $clusterName;
+            }
+            foreach (['size', 'region', 'engine', 'vm_size'] as $key) {
+                if (($config[$key] ?? '') !== '') {
+                    $this->bindingForm[$key] = (string) $config[$key];
+                }
+            }
+            if ($this->isManagedBindingPlacement($config)) {
+                $engine = (string) ($this->bindingForm['engine'] ?? ($type === 'redis' ? 'redis' : 'postgres'));
+                $this->coerceManagedDatabaseRegion(
+                    $engine,
+                    ProviderManagedDatabaseRegion::rejectedFromError(
+                        $binding->last_error ?? (isset($config['last_error']) ? (string) $config['last_error'] : null),
+                    ),
+                );
+                $this->bindingForm['size'] = CloudDatabase::resolveSizeSlug(
+                    $resizingTo !== '' ? $resizingTo : (string) ($this->bindingForm['size'] ?? $size ?: 'small'),
+                );
             }
         }
 
@@ -355,40 +640,186 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingModalMode = $mode;
-        $this->bindingForm = $this->defaultBindingForm($this->bindingModalType, $mode);
+        $this->bindingForm = $this->defaultBindingForm($this->bindingModalType, $mode === 'edit' ? 'attach' : $mode);
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $this->bindingModalType);
 
-        // Toggling into "Provision new" for a database must load the dedicated-VM
-        // size catalog too, or that placement card stays disabled.
+        // Toggling into "Provision new" must load the dedicated-VM size
+        // catalog so the picker is ready after they choose that card.
         $this->dedicatedVmSizes = [];
-        if ($this->bindingModalType === 'database' && $mode === 'provision') {
+        $this->dedicatedVmSizeError = null;
+        if (in_array($this->bindingModalType, ['database', 'redis'], true) && $mode === 'provision') {
             $this->loadDedicatedVmSizes();
         }
 
         $this->resetErrorBag();
     }
 
+    private function saveEditedBinding(SiteBindingManager $manager): void
+    {
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($this->bindingModalBindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $params = $this->bindingForm + ['binding_id' => (string) $binding->id];
+
+        try {
+            if ($binding->wasProvisionedByDply()) {
+                $manager->updateEditedBinding($binding, $params);
+            } else {
+                $manager->attachExisting($this->site, $binding->type, $params);
+            }
+        } catch (Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Binding updated.'));
+    }
+
+    public function openResizeManagedBindingConfirmModal(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($this->bindingModalBindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $cluster = $binding->target_type === 'cloud_database' && filled($binding->target_id)
+            ? CloudDatabase::query()->find($binding->target_id)
+            : null;
+
+        if (! $this->canResizeManagedBinding($binding, $cluster) || ! $cluster instanceof CloudDatabase) {
+            $this->toastError(__('This cluster cannot be resized from here.'));
+
+            return;
+        }
+
+        $current = $cluster->backendSizeSlug();
+        $size = CloudDatabase::resolveSizeSlug((string) ($this->bindingForm['size'] ?? ''));
+
+        if ($size === '' || $size === $current) {
+            $this->toastError(__('Pick a different plan first.'));
+
+            return;
+        }
+
+        $upsizing = ManagedDatabaseSizeCatalog::rank($size) > ManagedDatabaseSizeCatalog::rank($current);
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->openConfirmActionModal(
+            'resizeManagedBinding',
+            [(string) $binding->id, $size],
+            $upsizing
+                ? __('Upsize this cluster?')
+                : __('Downsize this cluster?'),
+            $upsizing
+                ? __('DigitalOcean will apply the larger plan on this same cluster. The host usually stays the same.')
+                : __('DigitalOcean will apply the smaller plan on this same cluster. Downsizing can fail if the dataset does not fit.'),
+            $upsizing ? __('Upsize') : __('Downsize'),
+            ! $upsizing,
+            [
+                ['label' => __('Current'), 'value' => ManagedDatabaseSizeCatalog::label($current)],
+                ['label' => __('New plan'), 'value' => ManagedDatabaseSizeCatalog::label($size)],
+            ],
+            null,
+            '',
+            false,
+            __('The cluster stays attached. Apps keep using the same REDIS_* / DB_* host while it resizes.'),
+        );
+    }
+
+    public function resizeManagedBinding(string $bindingId, string $size): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $cluster = $binding->target_type === 'cloud_database' && filled($binding->target_id)
+            ? CloudDatabase::query()->find($binding->target_id)
+            : null;
+
+        if (! $this->canResizeManagedBinding($binding, $cluster) || ! $cluster instanceof CloudDatabase) {
+            $this->toastError(__('This cluster cannot be resized from here.'));
+
+            return;
+        }
+
+        $size = CloudDatabase::resolveSizeSlug($size);
+        $current = $cluster->backendSizeSlug();
+        if ($size === '' || $size === $current) {
+            $this->toastError(__('Pick a different plan first.'));
+
+            return;
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $config['resizing_to'] = $size;
+        $binding->forceFill([
+            'config' => $config,
+            'last_error' => null,
+        ])->save();
+
+        ResizeManagedDatabaseJob::dispatch((string) $cluster->id, (string) $binding->id, $size);
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->bindingModalMode = '';
+        $this->bindingModalBindingId = null;
+        $this->bindingEdit = null;
+        $this->toastSuccess(__('Resize queued. Watch the console for DigitalOcean progress.'));
+    }
+
     public function saveBinding(SiteBindingManager $manager): void
     {
         Gate::authorize('update', $this->site);
+
+        if ($this->bindingModalMode === 'edit') {
+            $this->saveEditedBinding($manager);
+
+            return;
+        }
 
         // Placement decides which provisioner runs, and the two dedicated cards
         // differ only by one word ("Dedicated database server" vs "Dedicated
         // Docker database server") while routing to completely different
         // infrastructure. Verify the submitted placement is real and supports
         // the chosen engine instead of falling through to a different one.
-        if ($this->bindingModalType === 'database' && $this->bindingModalMode === 'provision') {
+        if (in_array($this->bindingModalType, ['database', 'redis'], true) && $this->bindingModalMode === 'provision') {
             $placement = (string) ($this->bindingForm['placement'] ?? '');
-            $engine = strtolower(trim((string) ($this->bindingForm['engine'] ?? '')));
+            $engine = strtolower(trim((string) ($this->bindingForm['engine'] ?? ($this->bindingModalType === 'redis' ? 'redis' : ''))));
             $match = collect($this->databasePlacements())->firstWhere('key', $placement);
 
-            if ($placement !== '' && $match === null) {
+            if ($placement === '') {
+                $this->toastError(__('Pick where it should live first.'));
+
+                return;
+            }
+
+            if ($match === null) {
                 $this->toastError(__('That database placement is no longer available. Pick one again.'));
 
                 return;
             }
 
-            if ($match !== null && $engine !== '' && ! in_array($engine, $match['engines'], true)) {
+            if ($engine !== '' && ! in_array($engine, $match['engines'], true)) {
                 $this->toastError(__(':placement does not support :engine. Pick a different placement or engine.', [
                     'placement' => $match['label'],
                     'engine' => $engine,
@@ -417,13 +848,23 @@ trait ManagesSiteBindingActions
             return;
         }
 
+        if (in_array($this->bindingModalType, ['database', 'redis'], true)
+            && $this->bindingModalMode === 'provision'
+            && ($this->bindingForm['placement'] ?? '') === 'cache_vm') {
+            $this->provisionDedicatedRedisVm();
+
+            return;
+        }
+
         // Auto-provision Redis on connect: when there's no Redis to attach AND
         // none is installed on the box, kick the install right from the connect
         // action instead of dead-ending on "nothing reachable" (the operator no
         // longer has to spot and click the separate Install Redis button). Once
         // it's running, reconnect attaches it. If Redis IS installed but just
         // unreachable, fall through so attach surfaces the precise error.
-        if ($this->bindingModalType === 'redis' && $this->maybeAutoInstallRedis($manager)) {
+        if ($this->bindingModalType === 'redis'
+            && $this->bindingModalMode !== 'provision'
+            && $this->maybeAutoInstallRedis($manager)) {
             return;
         }
 
@@ -444,7 +885,7 @@ trait ManagesSiteBindingActions
             $binding = $useProvision
                 ? $manager->provisionNew($this->site, $this->bindingModalType, $params)
                 : $manager->attachExisting($this->site, $this->bindingModalType, $params);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError($e->getMessage());
 
             return;
@@ -598,7 +1039,7 @@ trait ManagesSiteBindingActions
      * The delete flag is supplied by the confirm modal's opt-in toggle, so it
      * arrives as the trailing argument (no DI-typed parameter after it).
      */
-    public function openDetachBindingConfirmModal(string $bindingId, ?string $label = null): void
+    public function openDetachBindingConfirmModal(string $bindingId, ?string $label = null, bool $preferDelete = false): void
     {
         Gate::authorize('update', $this->site);
 
@@ -612,8 +1053,12 @@ trait ManagesSiteBindingActions
         }
 
         $label = filled($label) ? $label : Str::headline($binding->type);
-        $title = __('Detach :label?', ['label' => $label]);
-        $message = __('Remove this resource binding? Its injected variables will no longer be applied at deploy.');
+        $title = $preferDelete
+            ? __('Detach and delete :label?', ['label' => $label])
+            : __('Detach :label?', ['label' => $label]);
+        $message = $preferDelete
+            ? __('Remove this resource binding and delete the provisioned instance? Injected variables will no longer be applied at deploy. This cannot be undone.')
+            : __('Remove this resource binding? Its injected variables will no longer be applied at deploy.');
 
         $toggleLabel = $binding->deleteOnDetachLabel();
         if ($toggleLabel !== null) {
@@ -627,7 +1072,7 @@ trait ManagesSiteBindingActions
                 null,
                 $toggleLabel,
                 $binding->deleteOnDetachHint(),
-                false,
+                $preferDelete,
             );
 
             return;
@@ -641,6 +1086,11 @@ trait ManagesSiteBindingActions
             __('Detach'),
             true,
         );
+    }
+
+    public function openDetachAndDeleteBindingConfirmModal(string $bindingId, ?string $label = null): void
+    {
+        $this->openDetachBindingConfirmModal($bindingId, $label, true);
     }
 
     public function detachBinding(string $bindingId, bool $deleteResource = false): void
@@ -660,7 +1110,7 @@ trait ManagesSiteBindingActions
 
         try {
             app(SiteBindingManager::class)->detach($binding, $deleteResource);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError(__('Could not delete the resource: :error', ['error' => $e->getMessage()]));
 
             return;
@@ -681,16 +1131,47 @@ trait ManagesSiteBindingActions
     {
         Gate::authorize('view', $this->site);
 
+        if (! $this->refreshBindingInfo($bindingId)) {
+            return;
+        }
+
+        $regions = collect($this->bindingInfo['provision']['regions'] ?? [])->pluck('value')->filter()->values()->all();
+        $region = ProviderManagedDatabaseRegion::resolve(
+            $this->site->server?->provider?->value ?? '',
+            (string) ($this->bindingForm['region'] ?? ''),
+            (string) ($this->bindingInfo['provision']['region'] ?? ''),
+            $regions,
+        );
+        if ($region !== null) {
+            $this->bindingForm['region'] = $region;
+        }
+
+        $this->dispatch('open-modal', 'binding-info-modal');
+    }
+
+    /**
+     * Rebuild the read-only info payload for a binding. Used on open and again
+     * while a provisioning modal stays open so the journey digest stays live.
+     *
+     * Named refresh* (not hydrate*) so Livewire does not treat it as a
+     * property hydrator for {@see $bindingInfo}.
+     */
+    public function refreshBindingInfo(string $bindingId): bool
+    {
+        Gate::authorize('view', $this->site);
+
         $binding = SiteBinding::query()
             ->where('site_id', $this->site->id)
             ->whereKey($bindingId)
             ->first();
 
         if (! $binding instanceof SiteBinding) {
-            return;
+            $this->bindingInfo = null;
+
+            return false;
         }
 
-        $config = $binding->config;
+        $config = is_array($binding->config) ? $binding->config : [];
         $env = $binding->injected_env;
 
         $vars = [];
@@ -703,23 +1184,593 @@ trait ManagesSiteBindingActions
             ];
         }
 
-        $conn = is_array($binding->connectivity ?? null) ? $binding->connectivity : null;
+        $conn = is_array($config['connectivity'] ?? null) ? $config['connectivity'] : null;
+        $provision = $this->bindingProvisionPayload($binding, $config);
+        $consoleRun = $this->syncManagedProvisionConsole($binding);
+        if ($consoleRun instanceof ConsoleAction) {
+            $provision['console_run_id'] = (string) $consoleRun->id;
+        }
 
         $this->bindingInfo = [
+            'id' => (string) $binding->id,
             'type' => (string) $binding->type,
             'name' => $binding->name,
             'status' => (string) $binding->status,
             'provider' => $config['provider'] ?? null,
+            'placement' => $config['placement'] ?? null,
             'private_network' => ! empty($config['source_server_id']),
             'needs_remote_access' => ! empty($config['needs_remote_access']),
-            'last_error' => $config['last_error'] ?? null,
+            'last_error' => $this->bindingResolvedError($binding, $config),
             'reachable' => is_array($conn) ? ($conn['ok'] ?? null) : null,
             'reachable_detail' => is_array($conn) ? ($conn['detail'] ?? null) : null,
             'checked_at' => is_array($conn) ? ($conn['checked_at'] ?? null) : null,
             'vars' => $vars,
+            'can_delete_resource' => $binding->canOfferDeleteOnDetach(),
+            'provision' => $provision,
         ];
 
-        $this->dispatch('open-modal', 'binding-info-modal');
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array{
+     *     active: bool,
+     *     hint: string,
+     *     placement_label: ?string,
+     *     server_name: ?string,
+     *     server_status: ?string,
+     *     setup_status: ?string,
+     *     server_url: ?string,
+     *     journey_url: ?string,
+     *     digest_phase: ?string,
+     *     digest_step: ?string,
+     *     digest_step_index: ?int,
+     *     digest_step_total: ?int,
+     *     digest_elapsed: ?string,
+     *     digest_percent: ?int,
+     *     failed: bool,
+     *     error: ?string,
+     *     can_retry: bool,
+     *     can_fix_connectivity: bool,
+     *     console_run_id: ?string
+     * }
+     */
+    private function bindingProvisionPayload(SiteBinding $binding, array $config): array
+    {
+        $serverId = $binding->provisionServerId();
+        $server = filled($serverId)
+            ? Server::query()->whereKey($serverId)->first()
+            : null;
+        $digest = $server instanceof Server ? ProvisioningDigest::forServer($server) : null;
+        $percent = ($digest !== null && $digest->stepIndex && $digest->stepTotal)
+            ? max(0, min(100, (int) round(100 * $digest->stepIndex / $digest->stepTotal)))
+            : null;
+        $conn = is_array($config['connectivity'] ?? null) ? $config['connectivity'] : null;
+
+        return [
+            'active' => $binding->isProvisioning(),
+            'hint' => $this->bindingProvisionHint($binding, $config),
+            'placement_label' => $this->bindingPlacementLabel($config),
+            'server_name' => $server instanceof Server ? $server->name : null,
+            'server_status' => $server instanceof Server ? $server->status : null,
+            'setup_status' => $server instanceof Server ? $server->setup_status : null,
+            'server_url' => $server instanceof Server ? route('servers.show', $server) : null,
+            'journey_url' => $server instanceof Server ? route('servers.journey', $server) : null,
+            'digest_phase' => $digest?->phaseLabel,
+            'digest_step' => $digest?->stepLabel,
+            'digest_step_index' => $digest?->stepIndex,
+            'digest_step_total' => $digest?->stepTotal,
+            'digest_elapsed' => $digest?->elapsedHuman(),
+            'digest_percent' => $percent,
+            'failed' => $binding->isErrored(),
+            'error' => $binding->displayError($server instanceof Server ? $server : null),
+            'can_retry' => $this->canRetryBindingProvision($binding),
+            'can_change_placement' => $this->canRetryBindingProvision($binding)
+                && in_array($binding->type, ['database', 'redis'], true),
+            'can_pick_region' => $this->canRetryBindingProvision($binding)
+                && $this->isManagedBindingPlacement($config)
+                && $this->managedDatabaseRegions($this->managedDatabaseEngineFor($binding, $config)) !== [],
+            'regions' => $this->isManagedBindingPlacement($config)
+                ? $this->managedDatabaseRegions(
+                    $this->managedDatabaseEngineFor($binding, $config),
+                    ProviderManagedDatabaseRegion::rejectedFromError($this->bindingResolvedError($binding, $config)),
+                )
+                : [],
+            'region' => (string) ($config['region'] ?? ''),
+            'can_fix_connectivity' => is_array($conn) && ($conn['ok'] ?? true) === false,
+            'console_run_id' => isset($config['console_run_id']) ? (string) $config['console_run_id'] : null,
+        ];
+    }
+
+    private function syncManagedProvisionConsole(SiteBinding $binding): ?ConsoleAction
+    {
+        $config = is_array($binding->config) ? $binding->config : [];
+        if (! $this->isManagedBindingPlacement($config) || $binding->target_type !== 'cloud_database') {
+            return null;
+        }
+
+        $database = CloudDatabase::query()->find($binding->target_id);
+        if (! $database instanceof CloudDatabase) {
+            return null;
+        }
+
+        $run = ManagedDatabaseProvisionConsole::ensure($this->site, $binding, $database);
+
+        if (! $binding->isProvisioning() && ! $binding->isErrored()) {
+            return $run;
+        }
+
+        $backendId = trim((string) $database->backend_id);
+        if ($backendId === '') {
+            ManagedDatabaseProvisionConsole::noteIfNew(
+                $run,
+                'digitalocean',
+                __('Waiting for DigitalOcean to accept the create.'),
+            );
+
+            return $run;
+        }
+
+        try {
+            $database->loadMissing('providerCredential');
+            $credential = $database->providerCredential;
+            if ($credential === null) {
+                return $run;
+            }
+
+            $cluster = (new DigitalOceanService($credential))->getDatabaseCluster($backendId);
+            $status = (string) ($cluster['status'] ?? '');
+            $elapsed = max(1, (int) ($database->created_at?->diffInSeconds(now()) ?? 20));
+            $attempt = max(1, (int) ceil($elapsed / 20));
+
+            ManagedDatabaseProvisionConsole::poll($run, $database, $status, $attempt, 40);
+
+            if ($status === 'online') {
+                ManagedDatabaseProvisionConsole::noteIfNew(
+                    $run,
+                    'digitalocean',
+                    __('Cluster is online. Wiring connection variables.'),
+                    ConsoleAction::LEVEL_SUCCESS,
+                );
+            }
+        } catch (Throwable $e) {
+            ManagedDatabaseProvisionConsole::noteIfNew(
+                $run,
+                'digitalocean',
+                __('Could not refresh cluster status: :error', ['error' => $e->getMessage()]),
+                ConsoleAction::LEVEL_WARN,
+            );
+        }
+
+        return $run;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function bindingResolvedError(SiteBinding $binding, array $config): ?string
+    {
+        $serverId = $binding->provisionServerId();
+        $server = filled($serverId)
+            ? Server::query()->whereKey($serverId)->first()
+            : null;
+
+        return $binding->displayError($server instanceof Server ? $server : null)
+            ?? (isset($config['last_error']) ? (string) $config['last_error'] : null);
+    }
+
+    public function openFailedBindingRepair(string $bindingId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding || ! $binding->isErrored()) {
+            return;
+        }
+
+        $this->bindingInfo = null;
+        $this->dispatch('close-modal', 'binding-info-modal');
+        $this->openBindingModal($binding->type, 'provision', (string) $binding->id);
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    /**
+     * @param  list<string>  $rejected
+     * @return list<array{value: string, label: string}>
+     */
+    public function managedDatabaseRegions(?string $engine = null, array $rejected = []): array
+    {
+        $server = $this->site->server;
+        if ($server === null) {
+            return [];
+        }
+
+        $engine = strtolower(trim((string) $engine));
+        if ($engine === '') {
+            $engine = $this->managedDatabaseEngine();
+        }
+
+        $rejected = array_values(array_unique(array_merge(
+            $rejected,
+            ProviderManagedDatabaseRegion::rejectedFromError(
+                is_array($this->bindingInfo)
+                    ? (string) ($this->bindingInfo['provision']['error'] ?? $this->bindingInfo['last_error'] ?? '')
+                    : null,
+            ),
+        )));
+
+        return ManagedDatabaseRegionCatalog::options($server, $engine, null, $rejected);
+    }
+
+    /**
+     * @return list<array{value: string, label: string, group: string}>
+     */
+    public function managedDatabaseSizes(?string $engine = null): array
+    {
+        $server = $this->site->server;
+        if ($server === null) {
+            return [];
+        }
+
+        $engine = strtolower(trim((string) $engine));
+        if ($engine === '') {
+            $engine = $this->managedDatabaseEngine();
+        }
+
+        return ManagedDatabaseSizeCatalog::options($server, $engine);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function managedDatabaseEngineFor(SiteBinding $binding, array $config): string
+    {
+        $engine = strtolower(trim((string) ($config['engine'] ?? '')));
+        if (in_array($engine, ['redis', 'valkey', 'postgres', 'postgresql', 'pg', 'mysql'], true)) {
+            return $engine === 'postgresql' || $engine === 'pg' ? 'postgres' : $engine;
+        }
+
+        return $binding->type === 'redis' ? 'redis' : 'postgres';
+    }
+
+    private function managedDatabaseEngine(): string
+    {
+        $fromForm = strtolower(trim((string) ($this->bindingForm['engine'] ?? '')));
+        if (in_array($fromForm, ['redis', 'valkey', 'postgres', 'mysql'], true)) {
+            return $fromForm;
+        }
+
+        $type = (string) ($this->bindingInfo['type'] ?? $this->bindingModalType);
+
+        return $type === 'redis' ? 'redis' : 'postgres';
+    }
+
+    /**
+     * @param  list<string>  $rejected
+     */
+    private function coerceManagedDatabaseRegion(?string $engine = null, array $rejected = []): void
+    {
+        $options = $this->managedDatabaseRegions($engine, $rejected);
+        $slugs = array_column($options, 'value');
+        if ($slugs === []) {
+            return;
+        }
+
+        $resolved = ProviderManagedDatabaseRegion::resolve(
+            $this->site->server?->provider?->value ?? '',
+            (string) ($this->bindingForm['region'] ?? ''),
+            $this->site->server?->region,
+            $slugs,
+        );
+        if ($resolved !== null) {
+            $this->bindingForm['region'] = $resolved;
+        }
+    }
+
+    public function retryFailedBindingProvision(string $bindingId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding || ! $binding->isErrored()) {
+            return;
+        }
+
+        if (! $this->canRetryBindingProvision($binding)) {
+            $this->toastError(__('This resource cannot be retried from here — replace it or open the server journey.'));
+
+            return;
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $serverId = $binding->provisionServerId();
+        $server = filled($serverId)
+            ? Server::query()->whereKey($serverId)->first()
+            : null;
+
+        if ($this->isManagedBindingPlacement($config)) {
+            $this->recreateFailedManagedCluster($binding, $config);
+
+            return;
+        }
+
+        if ($server instanceof Server && filled($binding->target_id)) {
+            if ($server->setup_status === Server::SETUP_STATUS_FAILED
+                && RunSetupScriptJob::shouldDispatch($server)) {
+                $meta = is_array($server->meta) ? $server->meta : [];
+                unset($meta['provision_task_id'], $meta['provision_step_snapshots']);
+                $server->forceFill([
+                    'setup_status' => Server::SETUP_STATUS_PENDING,
+                    'meta' => $meta,
+                ])->save();
+                WaitForServerSshReadyJob::dispatch($server->fresh() ?? $server);
+            }
+
+            $binding->forceFill([
+                'status' => SiteBinding::STATUS_PROVISIONING,
+                'last_error' => null,
+            ])->save();
+
+            $this->redispatchBindingProvisionWait($binding);
+            $this->refreshBindingInfo((string) $binding->id);
+            $this->toastSuccess(__('Retrying provision — watch this card for status.'));
+
+            return;
+        }
+
+        $this->recreateFailedDedicatedVm($binding, $config);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function recreateFailedDedicatedVm(SiteBinding $binding, array $config): void
+    {
+        $placement = (string) ($config['placement'] ?? '');
+        $form = [
+            'engine' => (string) ($config['engine'] ?? ($binding->type === 'redis' ? 'redis' : 'mysql')),
+            'name' => (string) ($config['cluster_name'] ?? $config['database_name'] ?? ($binding->name ?: 'primary')),
+            'placement' => $placement,
+            'vm_size' => (string) ($config['vm_size'] ?? ''),
+            'connection' => (string) ($config['connection'] ?? ''),
+            'use_for_drivers' => (bool) ($config['use_for_drivers'] ?? false),
+        ];
+
+        $binding->delete();
+
+        try {
+            match ($placement) {
+                'cache_vm' => app(CreateDedicatedRedisVm::class)->handle($this, $this->site, $form),
+                'dedicated_vm' => app(CreateDedicatedDatabaseVm::class)->handle($this, $this->site, $form),
+                'docker_vm' => app(CreateDedicatedDockerDatabaseVm::class)->handle($this, $this->site, $form),
+                default => null,
+            };
+        } catch (Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->bindingInfo = null;
+        $this->toastSuccess(__('Retrying provision — watch this card for status.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function recreateFailedManagedCluster(SiteBinding $binding, array $config): void
+    {
+        $oldTargetId = (string) ($binding->target_id ?? '');
+        $rejected = ProviderManagedDatabaseRegion::rejectedFromError(
+            $this->bindingResolvedError($binding, $config),
+        );
+        if ($binding->target_type === 'cloud_database' && filled($binding->target_id)) {
+            $failed = CloudDatabase::query()->find($binding->target_id);
+            $rejected = array_values(array_unique(array_merge(
+                $rejected,
+                ProviderManagedDatabaseRegion::rejectedFromError(
+                    is_array($failed?->meta) ? (string) ($failed->meta['error'] ?? '') : null,
+                ),
+            )));
+        }
+        $region = (string) ($this->bindingForm['region'] ?? $config['region'] ?? '');
+        if (in_array(strtolower($region), $rejected, true)) {
+            $region = '';
+        }
+        $form = [
+            'engine' => (string) ($config['engine'] ?? ($binding->type === 'redis' ? CloudDatabase::ENGINE_REDIS : 'mysql')),
+            'name' => $this->bindingClusterName($binding, $config),
+            'placement' => (string) ($this->bindingForm['placement'] ?? $config['placement'] ?? 'managed'),
+            'size' => (string) ($this->bindingForm['size'] ?? $config['size'] ?? 'small'),
+            'region' => $region,
+            'rejected_regions' => $rejected,
+            'connection' => (string) ($config['connection'] ?? ''),
+            'binding_id' => (string) $binding->id,
+        ];
+
+        try {
+            $remade = app(SiteBindingManager::class)->provisionNew($this->site, $binding->type, $form);
+        } catch (Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        if ($oldTargetId !== ''
+            && $oldTargetId !== (string) $remade->target_id
+            && $binding->target_type === 'cloud_database') {
+            CloudDatabase::query()->whereKey($oldTargetId)->delete();
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->refreshBindingInfo((string) $remade->id);
+        $this->toastSuccess(__('Retrying provision — watch this card for status.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function bindingClusterName(SiteBinding $binding, array $config): string
+    {
+        foreach (['cluster_name', 'database_name'] as $key) {
+            $name = trim((string) ($config[$key] ?? ''));
+            if ($name !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $name) === 1) {
+                return $name;
+            }
+        }
+
+        $service = trim((string) ($config['service'] ?? ''));
+        if (preg_match('/^([a-zA-Z0-9_]+)/', $service, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return $binding->type === 'redis' ? 'redis' : 'database';
+    }
+
+    private function releaseFailedBindingBeforeReplace(): void
+    {
+        $id = trim((string) ($this->bindingModalBindingId ?? ''));
+        if ($id === '') {
+            return;
+        }
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->first();
+
+        if (! $binding instanceof SiteBinding || ! $binding->isErrored()) {
+            return;
+        }
+
+        $oldTargetId = (string) ($binding->target_id ?? '');
+        $targetType = (string) ($binding->target_type ?? '');
+        $binding->delete();
+        $this->bindingModalBindingId = null;
+
+        if ($targetType === 'cloud_database' && $oldTargetId !== '') {
+            CloudDatabase::query()->whereKey($oldTargetId)->delete();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function isManagedBindingPlacement(array $config): bool
+    {
+        return ! empty($config['managed']) || ($config['placement'] ?? '') === 'managed';
+    }
+
+    private function canResizeManagedBinding(SiteBinding $binding, ?CloudDatabase $cluster): bool
+    {
+        $config = is_array($binding->config) ? $binding->config : [];
+
+        return $binding->wasProvisionedByDply()
+            && $binding->target_type === 'cloud_database'
+            && $this->isManagedBindingPlacement($config)
+            && $binding->status === SiteBinding::STATUS_CONFIGURED
+            && ($config['resizing_to'] ?? '') === ''
+            && $cluster instanceof CloudDatabase
+            && $cluster->backend === CloudDatabase::BACKEND_DIGITALOCEAN
+            && $cluster->isActive()
+            && filled($cluster->backend_id);
+    }
+
+    public function canRetryBindingProvision(SiteBinding $binding): bool
+    {
+        $config = is_array($binding->config) ? $binding->config : [];
+        $placement = $config['placement'] ?? '';
+
+        if (! $binding->isErrored()) {
+            return false;
+        }
+
+        if ($this->isManagedBindingPlacement($config)) {
+            return true;
+        }
+
+        if (! in_array($placement, ['cache_vm', 'dedicated_vm', 'docker_vm'], true)) {
+            return false;
+        }
+
+        if (filled($config['vm_size'] ?? null)) {
+            return true;
+        }
+
+        return filled($binding->provisionServerId()) && filled($binding->target_id);
+    }
+
+    private function redispatchBindingProvisionWait(SiteBinding $binding): void
+    {
+        $config = is_array($binding->config) ? $binding->config : [];
+        $placement = $config['placement'] ?? '';
+        $serverId = (string) $binding->provisionServerId();
+        $siteId = (string) $this->site->id;
+        $targetId = (string) $binding->target_id;
+        $bindingId = (string) $binding->id;
+
+        match ($placement) {
+            'cache_vm' => ProvisionDedicatedRedisVmJob::dispatch($serverId, $siteId, $targetId, $bindingId),
+            'dedicated_vm' => ProvisionDedicatedDatabaseVmJob::dispatch($serverId, $siteId, $targetId, $bindingId),
+            'docker_vm' => ProvisionDedicatedDockerDatabaseVmJob::dispatch($serverId, $siteId, $targetId, $bindingId),
+            default => null,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function bindingProvisionHint(SiteBinding $binding, array $config): string
+    {
+        if (! $binding->isProvisioning()) {
+            return (string) Str::headline($binding->status);
+        }
+
+        if (! empty($config['managed'])) {
+            return __('Provisioning the managed cluster — this takes a few minutes.');
+        }
+
+        return match ($config['placement'] ?? '') {
+            'cache_vm' => __('Provisioning the dedicated Redis server — this can take several minutes.'),
+            'dedicated_vm' => __('Provisioning the dedicated database server — this can take several minutes.'),
+            'docker_vm' => __('Provisioning the Docker database server and starting the container — this can take several minutes.'),
+            'docker' => __('Starting the Docker database container — this usually takes under a minute.'),
+            default => __('Provisioning this resource — status updates as the job progresses.'),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function bindingPlacementLabel(array $config): ?string
+    {
+        if (! empty($config['managed'])) {
+            return in_array((string) ($config['engine'] ?? ''), ['redis', 'valkey'], true)
+                ? __('Managed Valkey')
+                : __('Managed cluster');
+        }
+
+        return match ($config['placement'] ?? null) {
+            'cache_vm' => __('Dedicated Redis server'),
+            'dedicated_vm' => __('Dedicated database server'),
+            'docker_vm' => __('Dedicated Docker database server'),
+            'docker' => __('Docker container on this server'),
+            'same_server' => __('This server'),
+            null, '' => null,
+            default => Str::headline((string) $config['placement']),
+        };
     }
 
     /**
@@ -796,11 +1847,14 @@ trait ManagesSiteBindingActions
             return [];
         }
 
-        // Only offer backends this site can actually reach: its own server
-        // (loopback) plus same-private-network peers. Listing the whole org let a
-        // site re-point at a database on an unrelated network it can never dial.
-        $reachableServerIds = app(SiteBindingManager::class)->reachableServerIdsForSite($this->site);
-        if ($reachableServerIds === []) {
+        // Databases stay scoped to the private network (listing the whole org
+        // let a site re-point at a DB it can never dial). Redis also includes
+        // same-org dedicated cache hosts, which are meant to be shared.
+        $manager = app(SiteBindingManager::class);
+        $serverIds = $binding->type === 'redis'
+            ? $manager->attachableCacheServerIdsForSite($this->site)
+            : $manager->reachableServerIdsForSite($this->site);
+        if ($serverIds === []) {
             return [];
         }
 
@@ -809,12 +1863,12 @@ trait ManagesSiteBindingActions
             'label' => $r->name ?: ucfirst((string) $r->engine),
             'engine' => (string) $r->engine,
             'server' => $r->server?->name,
-            'host' => $r->server?->private_ip_address,
+            'host' => $r->server?->private_ip_address ?: $r->server?->ip_address,
         ];
 
         return match ($binding->type) {
-            'database' => ServerDatabase::query()->whereIn('server_id', $reachableServerIds)->with('server')->get()->map($row)->values()->all(),
-            'redis' => ServerCacheService::query()->whereIn('server_id', $reachableServerIds)
+            'database' => ServerDatabase::query()->whereIn('server_id', $serverIds)->with('server')->get()->map($row)->values()->all(),
+            'redis' => ServerCacheService::query()->whereIn('server_id', $serverIds)
                 ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)->with('server')->get()->map($row)->values()->all(),
             default => [],
         };
@@ -1119,5 +2173,56 @@ trait ManagesSiteBindingActions
                 }
             }
         }
+    }
+
+    protected function dockerInstallIsInFlight(Server $server): bool
+    {
+        if ($this->dockerInstallRunId !== null) {
+            return true;
+        }
+
+        return ServerManageAction::query()
+            ->where('server_id', $server->id)
+            ->where('task_name', 'manage-action:install_docker')
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->exists();
+    }
+
+    protected function seedBindingConsoleAction(string $kind, string $label): ConsoleAction
+    {
+        if (method_exists($this, 'seedQueuedConsoleAction')) {
+            return $this->seedQueuedConsoleAction($kind, $label);
+        }
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => auth()->id(),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+    }
+
+    protected function syncBindingServer(Server $server): void
+    {
+        $this->site->setRelation('server', $server);
+
+        if (property_exists($this, 'server') && $this->server instanceof Server && (string) $this->server->id === (string) $server->id) {
+            $this->server = $server;
+        }
+    }
+
+    protected function markDockerEnginePresent(Server $server): void
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $manageDocker = is_array($meta['manage_docker'] ?? null) ? $meta['manage_docker'] : [];
+        $meta['manage_docker'] = array_merge($manageDocker, ['present' => true]);
+        $server->forceFill(['meta' => $meta])->save();
+        $this->syncBindingServer($server->fresh() ?? $server);
     }
 }

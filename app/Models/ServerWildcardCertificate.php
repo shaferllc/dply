@@ -30,8 +30,8 @@ use Illuminate\Support\Carbon;
  * @property string $zone
  * @property-read ?Server $server
  * @property-read ?ProviderCredential $providerCredential
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerWildcardCertificate extends Model
 {
@@ -114,5 +114,28 @@ class ServerWildcardCertificate extends Model
         }
 
         return $notAfter->isBefore(now()->addDays($renewWithinDays));
+    }
+
+    /**
+     * True when status is still `issuing` but the attempt is no longer in-flight.
+     *
+     * {@see WildcardCertificateIssuer}
+     * writes ISSUING at start. A killed or timed-out worker never flips the
+     * row to failed, and site-provision probes refuse to re-dispatch a live
+     * `issuing` row (the job lock would just no-op). Treat an attempt older
+     * than the issuer job timeout as abandoned so the next probe can retry.
+     */
+    public function issuanceIsStale(int $afterSeconds = 600): bool
+    {
+        if ($this->status !== self::STATUS_ISSUING) {
+            return false;
+        }
+
+        $started = $this->last_requested_at ?? $this->updated_at;
+        if ($started === null) {
+            return true;
+        }
+
+        return $started->lte(now()->subSeconds(max(1, $afterSeconds)));
     }
 }

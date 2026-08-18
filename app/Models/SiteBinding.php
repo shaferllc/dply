@@ -160,6 +160,67 @@ class SiteBinding extends Model
     }
 
     /**
+     * Dedicated VM this binding is waiting on (database box or Redis-only
+     * cache host). Null for managed/on-server placements.
+     */
+    public function provisionServerId(): ?string
+    {
+        $config = is_array($this->config) ? $this->config : [];
+        $placement = $config['placement'] ?? null;
+
+        $id = match ($placement) {
+            'cache_vm' => $config['cache_vm_server_id'] ?? null,
+            'dedicated_vm', 'docker_vm' => $config['db_vm_server_id'] ?? null,
+            default => $config['cache_vm_server_id'] ?? $config['db_vm_server_id'] ?? null,
+        };
+
+        return filled($id) ? (string) $id : null;
+    }
+
+    public function isProvisioning(): bool
+    {
+        return $this->status === self::STATUS_PROVISIONING;
+    }
+
+    public function isErrored(): bool
+    {
+        return $this->status === self::STATUS_ERROR;
+    }
+
+    /**
+     * Operator-facing failure text: the binding's own last_error plus, when
+     * this row owns a dedicated VM, the provider / setup error from that box.
+     */
+    public function displayError(?Server $provisionServer = null): ?string
+    {
+        $parts = [];
+        if (filled($this->last_error)) {
+            $parts[] = trim((string) $this->last_error);
+        }
+
+        $config = is_array($this->config) ? $this->config : [];
+        if (filled($config['last_error'] ?? null)) {
+            $fromConfig = trim((string) $config['last_error']);
+            if ($fromConfig !== '' && ! in_array($fromConfig, $parts, true)) {
+                $parts[] = $fromConfig;
+            }
+        }
+
+        if ($provisionServer instanceof Server) {
+            $meta = is_array($provisionServer->meta) ? $provisionServer->meta : [];
+            $provisionError = is_array($meta['provision_error'] ?? null) ? $meta['provision_error'] : [];
+            $serverMessage = trim((string) ($provisionError['message'] ?? ''));
+            if ($serverMessage !== '' && ! collect($parts)->contains(
+                static fn (string $part): bool => str_contains($part, $serverMessage)
+            )) {
+                $parts[] = $serverMessage;
+            }
+        }
+
+        return $parts === [] ? null : implode(' — ', $parts);
+    }
+
+    /**
      * Whether the detach confirm dialog should offer to delete the underlying
      * resource (database cluster, on-box database, dedicated DB VM, bucket…).
      */
@@ -187,6 +248,15 @@ class SiteBinding extends Model
                     : null,
                 default => null,
             },
+            'redis' => match ($this->target_type) {
+                'cloud_database' => $this->wasProvisionedByDply()
+                    ? __('Also delete the managed Valkey cluster')
+                    : null,
+                'server_cache_service' => ($this->wasProvisionedByDply() && ($this->config['placement'] ?? '') === 'cache_vm')
+                    ? __('Also destroy the dedicated Redis server')
+                    : null,
+                default => null,
+            },
             'storage' => $this->wasProvisionedByDply()
                 ? __('Also delete the bucket and its contents')
                 : null,
@@ -205,6 +275,11 @@ class SiteBinding extends Model
                     default => __('Runs DROP DATABASE on the server and removes the Dply row. Cannot be undone.'),
                 },
                 'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
+                default => '',
+            },
+            'redis' => match ($this->target_type) {
+                'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
+                'server_cache_service' => __('Destroys the Redis server dply provisioned for this binding. Cannot be undone.'),
                 default => '',
             },
             'storage' => __('Empties and deletes the bucket dply provisioned for this disk. Cannot be undone.'),

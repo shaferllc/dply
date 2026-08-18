@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeDeployment;
-use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeDeliveryContext;
 use App\Modules\Edge\Support\EdgeEffectiveCrons;
@@ -212,7 +211,7 @@ class EdgeMiddlewareBundleUploader
     }
 
     /**
-     * @param  array<string, mixed> $sidecarPayload
+     * @param  array<string, mixed>  $sidecarPayload
      */
     private function persistScriptName(EdgeDeployment $deployment, string $scriptName, array $sidecarPayload): void
     {
@@ -269,14 +268,11 @@ class EdgeMiddlewareBundleUploader
         // deployment's site to avoid a separate query when one is loaded.
         $site = $deployment->site;
         if ($site !== null) {
-            foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
-                    continue;
-                }
+            foreach (app(EdgeProductionEnv::class)->forSite($site) as $key => $value) {
                 $bindings[] = [
-                    'name' => $envVar->key,
+                    'name' => $key,
                     'type' => 'secret_text',
-                    'text' => (string) $envVar->value,
+                    'text' => $value,
                 ];
             }
         }

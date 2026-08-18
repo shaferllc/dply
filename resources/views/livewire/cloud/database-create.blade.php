@@ -1,7 +1,7 @@
 <div class="mx-auto max-w-3xl px-6 py-10">
     <header class="mb-8">
         <h1 class="text-3xl font-semibold text-slate-900">{{ __('Create a managed database') }}</h1>
-        <p class="mt-2 text-sm text-slate-600">{{ __('dply provisions a hosted Postgres, MySQL, or Redis instance on DigitalOcean Managed Databases. Once it\'s online you can attach it to any Cloud app — we inject the connection env vars and redeploy for you.') }}</p>
+        <p class="mt-2 text-sm text-slate-600">{{ __('dply provisions a hosted Postgres, MySQL, or Redis / Valkey instance on DigitalOcean Managed Databases. Once it\'s online you can attach it to any Cloud app — we inject the connection env vars and redeploy for you.') }}</p>
     </header>
 
     @if (! $hasDoCredential)
@@ -24,6 +24,10 @@
         </section>
     @endif
 
+    @if (filled($catalogError ?? null))
+        <p class="mt-6 text-sm font-medium text-amber-800">{{ $catalogError }}</p>
+    @endif
+
     <form wire:submit="create" class="mt-8 space-y-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="space-y-4">
@@ -40,16 +44,18 @@
                         <select id="engine" wire:model.live="engine" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
                             <option value="postgres">{{ __('PostgreSQL') }}</option>
                             <option value="mysql">{{ __('MySQL') }}</option>
-                            <option value="redis">{{ __('Redis') }}</option>
+                            <option value="redis">{{ __('Redis / Valkey') }}</option>
                         </select>
                         <x-input-error :messages="$errors->get('engine')" class="mt-2" />
                     </div>
                     <div>
                         <x-input-label for="version" :value="__('Engine version')" />
-                        <select id="version" wire:model="version" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
-                            @foreach (($engineVersions[$engine] ?? []) as $v)
+                        <select id="version" wire:model="version" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required @disabled(($engineVersions[$engine] ?? []) === [])>
+                            @forelse (($engineVersions[$engine] ?? []) as $v)
                                 <option value="{{ $v }}">{{ $v }}</option>
-                            @endforeach
+                            @empty
+                                <option value="">{{ __('Load a DigitalOcean credential to see versions') }}</option>
+                            @endforelse
                         </select>
                         <x-input-error :messages="$errors->get('version')" class="mt-2" />
                     </div>
@@ -57,23 +63,31 @@
 
                 <div>
                     <x-input-label for="size" :value="__('Size')" />
-                    <select id="size" wire:model="size" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
-                        @foreach ($sizeTiers as $tier => $slug)
-                            <option value="{{ $tier }}">{{ ucfirst($tier) }} ({{ $slug }})</option>
-                        @endforeach
+                    <select id="size" wire:model="size" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required @disabled($sizeTiers === [])>
+                        @forelse (collect($sizeTiers)->groupBy('group') as $group => $sizes)
+                            <optgroup label="{{ $group }}">
+                                @foreach ($sizes as $tier)
+                                    <option value="{{ $tier['value'] }}">{{ $tier['label'] }}</option>
+                                @endforeach
+                            </optgroup>
+                        @empty
+                            <option value="">{{ __('Load a DigitalOcean credential to see plans') }}</option>
+                        @endforelse
                     </select>
-                    <p class="mt-1 text-xs text-slate-500">{{ __('Small is a single-node 1 vCPU / 1 GB cluster. Resize later via dply:cloud:db.') }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Every single-node plan DigitalOcean currently lists for this engine.') }}</p>
                     <x-input-error :messages="$errors->get('size')" class="mt-2" />
                 </div>
 
                 <div>
                     <x-input-label for="region" :value="__('Region')" />
-                    <select id="region" wire:model="region" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required>
-                        @foreach ($regions as $r)
-                            <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
-                        @endforeach
+                    <select id="region" wire:model="region" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" required @disabled($regions === [])>
+                        @forelse ($regions as $r)
+                            <option value="{{ $r['value'] }}">{{ $r['label'] }}</option>
+                        @empty
+                            <option value="">{{ __('Load a DigitalOcean credential to see regions') }}</option>
+                        @endforelse
                     </select>
-                    <p class="mt-1 text-xs text-slate-500">{{ __('Pick the datacenter closest to the apps that will use this database.') }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Every datacenter DigitalOcean currently lists for this engine.') }}</p>
                     <x-input-error :messages="$errors->get('region')" class="mt-2" />
                 </div>
             </div>

@@ -32,12 +32,15 @@ test('size tier maps to do size slug', function () {
     expect(CloudDatabase::factory()->make(['size' => 'small'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb');
     expect(CloudDatabase::factory()->make(['size' => 'medium'])->backendSizeSlug())->toBe('db-s-1vcpu-2gb');
     expect(CloudDatabase::factory()->make(['size' => 'large'])->backendSizeSlug())->toBe('db-s-2vcpu-4gb');
-    expect(CloudDatabase::factory()->make(['size' => 'bogus'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb');
+    expect(CloudDatabase::factory()->make(['size' => 'bogus'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb')
+        ->and(CloudDatabase::resolveSizeSlug('db-s-4vcpu-8gb'))->toBe('db-s-4vcpu-8gb')
+        ->and(CloudDatabase::resolveSizeSlug('medium'))->toBe('db-s-1vcpu-2gb');
 });
 test('engine maps to do engine slug', function () {
     expect(CloudDatabase::factory()->make(['engine' => 'postgres'])->backendEngineSlug())->toBe('pg');
     expect(CloudDatabase::factory()->make(['engine' => 'mysql'])->backendEngineSlug())->toBe('mysql');
-    expect(CloudDatabase::factory()->make(['engine' => 'redis'])->backendEngineSlug())->toBe('redis');
+    expect(CloudDatabase::factory()->make(['engine' => 'redis'])->backendEngineSlug())->toBe('valkey')
+        ->and(CloudDatabase::factory()->redis()->make()->backendEngineVersion())->toBe('8');
 });
 test('postgres connection env vars', function () {
     $db = CloudDatabase::factory()->active()->create();

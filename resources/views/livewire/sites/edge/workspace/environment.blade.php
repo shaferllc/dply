@@ -32,6 +32,8 @@
             ])
         </section>
 
+        @include('livewire.sites.partials.linked-organization-secrets')
+
         @include('livewire.sites.partials.edge.environment-settings')
 
         @if ($missingSecrets !== [])

@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
 use App\Support\Deployment\DeploymentSecret;
+use App\Support\Sites\LinkedOrganizationSecrets;
 
 final class DeploymentSecretInventory
 {
@@ -39,6 +40,20 @@ final class DeploymentSecretInventory
                     isSecret: (bool) $row->is_secret || $this->looksSensitiveKey((string) $row->env_key),
                 );
             }
+        }
+
+        // Linked org vault secrets sit above workspace inheritance and below
+        // bindings / the site .env blob. A site .env key still wins.
+        foreach (app(LinkedOrganizationSecrets::class)->valuesForSite($site) as $key => $value) {
+            $inventory[] = new DeploymentSecret(
+                key: $key,
+                value: $value,
+                scope: 'organization',
+                source: 'organization_secret',
+                environment: $environment,
+                classification: $this->classify($key),
+                isSecret: true,
+            );
         }
 
         // Managed resource bindings contribute their connection variables here,

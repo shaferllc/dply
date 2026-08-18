@@ -62,10 +62,11 @@ class ProvisionServerlessCacheJob implements ShouldQueue
         try {
             if (empty($cache['cluster_id'])) {
                 $cluster = $service->createDatabaseCluster(
-                    'redis',
+                    'valkey',
                     $server->region !== '' ? (string) $server->region : 'nyc1',
                     (string) ($cache['size'] ?? 'db-s-1vcpu-1gb'),
                     'dply-cache-'.(Str::slug((string) $site->slug) ?: 'fn').'-'.Str::lower(Str::random(6)),
+                    '8',
                 );
                 $cache['cluster_id'] = $cluster['id'];
             } else {

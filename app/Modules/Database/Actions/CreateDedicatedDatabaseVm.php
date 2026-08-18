@@ -13,6 +13,8 @@ use App\Models\SiteBinding;
 use App\Models\User;
 use App\Modules\Database\Jobs\ProvisionDedicatedDatabaseVmJob;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
+use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Support\Servers\DedicatedVmPlacement;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Component;
@@ -51,7 +53,7 @@ class CreateDedicatedDatabaseVm
         // Connection name (blank = PRIMARY). A PRIMARY dedicated DB never
         // replaces an existing primary — refuse up front (before spinning up a
         // server). A NAMED one (e.g. clickhouse) is added alongside the primary.
-        $manager = app(\App\Modules\Deploy\Services\SiteBindingManager::class);
+        $manager = app(SiteBindingManager::class);
         $connection = $manager->resolveInstanceConnectionName($site, 'database', ['connection' => $form['connection'] ?? '']);
         $isPrimary = $connection === '';
         if ($isPrimary) {
@@ -88,13 +90,15 @@ class CreateDedicatedDatabaseVm
         $username = Str::limit(Str::slug($name, '_') ?: 'db', 28, '').'_'.Str::lower(Str::random(4));
         $password = Str::password(24);
         $allowedFrom = (string) ($appServer->private_ip_address ?: $appServer->ip_address ?: '');
+        $placement = DedicatedVmPlacement::for($appServer, $org);
+        DedicatedVmPlacement::assertSizeAvailable($size, $placement['sizes'], $placement['region']);
 
         $createForm = new ServerCreateForm($component, 'dedicatedDbForm');
         $createForm->mode = 'provider';
         $createForm->type = $appServer->provider->value;
         $createForm->provider_credential_id = (string) $appServer->provider_credential_id;
         $createForm->name = Str::limit(($site->slug ?: 'site').'-db', 60, '');
-        $createForm->region = (string) $appServer->region;
+        $createForm->region = $placement['region'];
         $createForm->size = $size;
         $createForm->server_role = 'database';
         $createForm->install_profile = 'database_node';
@@ -159,6 +163,8 @@ class CreateDedicatedDatabaseVm
                 'placement' => 'dedicated_vm',
                 'managed' => false,
                 'db_vm_server_id' => (string) $dbServer->id,
+                'vm_size' => $size,
+                'region' => $placement['region'],
             ],
             'last_error' => null,
         ]);

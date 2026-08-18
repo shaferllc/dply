@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -24,6 +25,8 @@ use RuntimeException;
  */
 class VultrManagedBackend implements DatabaseBackend
 {
+    use CannotResizeManagedDatabase;
+
     /** dply engine → Vultr `database_engine` slug (Valkey is Redis-compatible). */
     private const ENGINE_SLUGS = [
         CloudDatabase::ENGINE_POSTGRES => 'pg',

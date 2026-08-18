@@ -13,6 +13,7 @@ use App\Models\InsightFinding;
 use App\Models\InsightSetting;
 use App\Models\NotificationSubscription;
 use App\Models\Organization;
+use App\Models\OrganizationSecret;
 use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Script;
@@ -33,7 +34,6 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteDeploySyncGroup;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteRedirect;
@@ -46,6 +46,7 @@ use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\WorkerPool;
 use App\Models\Workspace;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\Sites\SecretResidencyResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,6 +86,7 @@ use Illuminate\Support\Collection;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRelease> $releases
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteProcess> $processes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteBinding> $bindings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSecret> $organizationSecrets
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRedirect> $redirects
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployHook> $deployHooks
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployPipeline> $deployPipelines
@@ -440,6 +442,14 @@ trait HasSiteRelationships
     public function bindings(): HasMany
     {
         return $this->hasMany(SiteBinding::class);
+    }
+
+    /** @return BelongsToMany<OrganizationSecret, $this> */
+    public function organizationSecrets(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSecret::class, 'organization_secret_sites')
+            ->withPivot('key')
+            ->withTimestamps();
     }
 
     /**

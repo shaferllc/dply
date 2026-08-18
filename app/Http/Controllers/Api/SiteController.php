@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\User;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Support\Sites\SiteApiAccess;
 use App\Support\Sites\SiteIndexAssembler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,12 +20,15 @@ class SiteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $organization = $request->attributes->get('api_organization');
+        $user = $request->user();
 
         $sites = Site::query()
             ->whereHas('server', fn ($q) => $q->where('organization_id', $organization->id))
-            ->with(['server:id,name', 'domains', 'workspace:id,name'])
+            ->with(['server:id,name,workspace_id,organization_id', 'domains', 'workspace:id,name'])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (Site $s): bool => $user instanceof User && SiteApiAccess::userCanView($user, $s, $organization))
+            ->values();
 
         return response()->json([
             'data' => $sites->map(fn (Site $s) => SiteIndexAssembler::toArray($s))->values(),
@@ -31,10 +37,8 @@ class SiteController extends Controller
 
     public function deploy(Request $request, Site $site): JsonResponse
     {
-        $organization = $request->attributes->get('api_organization');
-
-        if ($site->server->organization_id !== $organization->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        if ($response = $this->authorizeSite($request, $site, deploy: true)) {
+            return $response;
         }
 
         if (empty(trim((string) $site->git_repository_url))) {
@@ -98,9 +102,8 @@ class SiteController extends Controller
 
     public function deployments(Request $request, Site $site): JsonResponse
     {
-        $organization = $request->attributes->get('api_organization');
-        if ($site->server->organization_id !== $organization->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        if ($response = $this->authorizeSite($request, $site)) {
+            return $response;
         }
 
         $limit = min(50, max(1, (int) $request->query('limit', 20)));
@@ -118,9 +121,8 @@ class SiteController extends Controller
 
     public function showDeployment(Request $request, Site $site, SiteDeployment $deployment): JsonResponse
     {
-        $organization = $request->attributes->get('api_organization');
-        if ($site->server->organization_id !== $organization->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        if ($response = $this->authorizeSite($request, $site)) {
+            return $response;
         }
         if ($deployment->site_id !== $site->id) {
             return response()->json(['message' => 'Not found'], 404);
@@ -129,6 +131,27 @@ class SiteController extends Controller
         return response()->json([
             'data' => $this->deploymentPayload($deployment),
         ]);
+    }
+
+    protected function authorizeSite(Request $request, Site $site, bool $deploy = false): ?JsonResponse
+    {
+        /** @var Organization|null $organization */
+        $organization = $request->attributes->get('api_organization');
+        $user = $request->user();
+
+        if (! $organization instanceof Organization || ! $user instanceof User) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $allowed = $deploy
+            ? SiteApiAccess::userCanDeploy($user, $site, $organization)
+            : SiteApiAccess::userCanView($user, $site, $organization);
+
+        if (! $allowed) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        return null;
     }
 
     /**

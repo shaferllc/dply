@@ -186,11 +186,14 @@ return [
         ],
     ],
     'cache_services' => [
-        ['id' => 'redis', 'label' => 'Redis', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'valkey', 'label' => 'Valkey', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'memcached', 'label' => 'Memcached', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'keydb', 'label' => 'KeyDB (Redis-compatible, multithreaded)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'dragonfly', 'label' => 'Dragonfly (Redis-compatible)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
+        // Dedicated cache hosts (redis/valkey role) pick the engine from their
+        // own wizard, but StoreServerFromCreateForm still validates cache_service
+        // against this list — keep Redis-family ids eligible on those roles.
+        ['id' => 'redis', 'label' => 'Redis', 'exclude_server_roles' => ['load_balancer', 'database', 'plain']],
+        ['id' => 'valkey', 'label' => 'Valkey', 'exclude_server_roles' => ['load_balancer', 'database', 'plain']],
+        ['id' => 'memcached', 'label' => 'Memcached', 'exclude_server_roles' => ['load_balancer', 'database', 'plain']],
+        ['id' => 'keydb', 'label' => 'KeyDB (Redis-compatible, multithreaded)', 'exclude_server_roles' => ['load_balancer', 'database', 'plain']],
+        ['id' => 'dragonfly', 'label' => 'Dragonfly (Redis-compatible)', 'exclude_server_roles' => ['load_balancer', 'database', 'plain']],
         ['id' => 'none', 'label' => 'No cache service'],
     ],
     'webservers' => [

@@ -29,9 +29,37 @@ trait DeletesBindingResources
 
         match ($binding->type) {
             'database' => $this->deleteDatabaseBindingResource($binding),
+            'redis' => $this->deleteRedisBindingResource($binding),
             'storage' => $this->deleteStorageBindingResource($binding),
             default => null,
         };
+    }
+
+    private function deleteRedisBindingResource(SiteBinding $binding): void
+    {
+        if ($binding->target_type === 'cloud_database' && filled($binding->target_id)) {
+            TeardownCloudDatabaseJob::dispatch((string) $binding->target_id);
+
+            return;
+        }
+
+        if (($binding->config['placement'] ?? '') !== 'cache_vm') {
+            return;
+        }
+
+        $serverId = $binding->provisionServerId();
+        if ($serverId === null) {
+            return;
+        }
+
+        $vmServer = Server::query()->find($serverId);
+        if ($vmServer instanceof Server) {
+            app(DeleteServerAction::class)->execute(
+                $vmServer,
+                Auth::user(),
+                ['reason' => 'binding_detach'],
+            );
+        }
     }
 
     private function deleteDatabaseBindingResource(SiteBinding $binding): void

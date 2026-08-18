@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudDatabaseTest;
 
-use App\Modules\Cloud\Actions\CreateCloudDatabase;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
@@ -32,6 +33,7 @@ function orgWithDoCredential(): Organization
 }
 test('creates provisioning row and dispatches job', function () {
     Bus::fake();
+    fakeDoDatabaseCatalog();
     $org = orgWithDoCredential();
 
     $db = (new CreateCloudDatabase)->handle($org, [
@@ -44,7 +46,7 @@ test('creates provisioning row and dispatches job', function () {
 
     expect($db->name)->toBe('acme-db');
     expect($db->status)->toBe(CloudDatabase::STATUS_PROVISIONING);
-    expect($db->size)->toBe('medium');
+    expect($db->size)->toBe('db-s-1vcpu-2gb');
     expect($db->backend)->toBe(CloudDatabase::BACKEND_DIGITALOCEAN);
     expect($db->provider_credential_id)->not->toBeNull();
 
@@ -68,8 +70,9 @@ test('fails without a do credential', function () {
     $this->expectException(\RuntimeException::class);
     (new CreateCloudDatabase)->handle($org, ['name' => 'x', 'engine' => 'postgres']);
 });
-test('unknown size falls back to small', function () {
+test('unknown size falls back to the first catalog plan', function () {
     Bus::fake();
+    fakeDoDatabaseCatalog();
     $org = orgWithDoCredential();
 
     $db = (new CreateCloudDatabase)->handle($org, [
@@ -78,5 +81,25 @@ test('unknown size falls back to small', function () {
         'size' => 'enormous',
     ]);
 
-    expect($db->size)->toBe('small');
+    expect($db->size)->toBe('db-s-1vcpu-1gb')
+        ->and($db->region)->toBe('nyc3')
+        ->and($db->version)->toBe('16');
 });
+
+function fakeDoDatabaseCatalog(): void
+{
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases/options*' => Http::response([
+            'options' => [
+                'pg' => [
+                    'regions' => ['nyc1', 'nyc3', 'sfo2'],
+                    'versions' => ['16', '15'],
+                    'default_version' => '16',
+                    'layouts' => [
+                        ['num_nodes' => 1, 'sizes' => ['db-s-1vcpu-1gb', 'db-s-1vcpu-2gb', 'db-s-2vcpu-4gb']],
+                    ],
+                ],
+            ],
+        ], 200),
+    ]);
+}

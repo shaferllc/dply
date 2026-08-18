@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Actions;
 
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -54,20 +56,59 @@ class CreateCloudDatabase
             );
         }
 
-        $size = strtolower(trim((string) ($payload['size'] ?? 'small')));
-        if (! array_key_exists($size, CloudDatabase::SIZE_TIERS)) {
-            $size = 'small';
-        }
-
-        $inputRegion = trim((string) ($payload['region'] ?? ''));
-        $region = $inputRegion !== '' ? self::normalizeRegionForManagedDb($inputRegion) : 'nyc1';
-        $version = trim((string) ($payload['version'] ?? ''));
-
         $credential = $this->resolveCredential($organization);
         if ($credential === null) {
             throw new RuntimeException(
                 'No DigitalOcean credential connected. Connect a DigitalOcean credential first.',
             );
+        }
+
+        try {
+            $service = new DigitalOceanService($credential);
+            $availableRegions = $service->getDatabaseEngineRegions($engine);
+            $availableSizes = $service->getDatabaseEngineSizes($engine);
+            $availableVersions = $service->getDatabaseEngineVersions($engine);
+            $defaultVersion = $service->getDatabaseEngineDefaultVersion($engine);
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                'Could not load DigitalOcean\'s database catalog: '.$e->getMessage(),
+                previous: $e,
+            );
+        }
+
+        if ($availableRegions === []) {
+            throw new RuntimeException(
+                'DigitalOcean did not return any regions for this engine. Try again in a moment.',
+            );
+        }
+
+        if ($availableSizes === []) {
+            throw new RuntimeException(
+                'DigitalOcean did not return any sizes for this engine. Try again in a moment.',
+            );
+        }
+
+        $inputRegion = trim((string) ($payload['region'] ?? ''));
+        $region = ProviderManagedDatabaseRegion::resolve(
+            'digitalocean',
+            $inputRegion !== '' ? $inputRegion : null,
+            null,
+            $availableRegions,
+        );
+        if ($region === null) {
+            throw new RuntimeException(
+                'Could not pick a DigitalOcean region for this engine.',
+            );
+        }
+
+        $size = $this->resolveCatalogSize(
+            strtolower(trim((string) ($payload['size'] ?? ''))),
+            $availableSizes,
+        );
+
+        $version = trim((string) ($payload['version'] ?? ''));
+        if ($version === '' || ($availableVersions !== [] && ! in_array($version, $availableVersions, true))) {
+            $version = $defaultVersion ?? ($availableVersions[0] ?? $version);
         }
 
         $database = CloudDatabase::query()->create([
@@ -87,6 +128,25 @@ class CreateCloudDatabase
         return $database;
     }
 
+    /**
+     * @param  list<string>  $available
+     */
+    private function resolveCatalogSize(string $size, array $available): string
+    {
+        if ($size !== '' && array_key_exists($size, CloudDatabase::SIZE_TIERS)) {
+            $mapped = CloudDatabase::SIZE_TIERS[$size];
+            if (in_array($mapped, $available, true)) {
+                return $mapped;
+            }
+        }
+
+        if ($size !== '' && in_array($size, $available, true)) {
+            return $size;
+        }
+
+        return $available[0];
+    }
+
     private function resolveCredential(Organization $organization): ?ProviderCredential
     {
         foreach (self::DO_PROVIDERS as $provider) {
@@ -101,45 +161,5 @@ class CreateCloudDatabase
         }
 
         return null;
-    }
-
-    /**
-     * App Platform exposes short region codes (`ams`, `nyc`, `fra`); the
-     * Managed Databases API requires numbered slugs (`ams3`, `nyc3`,
-     * `fra1`). When a Cloud-site-with-DB deploy flows the App Platform
-     * region straight through to the DB create call, DO 400s with
-     * "region 'ams' is not valid for 'PG' cluster type". Normalize here
-     * so all callers (Cloud site extras, standalone DB page, CLI) end up
-     * with the slug DO actually accepts. Slugs that are already in the
-     * DB taxonomy (e.g. `ams3` from the standalone form) pass through.
-     *
-     * For NYC and SFO the canonical Managed DB region uses the newer
-     * datacenter (`nyc3`, `sfo3`) — both engines we ship (postgres,
-     * mysql, redis) run there, while `nyc1` is older and only supports
-     * a subset.
-     *
-     * Source: https://docs.digitalocean.com/products/regional-availability/
-     */
-    private static function normalizeRegionForManagedDb(string $region): string
-    {
-        $region = strtolower(trim($region));
-
-        // Already a DB-style slug (e.g. "ams3", "nyc1") — pass through.
-        if (preg_match('/^[a-z]{3}[0-9]$/', $region) === 1) {
-            return $region;
-        }
-
-        return match ($region) {
-            'ams' => 'ams3',
-            'nyc' => 'nyc3',
-            'fra' => 'fra1',
-            'sfo' => 'sfo3',
-            'sgp' => 'sgp1',
-            'lon' => 'lon1',
-            'tor' => 'tor1',
-            'blr' => 'blr1',
-            'syd' => 'syd1',
-            default => $region,
-        };
     }
 }

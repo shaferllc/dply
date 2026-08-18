@@ -98,7 +98,16 @@
                         {{ __('Cancel') }}
                     </x-secondary-button>
 
-                    @if ($confirmActionModalDestructive ?? false)
+                    @if (! empty($confirmActionModalToggleLabel))
+                        <x-secondary-button type="button" wire:click="confirmActionModal(false)" wire:loading.attr="disabled" wire:target="confirmActionModal">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-secondary-button>
+                        <x-danger-button type="button" wire:click="confirmActionModal(true)" wire:loading.attr="disabled" wire:target="confirmActionModal">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ __('Detach & delete') }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-danger-button>
+                    @elseif ($confirmActionModalDestructive ?? false)
                         <x-danger-button type="button" wire:click="confirmActionModal" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
                             <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Secrets\Services;
 
 use App\Models\OrgSecretKey;
+use App\Models\Site;
+use App\Models\SiteSecretResidency;
 use Illuminate\Database\QueryException;
 use RuntimeException;
 
@@ -15,8 +17,10 @@ use RuntimeException;
  * and (when dply holds the identity) decrypts ciphertext back.
  *
  * v1 mints DPLY-HELD keys: a distinct key per org for blast-radius isolation —
- * dply can still decrypt. Customer-held keys (true ZK at rest) are a later PR;
- * {@see decrypt()} already requires an explicit identity for that path.
+ * dply can still decrypt. Customer-held keys (true ZK at rest) are supported
+ * via {@see promoteToCustomerHeld()} / {@see adoptCustomerRecipient()};
+ * {@see decrypt()} requires an explicit identity on that path. {@see mintDplyHeld()}
+ * rotates a managed key or reverts from customer-held.
  */
 class OrgSecretKeyManager
 {
@@ -104,6 +108,41 @@ class OrgSecretKeyManager
         $key = $this->adoptCustomerRecipient($organizationId, $kp['recipient']);
 
         return ['key' => $key, 'identity' => $kp['identity']];
+    }
+
+    /**
+     * Replace the org key with a fresh dply-held keypair. Used to rotate a
+     * managed key or revert from customer-held. Does not re-encrypt escrowed
+     * ciphertext — callers must warn that old blobs stay locked to the previous
+     * recipient.
+     */
+    public function mintDplyHeld(string $organizationId): OrgSecretKey
+    {
+        $kp = $this->age->generateKeypair();
+        $key = OrgSecretKey::query()->where('organization_id', $organizationId)->first()
+            ?? new OrgSecretKey(['organization_id' => $organizationId]);
+
+        $key->forceFill([
+            'organization_id' => $organizationId,
+            'public_recipient' => $kp['recipient'],
+            'identity_holder' => OrgSecretKey::HOLDER_DPLY,
+            'dply_identity' => $kp['identity'],
+            'fingerprint' => substr(hash('sha256', $kp['recipient']), 0, 12),
+        ])->save();
+
+        return $key;
+    }
+
+    /** Escrowed site secrets encrypted to this org's current recipient. */
+    public function escrowedResidencyCount(string $organizationId): int
+    {
+        return SiteSecretResidency::query()
+            ->where('mode', SiteSecretResidency::MODE_ESCROW)
+            ->whereIn(
+                'site_id',
+                Site::query()->where('organization_id', $organizationId)->select('id'),
+            )
+            ->count();
     }
 
     /** age-encrypt a value to the org's recipient. */

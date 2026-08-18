@@ -4,33 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Jobs\FixSiteBindingConnectivityJob;
-use App\Jobs\InstallCacheServiceJob;
-use App\Jobs\SendBindingTestEmailJob;
-use App\Jobs\SwitchCacheServiceJob;
-use App\Jobs\TestBroadcastingBindingJob;
-use App\Jobs\ValidateBindingConnectivityJob;
-use App\Jobs\ValidateSiteBindingsReachableJob;
-use App\Models\AiCredential;
-use App\Models\CaptchaCredential;
-use App\Models\ErrorTrackingCredential;
-use App\Models\LogDrainCredential;
-use App\Models\MailCredential;
-use App\Models\OauthCredential;
-use App\Models\ObjectStorageCredential;
-use App\Models\PaymentCredential;
-use App\Models\ProviderCredential;
-use App\Modules\Realtime\Models\RealtimeApp;
-use App\Models\SearchCredential;
 use App\Models\Server;
-use App\Models\ServerCacheService;
-use App\Models\ServerDatabase;
-use App\Models\SiteBinding;
-use App\Models\SmsCredential;
-use App\Modules\Deploy\Services\DeploymentSecretInventory;
-use App\Modules\Deploy\Services\SiteBindingManager;
-use App\Support\Servers\CacheEngineAvailability;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * Attach / provision / detach actions for a site's managed resource bindings,
@@ -59,8 +33,16 @@ trait ManagesSiteBindings
 
     public string $bindingModalType = '';
 
-    /** attach | provision */
+    /** attach | provision | edit */
     public string $bindingModalMode = 'attach';
+
+    /**
+     * Summary of the binding being edited (placement, status, available
+     * actions). Null unless {@see $bindingModalMode} is `edit`.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $bindingEdit = null;
 
     /**
      * When set, the open binding modal is EDITING this specific binding row
@@ -83,6 +65,15 @@ trait ManagesSiteBindings
      */
     public array $dedicatedVmSizes = [];
 
+    /** Last catalog failure for dedicated VM placements; shown on the disabled card. */
+    public ?string $dedicatedVmSizeError = null;
+
+    /** Resolved IaaS region for dedicated VM create (after normalizing stale slugs). */
+    public ?string $dedicatedVmRegion = null;
+
+    /** App server region before remap, for the "same metro as sfo" note. */
+    public ?string $dedicatedVmRequestedRegion = null;
+
     /** Recipient for the mail binding's "send test email" action. */
     public string $mailTestRecipient = '';
 
@@ -94,5 +85,4 @@ trait ManagesSiteBindings
      * @var list<array{id: string, name: string}>
      */
     public array $lookoutOrganizations = [];
-
 }

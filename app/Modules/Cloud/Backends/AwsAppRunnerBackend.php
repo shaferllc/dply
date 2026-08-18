@@ -7,6 +7,7 @@ namespace App\Modules\Cloud\Backends;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Cloud\Services\AwsAppRunnerService;
+use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Support\Facades\Cache;
 
 class AwsAppRunnerBackend implements CloudBackend
@@ -624,7 +625,10 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function siteEnvVars(Site $site): array
     {
-        return $this->parseEnvLines((string) ($site->env_file_content ?? ''));
+        return app(LinkedOrganizationSecrets::class)->mergeUnder(
+            $this->parseEnvLines((string) ($site->env_file_content ?? '')),
+            $site,
+        );
     }
 
     /**

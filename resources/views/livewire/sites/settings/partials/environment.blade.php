@@ -88,6 +88,11 @@
             }
         }
     }
+    if (method_exists($this, 'linkedOrganizationSecretRows')) {
+        foreach ($this->linkedOrganizationSecretRows() as $linkedSecretRow) {
+            $envPresentKeys[] = (string) $linkedSecretRow['key'];
+        }
+    }
     $envPresentKeys = array_values(array_unique($envPresentKeys));
     $missingEnv = $supportsEnvPush ? $site->missingRequiredEnvKeys($envPresentKeys, $inheritedKeys) : [];
     $envRequirements = $site->envRequirements();
@@ -182,7 +187,7 @@
     unset($grp);
     $bindingTypeLabelsInline = [
         'database' => __('Database'),
-        'redis' => __('Redis'),
+        'redis' => __('Redis / Valkey'),
         'queue' => __('Queue'),
         'cache' => __('Cache'),
         'session' => __('Sessions'),
@@ -329,6 +334,8 @@
     @include('livewire.sites.settings.partials.environment.paste-env-modal')
 
     @include('livewire.sites.settings.partials.environment.add-missing-env-modal')
+
+    @include('livewire.sites.partials.linked-organization-secrets', ['secretsCard' => $card])
 
     @include('livewire.sites.settings.partials.environment.inherited')
 

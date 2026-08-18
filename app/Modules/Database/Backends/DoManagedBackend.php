@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -17,7 +18,7 @@ use RuntimeException;
  *
  * Wraps the existing {@see DigitalOceanService} Managed Databases endpoints
  * (the same ones the Cloud-site flow uses) so a VM site can co-locate a
- * managed Postgres / MySQL / Redis cluster in its own DigitalOcean region.
+ * managed Postgres / MySQL / Valkey cluster in its own DigitalOcean region.
  * Adds the network lockdown step (trusted sources) that the seamless
  * "just works, but not publicly exposed" placement requires.
  */
@@ -50,7 +51,7 @@ class DoManagedBackend implements DatabaseBackend
             return null;
         }
 
-        $region = $this->normalizeRegion((string) $server->region);
+        $region = ProviderManagedDatabaseRegion::normalize('digitalocean', (string) $server->region);
 
         return $region !== '' ? $region : null;
     }
@@ -69,6 +70,7 @@ class DoManagedBackend implements DatabaseBackend
             $database->region !== '' ? $database->region : 'nyc3',
             $database->backendSizeSlug(),
             $this->clusterName($database),
+            $database->backendEngineVersion(),
         );
 
         $database->forceFill(['backend_id' => (string) $cluster['id']])->save();
@@ -125,6 +127,29 @@ class DoManagedBackend implements DatabaseBackend
         }
     }
 
+    public function resize(CloudDatabase $database, string $size): void
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            throw new RuntimeException(__('This cluster has no DigitalOcean id yet.'));
+        }
+
+        $size = CloudDatabase::resolveSizeSlug($size);
+        $service = $this->service($database);
+
+        try {
+            $available = $service->getDatabaseEngineSizes($database->backendEngineSlug());
+            if ($available !== [] && ! in_array($size, $available, true)) {
+                throw new RuntimeException(__('DigitalOcean does not offer that plan for this cluster.'));
+            }
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            // Catalog is best-effort — still send the requested slug.
+        }
+
+        $service->resizeDatabaseCluster((string) $database->backend_id, $size);
+    }
+
     private function service(CloudDatabase $database): DigitalOceanService
     {
         $database->loadMissing('providerCredential');
@@ -141,32 +166,5 @@ class DoManagedBackend implements DatabaseBackend
         $slug = Str::slug($database->name) ?: 'db';
 
         return 'dply-'.$slug.'-'.Str::lower(Str::random(6));
-    }
-
-    /**
-     * Droplet regions (e.g. `nyc3`, `ams3`) are already valid Managed Database
-     * slugs; older short codes (`nyc`, `ams`) are mapped to the numbered slug
-     * DO's database API accepts. Mirrors CreateCloudDatabase's normalization.
-     */
-    private function normalizeRegion(string $region): string
-    {
-        $region = strtolower(trim($region));
-
-        if (preg_match('/^[a-z]{3}[0-9]$/', $region) === 1) {
-            return $region;
-        }
-
-        return match ($region) {
-            'ams' => 'ams3',
-            'nyc' => 'nyc3',
-            'fra' => 'fra1',
-            'sfo' => 'sfo3',
-            'sgp' => 'sgp1',
-            'lon' => 'lon1',
-            'tor' => 'tor1',
-            'blr' => 'blr1',
-            'syd' => 'syd1',
-            default => $region,
-        };
     }
 }

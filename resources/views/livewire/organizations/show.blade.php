@@ -57,6 +57,14 @@
             'show' => $canViewChannels,
         ],
         [
+            'label' => __('Secrets'),
+            'description' => __('Shared vault you link onto sites.'),
+            'href' => route('organizations.secrets', $organization),
+            'icon' => 'heroicon-o-lock-closed',
+            'tone' => 'forest',
+            'show' => auth()->user()?->can('view', $organization) ?? false,
+        ],
+        [
             'label' => __('Credentials'),
             'description' => __('Cloud, DNS, CDN tokens.'),
             'href' => route('organizations.credentials', $organization),

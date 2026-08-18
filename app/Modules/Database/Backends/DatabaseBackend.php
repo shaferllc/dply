@@ -6,13 +6,14 @@ namespace App\Modules\Database\Backends;
 
 use App\Models\CloudDatabase;
 use App\Models\Server;
+use App\Modules\Cloud\Backends\CloudBackend;
 
 /**
  * A managed-database backend — a hosted provider dply can provision a
  * database cluster on and attach to a site (DigitalOcean Managed Databases
  * today; Vultr / AWS RDS / serverless vendors to come).
  *
- * Mirrors the Cloud module's {@see \App\Modules\Cloud\Backends\CloudBackend}
+ * Mirrors the Cloud module's {@see CloudBackend}
  * pattern: one interface, a {@see DatabaseRouter} that selects the concrete
  * implementation, so the modal and the provisioning job stay provider-blind.
  *
@@ -66,4 +67,11 @@ interface DatabaseBackend
      * may no-op. Safe to call repeatedly.
      */
     public function lockNetworkTo(CloudDatabase $database, Server $server): void;
+
+    /**
+     * Change the cluster plan in place. Backends that cannot resize throw.
+     * Returns immediately; the cluster is still resizing until {@see poll()}
+     * reports `online`.
+     */
+    public function resize(CloudDatabase $database, string $size): void;
 }

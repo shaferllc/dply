@@ -61,6 +61,7 @@ use Laravel\Cashier\Billable;
  * @property-read Collection<int, Team> $teams
  * @property-read Collection<int, Server> $servers
  * @property-read Collection<int, Site> $sites
+ * @property-read Collection<int, OrganizationSecret> $sharedSecrets
  * @property-read Collection<int, Script> $scripts
  * @property-read Collection<int, NotificationChannel> $notificationChannels
  * @property-read Collection<int, WebserverTemplate> $webserverTemplates
@@ -202,6 +203,12 @@ class Organization extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
+    }
+
+    /** @return HasMany<OrganizationSecret, $this> */
+    public function sharedSecrets(): HasMany
+    {
+        return $this->hasMany(OrganizationSecret::class)->orderBy('key');
     }
 
     /**

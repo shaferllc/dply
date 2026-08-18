@@ -151,7 +151,6 @@
                         {{ __('Notification channels') }}
                     </a>
                 @endcan
-                {{-- Secrets nav temporarily hidden.
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.secrets', $org) }}"
@@ -162,7 +161,6 @@
                         {{ __('Secrets') }}
                     </a>
                 @endcan
-                --}}
                 <a
                     href="{{ route('organizations.teams', $org) }}"
                     wire:navigate
