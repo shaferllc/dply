@@ -191,6 +191,7 @@
                                                 <span>{{ __('No repositories returned for this account. Check the token or enter the repo manually.') }}</span>
                                             </p>
                                         @endif
+                                        <x-repo-access-hint :accounts="$linkedSourceControlAccounts" :selected="$source_control_account_id" />
                                         <x-input-error :messages="$errors->get('repository_selection')" class="mt-2" />
                                     </div>
                                 </div>

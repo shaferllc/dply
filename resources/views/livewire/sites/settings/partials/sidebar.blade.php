@@ -39,7 +39,7 @@
          also sets data-wsnav on <html> so the grid reclaims the column —
          see the script below + app.css. Desktop-only, like collapse itself. --}}
     <button type="button" @click="$store.wsnav && $store.wsnav.toggle()"
-        class="absolute -right-3.5 top-7 z-40 hidden h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-mist shadow-md transition hover:text-brand-ink hover:shadow-lg lg:flex"
+        class="absolute -right-3.5 top-7 z-20 hidden h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-mist shadow-md transition hover:text-brand-ink hover:shadow-lg lg:flex"
         :title="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'"
         :aria-label="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'">
         <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="($store.wsnav && $store.wsnav.collapsed) ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">

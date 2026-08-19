@@ -471,10 +471,14 @@
 
     /* Let the icon tooltips escape the column: the card normally clips
        (overflow-hidden) and the content column paints over the sidebar, so lift
-       the sidebar's stacking and open up its overflow while collapsed. */
+       the sidebar's stacking and open up its overflow while collapsed. Keep it
+       BELOW the sticky <x-site-header> (z-30): at z-30 the rail tied with the
+       header and, being later in the DOM, painted over it while scrolled. z-20
+       still clears the content column (auto), and the aside's stacking context
+       keeps the tooltips (z-50) and the collapse handle contained. */
     html[data-wsnav="collapsed"] aside.ws-sidebar {
         position: relative;
-        z-index: 30;
+        z-index: 20;
     }
     html[data-wsnav="collapsed"] .ws-sidebar .dply-card {
         overflow: visible !important;

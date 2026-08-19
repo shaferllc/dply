@@ -10,6 +10,19 @@ use Illuminate\Support\Facades\Http;
 
 class SourceControlRepositoryBrowser
 {
+    /**
+     * Page size asked of every provider. 100 is GitHub's and GitLab's maximum;
+     * Bitbucket accepts it too.
+     */
+    private const PER_PAGE = 100;
+
+    /**
+     * Hard stop on paging, so an account with thousands of repos can't turn one
+     * picker render into an unbounded fan of API calls. 10 x 100 = 1,000 repos;
+     * past that the "paste a URL" path is the sane way in.
+     */
+    private const MAX_PAGES = 10;
+
     public function __construct(
         private ?GitIdentityResolver $resolver = null,
     ) {
@@ -91,24 +104,47 @@ class SourceControlRepositoryBrowser
      */
     private function githubRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken($account->accessToken())
-            ->acceptJson()
-            ->get($account->apiBaseUrl().'/user/repos', [
-                'sort' => 'updated',
-                'per_page' => 100,
-            ]);
+        $rows = [];
 
-        if (! $response->successful()) {
-            return [];
+        // `affiliation` is spelled out rather than left to the default so the
+        // intent is visible: repos the user owns, is a collaborator on, or can
+        // reach through an org. Repos in an org that has not approved the OAuth
+        // app are invisible to the API regardless — the picker's access hint
+        // points there, since no amount of paging will surface them.
+        for ($page = 1; $page <= self::MAX_PAGES; $page++) {
+            $response = Http::withToken($account->accessToken())
+                ->acceptJson()
+                ->get($account->apiBaseUrl().'/user/repos', [
+                    'sort' => 'updated',
+                    'affiliation' => 'owner,collaborator,organization_member',
+                    'per_page' => self::PER_PAGE,
+                    'page' => $page,
+                ]);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $body = $response->json();
+            if (! is_array($body) || $body === []) {
+                break;
+            }
+
+            $rows = array_merge($rows, $body);
+
+            if (count($body) < self::PER_PAGE) {
+                break;
+            }
         }
 
-        return collect($response->json())
+        return collect($rows)
             ->filter(fn (mixed $repo): bool => is_array($repo) && is_string($repo['clone_url'] ?? null))
             ->map(fn (array $repo): array => [
                 'label' => (string) ($repo['full_name'] ?? $repo['name'] ?? $repo['clone_url']),
                 'url' => (string) $repo['clone_url'],
                 'branch' => (string) ($repo['default_branch'] ?? 'main'),
             ])
+            ->unique('url')
             ->sortBy('label')
             ->values()
             ->all();
@@ -119,25 +155,42 @@ class SourceControlRepositoryBrowser
      */
     private function gitlabRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken($account->accessToken())
-            ->acceptJson()
-            ->get($account->apiBaseUrl().'/api/v4/projects', [
-                'membership' => true,
-                'simple' => true,
-                'per_page' => 100,
-            ]);
+        $rows = [];
 
-        if (! $response->successful()) {
-            return [];
+        for ($page = 1; $page <= self::MAX_PAGES; $page++) {
+            $response = Http::withToken($account->accessToken())
+                ->acceptJson()
+                ->get($account->apiBaseUrl().'/api/v4/projects', [
+                    'membership' => true,
+                    'simple' => true,
+                    'per_page' => self::PER_PAGE,
+                    'page' => $page,
+                ]);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $body = $response->json();
+            if (! is_array($body) || $body === []) {
+                break;
+            }
+
+            $rows = array_merge($rows, $body);
+
+            if (count($body) < self::PER_PAGE) {
+                break;
+            }
         }
 
-        return collect($response->json())
+        return collect($rows)
             ->filter(fn (mixed $repo): bool => is_array($repo) && is_string($repo['http_url_to_repo'] ?? null))
             ->map(fn (array $repo): array => [
                 'label' => (string) ($repo['path_with_namespace'] ?? $repo['name'] ?? $repo['http_url_to_repo']),
                 'url' => (string) $repo['http_url_to_repo'],
                 'branch' => (string) ($repo['default_branch'] ?? 'main'),
             ])
+            ->unique('url')
             ->sortBy('label')
             ->values()
             ->all();
@@ -148,18 +201,38 @@ class SourceControlRepositoryBrowser
      */
     private function bitbucketRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken($account->accessToken())
-            ->acceptJson()
-            ->get($account->apiBaseUrl().'/2.0/repositories', [
-                'role' => 'member',
-                'pagelen' => 100,
-            ]);
+        $rows = [];
+        // Bitbucket hands back an absolute `next` URL rather than page numbers,
+        // so the first call carries the query and the rest just follow the link.
+        $url = $account->apiBaseUrl().'/2.0/repositories';
+        $query = ['role' => 'member', 'pagelen' => self::PER_PAGE];
 
-        if (! $response->successful()) {
-            return [];
+        for ($page = 1; $page <= self::MAX_PAGES; $page++) {
+            $response = Http::withToken($account->accessToken())
+                ->acceptJson()
+                ->get($url, $query);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $values = $response->json('values', []);
+            if (! is_array($values) || $values === []) {
+                break;
+            }
+
+            $rows = array_merge($rows, $values);
+
+            $next = $response->json('next');
+            if (! is_string($next) || $next === '') {
+                break;
+            }
+
+            $url = $next;
+            $query = [];
         }
 
-        return collect($response->json('values', []))
+        return collect($rows)
             ->filter(fn (mixed $repo): bool => is_array($repo))
             ->map(function (array $repo): ?array {
                 $cloneUrl = collect($repo['links']['clone'] ?? [])
@@ -176,6 +249,7 @@ class SourceControlRepositoryBrowser
                 ];
             })
             ->filter()
+            ->unique('url')
             ->sortBy('label')
             ->values()
             ->all();
