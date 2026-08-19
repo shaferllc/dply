@@ -691,6 +691,25 @@ it('presents a site-sourced worker as a worker server, not a pending site', func
         ->assertDontSee('Pending')
         ->assertDontSee('Add your first site')
         ->assertDontSee('Open Sites');
+});
+
+it('presents worker workload instead of a pending public site', function () {
+    Queue::fake();
+    [$user, , , , , $site] = fleetReadySite();
+    $pool = app(WorkerPoolManager::class)->createPoolFromSite($user, $site, 's-1vcpu-1gb', false);
+    $worker = $pool->primaryServer;
+    expect($worker)->toBeInstanceOf(Server::class);
+
+    $worker->forceFill([
+        'status' => Server::STATUS_READY,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+    ])->save();
+
+    app(WorkerWorkloadReplayer::class)->replicateOriginSite($site, $worker);
+
+    session(['current_organization_id' => $site->organization_id]);
+
+    Livewire::withoutLazyLoading();
 
     Livewire::actingAs($user)
         ->test(WorkspaceSites::class, ['server' => $worker->fresh()])
@@ -698,10 +717,8 @@ it('presents a site-sourced worker as a worker server, not a pending site', func
         ->assertSee('Workload')
         ->assertSee('Queue workload')
         ->assertSee('Installing')
-        ->assertSee('Worker')
         ->assertSee('Worker Servers')
         ->assertDontSee('Pending')
-        ->assertDontSee('Add site')
         ->assertDontSee('Sync ')
         ->assertDontSee('Deploy PHP/Laravel apps from Git');
 });

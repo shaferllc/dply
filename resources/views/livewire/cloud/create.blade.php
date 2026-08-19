@@ -87,18 +87,20 @@
                         </div>
                     @endif
 
-            {{-- 01 Source --}}
+            {{-- Source — the only required step. Everything else lives under Advanced. --}}
             <section class="border-b border-brand-ink/10">
                 <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">
+                        <x-heroicon-o-code-bracket class="h-4 w-4" aria-hidden="true" />
+                    </span>
                     <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Source') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Git repository or pre-built image. Source mode rebuilds on push.') }}</p>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Name the app, point at a repo or image, deploy. Defaults cover the rest.') }}</p>
                     </div>
                 </div>
-                <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
+                <div class="min-w-0 space-y-6 px-5 py-4 sm:px-6">
 
-                        <x-server-workspace-tablist :aria-label="__('Deployment source')" class="!mb-0">
+                        <x-server-workspace-tablist :aria-label="__('Deployment source')">
                             <x-server-workspace-tab icon="heroicon-o-code-bracket" :active="$mode === 'source'" wire:click="setMode('source')">
                                 {{ __('From repository') }}
                             </x-server-workspace-tab>
@@ -107,11 +109,21 @@
                             </x-server-workspace-tab>
                         </x-server-workspace-tablist>
 
-                        <div>
-                            <x-input-label for="name" :value="__('App name')" />
-                            <x-text-input id="name" wire:model.live="name" type="text" class="mt-1 block w-full" required placeholder="acme-api" />
-                            <p class="mt-1 text-xs text-brand-mist">{{ __('Used in the Cloud index, app workspace, and default subdomain.') }}</p>
-                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                        <div class="grid gap-6 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="name" class="mb-2.5 leading-6" :value="__('App name')" />
+                                <x-text-input id="name" wire:model.live="name" type="text" class="!mt-0 block w-full" required placeholder="acme-api" />
+                                <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="region" class="mb-2.5 leading-6" :value="__('Region')" />
+                                <select id="region" wire:model.live="region" class="dply-input !mt-0 block w-full" required>
+                                    @foreach ($regions as $r)
+                                        <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('region')" class="mt-2" />
+                            </div>
                         </div>
 
                         @if ($mode === 'source')
@@ -147,23 +159,39 @@
                             </div>
 
                             @if ($repo_source === 'connected' && $linkedSourceControlAccounts !== [])
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <x-input-label for="source_control_account_id" :value="__('Account')" />
-                                        <select id="source_control_account_id" wire:model.live="source_control_account_id" class="dply-input mt-1 block w-full">
-                                            @foreach ($linkedSourceControlAccounts as $account)
-                                                <option value="{{ $account['id'] }}">{{ $account['label'] ?? $account['name'] ?? $account['id'] }}</option>
-                                            @endforeach
-                                        </select>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex flex-col gap-2.5">
+                                        <x-input-label for="source_control_account_id" class="leading-6" :value="__('Account')" />
+                                        <x-repo-combobox
+                                            :repositories="$linkedSourceControlAccounts"
+                                            property="source_control_account_id"
+                                            target="source_control_account_id"
+                                            trigger-id="source_control_account_id"
+                                            :selected="$source_control_account_id"
+                                            :placeholder="__('Select an account…')"
+                                            :search-placeholder="__('Filter accounts…')"
+                                            :empty-message="__('No accounts match your filter.')"
+                                            :mono="false"
+                                        />
                                     </div>
-                                    <div>
-                                        <x-input-label for="repository_selection" :value="__('Repository')" />
-                                        <select id="repository_selection" wire:model.live="repository_selection" class="dply-input mt-1 block w-full" required>
-                                            <option value="">{{ __('Select a repository…') }}</option>
-                                            @foreach ($availableRepositories as $r)
-                                                <option value="{{ $r['url'] }}">{{ $r['name'] ?? $r['url'] }}</option>
-                                            @endforeach
-                                        </select>
+                                    <div class="flex flex-col gap-2.5">
+                                        <x-input-label for="repository_selection" class="leading-6" :value="__('Repository')" />
+                                        @if ($availableRepositories !== [])
+                                            <x-repo-combobox
+                                                :repositories="$availableRepositories"
+                                                property="repository_selection"
+                                                target="source_control_account_id"
+                                                trigger-id="repository_selection"
+                                                :selected="$repository_selection"
+                                                :placeholder="__('Select a repository…')"
+                                            />
+                                        @else
+                                            <p class="flex items-start gap-1.5 rounded-xl border border-brand-ink/10 bg-brand-cream/70 px-3 py-2.5 text-xs text-brand-moss">
+                                                <x-heroicon-o-information-circle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                <span>{{ __('No repositories returned for this account. Check the token or enter the repo manually.') }}</span>
+                                            </p>
+                                        @endif
+                                        <x-input-error :messages="$errors->get('repository_selection')" class="mt-2" />
                                     </div>
                                 </div>
                                 @if ($repo !== '')
@@ -184,32 +212,22 @@
                                 </div>
                             @endif
 
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <x-input-label for="branch" :value="__('Branch')" />
-                                    <div class="relative mt-1">
-                                        <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist" aria-hidden="true">
-                                            <x-heroicon-o-arrow-trending-up class="h-4 w-4" />
-                                        </span>
-                                        <x-text-input id="branch" wire:model.live="branch" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="main" />
-                                    </div>
-                                    <x-input-error :messages="$errors->get('branch')" class="mt-2" />
+                            <div class="flex flex-col gap-2.5">
+                                <x-input-label for="branch" class="leading-6" :value="__('Branch')" />
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist" aria-hidden="true">
+                                        <x-heroicon-o-arrow-trending-up class="h-4 w-4" />
+                                    </span>
+                                    <x-text-input id="branch" wire:model.live="branch" type="text" class="!mt-0 block w-full ps-10 font-mono text-sm" required placeholder="main" />
                                 </div>
-                                <div>
-                                    <x-input-label for="dockerfile_path" :value="__('Dockerfile path (optional)')" />
-                                    <x-text-input id="dockerfile_path" wire:model="dockerfile_path" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="Dockerfile" />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank for buildpack auto-detection.') }}</p>
-                                </div>
+                                <x-input-error :messages="$errors->get('branch')" class="mt-2" />
                             </div>
 
-                            <label class="group relative flex cursor-pointer rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 transition-colors has-[:checked]:border-brand-sage/40 has-[:checked]:bg-brand-sage/5 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40 dark:has-[:checked]:border-brand-sage/35 dark:has-[:checked]:bg-brand-sage/10">
+                            <label class="flex cursor-pointer items-start gap-2.5">
                                 <input type="checkbox" wire:model="deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
-                                <span class="ms-3">
-                                    <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                                        <x-heroicon-o-bolt class="h-4 w-4 text-brand-gold" aria-hidden="true" />
-                                        {{ __('Auto-deploy on push to this branch') }}
-                                    </span>
-                                    <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('A GitHub webhook triggers a rebuild and rollout every time you push.') }}</span>
+                                <span>
+                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Auto-deploy on push') }}</span>
+                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Rebuilds this app whenever you push to the branch.') }}</span>
                                 </span>
                             </label>
                         @else
@@ -228,8 +246,28 @@
                 </div>
             </section>
 
+            @php
+                $advancedHasValues = filled(trim((string) $env_file_content))
+                    || $databases !== []
+                    || $buckets !== []
+                    || $workers !== []
+                    || ($domains ?? []) !== []
+                    || $migrations_enabled
+                    || $autoscaling_enabled
+                    || $health_check_enabled
+                    || filled(trim((string) $dockerfile_path));
+            @endphp
+            <details @if ($advancedHasValues) open @endif class="group/advanced border-b border-brand-ink/10">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-brand-ink">{{ __('Advanced') }}</span>
+                        <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Runtime size, env, databases, workers, domains, and health checks.') }}</span>
+                    </span>
+                    <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-mist transition-transform group-open/advanced:rotate-180" aria-hidden="true" />
+                </summary>
+
             @if ($mode === 'source')
-                {{-- 02 Detect --}}
+                {{-- Detect --}}
                 <section class="border-b border-brand-ink/10">
                     <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
                         <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">02</span>
@@ -261,13 +299,14 @@
             @endif
 
             {{-- Runtime --}}
-            @php $runtimeStep = $mode === 'source' ? '03' : '02'; @endphp
             <section class="border-b border-brand-ink/10">
                 <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">{{ $runtimeStep }}</span>
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">
+                        <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
+                    </span>
                     <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Runtime') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('HTTP port, instances, size, and region.') }}</p>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('HTTP port, instances, and size. Region is set above.') }}</p>
                     </div>
                 </div>
                 <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
@@ -301,15 +340,13 @@
                                 <p class="mt-1 text-xs text-brand-mist">{{ __('Pro unlocks CPU-target autoscaling.') }}</p>
                                 <x-input-error :messages="$errors->get('size_tier')" class="mt-2" />
                             </div>
-                            <div>
-                                <x-input-label for="region" :value="__('Region')" />
-                                <select id="region" wire:model.live="region" class="dply-input mt-1 block w-full" required>
-                                    @foreach ($regions as $r)
-                                        <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('region')" class="mt-2" />
-                            </div>
+                            @if ($mode === 'source')
+                                <div>
+                                    <x-input-label for="dockerfile_path" :value="__('Dockerfile path (optional)')" />
+                                    <x-text-input id="dockerfile_path" wire:model="dockerfile_path" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="Dockerfile" />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank for buildpack auto-detection.') }}</p>
+                                </div>
+                            @endif
                         </div>
                 </div>
             </section>
@@ -334,7 +371,7 @@
             </section>
 
             <div class="border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-2.5 sm:px-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Configure (optional)') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Optional add-ons') }}</p>
             </div>
 
             {{-- Databases — one row per attached/created managed database.
@@ -953,6 +990,7 @@
                         </div>
                     </div>
             </section>
+            </details>
 
                     <x-slot:footer>
                         <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

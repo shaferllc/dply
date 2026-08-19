@@ -12,12 +12,21 @@ use App\Models\ServerSshSession;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
+use App\Modules\Database\Services\TunnelAccessProvisioner;
+use App\Support\Servers\DatabaseConnectionTarget;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\URL;
 
 uses(RefreshDatabase::class);
 
-/** @return array{0: User, 1: Site, 2: SiteBinding} */
+/**
+ * The installer route is signature-only by design: it is fetched with
+ * `curl | bash`, which carries no session cookie. Authorization happens when the
+ * key is MINTED, in the Connect modal; the signed URL is a short-lived, one-shot
+ * capability for collecting an already-authorized key.
+ */
+
+/** @return array{0: User, 1: Server, 2: DatabaseConnectionTarget} */
 function tunnelFixture(): array
 {
     $user = User::factory()->create();
@@ -43,7 +52,7 @@ function tunnelFixture(): array
 
     $database = CloudDatabase::factory()->active()->create(['organization_id' => $org->id]);
 
-    $binding = SiteBinding::query()->create([
+    SiteBinding::query()->create([
         'site_id' => $site->id,
         'type' => 'database',
         'mode' => 'managed',
@@ -55,26 +64,34 @@ function tunnelFixture(): array
         'injected_env' => [],
     ]);
 
-    return [$user, $site, $binding];
+    $target = new DatabaseConnectionTarget(
+        engine: 'postgres',
+        host: 'db.example.ondigitalocean.com',
+        port: 25060,
+        database: 'defaultdb',
+        username: 'doadmin',
+        sslMode: 'require',
+        label: 'primary',
+    );
+
+    return [$user, $server, $target];
 }
 
-function tunnelInstallUrl(Site $site, SiteBinding $binding, int $port = 15432): string
+function installUrl(ServerSshSession $session): string
 {
-    return URL::temporarySignedRoute('sites.databases.tunnel-install', now()->addMinutes(5), [
-        'server' => $site->server_id,
-        'site' => $site->id,
-        'binding' => $binding->id,
-        'port' => $port,
+    return URL::temporarySignedRoute('database-tunnels.install', now()->addMinutes(10), [
+        'session' => $session->id,
+        'host' => 'db.example.ondigitalocean.com',
+        'dbport' => 25060,
+        'port' => 15432,
     ]);
 }
 
 test('the install script carries a key and an ssh config block', function (): void {
-    [$user, $site, $binding] = tunnelFixture();
+    [$user, $server, $target] = tunnelFixture();
+    $session = app(TunnelAccessProvisioner::class)->provision($server, $user, $target);
 
-    $response = $this->actingAs($user)->get(tunnelInstallUrl($site, $binding));
-
-    $response->assertOk();
-    $body = (string) $response->getContent();
+    $body = (string) $this->get(installUrl($session))->assertOk()->getContent();
 
     expect($body)->toContain('BEGIN OPENSSH PRIVATE KEY')
         ->and($body)->toContain('IdentitiesOnly yes')
@@ -84,9 +101,8 @@ test('the install script carries a key and an ssh config block', function (): vo
 });
 
 test('the minted key can only forward to the one database', function (): void {
-    [$user, $site, $binding] = tunnelFixture();
-
-    $this->actingAs($user)->get(tunnelInstallUrl($site, $binding))->assertOk();
+    [$user, $server, $target] = tunnelFixture();
+    app(TunnelAccessProvisioner::class)->provision($server, $user, $target);
 
     $key = ServerAuthorizedKey::query()
         ->where('managed_key_type', ServerSshSession::class)
@@ -102,36 +118,53 @@ test('the minted key can only forward to the one database', function (): void {
         ->and($key->public_key)->toStartWith('ssh-ed25519 ');
 });
 
-test('the stored key is cleared on delivery and re-running rotates it', function (): void {
-    [$user, $site, $binding] = tunnelFixture();
+test('the key is delivered once and a replayed link yields nothing', function (): void {
+    [$user, $server, $target] = tunnelFixture();
+    $session = app(TunnelAccessProvisioner::class)->provision($server, $user, $target);
+    $url = installUrl($session);
 
-    $this->actingAs($user)->get(tunnelInstallUrl($site, $binding))->assertOk();
+    $this->get($url)->assertOk();
 
-    $session = ServerSshSession::query()->latest('created_at')->first();
-    expect($session->private_key)->toBeNull()
-        ->and($session->delivered_at)->not->toBeNull();
+    expect($session->fresh()->private_key)->toBeNull()
+        ->and($session->fresh()->delivered_at)->not->toBeNull();
 
-    // Re-running rotates rather than accumulating: the previous key is revoked,
-    // so a copy kept from an earlier run stops working.
-    $this->actingAs($user)->get(tunnelInstallUrl($site, $binding))->assertOk();
+    // A kept URL is inert once the key has been collected.
+    $this->get($url)->assertStatus(410);
+});
 
-    expect($session->fresh()->revoked_at)->not->toBeNull()
+test('re-provisioning rotates the key and revokes the previous one', function (): void {
+    [$user, $server, $target] = tunnelFixture();
+    $provisioner = app(TunnelAccessProvisioner::class);
+
+    $first = $provisioner->provision($server, $user, $target);
+    $second = $provisioner->provision($server, $user, $target);
+
+    expect($second->id)->not->toBe($first->id)
+        ->and($first->fresh()->revoked_at)->not->toBeNull()
         ->and(ServerSshSession::query()->whereNull('revoked_at')->count())->toBe(1);
 });
 
-test('a valid signature alone does not yield a key', function (): void {
-    [, $site, $binding] = tunnelFixture();
+test('an expired session yields nothing', function (): void {
+    [$user, $server, $target] = tunnelFixture();
+    $session = app(TunnelAccessProvisioner::class)->provision($server, $user, $target);
+    $session->forceFill(['expires_at' => now()->subMinute()])->save();
 
-    $this->get(tunnelInstallUrl($site, $binding))->assertRedirect();
-
-    expect(ServerSshSession::query()->count())->toBe(0);
+    $this->get(installUrl($session))->assertStatus(410);
 });
 
-test('a user from another organization is refused', function (): void {
-    [, $site, $binding] = tunnelFixture();
-    $outsider = User::factory()->create();
+test('an unsigned request is rejected', function (): void {
+    [$user, $server, $target] = tunnelFixture();
+    $session = app(TunnelAccessProvisioner::class)->provision($server, $user, $target);
 
-    $this->actingAs($outsider)->get(tunnelInstallUrl($site, $binding))->assertForbidden();
+    $this->get(route('database-tunnels.install', ['session' => $session->id]))->assertForbidden();
+});
 
-    expect(ServerSshSession::query()->count())->toBe(0);
+test('an unknown session is not found', function (): void {
+    tunnelFixture();
+
+    $url = URL::temporarySignedRoute('database-tunnels.install', now()->addMinutes(10), [
+        'session' => '01hzzzzzzzzzzzzzzzzzzzzzzz',
+    ]);
+
+    $this->get($url)->assertNotFound();
 });

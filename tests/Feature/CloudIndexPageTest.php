@@ -28,14 +28,16 @@ test('empty state with warning when no credentials', function () {
 
     $response->assertOk()
         ->assertSee('Cloud apps')
-        ->assertSee('Ship your first app in minutes')
-        ->assertSee('Connect a cloud account to deploy')
+        ->assertSee('Ship Laravel or Rails.')
+        ->assertSee('Skip the box.')
         ->assertSee('Connect DigitalOcean')
         ->assertSee('Use AWS')
-        ->assertSee('Deploy an app')
-        ->assertSee('What Cloud gives you')
-        ->assertSee('Auto-scale')
-        ->assertSee(route('cloud.create'), escape: false)
+        ->assertSee('Deploy from Git')
+        ->assertSee('Start from')
+        ->assertSee('What it costs')
+        ->assertSee('Your Git repo')
+        ->assertSee('Container image')
+        ->assertSee(route('cloud.create', ['mode' => 'source']), escape: false)
         ->assertSee(route('credentials.index', ['provider' => 'digitalocean']), escape: false);
 });
 test('lists only container sites for current org', function () {
@@ -104,10 +106,11 @@ test('warning hides when a backend credential is connected', function () {
     $response = $this->actingAs($user)->get(route('cloud.index'));
 
     $response->assertOk()
-        ->assertSee('Ship your first app in minutes')
-        ->assertSee('Deploy an app')
-        ->assertDontSee('Connect a cloud account to deploy')
-        ->assertDontSee('Connect DigitalOcean');
+        ->assertSee('Ship Laravel or Rails.')
+        ->assertSee('Deploy from Git')
+        ->assertSee('Databases')
+        ->assertDontSee('Connect DigitalOcean')
+        ->assertDontSee('Use AWS');
 });
 test('lists source mode site with repo branch', function () {
     $user = ownerWithOrg();

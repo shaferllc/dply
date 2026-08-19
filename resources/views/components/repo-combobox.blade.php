@@ -10,16 +10,21 @@
     // Currently-selected URL, so the trigger can show its label on first paint.
     'selected' => null,
     'placeholder' => null,
+    'searchPlaceholder' => null,
+    'mono' => true,
+    'emptyMessage' => null,
 ])
 
 @php
     $placeholder ??= __('Select a repository…');
+    $searchPlaceholder ??= __('Filter repositories…');
+    $emptyMessage ??= __('No repositories match your filter.');
     // Normalize to a flat {label,url} list once, server-side, so the Alpine
     // filter has a stable shape regardless of what the provider browser returns.
     $normalized = collect($repositories)
         ->map(fn ($r) => [
-            'label' => (string) ($r['label'] ?? $r['name'] ?? $r['url'] ?? ''),
-            'url' => (string) ($r['url'] ?? ''),
+            'label' => (string) ($r['label'] ?? $r['name'] ?? $r['url'] ?? $r['id'] ?? ''),
+            'url' => (string) ($r['url'] ?? $r['value'] ?? $r['id'] ?? ''),
         ])
         ->values();
     $selectedRepository = $normalized->firstWhere('url', $selected);
@@ -72,7 +77,7 @@
         wire:loading.attr="disabled" wire:target="{{ $target }}"
         class="flex w-full items-center justify-between gap-3 rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2.5 text-left text-sm shadow-sm transition focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink dark:bg-brand-ink/20"
     >
-        <span class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">
+        <span @class(['min-w-0 flex-1 truncate text-sm text-brand-ink', 'font-mono' => $mono])>
             <span wire:loading.remove wire:target="{{ $target }}">{{ $selectedRepository['label'] ?? $placeholder }}</span>
             <span wire:loading wire:target="{{ $target }}" class="inline-flex items-center gap-1.5 text-brand-moss">
                 <x-spinner size="sm" />
@@ -100,7 +105,7 @@
                 x-on:keydown.arrow-up.prevent="move(-1)"
                 x-on:keydown.enter.prevent="chooseActive()"
                 type="text"
-                placeholder="{{ __('Filter repositories…') }}"
+                placeholder="{{ $searchPlaceholder }}"
                 class="block w-full rounded-xl border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm text-brand-ink placeholder:text-brand-mist focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink"
             />
         </div>
@@ -119,11 +124,11 @@
                         'bg-brand-sand/40 ring-1 ring-brand-ink/15': repo.url === current && i !== active,
                         'hover:bg-brand-sand/30': i !== active && repo.url !== current,
                     }"
-                    class="block w-full rounded-lg px-3 py-2 text-left font-mono text-sm text-brand-ink transition"
+                    class="block w-full rounded-lg px-3 py-2 text-left text-sm text-brand-ink transition {{ $mono ? 'font-mono' : '' }}"
                     x-text="repo.label"
                 ></button>
             </template>
-            <p x-show="filtered.length === 0" class="px-3 py-2 text-xs text-brand-moss">{{ __('No repositories match your filter.') }}</p>
+            <p x-show="filtered.length === 0" class="px-3 py-2 text-xs text-brand-moss">{{ $emptyMessage }}</p>
         </div>
     </div>
 </div>

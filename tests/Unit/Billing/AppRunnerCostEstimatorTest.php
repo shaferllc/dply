@@ -35,3 +35,18 @@ test('app runner compute map stays aligned with backend size tiers', function ()
     expect(AwsAppRunnerBackend::computeForSizeTier('small')['vcpu'])->toBe(0.25);
     expect(AwsAppRunnerBackend::computeForSizeTier('xlarge-pro')['memory_gb'])->toBe(4.0);
 });
+test('cloud pricing summary applies markup to the same rates the biller uses', function () {
+    config([
+        'subscription.standard.cloud_cents' => 500,
+        'subscription.standard.cloud_markup_percent' => 40,
+        'subscription.standard.cloud_container_cents' => ['small' => 500],
+        'subscription.standard.cloud_database_cents' => ['small' => 1500],
+    ]);
+
+    $summary = (new ManagedProductCostEstimator)->cloudPricingSummary();
+
+    expect($summary['flat_cents'])->toBe(500)
+        ->and($summary['markup_percent'])->toBe(40)
+        ->and($summary['small_container_cents'])->toBe(700)
+        ->and($summary['small_database_cents'])->toBe(2100);
+});

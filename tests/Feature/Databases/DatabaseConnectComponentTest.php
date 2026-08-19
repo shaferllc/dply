@@ -112,7 +112,7 @@ test('a synthetic host explains itself instead of emitting a broken command', fu
             'server' => $site->server,
             'bindingId' => (string) $binding->id,
         ])
-        ->assertSee('no dply server to tunnel through', escape: false)
+        ->assertSee('no server to tunnel through', escape: false)
         ->assertDontSee('ssh -L');
 });
 
@@ -255,5 +255,5 @@ test('allow and open is offered when no allowance exists yet', function (): void
         // The one-click grant needs a routable address before it can be offered;
         // under test request()->ip() is loopback, as in local development.
         ->set('allowIp', '203.0.113.7')
-        ->assertSee('Allow my IP and open TablePlus');
+        ->assertSee('Allow my IP and open directly');
 });

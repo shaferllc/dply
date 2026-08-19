@@ -63,6 +63,17 @@ test('page hides empty-state when a cloud account is connected', function () {
     $response->assertOk()
         ->assertDontSee('Connect a cloud account to deploy');
 });
+test('create form leads with source and folds extras under advanced', function () {
+    $user = ownerWithOrg();
+
+    $this->actingAs($user)
+        ->get(route('cloud.create', ['mode' => 'source']))
+        ->assertOk()
+        ->assertSee('Name the app, point at a repo or image, deploy')
+        ->assertSee('Advanced')
+        ->assertSee('GitHub repo')
+        ->assertSee('Deploy app');
+});
 test('changing backend resets region to first available', function () {
     $user = ownerWithOrg();
 
@@ -125,7 +136,7 @@ test('source tab renders repo inputs', function () {
         ->set('mode', 'source')
         ->assertSee('GitHub repo')
         ->assertSee('Branch')
-        ->assertSee('Auto-deploy on push to this branch')
+        ->assertSee('Auto-deploy on push')
         ->assertSee('owner/name or full GitHub URL');
 });
 test('source mode validates repo and branch', function () {
@@ -278,6 +289,8 @@ test('picker selection populates repo and branch', function () {
     Livewire::actingAs($user)
         ->test(CloudCreate::class)
         ->set('mode', 'source')
+        ->assertSee('Select a repository')
+        ->assertSee('Filter repositories')
         ->set('repository_selection', 'https://github.com/acme/api.git')
         ->assertSet('repo', 'acme/api')
         ->assertSet('branch', 'develop');
