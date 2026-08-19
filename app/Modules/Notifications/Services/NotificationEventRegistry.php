@@ -35,6 +35,7 @@ class NotificationEventRegistry
                     // A dead/expiring Git credential is action-required: every
                     // deploy using it fails at clone until it's replaced.
                     || str_starts_with($eventKey, 'account.git_token.')
+                    || str_starts_with($eventKey, 'account.provider_credential.')
                     || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
@@ -71,6 +72,7 @@ class NotificationEventRegistry
     {
         if (str_contains($eventKey, 'monitor')
             || str_starts_with($eventKey, 'account.git_token.')
+            || str_starts_with($eventKey, 'account.provider_credential.')
             || str_contains($eventKey, 'uptime')
             || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')

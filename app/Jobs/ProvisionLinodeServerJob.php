@@ -44,7 +44,8 @@ class ProvisionLinodeServerJob implements ShouldQueue
 
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
-            $image = ServerImageCatalog::resolveForServer($this->server, 'linode')
+            $image = ServerImageCatalog::bootImageForServer($this->server)
+                ?? ServerImageCatalog::resolveForServer($this->server, 'linode')
                 ?? config('services.linode.default_image', 'linode/ubuntu24.04');
 
             $id = $linode->createInstance(

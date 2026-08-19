@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Database\Services;
 
+use App\Jobs\SyncAuthorizedKeysJob;
 use App\Models\Server;
 use App\Models\ServerSshSession;
 use App\Models\User;
@@ -12,6 +13,7 @@ use App\Support\OpenSshEd25519KeyPairGenerator;
 use App\Support\Servers\DatabaseConnectionTarget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -57,12 +59,12 @@ class TunnelAccessProvisioner
         // live tunnel key per operator per server, and the previous one stops
         // working the moment a replacement is issued.
         foreach ($this->liveSessions($server, $actor) as $previous) {
-            $this->sessions->revoke($previous);
+            $this->sessions->revoke($previous, syncNow: false);
         }
 
         [$privateKey, $publicKey] = OpenSshEd25519KeyPairGenerator::generate();
 
-        return $this->sessions->grant(
+        $session = $this->sessions->grant(
             server: $server,
             actor: $actor,
             name: $this->sessionName($actor),
@@ -71,7 +73,20 @@ class TunnelAccessProvisioner
             targetLinuxUser: trim((string) $server->ssh_user) !== '' ? trim((string) $server->ssh_user) : 'root',
             keyOptions: self::restrictionsFor($target),
             privateKey: $privateKey,
+            syncNow: false,
         );
+
+        // The key reaches the box on the queue. Doing it inline would put an SSH
+        // round trip in the HTTP request, which blocks the modal until PHP's
+        // max_execution_time — the "Generating…" spinner that never resolves.
+        SyncAuthorizedKeysJob::dispatch(
+            (string) $server->id,
+            (string) Str::ulid(),
+            (string) $actor->id,
+            request()->ip(),
+        );
+
+        return $session;
     }
 
     /**

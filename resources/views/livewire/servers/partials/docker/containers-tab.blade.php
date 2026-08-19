@@ -127,8 +127,10 @@
                                         @endif
                                     @endfeature
                                     <button type="button" wire:click="openContainerExec(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Exec') }}</button>
-                                    <button type="button" wire:click="openContainerLogs(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
-                                    <button type="button" wire:click="openContainerInspect(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Inspect') }}</button>
+                                    @can('update', $server)
+                                        <button type="button" wire:click="openContainerLogs(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                        <button type="button" wire:click="openContainerInspect(@js($ref), @js($name))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Inspect') }}</button>
+                                    @endcan
                                     @if (! $running)
                                         <button type="button" wire:click="confirmDockerContainerAction('docker_container_start', @js($ref))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Start') }}</button>
                                     @else

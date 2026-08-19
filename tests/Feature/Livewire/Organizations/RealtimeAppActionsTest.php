@@ -238,6 +238,33 @@ it('reports a publish that reached nobody as its own outcome', function () {
             && str_contains((string) ($params['message'] ?? ''), 'nothing was subscribed'));
 });
 
+it('does not hydrate the app secret for a view-only member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
+    $app = RealtimeApp::factory()->for($org)->create([
+        'status' => RealtimeApp::STATUS_ACTIVE,
+        'tier' => 'starter',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(RealtimeAppShow::class, ['realtimeApp' => $app])
+        ->assertSee($app->name)
+        ->assertDontSee($app->app_secret)
+        ->assertDontSee('PUSHER_APP_SECRET=')
+        ->assertDontSee('X-Dply-Secret:');
+});
+
+it('shows copy-paste credentials to an org admin', function () {
+    [$user, $app] = realtimeOwner();
+
+    Livewire::actingAs($user)
+        ->test(RealtimeAppShow::class, ['realtimeApp' => $app])
+        ->assertSee($app->app_secret)
+        ->assertSee('PUSHER_APP_SECRET=')
+        ->assertSee('X-Dply-Secret:');
+});
+
 it('never sends the app secret anywhere but the relay', function () {
     fakeRelay();
     [, $app] = realtimeOwner();

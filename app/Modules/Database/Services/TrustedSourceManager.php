@@ -45,7 +45,30 @@ class TrustedSourceManager
 
     public function defaultExpiry(): CarbonInterface
     {
-        return now()->addHours((int) config('server_database.trusted_source_ttl_hours', 8));
+        return $this->clampExpiry(now()->addHours($this->ttlHours()));
+    }
+
+    public function ttlHours(): int
+    {
+        return max(1, (int) config('server_database.trusted_source_ttl_hours', 8));
+    }
+
+    public function maxTtlHours(): int
+    {
+        return max(1, (int) config('server_database.trusted_source_max_ttl_hours', 24));
+    }
+
+    /**
+     * Temporary access that outlives the session it was granted for is just an
+     * open firewall with extra steps. A misconfigured TTL, or a caller passing
+     * its own expiry, must not be able to leave a cluster exposed for months —
+     * so every expiry is capped here rather than trusted.
+     */
+    public function clampExpiry(CarbonInterface $expiresAt): CarbonInterface
+    {
+        $ceiling = now()->addHours($this->maxTtlHours());
+
+        return $expiresAt->greaterThan($ceiling) ? $ceiling : $expiresAt;
     }
 
     /**
@@ -94,7 +117,7 @@ class TrustedSourceManager
             throw new RuntimeException('A valid public IP address is required.');
         }
 
-        $expiresAt ??= $this->defaultExpiry();
+        $expiresAt = $this->clampExpiry($expiresAt ?? $this->defaultExpiry());
 
         // Ledger first: if the provider write throws, we still know an attempt
         // was made and the reaper can clean up a partially applied rule.

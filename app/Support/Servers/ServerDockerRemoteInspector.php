@@ -206,7 +206,7 @@ BASH, 120);
     /**
      * @return array{inspect: string, error: ?string}
      */
-    public function containerInspect(Server $server, string $containerId): array
+    public function containerInspect(Server $server, string $containerId, bool $revealEnv = false): array
     {
         if (! $this->dockerCliPresent($server)) {
             return ['inspect' => '', 'error' => __('Docker CLI is not installed on this server.')];
@@ -230,7 +230,47 @@ BASH, 90);
             return ['inspect' => '', 'error' => __('Docker CLI is not installed on this server.')];
         }
 
-        return ['inspect' => $out, 'error' => null];
+        return [
+            'inspect' => $revealEnv ? $out : $this->redactInspectEnv($out),
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Strip Config.Env / Env from docker inspect JSON so view-only callers
+     * never receive APP_KEY, DB URLs, or cache AUTH values.
+     */
+    public function redactInspectEnv(string $json): string
+    {
+        $decoded = json_decode($json, true);
+        if (! is_array($decoded)) {
+            return $json;
+        }
+
+        $encoded = json_encode($this->redactEnvKeys($decoded), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return is_string($encoded) ? $encoded : $json;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $node
+     * @return array<int|string, mixed>
+     */
+    private function redactEnvKeys(array $node): array
+    {
+        foreach ($node as $key => $value) {
+            if ($key === 'Env' && is_array($value)) {
+                $node[$key] = ['[redacted]'];
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                $node[$key] = $this->redactEnvKeys($value);
+            }
+        }
+
+        return $node;
     }
 
     public function dockerCliPresent(Server $server): bool

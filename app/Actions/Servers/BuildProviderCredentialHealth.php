@@ -15,6 +15,7 @@ use App\Modules\Cloud\Services\OracleComputeService;
 use App\Modules\Cloud\Services\OvhService;
 use App\Modules\Cloud\Services\UpCloudService;
 use App\Modules\Cloud\Services\VultrService;
+use App\Support\Providers\ProviderAuthFailure;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
@@ -102,6 +103,10 @@ final class BuildProviderCredentialHealth
     private function classifyFailure(string $type, Throwable $e): array
     {
         $message = strtolower(trim($e->getMessage()));
+
+        if (ProviderAuthFailure::detected($e->getMessage())) {
+            return ['invalid', 'error', __('Credential validation failed'), __('The provider rejected this credential. Re-enter or rotate it before provisioning.')];
+        }
 
         if (str_contains($message, 'required')
             || str_contains($message, 'project id')

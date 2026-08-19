@@ -34,17 +34,21 @@
         x-data="{ copied: false }"
     >
         <span class="font-medium text-brand-ink/70">{{ $footerLabel }}</span>
-        <code class="ml-1 select-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 font-mono text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $command }}</code>
-        <button
-            type="button"
-            class="ml-1 inline-flex items-center justify-center rounded p-0.5 text-brand-mist align-middle hover:bg-brand-sand hover:text-brand-ink"
-            title="{{ __('Copy command') }}"
-            aria-label="{{ __('Copy command') }}"
-            @click="navigator.clipboard.writeText(@js($command)); copied = true; setTimeout(() => copied = false, 1500)"
-        >
-            <x-heroicon-o-clipboard class="h-3 w-3" />
-        </button>
-        <span x-show="copied" x-cloak class="ml-1 text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
+        {{-- A long command wraps inside the code block; the copy control stays
+             pinned to its top-right rather than being pushed onto its own line. --}}
+        <div class="mt-1 flex min-w-0 items-start gap-1.5">
+            <code class="min-w-0 flex-1 select-all break-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 font-mono text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $command }}</code>
+            <button
+                type="button"
+                class="mt-0.5 inline-flex shrink-0 items-center justify-center rounded p-1 text-brand-mist hover:bg-brand-sand hover:text-brand-ink"
+                title="{{ __('Copy command') }}"
+                aria-label="{{ __('Copy command') }}"
+                @click="navigator.clipboard.writeText(@js($command)); copied = true; setTimeout(() => copied = false, 1500)"
+            >
+                <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="!copied" />
+                <x-heroicon-o-check class="h-3.5 w-3.5 text-emerald-700" x-show="copied" x-cloak />
+            </button>
+        </div>
     </footer>
 @elseif ($resolvedTone === 'details' && $rows !== [])
     {{-- Flush disclosure — no nested rounded card (merged chrome footers).
@@ -61,22 +65,23 @@
         @endif
         <ul class="mt-2 space-y-1.5 font-mono {{ $rowSizeClass }}">
             @foreach ($rows as $row)
-                <li x-data="{ copied: false }" class="flex flex-wrap items-center gap-x-1.5">
+                <li x-data="{ copied: false }" class="min-w-0">
                     @if (! empty($row['label']))
                         <span class="font-sans text-brand-moss">{{ $row['label'] }}</span>
-                        <span class="font-sans text-brand-mist" aria-hidden="true">—</span>
                     @endif
-                    <code class="select-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $row['command'] }}</code>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center rounded p-0.5 text-brand-mist hover:bg-brand-sand hover:text-brand-ink"
-                        title="{{ __('Copy command') }}"
-                        aria-label="{{ __('Copy command') }}"
-                        @click="navigator.clipboard.writeText(@js($row['command'])); copied = true; setTimeout(() => copied = false, 1500)"
-                    >
-                        <x-heroicon-o-clipboard class="h-3 w-3" />
-                    </button>
-                    <span x-show="copied" x-cloak class="text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
+                    <div class="mt-0.5 flex min-w-0 items-start gap-1.5">
+                        <code class="min-w-0 flex-1 select-all break-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $row['command'] }}</code>
+                        <button
+                            type="button"
+                            class="mt-0.5 inline-flex shrink-0 items-center justify-center rounded p-1 text-brand-mist hover:bg-brand-sand hover:text-brand-ink"
+                            title="{{ __('Copy command') }}"
+                            aria-label="{{ __('Copy command') }}"
+                            @click="navigator.clipboard.writeText(@js($row['command'])); copied = true; setTimeout(() => copied = false, 1500)"
+                        >
+                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="!copied" />
+                            <x-heroicon-o-check class="h-3.5 w-3.5 text-emerald-700" x-show="copied" x-cloak />
+                        </button>
+                    </div>
                 </li>
             @endforeach
         </ul>

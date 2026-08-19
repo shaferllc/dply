@@ -6,12 +6,15 @@ namespace App\Services\WorkerPools;
 
 use App\Models\CloudDatabase;
 use App\Models\PrivateNetwork;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Services\Providers\ProviderCredentialHealth;
 use App\Services\Sites\DotEnvFileParser;
+use App\Support\Providers\ProviderAuthFailure;
 use App\Support\Sites\SiteWorkerFleetPreflightResult;
 
 /**
@@ -44,6 +47,7 @@ class SiteWorkerFleetPreflight
 
     public function __construct(
         private readonly DotEnvFileParser $envParser,
+        private readonly ProviderCredentialHealth $credentialHealth,
     ) {}
 
     public function evaluate(Site $site): SiteWorkerFleetPreflightResult
@@ -116,7 +120,7 @@ class SiteWorkerFleetPreflight
 
         $allowsRemoteRegion = $usesManaged && ! $hasVmBackend;
 
-        return new SiteWorkerFleetPreflightResult(
+        return $this->withCredentialHealth($app, new SiteWorkerFleetPreflightResult(
             true,
             $allowsRemoteRegion
                 ? __('This site uses managed Redis/database. The worker can stay in this region or run in another — we’ll allow its public IP on the cluster.')
@@ -126,6 +130,26 @@ class SiteWorkerFleetPreflight
             $rows,
             $networkName,
             $allowsRemoteRegion,
+        ));
+    }
+
+    private function withCredentialHealth(Server $app, SiteWorkerFleetPreflightResult $result): SiteWorkerFleetPreflightResult
+    {
+        $credential = ProviderCredential::preferredForServer($app);
+        if (! $credential instanceof ProviderCredential) {
+            return $result;
+        }
+
+        if ($this->credentialHealth->refresh($credential) !== false) {
+            return $result;
+        }
+
+        return new SiteWorkerFleetPreflightResult(
+            false,
+            ProviderAuthFailure::message($app->provider->value),
+            $result->backends,
+            $result->networkName,
+            $result->allowsRemoteRegion,
         );
     }
 

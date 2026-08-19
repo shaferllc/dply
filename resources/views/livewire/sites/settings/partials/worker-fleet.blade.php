@@ -17,6 +17,22 @@
         <div wire:poll.4s class="hidden" aria-hidden="true"></div>
     @endif
 
+    @if ($bootNote = $this->workerBootImageNote())
+        <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+            <p class="text-sm text-brand-moss">{{ $bootNote['message'] }}</p>
+        </div>
+    @endif
+
+    @if ($this->fleetCredentialAlert())
+        <div class="border-b border-rose-200 bg-rose-50 px-5 py-3 sm:px-6">
+            <p class="text-sm font-semibold text-rose-900">{{ $this->fleetCredentialAlert()['message'] }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-rose-800">
+                {{ __('“:name” can no longer connect. Add a new token before adding or retrying a worker.', ['name' => $this->fleetCredentialAlert()['name']]) }}
+            </p>
+            <a href="{{ route('credentials.index') }}" wire:navigate class="mt-2 inline-flex items-center text-xs font-semibold text-rose-900 underline underline-offset-2 hover:text-rose-950">{{ __('Open credentials') }}</a>
+        </div>
+    @endif
+
     @if ($this->fleetScaleRun() && ! $showWorkerProcessModal)
         <div class="border-b border-brand-ink/10">
             @include('livewire.partials.console-action-banner-static', [
@@ -141,6 +157,7 @@
                             $memberFailed = $member->status === \App\Models\Server::STATUS_ERROR
                                 || $member->poolMemberState() === \App\Models\WorkerPool::MEMBER_ERRORED;
                             $memberFailure = $memberFailed ? $this->workerProvisionFailure($member) : null;
+                            $memberProgress = $memberFailed ? null : $this->workerProvisionProgress($member);
                         @endphp
                         <li class="flex flex-wrap items-center gap-3 px-5 py-2 sm:px-6" wire:key="pool-member-{{ $member->id }}">
                             <div class="min-w-0 flex-1">
@@ -157,13 +174,19 @@
                                     @endif
                                     @if ($memberFailed)
                                         <span class="rounded-md bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800">{{ __('failed') }}</span>
-                                    @elseif ($member->poolMemberState())
+                                    @elseif ($memberProgress)
+                                        <span class="text-xs font-medium text-brand-moss">{{ $memberProgress['label'] }}</span>
+                                        <span class="text-xs tabular-nums text-brand-mist">{{ __(':step of :of', ['step' => $memberProgress['step'], 'of' => $memberProgress['of']]) }}</span>
+                                    @elseif ($member->poolMemberState() && $member->poolMemberState() !== \App\Models\WorkerPool::MEMBER_ACTIVE)
                                         <span class="text-xs text-brand-mist">{{ $member->poolMemberState() }}</span>
                                     @endif
                                 </div>
                                 @if ($memberFailure)
                                     <p class="mt-0.5 text-xs text-rose-800">{{ $memberFailure['message'] }}</p>
                                 @else
+                                    @if ($memberProgress)
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $memberProgress['detail'] }}</p>
+                                    @endif
                                     <p class="mt-0.5 truncate font-mono text-xs text-brand-mist">{{ $member->ip_address ?? '—' }} · {{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</p>
                                 @endif
                             </div>
@@ -397,8 +420,6 @@
 @if ($showWorkerProcessModal)
     @php
         $processMember = $this->workerProcessMember();
-        $processDeploy = $this->workerProcessDeployment();
-        $processScale = $this->fleetScaleRun();
         $processFailed = $processMember && (
             $processMember->status === \App\Models\Server::STATUS_ERROR
             || $processMember->poolMemberState() === \App\Models\WorkerPool::MEMBER_ERRORED
@@ -436,26 +457,22 @@
                     title-id="worker-process-modal-title"
                     max-width="2xl"
                 >
-                    @if ($installing || $deploying || ($processScale && $processScale->isInFlight()))
-                        <div wire:poll.4s class="hidden" aria-hidden="true"></div>
-                    @endif
-
                     @if (! $processMember)
-                        <p class="text-sm text-brand-moss">{{ __('That worker is no longer in this fleet.') }}</p>
+                        <p class="text-sm text-brand-moss">{{ __('That worker is no longer available.') }}</p>
                     @else
                         <div class="space-y-4">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <p class="text-sm text-brand-moss">
                                     {{ $processFailed
-                                        ? __('Install stopped before DigitalOcean created a droplet.')
+                                        ? __('Install stopped before the provider created the VM.')
                                         : ($installing
-                                            ? __('Installing the worker VM — cloud create, SSH, and the queue-worker setup script.')
+                                            ? __('Cloud create, SSH, setup script, then this site’s release.')
                                             : ($deploying
                                                 ? __('The box is up. Deploying this site’s release and starting queue workers.')
                                                 : __('Install and deploy for this worker.'))) }}
                                 </p>
                                 <a
-                                    href="{{ route('servers.show', $processMember) }}"
+                                    href="{{ $installing || $processFailed ? route('servers.journey', $processMember) : route('servers.show', $processMember) }}"
                                     wire:navigate
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                 >
@@ -480,44 +497,11 @@
                                 </div>
                             @endif
 
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Fleet progress') }}</p>
-                                <div class="mt-1.5 overflow-hidden rounded-lg border border-brand-ink/10">
-                                    @if ($processScale)
-                                        @include('livewire.partials.console-action-banner-static', [
-                                            'run' => $processScale,
-                                            'kindLabels' => (array) config('console_actions.kinds', []),
-                                            'embedded' => true,
-                                        ])
-                                    @else
-                                        <p class="px-3 py-2 text-sm text-brand-moss">{{ __('No fleet console yet — output appears as soon as provision starts.') }}</p>
-                                    @endif
-                                </div>
-                            </div>
-
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Site deploy') }}</p>
-                                @if ($processDeploy)
-                                    <div class="mt-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
-                                        <p class="text-sm font-medium text-brand-ink">
-                                            {{ __('Status') }}
-                                            <span class="font-normal text-brand-moss">{{ $processDeploy->status }}</span>
-                                            @if ($processDeploy->git_sha)
-                                                <span class="font-mono text-xs text-brand-mist">{{ \Illuminate\Support\Str::limit((string) $processDeploy->git_sha, 7, '') }}</span>
-                                            @endif
-                                        </p>
-                                        @if (filled($processDeploy->log_output))
-                                            <pre class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100">{{ $processDeploy->log_output }}</pre>
-                                        @else
-                                            <p class="mt-1 text-xs text-brand-moss">{{ __('Waiting for deploy output…') }}</p>
-                                        @endif
-                                    </div>
-                                @else
-                                    <p class="mt-1.5 text-sm text-brand-moss">{{ $installing
-                                        ? __('Deploy starts after the worker VM finishes installing.')
-                                        : __('No deploy recorded on this worker yet.') }}</p>
-                                @endif
-                            </div>
+                            <livewire:sites.worker-provision-path
+                                :server="$processMember"
+                                :origin-site-id="(string) $site->id"
+                                :key="'worker-path-'.$processMember->id"
+                            />
                         </div>
                     @endif
 

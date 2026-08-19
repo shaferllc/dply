@@ -16,8 +16,6 @@ use Illuminate\Support\Str;
  */
 trait ManagesDockerContainers
 {
-
-
     public function confirmDockerContainerAction(string $actionKey, string $containerId): void
     {
         $allowed = [
@@ -244,6 +242,8 @@ trait ManagesDockerContainers
 
     public function openContainerLogs(string $containerId, string $containerName): void
     {
+        $this->authorize('update', $this->server);
+
         if (! app(ServerDockerRemoteInspector::class)->isValidContainerRef($containerId)) {
             $this->toastError(__('Invalid container.'));
 
@@ -278,6 +278,8 @@ trait ManagesDockerContainers
 
     public function openContainerInspect(string $containerId, string $containerName): void
     {
+        $this->authorize('update', $this->server);
+
         if (! app(ServerDockerRemoteInspector::class)->isValidContainerRef($containerId)) {
             $this->toastError(__('Invalid container.'));
 
@@ -291,7 +293,7 @@ trait ManagesDockerContainers
         $this->inspectModalLoading = true;
 
         try {
-            $result = app(ServerDockerRemoteInspector::class)->containerInspect($this->server, $containerId);
+            $result = app(ServerDockerRemoteInspector::class)->containerInspect($this->server, $containerId, revealEnv: true);
             $this->inspectModalContent = $result['inspect'];
             $this->inspectModalError = $result['error'];
         } catch (\Throwable $e) {

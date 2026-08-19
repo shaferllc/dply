@@ -114,6 +114,12 @@ return [
     'tunnel_access_ttl_hours' => (int) env('DPLY_DB_TUNNEL_ACCESS_TTL_HOURS', 12),
 
     /**
+     * Hard ceiling on a trusted-source allowance, applied no matter what the
+     * caller or the TTL setting asks for.
+     */
+    'trusted_source_max_ttl_hours' => (int) env('DPLY_DB_TRUSTED_SOURCE_MAX_TTL_HOURS', 24),
+
+    /**
      * Kill switch for writes to a managed cluster's trusted-source list. Both
      * providers' APIs replace the whole rule set, so a bug here can cut a live
      * site off from its database — this turns the capability off fleet-wide

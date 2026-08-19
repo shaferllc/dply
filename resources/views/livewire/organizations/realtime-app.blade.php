@@ -53,16 +53,16 @@
         ));
     }
 
-    // The credential rows shown in the page (secret masked + copyable). Keyed so
-    // the Alpine reveal/copy chip below stays generic.
-    $credentials = [
+    // Credential rows (secret masked + copyable) are built only for org
+    // admins so view-only members never receive app_secret in HTML.
+    $credentials = $canManage ? [
         ['label' => __('Host'), 'value' => $app->host(), 'secret' => false],
         ['label' => __('App ID'), 'value' => (string) $app->id, 'secret' => false],
         ['label' => __('App key'), 'value' => (string) $app->app_key, 'secret' => false],
         ['label' => __('App secret'), 'value' => (string) $app->app_secret, 'secret' => true],
         ['label' => __('WebSocket URL'), 'value' => $app->websocketUrl(), 'secret' => false],
         ['label' => __('Publish endpoint'), 'value' => $app->publishEndpoint(), 'secret' => false],
-    ];
+    ] : [];
 @endphp
 
 <div class="contents">
@@ -432,7 +432,9 @@
                  org console so the two surfaces cannot drift. --}}
             @if ($isActive)
                 <x-realtime-playground :app="$app" :can-manage="$canManage" :channel="$demoChannel" />
-                <x-realtime-integration-guide :app="$app" />
+                @if ($canManage)
+                    <x-realtime-integration-guide :app="$app" />
+                @endif
             @endif
 
             {{-- Connected sites --}}

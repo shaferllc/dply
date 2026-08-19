@@ -32,6 +32,12 @@ return [
                 'account.git_token.unhealthy' => 'Git credential expired or rejected (action required)',
             ],
         ],
+        'credentials' => [
+            'label' => 'Provider credentials',
+            'events' => [
+                'account.provider_credential.unhealthy' => 'Cloud API token rejected (action required)',
+            ],
+        ],
         'system_user' => [
             'label' => 'System user notifications',
             'events' => [

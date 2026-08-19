@@ -3,13 +3,17 @@
     'app',
 ])
 
+{{--
+    The secret is admin-only — same gate as the Credentials panel
+    (`can('update', $organization)`). View-only members can open /realtime
+    but must not receive PUSHER_APP_SECRET / X-Dply-Secret in HTML.
+--}}
+@can('update', $app->organization)
 @php
     /*
      * Snippets are filled in with the app's real credentials so they are
-     * copy-and-run rather than placeholders to hunt down. The secret appears
-     * because it is server-side config that is already listed on this app's own
-     * Credentials panel — this exposes nothing to anyone who could not read it
-     * one section further down.
+     * copy-and-run rather than placeholders to hunt down. Only org admins
+     * reach this block; do not interpolate app_secret outside it.
      */
     $envSnippet = <<<ENV
     BROADCAST_CONNECTION=pusher
@@ -156,3 +160,4 @@
         </div>
     @endforeach
 </section>
+@endcan

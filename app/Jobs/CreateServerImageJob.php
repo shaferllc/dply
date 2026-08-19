@@ -49,14 +49,22 @@ class CreateServerImageJob implements ShouldQueue
             return;
         }
 
-        $image->update(['status' => ServerImage::STATUS_CREATING]);
-
         try {
-            $result = $provider->create(
-                $server,
-                $image->name,
-                onTick: fn (string $note) => Log::debug('CreateServerImageJob tick', ['image' => $image->id, 'note' => $note]),
-            );
+            $onTick = fn (string $note) => Log::debug('CreateServerImageJob tick', ['image' => $image->id, 'note' => $note]);
+            $alreadyStarted = $image->status === ServerImage::STATUS_CREATING
+                && (filled($image->provider_action_id) || filled($image->provider_image_id));
+
+            if ($alreadyStarted) {
+                $result = $provider->finish($server, $image->name, [
+                    'provider_image_id' => $image->provider_image_id,
+                    'provider_action_id' => $image->provider_action_id,
+                    'region' => $image->region,
+                    'bytes' => $image->bytes,
+                ], $onTick);
+            } else {
+                $image->update(['status' => ServerImage::STATUS_CREATING]);
+                $result = $provider->create($server, $image->name, onTick: $onTick);
+            }
 
             $image->update([
                 'status' => ServerImage::STATUS_COMPLETED,
@@ -73,14 +81,18 @@ class CreateServerImageJob implements ShouldQueue
                 ]);
             }
 
-            $this->notify($image, $server, ServerImage::STATUS_COMPLETED);
+            if ($image->purpose !== ServerImage::PURPOSE_WORKER_BAKE) {
+                $this->notify($image, $server, ServerImage::STATUS_COMPLETED);
+            }
         } catch (\Throwable $e) {
             $image->update([
                 'status' => ServerImage::STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
 
-            $this->notify($image, $server, ServerImage::STATUS_FAILED, $e->getMessage());
+            if ($image->purpose !== ServerImage::PURPOSE_WORKER_BAKE) {
+                $this->notify($image, $server, ServerImage::STATUS_FAILED, $e->getMessage());
+            }
         }
     }
 

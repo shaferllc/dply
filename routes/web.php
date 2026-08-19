@@ -24,6 +24,8 @@ use App\Http\Controllers\ServerlessQueueWakeController;
 use App\Http\Controllers\ServerlessWorkspaceController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\Sites\DatabaseConnectionUriController;
+use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseConnectLinkController;
 use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
@@ -938,10 +940,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/databases/{binding}/connect-link', DatabaseConnectLinkController::class)
         ->middleware('signed')
         ->name('sites.databases.connect-link');
-    // One-shot installer for a purpose-minted, permitopen-restricted tunnel key.
-    Route::get('servers/{server}/sites/{site}/databases/{binding}/tunnel-install', DatabaseTunnelInstallController::class)
-        ->middleware('signed')
-        ->name('sites.databases.tunnel-install');
     // Quick downloads now queue + stage to the download bucket; this signed,
     // login-gated route streams the staged artifact once then deletes it.
     Route::get('quick-downloads/{quickDownload}/fetch', [QuickDownloadController::class, 'fetch'])
@@ -1204,3 +1202,37 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+/*
+ * One-shot installer for a purpose-minted, permitopen-restricted database tunnel
+ * key. Deliberately OUTSIDE the authenticated group: it is fetched with
+ * `curl | bash`, which carries no session cookie — a Gate check here just
+ * redirects curl to the login page and pipes HTML into the shell.
+ *
+ * The signed URL is therefore the capability. It is safe to be one because the
+ * key was already authorized when it was minted (in the Connect modal, by an
+ * operator with update rights), the URL expires in minutes, the private key is
+ * cleared on first fetch so a replay yields nothing, and the key itself can only
+ * forward to a single database and can never open a shell.
+ */
+Route::get('database-tunnels/{session}/install', DatabaseTunnelInstallController::class)
+    ->middleware('signed')
+    ->name('database-tunnels.install');
+
+/*
+ * Plain-text connection URI for shell use. Signature-only for the same reason as
+ * the installer above — curl carries no session — and short-lived, because the
+ * response body is a live credential.
+ */
+Route::get('database-connections/{binding}/uri', DatabaseConnectionUriController::class)
+    ->middleware('signed')
+    ->name('database-connections.uri');
+
+/*
+ * Downloadable .command that opens a terminal session on the database. Signed
+ * and short-lived; the credential is fetched by the script at run time, so the
+ * downloaded file never contains one.
+ */
+Route::get('database-connections/{binding}/terminal', DatabaseTerminalScriptController::class)
+    ->middleware('signed')
+    ->name('database-connections.terminal');

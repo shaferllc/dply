@@ -9,6 +9,7 @@ use App\Jobs\CreateServerImageJob;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -35,8 +36,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerImage extends Model
 {
@@ -50,6 +51,8 @@ class ServerImage extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const PURPOSE_WORKER_BAKE = 'worker_bake';
+
     protected $table = 'server_images';
 
     protected $fillable = [
@@ -60,6 +63,7 @@ class ServerImage extends Model
         'provider_image_id',
         'provider_action_id',
         'name',
+        'purpose',
         'status',
         'region',
         'bytes',

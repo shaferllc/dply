@@ -33,7 +33,8 @@
 
                 @php
                     $connectedProviderCount = $credentials->pluck('provider')->unique()->count();
-                    $verifiedCount = $credentials->filter(fn ($c) => ! empty($c->verified_at ?? null))->count();
+                    $verifiedCount = $credentials->filter(fn ($c) => $c->last_validated_at && blank($c->validation_error))->count();
+                    $rejectedCount = $credentials->filter(fn ($c) => filled($c->validation_error))->count();
                 @endphp
                 <x-slot:stats>
                     <dl class="grid grid-cols-4 gap-px bg-brand-ink/5" aria-label="{{ __('Credentials at a glance') }}">
@@ -45,8 +46,10 @@
                             <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Credentials') }}</dt>
                             <dd class="mt-0.5 flex items-baseline gap-1.5">
                                 <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $credentials->count() }}</span>
-                                @if ($verifiedCount > 0)
-                                    <span class="text-2xs font-semibold text-brand-forest">{{ __(':n verified', ['n' => $verifiedCount]) }}</span>
+                                @if ($rejectedCount > 0)
+                                    <span class="text-2xs font-semibold text-rose-700">{{ __(':n can’t connect', ['n' => $rejectedCount]) }}</span>
+                                @elseif ($verifiedCount > 0)
+                                    <span class="text-2xs font-semibold text-brand-forest">{{ __(':n connected', ['n' => $verifiedCount]) }}</span>
                                 @endif
                             </dd>
                         </div>
@@ -109,7 +112,7 @@
                                     {{ __('Verified where possible') }}
                                 </dt>
                                 <dd class="mt-1 text-xs leading-relaxed text-brand-moss">
-                                    {{ __('We call the provider when a token is added, so a typo fails here rather than halfway through a provision.') }}
+                                    {{ __('We call the provider when a token is added and keep checking it, so a revoked key shows up here instead of halfway through a provision.') }}
                                 </dd>
                             </div>
                             <div class="bg-brand-cream/40 px-5 py-3 sm:px-4">

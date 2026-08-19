@@ -10,6 +10,7 @@ use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Database\Services\ManagedDatabaseUsers;
 use App\Modules\Database\Services\TrustedSourceManager;
 use App\Support\Servers\DatabaseConnectionTarget;
 use App\Support\Servers\DatabaseConnectionTargetResolver;
@@ -61,7 +62,16 @@ final class DatabaseConnectLinkController extends Controller
             $this->grantAccess($request, $siteBinding);
         }
 
-        $password = $this->password($siteBinding);
+        // Connecting as a non-admin user: re-point the target and resolve that
+        // user's password from the provider rather than the binding's.
+        $connectAs = trim((string) $request->query('as', ''));
+        if ($connectAs !== '') {
+            $target = $target->as($connectAs);
+        }
+
+        $password = $connectAs !== ''
+            ? $this->userPassword($siteBinding, $connectAs)
+            : $this->password($siteBinding);
         abort_if($password === null, 404);
 
         // "tunnel" means the operator is forwarding to 127.0.0.1 themselves —
@@ -140,6 +150,20 @@ final class DatabaseConnectLinkController extends Controller
             // The hand-off still proceeds: the operator may already hold a live
             // allowance, and a failure here is surfaced by the connection itself.
         }
+    }
+
+    /** Password for a named non-admin user, read from the provider at click time. */
+    private function userPassword(SiteBinding $binding, string $username): ?string
+    {
+        if ($binding->target_type !== 'cloud_database' || blank($binding->target_id)) {
+            return null;
+        }
+
+        $cluster = CloudDatabase::query()->find($binding->target_id);
+
+        return $cluster instanceof CloudDatabase
+            ? app(ManagedDatabaseUsers::class)->passwordFor($cluster, $username)
+            : null;
     }
 
     /**

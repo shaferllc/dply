@@ -32,6 +32,7 @@ final class ServerSshSessionManager
         string $targetLinuxUser = '',
         string $keyOptions = '',
         ?string $privateKey = null,
+        bool $syncNow = true,
     ): ServerSshSession {
         $organization = $server->organization;
         if (! $organization instanceof Organization) {
@@ -82,7 +83,9 @@ final class ServerSshSessionManager
 
         $session->update(['server_authorized_key_id' => $authorizedKey->id]);
 
-        if ($server->isReady()) {
+        // Callers on an HTTP request pass syncNow: false and queue the sync —
+        // SSH in the render path blocks until max_execution_time.
+        if ($syncNow && $server->isReady()) {
             try {
                 $this->synchronizer->sync($server);
             } catch (\Throwable $e) {
@@ -104,7 +107,7 @@ final class ServerSshSessionManager
         return $session->fresh(['serverAuthorizedKey', 'createdBy']);
     }
 
-    public function revoke(ServerSshSession $session): void
+    public function revoke(ServerSshSession $session, bool $syncNow = true): void
     {
         if ($session->isRevoked()) {
             return;
@@ -121,7 +124,7 @@ final class ServerSshSessionManager
         $session->update(['revoked_at' => now()]);
 
         $server = $session->server;
-        if ($server instanceof Server && $server->isReady()) {
+        if ($syncNow && $server instanceof Server && $server->isReady()) {
             try {
                 $this->synchronizer->sync($server);
             } catch (\Throwable $e) {

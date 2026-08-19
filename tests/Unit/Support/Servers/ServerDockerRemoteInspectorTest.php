@@ -28,6 +28,27 @@ test('isValidImageRef accepts repository tags and ids', function (): void {
     expect($inspector->isValidImageRef('bad ref!'))->toBeFalse();
 });
 
+test('redactInspectEnv strips Config.Env and Env from inspect json', function (): void {
+    $json = json_encode([
+        [
+            'Id' => 'abc123',
+            'Config' => [
+                'Image' => 'nginx:alpine',
+                'Env' => ['APP_KEY=base64:secret', 'DB_PASSWORD=hunter2'],
+            ],
+            'Env' => ['CACHE_AUTH=token'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $redacted = app(ServerDockerRemoteInspector::class)->redactInspectEnv($json);
+
+    expect($redacted)->toContain('nginx:alpine')
+        ->and($redacted)->toContain('[redacted]')
+        ->and($redacted)->not->toContain('APP_KEY=base64:secret')
+        ->and($redacted)->not->toContain('DB_PASSWORD=hunter2')
+        ->and($redacted)->not->toContain('CACHE_AUTH=token');
+});
+
 test('dockerCliPresent reads manage_docker meta', function (): void {
     $server = Server::factory()->make([
         'meta' => ['manage_docker' => ['present' => true]],

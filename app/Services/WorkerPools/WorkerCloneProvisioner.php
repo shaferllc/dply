@@ -3,7 +3,6 @@
 namespace App\Services\WorkerPools;
 
 use App\Enums\ServerProvider;
-use App\Jobs\ReconcileWorkerPoolJob;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
@@ -12,8 +11,10 @@ use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionOracleServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
+use App\Jobs\ReconcileWorkerPoolJob;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\WorkerPool;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -84,6 +85,9 @@ class WorkerCloneProvisioner
             $meta['placement'] = ['region' => $region, 'source_region' => (string) $source->region, 'provider' => $provider->value];
         }
 
+        $meta = $this->withParentPhp($meta, $source, $pool->originSite());
+        $meta = $this->withBootImage($meta, $source->organization_id, $provider, $region);
+
         $clone = Server::query()->create([
             'user_id' => $source->user_id,
             'organization_id' => $source->organization_id,
@@ -143,6 +147,9 @@ class WorkerCloneProvisioner
             ];
         }
 
+        $meta = $this->withParentPhp($meta, $app, $pool->originSite());
+        $meta = $this->withBootImage($meta, $app->organization_id, $app->provider, $region);
+
         $worker = Server::query()->create([
             'user_id' => $app->user_id,
             'organization_id' => $app->organization_id,
@@ -187,6 +194,11 @@ class WorkerCloneProvisioner
 
         $originId = data_get($meta, 'cloned_from_server_id');
         $origin = filled($originId) ? Server::query()->find($originId) : null;
+        $originSite = filled($server->worker_pool_id)
+            ? WorkerPool::query()->find($server->worker_pool_id)?->originSite()
+            : null;
+        $meta = $this->withParentPhp($meta, $origin instanceof Server ? $origin : $server, $originSite);
+        $meta = $this->withBootImage($meta, $server->organization_id, $server->provider, (string) $server->region);
 
         $server->forceFill([
             'status' => Server::STATUS_PENDING,
@@ -255,6 +267,34 @@ class WorkerCloneProvisioner
             ServerProvider::UpCloud,
             ServerProvider::Aws, ServerProvider::Azure, ServerProvider::Oracle,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function withParentPhp(array $meta, Server $source, ?Site $originSite): array
+    {
+        return app(WorkerPhpVersion::class)->applyToMeta($meta, $source, $originSite);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function withBootImage(array $meta, ?string $organizationId, ServerProvider $provider, string $region): array
+    {
+        $probe = new Server([
+            'organization_id' => $organizationId,
+            'provider' => $provider,
+            'region' => $region,
+        ]);
+        $imageId = app(WorkerBootImage::class)->providerImageIdFor($probe);
+        if ($imageId !== null) {
+            $meta['boot_image_id'] = $imageId;
+        }
+
+        return $meta;
     }
 
     /**

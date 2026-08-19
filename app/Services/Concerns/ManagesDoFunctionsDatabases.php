@@ -557,6 +557,63 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
+     * Users that exist on a managed cluster.
+     *
+     * Lets an operator connect as something other than the cluster admin — a
+     * GUI table editor authenticated as doadmin is one mis-clicked cell away
+     * from a very bad afternoon.
+     *
+     * @return list<array{name: string, role: string, password: string}>
+     */
+    public function listDatabaseUsers(string $clusterId): array
+    {
+        $response = $this->request('get', '/databases/'.$clusterId.'/users');
+        $this->assertSuccess($response, 'list database users');
+
+        $users = [];
+        foreach ((array) $response->json('users', []) as $user) {
+            if (! is_array($user)) {
+                continue;
+            }
+
+            $name = trim((string) ($user['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $users[] = [
+                'name' => $name,
+                'role' => (string) ($user['role'] ?? 'normal'),
+                'password' => (string) ($user['password'] ?? ''),
+            ];
+        }
+
+        return $users;
+    }
+
+    /**
+     * Create a user on a managed cluster. The provider generates the password
+     * and returns it once, in this response.
+     *
+     * @return array{name: string, role: string, password: string}
+     */
+    public function createDatabaseUser(string $clusterId, string $name): array
+    {
+        $response = $this->request('post', '/databases/'.$clusterId.'/users', [
+            'name' => $name,
+        ]);
+        $this->assertSuccess($response, 'create database user');
+
+        $user = (array) $response->json('user', []);
+
+        return [
+            'name' => (string) ($user['name'] ?? $name),
+            'role' => (string) ($user['role'] ?? 'normal'),
+            'password' => (string) ($user['password'] ?? ''),
+        ];
+    }
+
+    /**
      * Read a cluster's current trusted sources.
      *
      * {@see setDatabaseTrustedSources()} replaces the entire rule set, so any

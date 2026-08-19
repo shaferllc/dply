@@ -65,6 +65,17 @@ test('resolves a slug from a server meta os_image', function () {
     expect(ServerImageCatalog::resolveForServer($without, 'hetzner'))->toBeNull();
 });
 
+test('reads a stamped worker boot image id', function () {
+    $server = new Server;
+    $server->meta = ['boot_image_id' => '170123456'];
+
+    expect(ServerImageCatalog::bootImageForServer($server))->toBe('170123456');
+
+    $without = new Server;
+    $without->meta = ['os_image' => 'ubuntu-24-04'];
+    expect(ServerImageCatalog::bootImageForServer($without))->toBeNull();
+});
+
 test('returns a human label for a key', function () {
     expect(ServerImageCatalog::labelFor('ubuntu-24-04'))->toBe('Ubuntu 24.04 LTS');
     expect(ServerImageCatalog::labelFor('debian-12'))->toBe('Debian 12 (Bookworm)');

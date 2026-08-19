@@ -161,6 +161,17 @@ final class ServerImageCatalog
     }
 
     /**
+     * Org worker-bake snapshot id stamped on {@see Server::$meta} `boot_image_id`.
+     * Provision jobs prefer this over the stock distro so setup skip-fasts.
+     */
+    public static function bootImageForServer(Server $server): ?string
+    {
+        $id = trim((string) data_get($server->meta, 'boot_image_id'));
+
+        return $id !== '' ? $id : null;
+    }
+
+    /**
      * Resolve a pre-baked snapshot/image ID for a region from the provider's
      * `services.<provider>.baked_snapshots` config. Returns null when none is
      * configured — provisioning then falls back to the stock distro image.

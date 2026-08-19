@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Http;
  * @property ?string $organization_id
  * @property string $provider
  * @property ?string $user_id
+ * @property \Illuminate\Support\Carbon|null $last_validated_at
+ * @property ?string $validation_error
  * @property-read ?User $user
  * @property-read ?Organization $organization
  * @property-read Collection<int, Server> $servers
@@ -39,6 +41,8 @@ class ProviderCredential extends Model
         'provider',
         'name',
         'credentials',
+        'last_validated_at',
+        'validation_error',
     ];
 
     /** @return array<string, string> */
@@ -46,6 +50,7 @@ class ProviderCredential extends Model
     {
         return [
             'credentials' => 'encrypted:array',
+            'last_validated_at' => 'datetime',
         ];
     }
 
@@ -78,6 +83,30 @@ class ProviderCredential extends Model
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class, 'provider_credential_id');
+    }
+
+    public function isUnhealthy(): bool
+    {
+        return filled($this->validation_error);
+    }
+
+    public static function newestForOrganization(?string $organizationId, string $provider): ?self
+    {
+        if (! filled($organizationId) || trim($provider) === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('organization_id', $organizationId)
+            ->where('provider', $provider)
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    public static function preferredForServer(Server $server): ?self
+    {
+        return static::newestForOrganization((string) $server->organization_id, $server->provider->value)
+            ?? $server->providerCredential;
     }
 
     public function getApiToken(): ?string

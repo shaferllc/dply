@@ -125,6 +125,31 @@ final class DatabaseConnectionTarget
         };
     }
 
+    /**
+     * The same database reached as a different user. Used when the operator
+     * connects as something other than the cluster admin.
+     */
+    public function as(string $username): self
+    {
+        $username = trim($username);
+        if ($username === '' || $username === $this->username) {
+            return $this;
+        }
+
+        return new self(
+            engine: $this->engine,
+            host: $this->host,
+            port: $this->port,
+            database: $this->database,
+            username: $username,
+            sslMode: $this->sslMode,
+            kind: $this->kind,
+            publiclyReachable: $this->publiclyReachable,
+            supportsTrustedSourceWrites: $this->supportsTrustedSourceWrites,
+            label: $this->label,
+        );
+    }
+
     public function isRedis(): bool
     {
         return $this->engine === 'redis';

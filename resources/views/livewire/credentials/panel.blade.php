@@ -19,6 +19,12 @@
 
 @if ($credentials->isNotEmpty())
     <section class="dply-card overflow-hidden">
+        @if ($credentials->contains(fn ($cred) => filled($cred->validation_error)))
+            <div class="border-b border-rose-200 bg-rose-50 px-6 py-3 sm:px-7">
+                <p class="text-sm font-semibold text-rose-900">{{ __('A saved token can no longer connect') }}</p>
+                <p class="mt-1 text-xs leading-relaxed text-rose-800">{{ __('Add a new API key below. Existing servers keep the old one until you do — creating a worker or droplet will fail.') }}</p>
+            </div>
+        @endif
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
@@ -47,6 +53,16 @@
                             <span class="truncate font-semibold text-brand-ink">{{ $cred->name }}</span>
                             <span class="font-mono text-xs uppercase tracking-wide text-brand-mist">{{ $cred->provider }}</span>
                         </div>
+                        @if (filled($cred->validation_error))
+                            <p class="text-xs font-medium text-rose-700">
+                                {{ __('Can’t connect') }}
+                                @if ($cred->last_validated_at)
+                                    · {{ __('checked :time', ['time' => $cred->last_validated_at->diffForHumans()]) }}
+                                @endif
+                            </p>
+                        @elseif ($cred->last_validated_at)
+                            <p class="text-xs text-brand-moss">{{ __('Connected :time', ['time' => $cred->last_validated_at->diffForHumans()]) }}</p>
+                        @endif
                         @if (count($cred->capabilities()))
                             <div class="flex flex-wrap items-center gap-1.5">
                                 @foreach ($cred->capabilities() as $cap)

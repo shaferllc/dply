@@ -459,7 +459,9 @@
                         :channel="$demoChannel"
                     />
 
-                    <x-realtime-integration-guide :app="$demoApp" />
+                    @if ($canManage)
+                        <x-realtime-integration-guide :app="$demoApp" />
+                    @endif
                 @endif
             @endif
         </x-profile-shell>

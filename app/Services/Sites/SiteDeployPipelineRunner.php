@@ -257,8 +257,10 @@ class SiteDeployPipelineRunner
         // from the log instead of guesswork.
         $log .= sprintf("\n[dply] phase '%s' → working dir: %s\n", $phase, $workingDirectory);
         $log .= sprintf("[dply] %d step(s) queued: %s\n", $ordered->count(), $ordered->pluck('step_type')->implode(', ') ?: '(none)');
+        $phpPin = $this->phpCliGuard()->prefix($site);
         $probe = $ssh->exec(sprintf(
-            'echo "=== [dply] PHASE PROBE: %2$s ==="; '
+            '%3$s'
+            .'echo "=== [dply] PHASE PROBE: %2$s ==="; '
             .'echo "[dply] whoami=$(whoami)"; '
             .'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
             .'echo "[dply] is-symlink=$([ -L %1$s ] && echo yes || echo no)"; '
@@ -270,14 +272,15 @@ class SiteDeployPipelineRunner
             .'echo "[dply] git-sha:"; git -C %1$s rev-parse HEAD 2>&1 || echo "(n/a)"; '
             .'echo "[dply] git-branch:"; git -C %1$s branch --show-current 2>&1 || echo "(n/a)"; '
             .'echo "[dply] git-status:"; git -C %1$s status --short 2>&1 || echo "(n/a)"; '
-            .'echo "[dply] php:"; php --version 2>&1 | head -n 1 || echo "(php not found)"; '
+            .'echo "[dply] php:"; { export PATH="$HOME/.dply/bin:$PATH"; php --version 2>&1 | head -n 1 || echo "(php not found)"; }; '
             .'echo "[dply] composer:"; composer --version 2>&1 | head -n 1 || echo "(composer not found)"; '
             .'echo "[dply] node:"; node --version 2>&1 || echo "(node not found)"; '
             .'echo "[dply] disk:"; df -h %1$s 2>&1; '
             .'echo "[dply] ls:"; ls -la %1$s 2>&1; '
             .'echo "=== [dply] END PHASE PROBE ==="',
             $cwd,
-            $phase
+            $phase,
+            $phpPin !== '' ? '{ '.$phpPin.'export PATH="$HOME/.dply/bin:$PATH"; } && ' : ''
         ), 30);
         $log .= $probe."\n";
 
@@ -314,7 +317,7 @@ class SiteDeployPipelineRunner
             // would be recorded (and shown on the timeline) as success.
             // The recorded `command` stays clean; only the executed command is
             // prefixed with any tooling guard (e.g. ensure Composer is present).
-            $runCmd = $this->ensureToolingPrefix($step, $cmd).$cmd;
+            $runCmd = $this->ensureToolingPrefix($step, $cmd, $site).$cmd;
             // Echo the fully-resolved shell line (incl. the `cd`) so the log
             // shows precisely what ran and where — invaluable when a step fails.
             $log .= sprintf("[dply] exec (timeout %ds): cd %s && %s\n", $timeout, $workingDirectory, $runCmd);
@@ -358,7 +361,7 @@ class SiteDeployPipelineRunner
         // assets here; if a manifest still can't be produced, fail the phase so
         // the deploy aborts BEFORE cutover instead of going live broken.
         if ($ok && $phase === SiteDeployStep::PHASE_BUILD) {
-            $guard = $this->ensureViteManifest($ssh, $workingDirectory, $cwd);
+            $guard = $this->ensureViteManifest($ssh, $site, $workingDirectory, $cwd);
             $log .= $guard['log'];
             if ($guard['step'] !== null) {
                 $steps[] = $guard['step'];
@@ -378,7 +381,7 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, ok: bool, step: ?array<string, mixed>}
      */
-    private function ensureViteManifest(RemoteShell $ssh, string $workingDirectory, string $cwd): array
+    private function ensureViteManifest(RemoteShell $ssh, Site $site, string $workingDirectory, string $cwd): array
     {
         $probe = $ssh->exec(sprintf(
             'cd %s 2>/dev/null && { vite=no; for f in vite.config.js vite.config.ts vite.config.mjs vite.config.cjs; do [ -f "$f" ] && vite=yes; done; '
@@ -405,7 +408,7 @@ class SiteDeployPipelineRunner
         $synthetic = new SiteDeployStep;
         $synthetic->step_type = SiteDeployStep::TYPE_NPM_RUN;
         $buildCmd = 'npm ci --include=dev && npm run build --if-present';
-        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd).$buildCmd;
+        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd, $site).$buildCmd;
 
         $start = microtime(true);
         $out = $ssh->exec(sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd), 900);
@@ -479,7 +482,7 @@ class SiteDeployPipelineRunner
      * The node guard skips cleanly when no package.json exists so API-only apps
      * that happen to have an npm command in a shared custom step don't fail.
      */
-    protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd): string
+    protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd, Site $site): string
     {
         $usesComposer = $step->step_type === SiteDeployStep::TYPE_COMPOSER_INSTALL
             || preg_match('/\bcomposer\s/', $cmd) === 1;
@@ -487,12 +490,21 @@ class SiteDeployPipelineRunner
         $usesNode = in_array($step->step_type, [SiteDeployStep::TYPE_NPM_CI, SiteDeployStep::TYPE_NPM_RUN], true)
             || preg_match('/\b(npm|npx|node|yarn|pnpm)\s/', $cmd) === 1;
 
-        if (! $usesComposer && ! $usesNode) {
+        $phpPin = $this->phpCliGuard()->prefix($site);
+        $usesPhp = $phpPin !== '' && (
+            $usesComposer
+            || preg_match('/\bphp\s/', $cmd) === 1
+            || str_contains((string) $step->step_type, 'artisan')
+            || str_contains((string) $step->step_type, 'php')
+        );
+
+        if (! $usesComposer && ! $usesNode && ! $usesPhp) {
             return '';
         }
 
-        // Shared PATH setup — always emitted when any tool guard fires.
-        $prefix = '{ export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:$PATH"; ';
+        // Site PHP wins over mise shims and the distro /usr/bin/php (often 8.3
+        // on Ubuntu 24.04 while the lockfile needs 8.4).
+        $prefix = '{ '.($usesPhp ? $phpPin : '').'export PATH="$HOME/.dply/bin:$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:$PATH"; ';
 
         if ($usesComposer) {
             $prefix .= 'command -v composer >/dev/null 2>&1 || { '
@@ -564,6 +576,11 @@ class SiteDeployPipelineRunner
         }
 
         return $prefix.'} && ';
+    }
+
+    private function phpCliGuard(): SitePhpCliGuard
+    {
+        return app(SitePhpCliGuard::class);
     }
 
     /**

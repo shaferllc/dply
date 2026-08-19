@@ -64,10 +64,10 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                 return;
             }
 
-            // Image precedence: an explicit user-chosen OS image wins; otherwise
-            // launch from a region-matched pre-baked snapshot (fast path — stack
-            // already installed, setup script skip-fasts); otherwise stock Ubuntu.
-            $image = ServerImageCatalog::resolveForServer($this->server, 'digitalocean')
+            // Image precedence: org worker-bake snapshot, then the wizard OS
+            // image, then a platform baked snapshot, then stock Ubuntu.
+            $image = ServerImageCatalog::bootImageForServer($this->server)
+                ?? ServerImageCatalog::resolveForServer($this->server, 'digitalocean')
                 ?? ServerImageCatalog::bakedSnapshotForRegion('digitalocean', $this->server->region)
                 ?? config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
 

@@ -6,6 +6,7 @@ namespace App\Console\Scheduling;
 
 use App\Console\Commands\CdnSyncMetricsCommand;
 use App\Console\Commands\CheckGitProviderTokensCommand;
+use App\Console\Commands\CheckProviderCredentialsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
@@ -127,6 +128,13 @@ final class DplySchedule
             ->dailyAt('03:35')
             ->withoutOverlapping()
             ->name('check-git-provider-tokens');
+
+        // Provider API tokens rot independently of Git. Catch a revoked
+        // DigitalOcean/Hetzner key here instead of during droplet create.
+        $schedule->command(CheckProviderCredentialsCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('check-provider-credentials');
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()

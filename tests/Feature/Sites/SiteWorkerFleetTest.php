@@ -27,10 +27,17 @@ use App\Services\WorkerPools\WorkerCloneProvisioner;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerWorkloadReplayer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Http::fake([
+        'api.digitalocean.com/*' => Http::response(['account' => ['uuid' => 'ok']], 200),
+    ]);
+});
 
 /** @return array{0: User, 1: Organization} */
 function fleetActor(): array
@@ -293,6 +300,20 @@ it('passes add-worker preflight for managed Redis/database without a site VPC', 
         ->and($result->networkName)->toBeNull();
 });
 
+it('refuses add-worker preflight when the DigitalOcean token is rejected', function () {
+    [, , , $app, , $site] = fleetReadySite();
+    $app->providerCredential?->forceFill([
+        'last_validated_at' => now(),
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ])->save();
+
+    $result = app(SiteWorkerFleetPreflight::class)->evaluate($site);
+
+    expect($result->ok)->toBeFalse()
+        ->and($result->message)->toContain('rejected this API token')
+        ->and($app->providerCredential?->fresh()?->isUnhealthy())->toBeTrue();
+});
+
 it('passes add-worker preflight when the site and Redis share a VPC', function () {
     [, , $network, , $redis, $site] = fleetReadySite();
 
@@ -333,6 +354,28 @@ it('creates a site-sourced pool and provisions the first worker', function () {
 
     Queue::assertPushed(ProvisionDigitalOceanDropletJob::class);
     Queue::assertPushed(ReconcileWorkerPoolJob::class, fn (ReconcileWorkerPoolJob $job): bool => $job->poolId === $pool->id);
+});
+
+it('pins the worker php version to the origin site, not the app server default', function () {
+    Queue::fake();
+    [$user, , , $app, , $site] = fleetReadySite([
+        'app' => [
+            'meta' => [
+                'server_role' => 'application',
+                'host_kind' => 'vm',
+                'php_version' => '8.3',
+                'default_php_version' => '8.3',
+            ],
+        ],
+    ]);
+    $site->forceFill(['runtime' => 'php', 'runtime_version' => '8.4'])->save();
+
+    $pool = app(WorkerPoolManager::class)->createPoolFromSite($user, $site, 's-2vcpu-2gb', true);
+    $worker = $pool->primaryServer;
+
+    expect($worker)->toBeInstanceOf(Server::class)
+        ->and($worker->meta['php_version'] ?? null)->toBe('8.4')
+        ->and($worker->meta['default_php_version'] ?? null)->toBe('8.4');
 });
 
 it('provisions a managed-backend worker in another region without joining the site VPC', function () {
@@ -585,12 +628,17 @@ it('opens the worker process log from the fleet page', function () {
             'section' => 'worker-fleet',
         ])
         ->assertSee('View install')
+        ->assertSee('Queued with DigitalOcean')
+        ->assertSee('1 of 7')
         ->assertSee('provisioning replica '.$worker->name)
         ->call('openWorkerProcessModal', (string) $worker->id)
         ->assertSet('showWorkerProcessModal', true)
         ->assertSee('Open full install')
-        ->assertSee('Fleet progress')
-        ->assertSee('Site deploy');
+        ->assertSee('Provision path')
+        ->assertSee('Request queued with provider')
+        ->assertSee('Provisioning server')
+        ->assertSee('Site release')
+        ->assertDontSee('Fleet progress');
 });
 
 it('manages a site-sourced fleet on the origin site, not the worker pool page', function () {

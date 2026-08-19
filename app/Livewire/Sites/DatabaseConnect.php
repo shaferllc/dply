@@ -8,6 +8,7 @@ use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Database\Services\ManagedDatabaseUsers;
 use App\Modules\Database\Services\TrustedSourceManager;
 use App\Modules\Database\Services\TunnelAccessProvisioner;
 use App\Support\Servers\DatabaseConnectionTarget;
@@ -59,6 +60,17 @@ class DatabaseConnect extends Component
      * matching private half.
      */
     public string $sshKeyPath = '~/.ssh/id_ed25519';
+
+    /** Database user to connect as. Empty means the cluster admin. */
+    public string $connectAs = '';
+
+    /** Name for a user being created, when the operator wants a non-admin login. */
+    public string $newUserName = '';
+
+    public bool $creatingUser = false;
+
+    /** Minted tunnel session, once the operator has asked to set access up. */
+    public string $tunnelSessionId = '';
 
     public function mount(Site $site, Server $server, string $bindingId): void
     {
@@ -162,6 +174,81 @@ class DatabaseConnect extends Component
         $this->dispatch('toast', type: 'success', message: __('Access revoked.'));
     }
 
+    /**
+     * Mint forward-only tunnel access for this operator.
+     *
+     * Authorization happens HERE rather than on the install URL: that URL is
+     * fetched by curl, which carries no session, so the check has to sit on the
+     * action that creates the key.
+     */
+    public function setUpTunnelAccess(TunnelAccessProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $user = auth()->user();
+        $binding = $this->binding();
+        $target = $binding !== null
+            ? app(DatabaseConnectionTargetResolver::class)->forBinding($binding)
+            : null;
+
+        if ($user === null || ! $target instanceof DatabaseConnectionTarget) {
+            return;
+        }
+
+        try {
+            $session = $provisioner->provision($this->server, $user, $target);
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+
+            return;
+        }
+
+        $this->tunnelSessionId = (string) $session->id;
+    }
+
+    public function startCreatingUser(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->creatingUser = true;
+        if ($this->newUserName === '') {
+            $this->newUserName = ManagedDatabaseUsers::suggestedName(
+                (string) (auth()->user()->name ?: 'dply user'),
+            );
+        }
+    }
+
+    public function cancelCreatingUser(): void
+    {
+        $this->creatingUser = false;
+    }
+
+    public function createUser(ManagedDatabaseUsers $users): void
+    {
+        $this->authorize('update', $this->site);
+
+        $cluster = $this->cluster($this->binding());
+        if (! $cluster instanceof CloudDatabase) {
+            return;
+        }
+
+        try {
+            $created = $users->create($cluster, $this->newUserName);
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+
+            return;
+        }
+
+        // Connect as the new user straight away — that is the whole point of
+        // creating it.
+        $this->connectAs = $created['name'];
+        $this->creatingUser = false;
+        $this->newUserName = '';
+
+        $this->dispatch('toast', type: 'success', message: __('Created :user.', ['user' => $created['name']]));
+    }
+
     public function binding(): ?SiteBinding
     {
         if ($this->bindingId === '') {
@@ -180,10 +267,18 @@ class DatabaseConnect extends Component
 
         $target = $binding instanceof SiteBinding ? $resolver->forBinding($binding) : null;
 
+        // Everything downstream — commands, URIs, hand-off links — is built for
+        // whichever user the operator chose, so the choice is applied once here.
+        if ($target instanceof DatabaseConnectionTarget && $this->connectAs !== '') {
+            $target = $target->as($this->connectAs);
+        }
+
         $reason = null;
         $tunnel = null;
         $allowance = null;
         $canAllowIp = false;
+        $databaseUsers = [];
+        $canManageUsers = false;
 
         if ($target instanceof DatabaseConnectionTarget) {
             $reason = $resolver->tunnelUnavailableReason($target, $this->server);
@@ -208,6 +303,10 @@ class DatabaseConnect extends Component
                     && $user !== null
                     && (bool) $this->site->organization?->hasAdminAccess($user);
                 $allowance = $user !== null ? $manager->liveForUser($cluster, $user) : null;
+
+                $userManager = app(ManagedDatabaseUsers::class);
+                $canManageUsers = $userManager->supports($cluster);
+                $databaseUsers = $canManageUsers ? $userManager->list($cluster) : [];
             }
         }
 
@@ -223,15 +322,16 @@ class DatabaseConnect extends Component
             'tunnelLink' => $target instanceof DatabaseConnectionTarget && $reason === null
                 ? $this->connectLink($target, true)
                 : null,
-            'tunnelInstallCommand' => $reason === null ? $this->tunnelInstallCommand() : null,
+            'tunnelInstallCommand' => $reason === null ? $this->tunnelInstallCommand($target) : null,
             'tunnelAlias' => $reason === null ? $this->existingTunnelAlias() : null,
             'allowAndOpenLink' => $canAllowIp && $allowance === null
                 ? $this->allowAndOpenLink($target)
                 : null,
-            'launchCommand' => $tunnel !== null && $target instanceof DatabaseConnectionTarget
-                ? $this->launchCommand($tunnel['tunnel'], $target)
-                : null,
+            'launchCommand' => $reason === null ? $this->launchCommand($target) : null,
+            'terminalScriptLink' => $this->terminalScriptLink($target),
             'target' => $target,
+            'databaseUsers' => $databaseUsers,
+            'canManageUsers' => $canManageUsers,
             'tunnel' => $tunnel,
             'unavailableReason' => $reason,
             'canAllowIp' => $canAllowIp,
@@ -258,6 +358,35 @@ class DatabaseConnect extends Component
             'binding' => $this->bindingId,
             'via' => $viaTunnel ? 'tunnel' : 'direct',
             'port' => $viaTunnel ? $this->localPort : $target->port,
+            'as' => $this->connectAs !== '' ? $this->connectAs : null,
+        ]);
+    }
+
+    /**
+     * Downloadable .command that opens a terminal session on the database.
+     *
+     * A browser cannot start a process; a double-clicked .command file can. This
+     * is the nearest thing to one-click terminal access on macOS.
+     */
+    private function terminalScriptLink(?DatabaseConnectionTarget $target): ?string
+    {
+        if (! $target instanceof DatabaseConnectionTarget) {
+            return null;
+        }
+
+        $alias = $this->existingTunnelAlias();
+
+        return URL::temporarySignedRoute('database-connections.terminal', now()->addMinutes(15), [
+            'binding' => $this->bindingId,
+            'port' => $this->localPort,
+            'alias' => $alias,
+            'as' => $this->connectAs !== '' ? $this->connectAs : null,
+            'uri_url' => URL::temporarySignedRoute('database-connections.uri', now()->addHours(12), [
+                'binding' => $this->bindingId,
+                'via' => $alias !== null ? 'tunnel' : 'direct',
+                'port' => $this->localPort,
+                'as' => $this->connectAs !== '' ? $this->connectAs : null,
+            ]),
         ]);
     }
 
@@ -286,6 +415,7 @@ class DatabaseConnect extends Component
             'port' => $target->port,
             'allow' => '1',
             'ip' => $ip,
+            'as' => $this->connectAs !== '' ? $this->connectAs : null,
         ]);
     }
 
@@ -293,13 +423,23 @@ class DatabaseConnect extends Component
      * curl|bash one-liner that installs a minted, forward-only key plus an SSH
      * config block. Signed and session-gated, and the key is delivered once.
      */
-    private function tunnelInstallCommand(): string
+    private function tunnelInstallCommand(?DatabaseConnectionTarget $target): ?string
     {
-        $url = URL::temporarySignedRoute('sites.databases.tunnel-install', now()->addMinutes(5), [
-            'server' => $this->server->id,
-            'site' => $this->site->id,
-            'binding' => $this->bindingId,
+        if ($this->tunnelSessionId === '' || ! $target instanceof DatabaseConnectionTarget) {
+            return null;
+        }
+
+        $url = URL::temporarySignedRoute('database-tunnels.install', now()->addMinutes(10), [
+            'session' => $this->tunnelSessionId,
+            'host' => $target->host,
+            'dbport' => $target->port,
             'port' => $this->localPort,
+            'uri_url' => URL::temporarySignedRoute('database-connections.uri', now()->addMinutes(15), [
+                'binding' => $this->bindingId,
+                'via' => 'tunnel',
+                'port' => $this->localPort,
+                'as' => $this->connectAs !== '' ? $this->connectAs : null,
+            ]),
         ]);
 
         return 'curl -fsSL '.escapeshellarg($url).' | bash';
@@ -322,15 +462,49 @@ class DatabaseConnect extends Component
     }
 
     /**
-     * One paste that backgrounds the tunnel and launches the client, instead of
-     * three commands run in order. `-f -N` detaches without opening a shell.
+     * One command that gets the operator connected, whatever state they are in.
+     *
+     * Reuses a tunnel that is already up rather than failing with "address
+     * already in use" (ssh -f -N backgrounds itself, so a second run collides
+     * with the first), opens one only when needed, then hands off to the client.
+     * nc rather than bash's /dev/tcp because the default shell here is zsh,
+     * which has no /dev/tcp.
      */
-    private function launchCommand(string $tunnelCommand, DatabaseConnectionTarget $target): string
+    private function launchCommand(?DatabaseConnectionTarget $target): ?string
     {
-        $backgrounded = preg_replace('/^ssh /', 'ssh -f -N ', $tunnelCommand, 1) ?? $tunnelCommand;
+        if (! $target instanceof DatabaseConnectionTarget || $target->host === '') {
+            return null;
+        }
 
-        return $backgrounded.' && open -a TablePlus '.escapeshellarg(
-            $target->uri(null, '127.0.0.1', $this->localPort),
+        $alias = $this->existingTunnelAlias();
+        $sshTarget = $alias !== null
+            ? $alias
+            : DatabaseJumpHostAccess::sshUserFor($this->server).'@'.$this->server->ip_address;
+
+        $sshPort = (int) ($this->server->ssh_port ?: 22);
+        $portFlag = $sshPort === 22 ? '' : ' -p '.$sshPort;
+        $identity = $alias !== null ? '' : ' -o IdentitiesOnly=yes -i '.$this->sshKeyPath;
+
+        // The URI is fetched at run time rather than baked in: clients do not
+        // prompt for a missing password, but embedding one would leave a live
+        // credential in the clipboard and shell history. The signed URL expires.
+        $uriUrl = URL::temporarySignedRoute('database-connections.uri', now()->addMinutes(10), [
+            'binding' => $this->bindingId,
+            'via' => 'tunnel',
+            'port' => $this->localPort,
+            'as' => $this->connectAs !== '' ? $this->connectAs : null,
+        ]);
+
+        return sprintf(
+            'nc -z 127.0.0.1 %d 2>/dev/null || ssh -f -N%s%s -L %d:%s:%d %s; open -a TablePlus "$(curl -fsSL %s)"',
+            $this->localPort,
+            $identity,
+            $portFlag,
+            $this->localPort,
+            $target->host,
+            $target->port,
+            $sshTarget,
+            escapeshellarg($uriUrl),
         );
     }
 

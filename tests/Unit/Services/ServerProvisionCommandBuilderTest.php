@@ -458,3 +458,24 @@ test('build database role with remote access opens port and bootstraps credentia
         ->and($joined)->toContain('CREATE DATABASE app')
         ->and($joined)->not->toContain('ufw deny 5432/tcp');
 });
+
+test('worker provision installs the pinned php and makes it the cli default', function () {
+    config(['server_provision.install_supervisor_on_provision' => false]);
+
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'worker',
+            'webserver' => 'caddy',
+            'php_version' => '8.4',
+            'database' => 'none',
+            'cache_service' => 'none',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    expect($joined)->toContain('[dply-step] Installing PHP 8.4')
+        ->and($joined)->toContain('php8.4-cli')
+        ->and($joined)->toContain("update-alternatives --set php '/usr/bin/php8.4'");
+});

@@ -50,7 +50,9 @@
                             <td class="max-w-md truncate px-4 py-3 font-mono text-xs text-brand-moss" title="{{ $config }}">{{ $config }}</td>
                             <td class="px-3 py-2 text-right">
                                 <div class="inline-flex flex-wrap justify-end gap-1.5">
-                                    <button type="button" wire:click="openComposeLogs(@js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                    @can('update', $server)
+                                        <button type="button" wire:click="openComposeLogs(@js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                    @endcan
                                     <button type="button" wire:click="confirmDockerComposeAction('docker_compose_up', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Up') }}</button>
                                     <button type="button" wire:click="confirmDockerComposeAction('docker_compose_restart', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">{{ __('Restart') }}</button>
                                     <button type="button" wire:click="confirmDockerComposeAction('docker_compose_down', @js($project), @js($config))" class="inline-flex h-6 items-center rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100">{{ __('Down') }}</button>

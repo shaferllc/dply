@@ -2,6 +2,8 @@
 
 namespace Tests\Unit\Services\SiteDeployPipelineRunnerTest;
 
+use App\Enums\SiteType;
+use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Sites\SiteDeployPipelineCommands;
 use App\Services\Sites\SiteDeployPipelineRunner;
@@ -42,6 +44,33 @@ test('resolves artisan install steps', function (string $type, string $expected)
 
     expect($runner->publicResolve($step))->toBe($expected);
 })->with('artisanInstallSteps');
+
+test('composer install prefix pins the site php binary ahead of the distro php', function () {
+    $site = new Site([
+        'runtime' => 'php',
+        'runtime_version' => '8.4',
+        'type' => SiteType::Php,
+    ]);
+    $step = new SiteDeployStep([
+        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+        'custom_command' => null,
+    ]);
+    $runner = new class extends SiteDeployPipelineRunner
+    {
+        public function __construct() {}
+
+        public function publicPrefix(SiteDeployStep $step, string $cmd, Site $site): string
+        {
+            return $this->ensureToolingPrefix($step, $cmd, $site);
+        }
+    };
+
+    $prefix = $runner->publicPrefix($step, 'composer install --no-dev', $site);
+
+    expect($prefix)->toContain('/usr/bin/php8.4')
+        ->and($prefix)->toContain('$HOME/.dply/bin')
+        ->and($prefix)->toContain('composer not found');
+});
 
 test('artisan optimize includes no interaction flag', function () {
     expect(SiteDeployPipelineCommands::fragmentFor(SiteDeployStep::TYPE_ARTISAN_OPTIMIZE, ''))->toBe('php artisan optimize --no-interaction');
