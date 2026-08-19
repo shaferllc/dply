@@ -39,9 +39,13 @@
             $syncFinished = $syncConsoleMode && ! $syncBusy;
         @endphp
 
+        {{-- Poll even when idle, slowly: a deploy can start from anywhere (quick
+             deploy on push, the API, another tab), and polling only once we
+             already know one is running meant the bar could never NOTICE one
+             beginning — it just sat on "Deploy" through the whole run. --}}
         <div
             class="flex items-center gap-2"
-            @if ($inProgress || $fixerInFlight) wire:poll.3s @endif
+            @if ($inProgress || $fixerInFlight) wire:poll.3s @else wire:poll.15s @endif
         >
             {{-- Deploy now — available from any site page. --}}
             <button
