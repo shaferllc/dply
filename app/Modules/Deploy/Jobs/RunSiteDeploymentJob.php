@@ -2,17 +2,16 @@
 
 namespace App\Modules\Deploy\Jobs;
 
+use App\Enums\DeploymentMethod;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
+use App\Jobs\SyncWorkerPoolEnvJob;
 use App\Jobs\TestSiteHealthJob;
-
-use App\Enums\DeploymentMethod;
 use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\User;
-use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
@@ -24,6 +23,7 @@ use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
+use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
 use App\Services\Sites\Backends\CanarySiteDeployer;
@@ -335,6 +335,14 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $siteUpdates = [
                     'last_deploy_at' => now(),
                 ];
+
+                // Worker replicas are COPIES of the primary's env taken at
+                // scale-up, so without this they keep whatever credentials
+                // existed then and drift from the parent — which surfaces as a
+                // worker that cannot reach Redis or the database while the
+                // primary is fine. Syncing on every successful deploy makes the
+                // replicas' credentials always the parent's.
+                $this->syncWorkerReplicaEnv();
                 $caps = $this->site->server?->hostCapabilities();
                 if ($caps?->supportsFunctionDeploy() || $caps?->supportsClusterDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
@@ -530,6 +538,25 @@ class RunSiteDeploymentJob implements ShouldQueue
             'Deployment blocked: the app requires environment variables that are not set: '
             .$shown.$more.'. Add them on the Deploy panel (or Settings → Environment) and redeploy.'
         );
+    }
+
+    /**
+     * Project the primary's env onto its worker replicas after a deploy.
+     *
+     * Queued, never inline: the fan-out SSHes to every replica. Silent when the
+     * site has no replicas, so the ordinary single-server deploy is unaffected.
+     */
+    private function syncWorkerReplicaEnv(): void
+    {
+        $hasReplicas = Site::query()
+            ->where('meta->replicated_from_site_id', (string) $this->site->id)
+            ->exists();
+
+        if (! $hasReplicas) {
+            return;
+        }
+
+        SyncWorkerPoolEnvJob::dispatch((string) $this->site->id, $this->auditUserId);
     }
 
     /**
