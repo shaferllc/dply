@@ -23,16 +23,28 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('site_deployments', function (Blueprint $table): void {
-            $table->char('server_id', 26)->nullable()->after('site_id');
-            $table->index(['server_id', 'created_at']);
+            // Production already has this column (added outside this
+            // migration). Re-running must not fail on 42701.
+            if (! Schema::hasColumn('site_deployments', 'server_id')) {
+                $table->char('server_id', 26)->nullable()->after('site_id');
+            }
+
+            if (! Schema::hasIndex('site_deployments', ['server_id', 'created_at'])) {
+                $table->index(['server_id', 'created_at']);
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('site_deployments', function (Blueprint $table): void {
-            $table->dropIndex(['server_id', 'created_at']);
-            $table->dropColumn('server_id');
+            if (Schema::hasIndex('site_deployments', ['server_id', 'created_at'])) {
+                $table->dropIndex(['server_id', 'created_at']);
+            }
+
+            if (Schema::hasColumn('site_deployments', 'server_id')) {
+                $table->dropColumn('server_id');
+            }
         });
     }
 };

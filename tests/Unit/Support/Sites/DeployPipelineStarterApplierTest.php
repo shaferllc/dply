@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-test('starter applier replaces steps and applies atomic rollout', function () {
+beforeEach(function () {
     Queue::fake();
+});
 
+test('starter applier replaces steps and applies atomic rollout', function () {
     $site = Site::factory()->create([
         'deploy_strategy' => 'simple',
         'meta' => [
