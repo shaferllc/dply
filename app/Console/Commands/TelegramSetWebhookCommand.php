@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Modules\Notifications\Services\PlatformNotificationApps;
 use App\Modules\Notifications\Services\TelegramBotClient;
 use Illuminate\Console\Command;
 
@@ -27,7 +28,7 @@ class TelegramSetWebhookCommand extends Command
     public function handle(): int
     {
         if (! TelegramBotClient::botConfigured()) {
-            $this->error('TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather first.');
+            $this->error('No Telegram bot token is configured. Save one under Admin → Connections, or set TELEGRAM_BOT_TOKEN.');
 
             return self::FAILURE;
         }
@@ -66,9 +67,9 @@ class TelegramSetWebhookCommand extends Command
             return self::SUCCESS;
         }
 
-        $secret = config('services.telegram.webhook_secret');
-        if (! is_string($secret) || $secret === '') {
-            $this->error('TELEGRAM_WEBHOOK_SECRET is not set. Pick any random string — it is what authenticates the public endpoint.');
+        $secret = PlatformNotificationApps::telegram()['webhook_secret'];
+        if ($secret === '') {
+            $this->error('No Telegram webhook secret is configured. Save one under Admin → Connections, or set TELEGRAM_WEBHOOK_SECRET.');
 
             return self::FAILURE;
         }
@@ -108,11 +109,6 @@ class TelegramSetWebhookCommand extends Command
             return rtrim($option, '/');
         }
 
-        $configured = config('services.telegram.webhook_url');
-        if (is_string($configured) && $configured !== '') {
-            return rtrim($configured, '/');
-        }
-
-        return rtrim((string) config('app.url'), '/').'/hooks/telegram';
+        return PlatformNotificationApps::telegramWebhookUrl();
     }
 }

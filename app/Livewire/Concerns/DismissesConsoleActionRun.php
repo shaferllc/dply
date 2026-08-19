@@ -37,4 +37,32 @@ trait DismissesConsoleActionRun
 
         $row->forceFill(['dismissed_at' => now()])->save();
     }
+
+    public function cancelConsoleActionRun(string $runId): void
+    {
+        $subject = $this->consoleActionSubject();
+
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $subject->getMorphClass())
+            ->where('subject_id', $subject->getKey())
+            ->first();
+
+        if ($row === null || ! $row->isCancellable()) {
+            return;
+        }
+
+        if (method_exists($this, 'afterConsoleActionCancelled')) {
+            $this->afterConsoleActionCancelled($row);
+        }
+
+        $row->refresh();
+        if ($row->isInFlight()) {
+            $row->forceFill([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => __('Stopped.'),
+            ])->save();
+        }
+    }
 }

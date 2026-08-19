@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Modules\Remediations\Services\RemediationActionInterface;
 use App\Modules\Remediations\Services\RemediationCatalog;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,7 +24,7 @@ use Illuminate\Support\Str;
  * ConsoleAction on the site so the deploy console / Errors view can show live
  * progress, and (on success) the operator can re-run the failed operation.
  */
-class ApplyRemediationJob implements ShouldQueue
+class ApplyRemediationJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
     use WritesConsoleAction;
@@ -32,6 +33,9 @@ class ApplyRemediationJob implements ShouldQueue
 
     public int $tries = 1;
 
+    /** Hold the unique lock for the whole install (PPA + apt), not just dequeue. */
+    public int $uniqueFor = 900;
+
     public function __construct(
         public string $serverId,
         public ?string $siteId,
@@ -39,8 +43,14 @@ class ApplyRemediationJob implements ShouldQueue
         public string $actionKey,
         public ?string $userId = null,
         public ?string $errorEventId = null,
+        public ?string $seededConsoleRunId = null,
     ) {
         $this->onQueue('dply-control');
+    }
+
+    public function uniqueId(): string
+    {
+        return implode(':', ['remediation', $this->serverId, $this->siteId ?? '', $this->code, $this->actionKey]);
     }
 
     /** Stream to the site when there is one (deploy/site errors), else the server. */
@@ -65,6 +75,8 @@ class ApplyRemediationJob implements ShouldQueue
 
     public function handle(ExecuteRemoteTaskOnServer $exec, RemediationCatalog $catalog): void
     {
+        $this->bindConsoleRunId($this->seededConsoleRunId);
+
         $server = Server::find($this->serverId);
         $action = $catalog->action($this->code, $this->actionKey);
         $emit = $this->beginConsoleAction();

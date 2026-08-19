@@ -19,6 +19,7 @@
     $usersActive = request()->routeIs('admin.users.*');
     $betaInvitesActive = request()->routeIs('admin.beta-invites');
     $comingSoonAccessActive = request()->routeIs('admin.coming-soon-access');
+    $connectionsActive = request()->routeIs('admin.connections');
 
     $productLines = \App\Support\Admin\AdminFeatureFlags::productLineSlugs();
     $vmLines = ['vm-servers', 'vm-sites'];
@@ -116,5 +117,9 @@
     <a href="{{ route('admin.coming-soon-access') }}" wire:navigate @class([$navBase, $comingSoonAccessActive ? $navOn : $navOff])>
         <x-heroicon-o-lock-closed class="{{ $navIcon }}" />
         {{ __('Coming-soon access') }}
+    </a>
+    <a href="{{ route('admin.connections') }}" wire:navigate @class([$navBase, $connectionsActive ? $navOn : $navOff])>
+        <x-heroicon-o-link class="{{ $navIcon }}" />
+        {{ __('Connections') }}
     </a>
 </nav>

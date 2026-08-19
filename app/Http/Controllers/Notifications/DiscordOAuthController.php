@@ -11,6 +11,7 @@ use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
 use App\Modules\Notifications\Services\DiscordGuildClient;
+use App\Modules\Notifications\Services\PlatformNotificationApps;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,14 +48,7 @@ class DiscordOAuthController extends Controller
 
     public static function configured(): bool
     {
-        $id = config('services.discord.client_id');
-        $secret = config('services.discord.client_secret');
-
-        return is_string($id) && $id !== ''
-            && is_string($secret) && $secret !== ''
-            // Without the bot token the flow would "succeed" into a channel that
-            // can never deliver, so treat it as part of being configured.
-            && DiscordGuildClient::botConfigured();
+        return PlatformNotificationApps::discordReady();
     }
 
     public function redirect(Request $request): RedirectResponse
@@ -89,7 +83,7 @@ class DiscordOAuthController extends Controller
         ]);
 
         $query = http_build_query([
-            'client_id' => config('services.discord.client_id'),
+            'client_id' => PlatformNotificationApps::discord()['client_id'],
             'scope' => self::SCOPES,
             'permissions' => DiscordPermissions::REQUIRED,
             // response_type=code (rather than Discord's older implicit bot-add)
@@ -138,9 +132,10 @@ class DiscordOAuthController extends Controller
             return $this->back($returnTo, __('You cannot connect a Discord server for that account.'));
         }
 
+        $discord = PlatformNotificationApps::discord();
         $response = Http::asForm()->acceptJson()->post('https://discord.com/api/v10/oauth2/token', [
-            'client_id' => config('services.discord.client_id'),
-            'client_secret' => config('services.discord.client_secret'),
+            'client_id' => $discord['client_id'],
+            'client_secret' => $discord['client_secret'],
             'grant_type' => 'authorization_code',
             'code' => $request->string('code')->toString(),
             'redirect_uri' => $this->redirectUri(),
@@ -242,11 +237,7 @@ class DiscordOAuthController extends Controller
 
     private function redirectUri(): string
     {
-        $configured = config('services.discord.redirect');
-
-        return is_string($configured) && $configured !== ''
-            ? $configured
-            : route('notifications.oauth.discord.callback', [], true);
+        return PlatformNotificationApps::discordRedirectUri();
     }
 
     private function stateKey(string $nonce): string

@@ -137,6 +137,12 @@ final class SiteBindingCatalog
                 'env' => ['GITHUB_CLIENT_ID'],
                 'runtimes' => ['vm'],
             ],
+            'connected_app' => [
+                'group' => 'integrations', 'label' => 'Connected apps', 'icon' => 'heroicon-o-puzzle-piece',
+                'purpose' => 'Slack, Discord, Telegram, Google Drive, Dropbox keys for the app.',
+                'env' => ['SLACK_BOT_TOKEN', 'GOOGLE_DRIVE_CLIENT_ID'],
+                'runtimes' => ['vm'],
+            ],
             'scheduler' => [
                 'group' => 'runtime', 'label' => 'Scheduler', 'icon' => 'heroicon-o-clock',
                 'purpose' => 'Run the Laravel scheduler (cron) for this site.',

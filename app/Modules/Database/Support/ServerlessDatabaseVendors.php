@@ -52,22 +52,6 @@ final class ServerlessDatabaseVendors
                 ],
             ],
             [
-                'key' => CloudDatabase::BACKEND_PLANETSCALE,
-                'label' => 'PlanetScale',
-                'provider' => 'planetscale',
-                'engines' => [CloudDatabase::ENGINE_MYSQL],
-                'account_label' => 'Organization (optional)',
-                'account_required' => false,
-                'regions' => [
-                    ['value' => 'us-east', 'label' => 'AWS US East (Virginia)'],
-                    ['value' => 'us-west', 'label' => 'AWS US West (Oregon)'],
-                    ['value' => 'eu-west', 'label' => 'AWS Europe (Ireland)'],
-                    ['value' => 'eu-central', 'label' => 'AWS Europe (Frankfurt)'],
-                    ['value' => 'ap-southeast', 'label' => 'AWS Asia Pacific (Singapore)'],
-                    ['value' => 'ap-northeast', 'label' => 'AWS Asia Pacific (Tokyo)'],
-                ],
-            ],
-            [
                 'key' => CloudDatabase::BACKEND_SUPABASE,
                 'label' => 'Supabase',
                 'provider' => 'supabase',
@@ -99,6 +83,22 @@ final class ServerlessDatabaseVendors
                     ['value' => 'ap-southeast-1', 'label' => 'AWS Asia Pacific (Singapore)'],
                 ],
             ],
+            [
+                'key' => CloudDatabase::BACKEND_PLANETSCALE,
+                'label' => 'PlanetScale',
+                'provider' => 'planetscale',
+                'engines' => [CloudDatabase::ENGINE_MYSQL],
+                'account_label' => 'Organization (optional)',
+                'account_required' => false,
+                'regions' => [
+                    ['value' => 'us-east', 'label' => 'AWS US East (Virginia)'],
+                    ['value' => 'us-west', 'label' => 'AWS US West (Oregon)'],
+                    ['value' => 'eu-west', 'label' => 'AWS Europe (Ireland)'],
+                    ['value' => 'eu-central', 'label' => 'AWS Europe (Frankfurt)'],
+                    ['value' => 'ap-southeast', 'label' => 'AWS Asia Pacific (Singapore)'],
+                    ['value' => 'ap-northeast', 'label' => 'AWS Asia Pacific (Tokyo)'],
+                ],
+            ],
         ];
     }
 
@@ -115,15 +115,19 @@ final class ServerlessDatabaseVendors
 
     /**
      * Whether this vendor may be provisioned. Ungated vendors are always on;
-     * Upstash is behind {@see Feature} `database.upstash`.
+     * Upstash / Neon / Supabase are behind {@see Feature} `database.*` flags
+     * (off = Coming soon card, not hidden).
      */
     public static function isEnabled(string $key): bool
     {
-        if ($key === CloudDatabase::BACKEND_UPSTASH) {
-            return Feature::active('database.upstash');
-        }
+        $flag = match ($key) {
+            CloudDatabase::BACKEND_UPSTASH => 'database.upstash',
+            CloudDatabase::BACKEND_NEON => 'database.neon',
+            CloudDatabase::BACKEND_SUPABASE => 'database.supabase',
+            default => null,
+        };
 
-        return true;
+        return $flag === null || Feature::active($flag);
     }
 
     /**

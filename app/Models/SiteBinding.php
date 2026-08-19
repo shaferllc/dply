@@ -56,6 +56,7 @@ class SiteBinding extends Model
         'search',
         'payments',
         'oauth',
+        'connected_app',
     ];
 
     /**
@@ -90,6 +91,7 @@ class SiteBinding extends Model
         // config/mail.php snippet. API providers (Mailgun/SES/…) read global
         // config/services.php creds, so they can't be a second instance.
         'mail',
+        'connected_app',
     ];
 
     public static function isMultiInstance(string $type): bool
@@ -148,6 +150,22 @@ class SiteBinding extends Model
         foreach ($env as $key => $value) {
             if ($key !== '') {
                 $clean[$key] = (string) $value;
+            }
+        }
+
+        // Managed Redis bindings stored before TLS was injected still have
+        // HOST/PORT/PASSWORD only. Re-derive from the cluster so the next
+        // env push / deploy handshakes with rediss:// instead of 500ing.
+        if ($this->type === 'redis' && $this->target_type === 'cloud_database' && filled($this->target_id)) {
+            $cluster = CloudDatabase::query()->find($this->target_id);
+            if ($cluster instanceof CloudDatabase) {
+                $connection = (string) (data_get($this->config, 'connection') ?? '');
+                $prefix = ($connection === '' || strtolower($connection) === 'primary')
+                    ? 'REDIS'
+                    : 'REDIS_'.strtoupper($connection);
+                foreach ($cluster->connectionEnvVars($prefix) as $key => $value) {
+                    $clean[$key] = $value;
+                }
             }
         }
 

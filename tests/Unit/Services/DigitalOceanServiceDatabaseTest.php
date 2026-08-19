@@ -5,7 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\DigitalOceanServiceDatabaseTest;
 
 use App\Modules\Cloud\Services\DigitalOceanService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+
+test('mutating digitalocean calls wait longer than catalog reads', function () {
+    expect(DigitalOceanService::transferTimeoutSeconds('get'))->toBe(8)
+        ->and(DigitalOceanService::transferTimeoutSeconds('GET'))->toBe(8)
+        ->and(DigitalOceanService::transferTimeoutSeconds('post'))->toBeGreaterThan(30)
+        ->and(DigitalOceanService::transferTimeoutSeconds('put'))->toBeGreaterThan(30)
+        ->and(DigitalOceanService::transferTimeoutSeconds('delete'))->toBeGreaterThan(30);
+});
 
 test('create database cluster posts and normalizes the response', function () {
     Http::fake([
@@ -65,6 +74,20 @@ test('create remaps portable size and rejected region from the live catalog', fu
         && $request['region'] === 'sfo2'
         && $request['size'] === 'db-s-1vcpu-1gb'
         && $request['num_nodes'] === 1);
+});
+
+test('create maps a transport timeout to a retryable operator message', function () {
+    Http::fake(function ($request) {
+        if (str_contains($request->url(), '/databases/options')) {
+            return Http::response(['options' => []], 200);
+        }
+
+        throw new ConnectionException('cURL error 28: Operation timed out after 8002 milliseconds with 0 bytes received');
+    });
+
+    expect(fn () => (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('mysql', 'sfo2', 'db-s-1vcpu-2gb', 'dply-db'))
+        ->toThrow(\RuntimeException::class, 'did not accept the database create in time');
 });
 
 test('create remaps discontinued redis clusters to valkey 8', function () {

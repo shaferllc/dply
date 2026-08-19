@@ -35,8 +35,9 @@
     $activeFixerKey = $this->fixerRunKey;
 @endphp
 
-{{-- Inline smart fixes for a failed deploy. --}}
-@if ($deployFixers !== [])
+{{-- Inline smart fixes for a failed deploy. The deploy hub lists each unique
+     fix as its own card ({@see _deploy-fix-cards}) — skip this list there. --}}
+@if ($deployFixers !== [] && empty($hideFixerList))
     <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
         <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
             <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />

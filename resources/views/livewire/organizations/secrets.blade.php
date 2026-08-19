@@ -36,7 +36,6 @@
         </x-organization-shell>
     </div>
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Confirm modal must live in the Livewire view tree (not only a layout slot) so state updates and wire: targets bind reliably. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

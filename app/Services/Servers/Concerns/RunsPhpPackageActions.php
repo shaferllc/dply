@@ -16,10 +16,9 @@ use App\Support\Servers\ServerPhpMutationLock;
  */
 trait RunsPhpPackageActions
 {
-
-
     /**
      * @param  \Closure(string $step, string $action, string $version): void|null  $onProgress
+     * @param  \Closure(string $line): void|null  $onOutput
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
     public function applyPackageAction(
@@ -29,6 +28,7 @@ trait RunsPhpPackageActions
         ?\Closure $onProgress = null,
         bool $migrateSitesBeforeUninstall = false,
         ?string $actingUserId = null,
+        ?\Closure $onOutput = null,
     ): array {
         $version = $this->normalizeVersionId($version) ?? '';
         $action = trim($action);
@@ -63,16 +63,9 @@ trait RunsPhpPackageActions
                 $server = $server->fresh() ?? $server;
             }
 
-            if ($action === 'install' && $this->isVersionInstalledInInventory($version, $preflightInventory)) {
-                return $this->completePackageActionWithInventory(
-                    $server,
-                    $action,
-                    $version,
-                    $preflightInventory,
-                    null,
-                    __('PHP :version is already installed.', ['version' => $version]),
-                );
-            }
+            // A version can be "installed" as cli/fpm only (the pre-redis
+            // upgrade path). Re-run the install script so required extensions
+            // (phpredis) and FPM restart still happen — apt-get is idempotent.
 
             if ($action === 'set_cli_default' && $this->isCliDefaultInInventory($version, $preflightInventory)) {
                 return $this->completePackageActionWithInventory(
@@ -127,7 +120,7 @@ trait RunsPhpPackageActions
 
             $onProgress?->__invoke('execute', $action, $version);
 
-            $commandOutput = $this->executePackageAction($server, $action, $version);
+            $commandOutput = $this->executePackageAction($server, $action, $version, $onOutput);
 
             $freshInventory = $this->fetchRemoteInventory($server->fresh());
 
@@ -384,12 +377,15 @@ trait RunsPhpPackageActions
         return $preflightInventory;
     }
 
-    protected function executePackageAction(Server $server, string $action, string $version): string
+    protected function executePackageAction(Server $server, string $action, string $version, ?\Closure $onOutput = null): string
     {
         return app(ServerSshConnectionRunner::class)->run(
             $server,
-            function ($ssh) use ($server, $action, $version): string {
-                $output = $ssh->exec($this->packageActionScript($server, $action, $version), 600);
+            function ($ssh) use ($server, $action, $version, $onOutput): string {
+                $script = $this->packageActionScript($server, $action, $version);
+                $output = $onOutput !== null
+                    ? $ssh->execWithCallback($script, $onOutput, 600)
+                    : $ssh->exec($script, 600);
                 $exitCode = $ssh->lastExecExitCode();
 
                 if ($exitCode !== null && $exitCode !== 0) {

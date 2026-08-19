@@ -4,6 +4,7 @@
          workspace inherited set. --}}
     <div
         class="{{ $card }}"
+        x-data="{ open: true }"
         @if ($envSyncInFlight) wire:poll.3s @endif
     >
         {{-- Single merged header: identity + count/freshness on the left, every
@@ -13,7 +14,8 @@
              variable appeared. --}}
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2.5 sm:px-6">
             <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <button type="button" class="flex min-w-0 flex-wrap items-center gap-2 text-left" x-on:click="open = ! open" :aria-expanded="open">
+                    <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open && 'rotate-90'" />
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
@@ -26,7 +28,7 @@
                     @if ($freshnessLabel)
                         <span class="text-xs text-brand-mist">· {{ $freshnessLabel }}</span>
                     @endif
-                </div>
+                </button>
             {{-- Action toolbar: create actions on the left, the primary CTA
                  anchored right, and the occasional server / bulk-edit tools
                  tucked into a "More" menu so the bar stays tidy as it grows. --}}
@@ -141,6 +143,7 @@
             </p>
         </div>
 
+        <div x-show="open">
         @if ($variableCount > 0 && $envAdvanced)
             {{-- Search and the prefix filters share a line: the search field was
                  full-width on its own row above the chips for no reason. --}}
@@ -870,4 +873,5 @@
                 </div>
             @endif
         @endif
+        </div>
     </div>

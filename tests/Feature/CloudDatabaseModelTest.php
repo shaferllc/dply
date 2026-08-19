@@ -66,6 +66,27 @@ test('redis connection env vars', function () {
         'REDIS_HOST' => 'db.example.ondigitalocean.com',
         'REDIS_PORT' => '25060',
         'REDIS_PASSWORD' => 'secret-pass',
+        'REDIS_USERNAME' => 'doadmin',
+        'REDIS_SCHEME' => 'tls',
+        'REDIS_URL' => 'rediss://doadmin:secret-pass@db.example.ondigitalocean.com:25060',
+    ]);
+});
+
+test('on-box redis without tls does not invent a rediss url', function () {
+    $db = CloudDatabase::factory()->redis()->active()->create([
+        'backend' => CloudDatabase::BACKEND_EXTERNAL,
+        'connection' => [
+            'host' => '127.0.0.1',
+            'port' => 6379,
+            'password' => 'local-pass',
+            'ssl' => false,
+        ],
+    ]);
+
+    expect($db->connectionEnvVars())->toBe([
+        'REDIS_HOST' => '127.0.0.1',
+        'REDIS_PORT' => '6379',
+        'REDIS_PASSWORD' => 'local-pass',
     ]);
 });
 test('connection env vars empty when not provisioned', function () {
@@ -75,7 +96,9 @@ test('connection env vars empty when not provisioned', function () {
 });
 test('connection env keys per engine', function () {
     expect(CloudDatabase::factory()->make()->connectionEnvKeys())->toContain('DB_HOST');
-    expect(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_HOST');
+    expect(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_HOST')
+        ->and(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_URL')
+        ->and(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_SCHEME');
 });
 test('sites relation via pivot', function () {
     $db = CloudDatabase::factory()->create();

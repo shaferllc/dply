@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
+use App\Models\ConnectedAppCredential;
 use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
 use App\Models\OauthCredential;
@@ -21,8 +22,6 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSiteBindingCredentials
 {
-
-
     /**
      * Saved error-tracking credentials the site's org can reuse for $provider.
      *
@@ -170,6 +169,42 @@ trait ManagesSiteBindingCredentials
         }
 
         $this->toastSuccess(__('Saved SMS credential removed.'));
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function connectedAppCredentialsFor(string $provider): array
+    {
+        return ConnectedAppCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ConnectedAppCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteConnectedAppCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = ConnectedAppCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof ConnectedAppCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved app credential removed.'));
     }
 
     /**

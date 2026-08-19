@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Enums\ServerProvider;
 use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
 use App\Models\CloudDatabase;
+use App\Models\ConnectedAppCredential;
 use App\Models\ConsoleAction;
 use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
@@ -39,16 +41,20 @@ use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Servers\ServerManageScriptQueuer;
+use App\Support\Providers\ProviderAuthFailure;
 use App\Support\Servers\DatabaseNameGenerator;
 use App\Support\Servers\DedicatedVmPlacement;
+use App\Support\Servers\ManagedDatabaseCatalogFailure;
 use App\Support\Servers\ManagedDatabaseRegionCatalog;
 use App\Support\Servers\ManagedDatabaseSizeCatalog;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
 use App\Support\Servers\ProvisioningDigest;
+use App\Support\Sites\ConnectedAppEnvPaste;
 use App\Support\Sites\ManagedDatabaseProvisionConsole;
 use App\Support\Sites\SiteBindingCatalog;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Throwable;
 
 /**
@@ -71,6 +77,18 @@ trait ManagesSiteBindingActions
     {
         Gate::authorize('update', $this->site);
 
+        // A primary already mid-provision (or failed) is easy to miss — the
+        // resources card used to say "Connected". Open that row's status
+        // instead of a second Provision form that only warns about a name clash.
+        if ($bindingId === null && $mode === 'provision' && in_array($type, ['database', 'redis'], true)) {
+            $inFlight = $this->inFlightPrimaryBinding($type);
+            if ($inFlight instanceof SiteBinding) {
+                $this->openBindingInfoModal((string) $inFlight->id);
+
+                return;
+            }
+        }
+
         if ($type === 'queue'
             && SiteBindingCatalog::missingNeedsAny($this->site->bindings, ['redis', 'database'])) {
             $this->toastError(__('Attach Redis or a database before configuring the queue.'));
@@ -79,6 +97,7 @@ trait ManagesSiteBindingActions
         }
 
         $this->resetErrorBag();
+        $this->connectedAppPasteNote = null;
         $this->bindingModalType = $type;
         $this->bindingModalMode = $mode === 'provision' ? 'provision' : 'attach';
         $this->bindingModalBindingId = null;
@@ -484,8 +503,8 @@ trait ManagesSiteBindingActions
             ];
         }
 
-        // BYO serverless vendors (Neon …): region-agnostic. Upstash stays
-        // visible when its flag is off — Coming soon, not hidden.
+        // BYO serverless vendors (Neon / Supabase / Upstash …): region-agnostic.
+        // Flag-off vendors stay visible as Coming soon, not hidden.
         foreach (ServerlessDatabaseVendors::all() as $vendor) {
             $enabled = ServerlessDatabaseVendors::isEnabled($vendor['key']);
             $options[] = [
@@ -805,6 +824,11 @@ trait ManagesSiteBindingActions
         if (in_array($this->bindingModalType, ['database', 'redis'], true) && $this->bindingModalMode === 'provision') {
             $placement = (string) ($this->bindingForm['placement'] ?? '');
             $engine = strtolower(trim((string) ($this->bindingForm['engine'] ?? ($this->bindingModalType === 'redis' ? 'redis' : ''))));
+            if ($this->bindingModalType === 'database' && in_array($engine, ['redis', 'valkey'], true)) {
+                $this->toastError(__('Redis belongs on the Redis / Valkey resource, not Database.'));
+
+                return;
+            }
             $match = collect($this->databasePlacements())->firstWhere('key', $placement);
 
             if ($placement === '') {
@@ -1052,6 +1076,13 @@ trait ManagesSiteBindingActions
             return;
         }
 
+        // Close the status/info modal from PHP. Alpine `$dispatch('close')` on
+        // the same click hides every `x-modal` (generic `close`) and can abort
+        // the Livewire request when the button is unmounted — the confirm then
+        // never appears, so a stuck provisioning cluster cannot be detached.
+        $this->bindingInfo = null;
+        $this->dispatch('close-modal', 'binding-info-modal');
+
         $label = filled($label) ? $label : Str::headline($binding->type);
         $title = $preferDelete
             ? __('Detach and delete :label?', ['label' => $label])
@@ -1117,6 +1148,8 @@ trait ManagesSiteBindingActions
         }
 
         $this->site = $this->site->fresh() ?? $this->site;
+        $this->bindingInfo = null;
+        $this->dispatch('close-modal', 'binding-info-modal');
         $this->toastSuccess($deleteResource && $offeredDelete
             ? __('Binding detached and the resource is being deleted.')
             : __('Binding detached.'));
@@ -1147,6 +1180,86 @@ trait ManagesSiteBindingActions
         }
 
         $this->dispatch('open-modal', 'binding-info-modal');
+
+        if (! empty($this->bindingInfo['provision']['auth_failure'])) {
+            $this->dispatch(
+                'open-add-provider-credential-modal',
+                provider: (string) ($this->bindingInfo['provision']['auth_provider'] ?? ''),
+            );
+        }
+    }
+
+    public function openProviderCredentialModal(?string $provider = null): void
+    {
+        $this->dispatch('open-add-provider-credential-modal', provider: $provider);
+    }
+
+    #[On('provider-credential-created')]
+    public function afterProviderCredentialCreatedForBindings(string $provider = '', mixed $credentialId = null): void
+    {
+        ManagedDatabaseCatalogFailure::clear();
+
+        $info = $this->bindingInfo;
+        if (! is_array($info) || empty($info['provision']['auth_failure']) || ! filled($info['id'] ?? null)) {
+            return;
+        }
+
+        $expected = (string) ($info['provision']['auth_provider'] ?? '');
+        if ($expected !== '' && $provider !== '' && $expected !== $provider) {
+            return;
+        }
+
+        $this->retryFailedBindingProvision((string) $info['id']);
+    }
+
+    public function afterConsoleActionCancelled(ConsoleAction $run): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! in_array($run->kind, [
+            ManagedDatabaseProvisionConsole::KIND,
+            ManagedDatabaseProvisionConsole::KIND_RESIZE,
+        ], true)) {
+            return;
+        }
+
+        $message = __('Stopped.');
+        $bindings = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', SiteBinding::STATUS_PROVISIONING)
+            ->get();
+
+        foreach ($bindings as $binding) {
+            $config = is_array($binding->config) ? $binding->config : [];
+            if ((string) ($config['console_run_id'] ?? '') !== (string) $run->id) {
+                continue;
+            }
+
+            $binding->forceFill([
+                'status' => SiteBinding::STATUS_ERROR,
+                'last_error' => $message,
+            ])->save();
+
+            if ($binding->target_type === 'cloud_database' && filled($binding->target_id)) {
+                $database = CloudDatabase::query()->find($binding->target_id);
+                if ($database instanceof CloudDatabase && $database->status === CloudDatabase::STATUS_PROVISIONING) {
+                    $meta = is_array($database->meta) ? $database->meta : [];
+                    $meta['error'] = $message;
+                    $meta['error_at'] = now()->toIso8601String();
+                    $database->forceFill([
+                        'status' => CloudDatabase::STATUS_FAILED,
+                        'meta' => $meta,
+                    ])->save();
+                }
+            }
+        }
+
+        ManagedDatabaseProvisionConsole::fail($run, $message);
+        $this->toastSuccess(__('Stopped provisioning.'));
+
+        if (is_array($this->bindingInfo) && filled($this->bindingInfo['id'] ?? null)) {
+            $this->refreshBindingInfo((string) $this->bindingInfo['id']);
+        }
     }
 
     /**
@@ -1247,6 +1360,9 @@ trait ManagesSiteBindingActions
             ? max(0, min(100, (int) round(100 * $digest->stepIndex / $digest->stepTotal)))
             : null;
         $conn = is_array($config['connectivity'] ?? null) ? $config['connectivity'] : null;
+        $error = $binding->displayError($server instanceof Server ? $server : null);
+        $authProvider = $this->bindingAuthProvider($binding, $config);
+        $authFailure = $binding->isErrored() && ProviderAuthFailure::detected($error);
 
         return [
             'active' => $binding->isProvisioning(),
@@ -1264,11 +1380,17 @@ trait ManagesSiteBindingActions
             'digest_elapsed' => $digest?->elapsedHuman(),
             'digest_percent' => $percent,
             'failed' => $binding->isErrored(),
-            'error' => $binding->displayError($server instanceof Server ? $server : null),
-            'can_retry' => $this->canRetryBindingProvision($binding),
+            'error' => $authFailure ? ProviderAuthFailure::message($authProvider) : $error,
+            'error_detail' => $authFailure ? $error : null,
+            'auth_failure' => $authFailure,
+            'auth_provider' => $authProvider,
+            'auth_provider_label' => ProviderAuthFailure::providerLabel($authProvider),
+            'auth_title' => $authFailure ? ProviderAuthFailure::title($authProvider) : null,
+            'can_retry' => $this->canRetryBindingProvision($binding) && ! $authFailure,
             'can_change_placement' => $this->canRetryBindingProvision($binding)
                 && in_array($binding->type, ['database', 'redis'], true),
             'can_pick_region' => $this->canRetryBindingProvision($binding)
+                && ! $authFailure
                 && $this->isManagedBindingPlacement($config)
                 && $this->managedDatabaseRegions($this->managedDatabaseEngineFor($binding, $config)) !== [],
             'regions' => $this->isManagedBindingPlacement($config)
@@ -1281,6 +1403,24 @@ trait ManagesSiteBindingActions
             'can_fix_connectivity' => is_array($conn) && ($conn['ok'] ?? true) === false,
             'console_run_id' => isset($config['console_run_id']) ? (string) $config['console_run_id'] : null,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public function bindingAuthProvider(SiteBinding $binding, array $config = []): string
+    {
+        $fromConfig = strtolower(trim((string) ($config['provider'] ?? '')));
+        if ($fromConfig !== '') {
+            return $fromConfig;
+        }
+
+        $serverProvider = $this->site->server?->provider;
+        if ($serverProvider instanceof ServerProvider) {
+            return $serverProvider->value;
+        }
+
+        return 'unknown';
     }
 
     private function syncManagedProvisionConsole(SiteBinding $binding): ?ConsoleAction
@@ -1297,7 +1437,7 @@ trait ManagesSiteBindingActions
 
         $run = ManagedDatabaseProvisionConsole::ensure($this->site, $binding, $database);
 
-        if (! $binding->isProvisioning() && ! $binding->isErrored()) {
+        if (! $binding->isProvisioning()) {
             return $run;
         }
 
@@ -1425,6 +1565,11 @@ trait ManagesSiteBindingActions
         }
 
         return ManagedDatabaseSizeCatalog::options($server, $engine);
+    }
+
+    public function managedDatabaseCatalogError(): ?string
+    {
+        return ManagedDatabaseCatalogFailure::operatorMessage();
     }
 
     /**
@@ -1729,6 +1874,19 @@ trait ManagesSiteBindingActions
         };
     }
 
+    private function inFlightPrimaryBinding(string $type): ?SiteBinding
+    {
+        return $this->site->loadMissing('bindings')->bindings->first(
+            fn (SiteBinding $binding): bool => $binding->type === $type
+                && trim((string) (((array) $binding->config)['connection'] ?? '')) === ''
+                && in_array($binding->status, [
+                    SiteBinding::STATUS_PENDING,
+                    SiteBinding::STATUS_PROVISIONING,
+                    SiteBinding::STATUS_ERROR,
+                ], true),
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $config
      */
@@ -1885,6 +2043,34 @@ trait ManagesSiteBindingActions
      * For the logging modal, clears provider-specific fields and pre-fills
      * from a saved credential when one is selected.
      */
+    private function applyConnectedAppEnvPaste(): void
+    {
+        $blob = trim((string) ($this->bindingForm['env_paste'] ?? ''));
+        if ($blob === '' || ! str_contains($blob, '=')) {
+            return;
+        }
+
+        $provider = (string) ($this->bindingForm['provider'] ?? 'slack');
+        $fields = ConnectedAppEnvPaste::fromBlob($provider, $blob);
+        if ($fields === []) {
+            $this->connectedAppPasteNote = __('No :app keys in that paste.', [
+                'app' => app(SiteBindingManager::class)->connectedAppLabel($provider),
+            ]);
+
+            return;
+        }
+
+        foreach ($fields as $field => $value) {
+            $this->bindingForm[$field] = $value;
+        }
+        $this->bindingForm['env_paste'] = '';
+        $this->connectedAppPasteNote = trans_choice(
+            '{1} Filled 1 field from the pasted .env.|[2,*] Filled :count fields from the pasted .env.',
+            count($fields),
+            ['count' => count($fields)],
+        );
+    }
+
     public function updatedBindingForm(mixed $value, ?string $key = null): void
     {
         if ($this->bindingModalType === 'mail') {
@@ -2019,6 +2205,43 @@ trait ManagesSiteBindingActions
                     $c = $cred->credentials;
                     $this->bindingForm['api_key'] = (string) ($c['api_key'] ?? '');
                     $this->bindingForm['organization'] = (string) ($c['organization'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'connected_app') {
+            if ($key === 'provider') {
+                foreach ([
+                    'credential_id', 'bot_token', 'webhook_url', 'channel', 'chat_id',
+                    'client_id', 'client_secret', 'refresh_token', 'folder_id',
+                    'access_token', 'app_key', 'app_secret',
+                ] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+                $this->applyConnectedAppEnvPaste();
+            }
+
+            if ($key === 'env_paste') {
+                $this->applyConnectedAppEnvPaste();
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = ConnectedAppCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof ConnectedAppCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach ([
+                        'bot_token', 'webhook_url', 'channel', 'chat_id',
+                        'client_id', 'client_secret', 'refresh_token', 'folder_id',
+                        'access_token', 'app_key', 'app_secret',
+                    ] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? '');
+                    }
                 }
             }
 

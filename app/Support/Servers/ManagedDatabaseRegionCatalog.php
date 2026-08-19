@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
-use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Modules\Cloud\Services\DigitalOceanService;
@@ -24,23 +23,13 @@ final class ManagedDatabaseRegionCatalog
      */
     public static function slugs(Server $server, string $engine, ?ProviderCredential $credential = null, array $rejected = []): array
     {
-        if ($server->provider !== ServerProvider::DigitalOcean) {
-            return [];
-        }
+        $slugs = ManagedDatabaseCatalogAuth::firstSuccessful(
+            $server,
+            $credential,
+            static fn (DigitalOceanService $service): array => $service->getDatabaseEngineRegions($engine),
+        );
 
-        $credential ??= $server->providerCredential;
-        if (! $credential instanceof ProviderCredential) {
-            $server->loadMissing('providerCredential');
-            $credential = $server->providerCredential;
-        }
-
-        if (! $credential instanceof ProviderCredential) {
-            return [];
-        }
-
-        try {
-            $slugs = (new DigitalOceanService($credential))->getDatabaseEngineRegions($engine);
-        } catch (\Throwable) {
+        if (! is_array($slugs) || $slugs === []) {
             return [];
         }
 
@@ -57,5 +46,15 @@ final class ManagedDatabaseRegionCatalog
             $server->provider->value,
             self::slugs($server, $engine, $credential, $rejected),
         );
+    }
+
+    public static function lastError(): ?string
+    {
+        return ManagedDatabaseCatalogFailure::lastError();
+    }
+
+    public static function operatorMessage(): ?string
+    {
+        return ManagedDatabaseCatalogFailure::operatorMessage();
     }
 }

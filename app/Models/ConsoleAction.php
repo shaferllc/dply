@@ -155,6 +155,12 @@ class ConsoleAction extends Model
         return in_array($this->status, [self::STATUS_QUEUED, self::STATUS_RUNNING], true);
     }
 
+    public function isCancellable(): bool
+    {
+        return $this->isInFlight()
+            && (bool) config('console_actions.kinds.'.$this->kind.'.cancellable', false);
+    }
+
     public function isDismissed(): bool
     {
         return $this->dismissed_at !== null;

@@ -6,6 +6,7 @@ namespace App\Services\Concerns;
 
 use App\Models\CloudDatabase;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -313,7 +314,15 @@ trait ManagesDoFunctionsDatabases
             $payload['version'] = $constrained['version'];
         }
 
-        $response = $this->request('post', '/databases', $payload);
+        try {
+            $response = $this->request('post', '/databases', $payload);
+        } catch (ConnectionException $e) {
+            throw new \RuntimeException(
+                'DigitalOcean did not accept the database create in time. This is usually a slow API, not a bad token — retry provision.',
+                0,
+                $e,
+            );
+        }
         if (! $response->successful()) {
             $message = $response->json('message') ?? $response->json('error') ?? $response->body() ?: $response->reason();
 

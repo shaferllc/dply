@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
-use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -52,25 +51,13 @@ final class ManagedDatabaseSizeCatalog
      */
     public static function slugs(Server $server, string $engine, ?ProviderCredential $credential = null): array
     {
-        if ($server->provider !== ServerProvider::DigitalOcean) {
-            return [];
-        }
+        $slugs = ManagedDatabaseCatalogAuth::firstSuccessful(
+            $server,
+            $credential,
+            static fn (DigitalOceanService $service): array => $service->getDatabaseEngineSizes($engine),
+        );
 
-        $credential ??= $server->providerCredential;
-        if (! $credential instanceof ProviderCredential) {
-            $server->loadMissing('providerCredential');
-            $credential = $server->providerCredential;
-        }
-
-        if (! $credential instanceof ProviderCredential) {
-            return [];
-        }
-
-        try {
-            return (new DigitalOceanService($credential))->getDatabaseEngineSizes($engine);
-        } catch (\Throwable) {
-            return [];
-        }
+        return is_array($slugs) ? $slugs : [];
     }
 
     /**

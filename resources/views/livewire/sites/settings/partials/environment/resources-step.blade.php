@@ -35,7 +35,15 @@
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-1.5">
                             <p class="text-sm font-semibold text-brand-ink">{{ $s['label'] }}</p>
-                            @if ($satisfied)
+                            @if (($s['has_binding'] ?? false) && ($s['binding_status'] ?? '') === 'provisioning')
+                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-800 ring-1 ring-sky-200">
+                                    {{ __('Provisioning…') }}
+                                </span>
+                            @elseif (($s['has_binding'] ?? false) && ($s['binding_status'] ?? '') === 'error')
+                                <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold text-rose-800 ring-1 ring-rose-200">
+                                    {{ __('Failed') }}
+                                </span>
+                            @elseif ($satisfied)
                                 <span class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-1.5 py-0.5 text-2xs font-semibold text-brand-forest">
                                     <x-heroicon-s-check class="h-2.5 w-2.5" />
                                     {{ ($s['has_binding'] ?? false) ? __('Connected') : __('Set via variables') }}
@@ -64,6 +72,11 @@
                         <button type="button" wire:click="connectSuggestedResource('{{ $s['type'] }}')"
                             class="dply-btn dply-btn-xs dply-btn-outline">
                             {{ ($s['has_binding'] ?? false) ? __('Reconfigure') : __('Connect anyway') }}
+                        </button>
+                    @elseif ($s['has_binding'] ?? false)
+                        <button type="button" wire:click="connectSuggestedResource('{{ $s['type'] }}')"
+                            class="dply-btn dply-btn-xs dply-btn-primary">
+                            {{ ($s['binding_status'] ?? '') === 'error' ? __('Retry provision') : __('View status') }}
                         </button>
                     @elseif ($attachable > 0)
                         {{-- Lead with linking the resource already on the server; keep
@@ -96,7 +109,12 @@
         {{ __('Prefer to wire these by hand? Skip ahead — any resource you leave unconnected just shows up as plain variables in the next step.') }}
     </p>
 
-    <div class="flex items-center justify-end border-t border-brand-ink/10 px-5 py-3 sm:px-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-3 sm:px-6">
+        <button type="button" wire:click="openBindingModal('connected_app', 'attach')"
+            class="dply-btn dply-btn-xs dply-btn-outline">
+            <x-heroicon-o-puzzle-piece class="h-3.5 w-3.5" />
+            {{ __('Add Slack, Discord, Drive…') }}
+        </button>
         <button type="button" wire:click="goToStep('environment')" class="dply-btn dply-btn-sm dply-btn-primary">
             {{ __('Continue to variables') }} <x-heroicon-o-arrow-right class="h-4 w-4" />
         </button>

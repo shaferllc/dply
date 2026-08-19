@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
 use App\Modules\Deploy\Services\DeployPhaseRunner;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
@@ -206,6 +207,7 @@ class SiteDeployPipelineRunner
      */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase, ?callable $onProgress = null): array
     {
+        $this->collapseDuplicatePresetSteps($site);
         $site->loadMissing('deploySteps');
         $cwd = escapeshellarg($workingDirectory);
         $log = '';
@@ -562,5 +564,31 @@ class SiteDeployPipelineRunner
         }
 
         return $prefix.'} && ';
+    }
+
+    /**
+     * Create + Setup both seed runtime defaults, which used to leave two
+     * Composer install rows. Drop extras before this phase queues steps.
+     */
+    private function collapseDuplicatePresetSteps(Site $site): void
+    {
+        $pipeline = $site->relationLoaded('activeDeployPipeline')
+            ? $site->activeDeployPipeline
+            : null;
+
+        if ($pipeline === null && filled($site->active_deploy_pipeline_id)) {
+            $site->loadMissing('activeDeployPipeline');
+            $pipeline = $site->activeDeployPipeline;
+        }
+
+        if ($pipeline === null) {
+            return;
+        }
+
+        if (app(SiteDeployPipelineManager::class)->collapseDuplicatePresetSteps($pipeline) < 1) {
+            return;
+        }
+
+        $site->unsetRelation('deploySteps');
     }
 }

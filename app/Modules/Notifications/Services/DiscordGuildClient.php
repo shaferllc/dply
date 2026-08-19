@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\Http;
  *
  * - Discord uses **honest HTTP status codes** — a rejected call is a 4xx with
  *   `{"message": "...", "code": 50001}`. No Slack-style 200-with-ok:false.
- * - There is **one bot token for the whole application**, read from config
- *   rather than from the install row, so every guild shares it.
+ * - There is **one bot token for the whole application**, resolved via
+ *   {@see PlatformNotificationApps} (admin Connections overlay, else env),
+ *   not from the install row, so every guild shares it.
  * - Guild-level permission does not imply channel-level permission. A channel
  *   with a permission overwrite denies the bot even though the install looks
  *   healthy, and that surfaces only as a 403 on send (code 50001).
@@ -36,17 +37,13 @@ class DiscordGuildClient
 
     public static function make(): self
     {
-        $token = config('services.discord.bot_token');
-
-        return new self(is_string($token) ? $token : '');
+        return new self(PlatformNotificationApps::discord()['bot_token']);
     }
 
     /** Whether this deployment has a bot token at all — without one the picker cannot work. */
     public static function botConfigured(): bool
     {
-        $token = config('services.discord.bot_token');
-
-        return is_string($token) && $token !== '';
+        return PlatformNotificationApps::discord()['bot_token'] !== '';
     }
 
     /**

@@ -21,6 +21,7 @@ use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\ManagedDatabaseCatalogAuth;
 use App\Support\Servers\ManagedDatabaseRegionCatalog;
 use App\Support\Servers\ManagedDatabaseSizeCatalog;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
@@ -565,9 +566,9 @@ trait ManagesDatabaseBindings
      */
     private function resolveManagedDatabaseCredential(Site $site, Server $server): ?ProviderCredential
     {
-        $server->loadMissing('providerCredential');
-        if ($server->providerCredential !== null) {
-            return $server->providerCredential;
+        $resolved = ManagedDatabaseCatalogAuth::resolveCredential($server);
+        if ($resolved instanceof ProviderCredential) {
+            return $resolved;
         }
 
         $provider = $server->provider->value;

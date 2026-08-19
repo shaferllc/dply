@@ -24,16 +24,12 @@ class TelegramBotClient
 
     public static function make(): self
     {
-        $token = config('services.telegram.bot_token');
-
-        return new self(is_string($token) ? $token : '');
+        return new self(PlatformNotificationApps::telegram()['bot_token']);
     }
 
     public static function botConfigured(): bool
     {
-        $token = config('services.telegram.bot_token');
-
-        return is_string($token) && $token !== '';
+        return PlatformNotificationApps::telegramReady();
     }
 
     /**

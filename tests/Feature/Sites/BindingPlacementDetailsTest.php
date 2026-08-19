@@ -73,6 +73,22 @@ function fakeDoCatalog(): void
     ]);
 }
 
+test('database provision does not offer redis as an engine', function () {
+    fakeDoCatalog();
+    [$user, $server, $site] = placementDetailsSite();
+
+    Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $server, 'site' => $site])
+        ->call('openBindingModal', 'database', 'provision')
+        ->assertSee(__('MySQL / MariaDB'))
+        ->assertSee(__('PostgreSQL'))
+        ->assertDontSeeHtml('value="redis"')
+        ->set('bindingForm.engine', 'redis')
+        ->set('bindingForm.placement', 'managed')
+        ->call('saveBinding')
+        ->assertDispatched('notify', message: __('Redis belongs on the Redis / Valkey resource, not Database.'), type: 'error');
+});
+
 test('redis provision waits for a placement before showing size or vendor fields', function () {
     fakeDoCatalog();
     [$user, $server, $site] = placementDetailsSite();
@@ -112,6 +128,54 @@ test('redis provision waits for a placement before showing size or vendor fields
         ->assertSee('Dedicated Redis server')
         ->assertSee('Coming soon')
         ->assertDontSee('Account email');
+});
+
+test('neon and supabase placements are coming soon by default', function () {
+    fakeDoCatalog();
+    [$user, $server, $site] = placementDetailsSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $server, 'site' => $site])
+        ->call('openBindingModal', 'database', 'provision')
+        ->set('bindingForm.engine', 'postgres');
+
+    $placements = collect($component->instance()->databasePlacements());
+
+    foreach ([CloudDatabase::BACKEND_NEON, CloudDatabase::BACKEND_SUPABASE] as $key) {
+        $vendor = $placements->firstWhere('key', $key);
+        expect($vendor)->not->toBeNull()
+            ->and($vendor['available'])->toBeFalse()
+            ->and($vendor['note'])->toBe(__('Coming soon'));
+    }
+
+    $component
+        ->assertSee('Neon')
+        ->assertSee('Supabase')
+        ->assertSee(__('Coming soon'))
+        ->assertDontSee('Neon API key');
+});
+
+test('neon placement unlocks when database.neon is on', function () {
+    config(['features.database.neon' => true]);
+    Feature::flushCache();
+    fakeDoCatalog();
+    [$user, $server, $site] = placementDetailsSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $server, 'site' => $site])
+        ->call('openBindingModal', 'database', 'provision')
+        ->set('bindingForm.engine', 'postgres');
+
+    $neon = collect($component->instance()->databasePlacements())
+        ->firstWhere('key', CloudDatabase::BACKEND_NEON);
+
+    expect($neon)->not->toBeNull()
+        ->and($neon['available'])->toBeTrue()
+        ->and($neon['note'])->toBeNull();
+
+    $component
+        ->set('bindingForm.placement', CloudDatabase::BACKEND_NEON)
+        ->assertSee('Neon API key');
 });
 
 test('upstash placement unlocks when database.upstash is on', function () {

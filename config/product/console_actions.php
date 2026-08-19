@@ -16,6 +16,7 @@ return [
     |   - completed: "X done."
     |   - failed:    "X failed."
     |   - stale:     "X did not finish."       (used when run is past staleness threshold)
+    |   - cancellable: in-flight Stop button (managed creates that outlive a killed worker)
     */
     'kinds' => [
         'webserver_config' => [
@@ -128,6 +129,7 @@ return [
             // Poll loop is ~13 min (40 × 20s). Stay above that so the banner
             // does not flip to stale while DigitalOcean is still creating.
             'stale_seconds' => 900,
+            'cancellable' => true,
         ],
         'managed_db_resize' => [
             'running' => 'Resizing the managed cluster …',
@@ -135,6 +137,7 @@ return [
             'failed' => 'Managed cluster resize failed.',
             'stale' => 'Managed cluster resize did not finish.',
             'stale_seconds' => 900,
+            'cancellable' => true,
         ],
         'disk_usage_measure' => [
             'running' => 'Measuring :host disk usage …',
@@ -147,6 +150,8 @@ return [
             'completed' => 'Fix applied — re-run the operation to continue.',
             'failed' => 'The fix could not finish — check the log.',
             'stale' => 'The fix did not finish.',
+            // PHP upgrades add a PPA then apt-get install; 10 minutes is not enough.
+            'stale_seconds' => 1200,
         ],
         'site_test' => [
             'running' => 'Testing whether the site loads …',

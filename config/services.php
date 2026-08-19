@@ -81,7 +81,8 @@ return [
      | using APP_URL (use your Expose URL locally; Slack rejects `.test` hosts).
      | Turn on "Manage Distribution" so workspaces other than your own can install.
      | Optional: without it the button hides and operators paste an incoming
-     | webhook URL by hand instead.
+     | webhook URL by hand instead. Platform admin can also save these under
+     | /admin/connections (DB overlay; does not write this file).
      */
     'slack' => [
         'client_id' => env('SLACK_CLIENT_ID'),

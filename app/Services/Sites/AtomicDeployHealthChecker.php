@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Services\Servers\PhpRedisExtensionScripts;
 use App\Services\SshConnection;
 
 /**
@@ -129,6 +130,7 @@ final class AtomicDeployHealthChecker
      * deployer's auto-rollback.
      *
      * @param  list<string>  $hosts
+     *
      * @throws \RuntimeException when assets stay broken after the heal attempt
      */
     private function verifyAssets(Site $site, SshConnection $ssh, string $scheme, string $targetHost, array $hosts): string
@@ -347,6 +349,8 @@ echo "── php cli (extension/load fatals) ──"
 php -v 2>&1 | head -n 6
 printf 'redis loaded: %s\n' "\$(php -m 2>/dev/null | grep -qi '^redis\$' && echo yes || echo NO)"
 
+BASH;
+        $script .= "\n".PhpRedisExtensionScripts::detectListing()."\n".<<<BASH
 echo
 echo "── php-fpm ──"
 units=\$(systemctl list-units --type=service --all --no-legend 'php*-fpm*' 2>/dev/null | awk '{print \$1}')

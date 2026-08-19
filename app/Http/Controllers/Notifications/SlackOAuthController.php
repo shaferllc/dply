@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\SlackInstallation;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Services\PlatformNotificationApps;
 use App\Modules\Notifications\Services\SlackWorkspaceClient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -51,10 +52,7 @@ class SlackOAuthController extends Controller
 
     public static function configured(): bool
     {
-        $id = config('services.slack.client_id');
-        $secret = config('services.slack.client_secret');
-
-        return is_string($id) && $id !== '' && is_string($secret) && $secret !== '';
+        return PlatformNotificationApps::slackReady();
     }
 
     public function redirect(Request $request): RedirectResponse
@@ -91,7 +89,7 @@ class SlackOAuthController extends Controller
         ]);
 
         $query = http_build_query([
-            'client_id' => config('services.slack.client_id'),
+            'client_id' => PlatformNotificationApps::slack()['client_id'],
             // Bot scopes go in `scope`; `user_scope` stays empty because dply acts
             // as itself, never on behalf of the installing person.
             'scope' => self::SCOPES,
@@ -139,9 +137,10 @@ class SlackOAuthController extends Controller
             return $this->back($returnTo, __('You cannot connect a Slack workspace for that account.'));
         }
 
+        $slack = PlatformNotificationApps::slack();
         $response = Http::asForm()->acceptJson()->post('https://slack.com/api/oauth.v2.access', [
-            'client_id' => config('services.slack.client_id'),
-            'client_secret' => config('services.slack.client_secret'),
+            'client_id' => $slack['client_id'],
+            'client_secret' => $slack['client_secret'],
             'code' => $request->string('code')->toString(),
             'redirect_uri' => $this->redirectUri(),
         ]);
@@ -294,11 +293,7 @@ class SlackOAuthController extends Controller
 
     private function redirectUri(): string
     {
-        $configured = config('services.slack.redirect');
-
-        return is_string($configured) && $configured !== ''
-            ? $configured
-            : route('notifications.oauth.slack.callback', [], true);
+        return PlatformNotificationApps::slackRedirectUri();
     }
 
     /** Same-app paths only — never a scheme/host an attacker supplied. */

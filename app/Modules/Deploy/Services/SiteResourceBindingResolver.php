@@ -130,6 +130,7 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->searchBinding($env);
         $bindings[] = $this->paymentsBinding($env);
         $bindings[] = $this->oauthBinding($env);
+        $bindings[] = $this->connectedAppBinding($env);
 
         // A persisted SiteBinding (an explicit operator attach/provision) is
         // authoritative: it replaces the derived inference for its type so the
@@ -180,7 +181,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function redisBinding(array $env): SiteResourceBinding
     {
@@ -220,7 +221,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function queueBinding(array $env): SiteResourceBinding
     {
@@ -250,7 +251,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function cacheBinding(array $env): SiteResourceBinding
     {
@@ -283,7 +284,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function objectStorageBinding(array $env): SiteResourceBinding
     {
@@ -337,7 +338,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function broadcastingBinding(array $env): SiteResourceBinding
     {
@@ -356,7 +357,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function errorTrackingBinding(array $env): SiteResourceBinding
     {
@@ -391,7 +392,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function aiBinding(array $env): SiteResourceBinding
     {
@@ -408,7 +409,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function captchaBinding(array $env): SiteResourceBinding
     {
@@ -423,7 +424,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function smsBinding(array $env): SiteResourceBinding
     {
@@ -438,7 +439,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function searchBinding(array $env): SiteResourceBinding
     {
@@ -454,7 +455,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function paymentsBinding(array $env): SiteResourceBinding
     {
@@ -468,7 +469,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function oauthBinding(array $env): SiteResourceBinding
     {
@@ -482,6 +483,23 @@ final class SiteResourceBindingResolver
         };
 
         return $this->configBindingFromProvider('oauth', $provider);
+    }
+
+    /**
+     * @param  array<string, mixed>  $env
+     */
+    private function connectedAppBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'SLACK_BOT_USER_OAUTH_TOKEN') || $this->envFilled($env, 'SLACK_BOT_TOKEN') || $this->envFilled($env, 'SLACK_WEBHOOK_URL') => 'slack',
+            $this->envFilled($env, 'DISCORD_BOT_TOKEN') || $this->envFilled($env, 'DISCORD_WEBHOOK_URL') => 'discord',
+            $this->envFilled($env, 'TELEGRAM_BOT_TOKEN') => 'telegram',
+            $this->envFilled($env, 'GOOGLE_DRIVE_CLIENT_ID') => 'google_drive',
+            $this->envFilled($env, 'DROPBOX_ACCESS_TOKEN') => 'dropbox',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('connected_app', $provider);
     }
 
     /**
@@ -514,17 +532,17 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function envFilled(array $env, string $key): bool
     {
         $value = $env[$key] ?? '';
 
-        return ($value) && trim($value) !== '';
+        return $value && trim($value) !== '';
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function envHasRedisConnection(array $env): bool
     {
@@ -533,7 +551,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      */
     private function envReferencesRedisWithoutHost(array $env): bool
     {

@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\OrganizationSecret;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Sites\DotEnvFileParser;
 
 /**
  * Create / rotate / delete org vault secrets and link them onto sites.
@@ -18,6 +19,43 @@ use App\Models\User;
 final class OrganizationSecretManager
 {
     public const KEY_RULE = 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/';
+
+    /**
+     * Parse a pasted `.env` snippet (section banners, comments, `export`,
+     * quoted values). Empty values are skipped. Last assignment wins.
+     *
+     * @return list<array{key: string, value: string, note: ?string}>
+     */
+    public function parsePastedEnv(string $blob): array
+    {
+        $parsed = app(DotEnvFileParser::class)->parse($blob);
+        $pairs = [];
+        $section = null;
+
+        foreach ($parsed['variables'] as $rawKey => $value) {
+            $key = $this->normalizeKey((string) $rawKey);
+            $value = (string) $value;
+            if ($key === '' || $value === '' || ! preg_match('/^[A-Z_][A-Z0-9_]*$/', $key)) {
+                continue;
+            }
+
+            $comment = $parsed['comments'][$rawKey] ?? null;
+            if (is_string($comment)) {
+                $label = $this->sectionLabelFromComment($comment);
+                if ($label !== null) {
+                    $section = $label;
+                }
+            }
+
+            $pairs[$key] = [
+                'key' => $key,
+                'value' => $value,
+                'note' => $section,
+            ];
+        }
+
+        return array_values($pairs);
+    }
 
     public function create(Organization $organization, string $key, string $value, ?string $notes, ?User $actor = null): OrganizationSecret
     {
@@ -105,6 +143,24 @@ final class OrganizationSecretManager
                 'key' => $key,
             ]));
         }
+    }
+
+    private function sectionLabelFromComment(string $comment): ?string
+    {
+        $labels = [];
+        foreach (preg_split('/\R/', $comment) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || preg_match('/^[=*-]+$/', $line) === 1) {
+                continue;
+            }
+            $labels[] = $line;
+        }
+
+        if ($labels === []) {
+            return null;
+        }
+
+        return implode(' · ', $labels);
     }
 
     private function normalizeKey(string $key): string

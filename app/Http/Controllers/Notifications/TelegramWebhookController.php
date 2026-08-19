@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\TelegramConnectToken;
 use App\Models\TelegramInstallation;
 use App\Models\User;
+use App\Modules\Notifications\Services\PlatformNotificationApps;
 use App\Modules\Notifications\Services\TelegramBotClient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -76,8 +77,8 @@ class TelegramWebhookController extends Controller
 
     private function secretMatches(Request $request): bool
     {
-        $expected = config('services.telegram.webhook_secret');
-        if (! is_string($expected) || $expected === '') {
+        $expected = PlatformNotificationApps::telegram()['webhook_secret'];
+        if ($expected === '') {
             // Refuse to run unsecured. An unset secret would otherwise mean
             // "accept anything", which is the worst possible default here.
             Log::warning('telegram.webhook.no_secret_configured');

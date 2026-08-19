@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\PreflightSiteSetupJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteWorkerPageBuilder;
@@ -537,6 +538,13 @@ trait TracksProvisioningStatus
                 $missing[] = $name;
             }
         }
+
+        assert($this instanceof Site);
+        $owned = array_flip(app(SiteBindingManager::class)->ownedEnvKeysForSite($this));
+        $missing = array_values(array_filter(
+            $missing,
+            static fn (string $name): bool => ! isset($owned[$name]),
+        ));
 
         return $missing;
     }

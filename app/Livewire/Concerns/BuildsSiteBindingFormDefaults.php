@@ -59,6 +59,7 @@ trait BuildsSiteBindingFormDefaults
             $type === 'search' => $this->defaultSearchBindingForm(),
             $type === 'payments' => $this->defaultPaymentsBindingForm(),
             $type === 'oauth' => $this->defaultOauthBindingForm(),
+            $type === 'connected_app' => $this->defaultConnectedAppBindingForm(),
             default => [],
         };
     }
@@ -581,6 +582,37 @@ trait BuildsSiteBindingFormDefaults
             'credential_id' => '',
             'save_credential' => false,
             'credential_name' => '',
+        ];
+    }
+
+    /**
+     * Default Slack / Discord / Drive form. Prefills provider from an existing
+     * binding; secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultConnectedAppBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'connected_app');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'slack'),
+            'bot_token' => '',
+            'webhook_url' => '',
+            'channel' => '',
+            'chat_id' => '',
+            'client_id' => '',
+            'client_secret' => '',
+            'refresh_token' => '',
+            'folder_id' => '',
+            'access_token' => '',
+            'app_key' => '',
+            'app_secret' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+            'env_paste' => '',
         ];
     }
 }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\IntegrationBindingsTest;
 
+use App\Livewire\Sites\ResourceMap;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
+use App\Models\ConnectedAppCredential;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -15,6 +17,7 @@ use App\Models\User;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -161,4 +164,86 @@ test('attaching adopts the provider key out of the loose .env', function () {
     ]);
 
     expect((string) $site->fresh()->env_file_content)->not->toContain('OPENAI_API_KEY');
+});
+
+test('attaching slack injects bot token and webhook', function () {
+    [, , $site] = integrationFixture();
+
+    $binding = app(SiteBindingManager::class)->attachExisting($site, 'connected_app', [
+        'provider' => 'slack',
+        'bot_token' => 'xoxb-test',
+        'webhook_url' => 'https://hooks.slack.com/services/T/B/X',
+        'channel' => '#ops',
+    ]);
+
+    expect($binding->type)->toBe('connected_app')
+        ->and($binding->name)->toBe('Slack')
+        ->and($binding->connectionEnv())->toMatchArray([
+            'SLACK_BOT_USER_OAUTH_TOKEN' => 'xoxb-test',
+            'SLACK_BOT_TOKEN' => 'xoxb-test',
+            'SLACK_WEBHOOK_URL' => 'https://hooks.slack.com/services/T/B/X',
+            'SLACK_BOT_USER_DEFAULT_CHANNEL' => '#ops',
+        ]);
+});
+
+test('slack requires a bot token or a webhook', function () {
+    [, , $site] = integrationFixture();
+
+    app(SiteBindingManager::class)->attachExisting($site, 'connected_app', [
+        'provider' => 'slack',
+        'channel' => '#ops',
+    ]);
+})->throws(InvalidArgumentException::class);
+
+test('google drive and slack coexist on one site', function () {
+    [, , $site] = integrationFixture();
+    $manager = app(SiteBindingManager::class);
+
+    $manager->attachExisting($site, 'connected_app', [
+        'provider' => 'slack',
+        'bot_token' => 'xoxb-1',
+    ]);
+    $drive = $manager->attachExisting($site->fresh(), 'connected_app', [
+        'provider' => 'google_drive',
+        'client_id' => 'id.apps.googleusercontent.com',
+        'client_secret' => 'secret',
+        'refresh_token' => '1//refresh',
+    ]);
+
+    expect(SiteBinding::query()->where('site_id', $site->id)->where('type', 'connected_app')->count())->toBe(2)
+        ->and($drive->connectionEnv())->toMatchArray([
+            'GOOGLE_DRIVE_CLIENT_ID' => 'id.apps.googleusercontent.com',
+            'GOOGLE_DRIVE_CLIENT_SECRET' => 'secret',
+            'GOOGLE_DRIVE_REFRESH_TOKEN' => '1//refresh',
+        ])
+        ->and($drive->connectionEnv())->not->toHaveKey('SLACK_BOT_TOKEN');
+});
+
+test('save_credential stores a reusable connected app credential', function () {
+    [$user, $org, $site] = integrationFixture();
+    $this->actingAs($user);
+
+    app(SiteBindingManager::class)->attachExisting($site, 'connected_app', [
+        'provider' => 'discord',
+        'bot_token' => 'discord-bot',
+        'save_credential' => true,
+        'credential_name' => 'Ops Discord',
+    ]);
+
+    expect(ConnectedAppCredential::query()->where('organization_id', $org->id)->where('provider', 'discord')->first()?->name)
+        ->toBe('Ops Discord');
+});
+
+test('pasting slack env fills slack fields and ignores other keys', function () {
+    [$user, , $site] = integrationFixture();
+
+    Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $site->server, 'site' => $site])
+        ->call('openBindingModal', 'connected_app', 'attach')
+        ->set('bindingForm.provider', 'slack')
+        ->set('bindingForm.env_paste', "SLACK_BOT_TOKEN=xoxb-1\nSLACK_WEBHOOK_URL=https://hooks.slack.com/x\nDISCORD_BOT_TOKEN=nope\n")
+        ->assertSet('bindingForm.bot_token', 'xoxb-1')
+        ->assertSet('bindingForm.webhook_url', 'https://hooks.slack.com/x')
+        ->assertSet('bindingForm.env_paste', '')
+        ->assertSee(__('Filled 2 fields from the pasted .env.'));
 });

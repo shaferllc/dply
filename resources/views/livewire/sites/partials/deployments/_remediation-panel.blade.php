@@ -8,6 +8,11 @@
     $remediation = $this->remediationForDeployment($deployment);
     $run = $this->deploymentRemediationRun;
     $succeeded = $run && $run->status === 'completed';
+    $fixBusy = $run && $run->isInFlight() && ! $run->isStale();
+    $pageConsoleRun = method_exists($this, 'activeConsoleRun') ? $this->activeConsoleRun() : null;
+    $runShownOnPageBanner = $run
+        && $pageConsoleRun
+        && (string) $pageConsoleRun->id === (string) $run->id;
 @endphp
 {{-- "Guided" remediations (e.g. database_connection_failed) aren't one-click
      scripts — they render their own inline panel under the failed step, so skip
@@ -80,17 +85,24 @@
                                     type="button"
                                     wire:click="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
                                     wire:loading.attr="disabled"
+                                    @disabled($fixBusy)
                                     wire:target="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
                                     @class([
                                         'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-60',
-                                        'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
-                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
+                                        'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']) && ! $fixBusy,
+                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']) && ! $fixBusy,
+                                        'bg-sky-100 text-sky-900' => $fixBusy,
                                     ])
                                 >
-                                    <x-heroicon-o-wrench class="h-3.5 w-3.5" aria-hidden="true" />
-                                    {{ $action['label'] }}
-                                    @if (! empty($action['recommended']))
-                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                    @if ($fixBusy)
+                                        <x-spinner size="sm" />
+                                        {{ __('Installing…') }}
+                                    @else
+                                        <x-heroicon-o-wrench class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ $action['label'] }}
+                                        @if (! empty($action['recommended']))
+                                            <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-2xs uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                        @endif
                                     @endif
                                 </button>
                             @endif
@@ -106,8 +118,10 @@
             </div>
         </div>
 
-        {{-- The run's live/finished log (collapsed transcript via the banner). --}}
-        @if ($run)
+        {{-- Skip the nested transcript when the deploy hub already shows this
+             run in the page-top console banner. Deployment-detail has no top
+             banner, so it still renders the log here. --}}
+        @if ($run && ! $runShownOnPageBanner)
             <div @class([
                 'border-t px-3 py-2 sm:px-4',
                 'border-emerald-200/70' => $succeeded,

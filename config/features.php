@@ -145,6 +145,11 @@ return [
         // Off = visible Coming soon card (no connect fields). Flip per-org
         // from /admin/flags or set FEATURE_DATABASE_UPSTASH=true.
         'upstash' => filter_var(env('FEATURE_DATABASE_UPSTASH', false), FILTER_VALIDATE_BOOLEAN),
+        // BYO serverless Postgres vendors in the database binding picker.
+        // Off = visible Coming soon card (no connect fields). APIs exist but
+        // are not shipped until a live account run validates them.
+        'neon' => filter_var(env('FEATURE_DATABASE_NEON', false), FILTER_VALIDATE_BOOLEAN),
+        'supabase' => filter_var(env('FEATURE_DATABASE_SUPABASE', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*

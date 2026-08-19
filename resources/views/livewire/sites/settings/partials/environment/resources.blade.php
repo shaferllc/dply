@@ -34,6 +34,7 @@
             'search' => __('Search'),
             'payments' => __('Payments'),
             'oauth' => __('OAuth login'),
+            'connected_app' => __('Connected apps'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
             'publication' => __('Publication'),
@@ -168,17 +169,34 @@
             <div class="space-y-5 px-6 py-6">
                 @php $prov = is_array($bi['provision'] ?? null) ? $bi['provision'] : []; @endphp
                 @if (! empty($prov['failed']))
-                    <div class="rounded-xl border border-rose-200/80 bg-rose-50/80 p-4">
+                    <div @class([
+                        'rounded-xl border p-4',
+                        'border-rose-400 bg-rose-100/90 ring-2 ring-rose-300/70' => ! empty($prov['auth_failure']),
+                        'border-rose-200/80 bg-rose-50/80' => empty($prov['auth_failure']),
+                    ])>
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200">
                                 <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
-                                {{ $bi['status'] }}
+                                {{ ! empty($prov['auth_failure']) ? __('Token rejected') : $bi['status'] }}
                             </span>
-                            @if (! empty($prov['placement_label']))
+                            @if (! empty($prov['auth_provider_label']))
+                                <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-rose-900 ring-1 ring-inset ring-rose-200/70">{{ $prov['auth_provider_label'] }}</span>
+                            @elseif (! empty($prov['placement_label']))
                                 <span class="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-rose-900 ring-1 ring-inset ring-rose-200/70">{{ $prov['placement_label'] }}</span>
                             @endif
                         </div>
-                        <p class="mt-2 text-sm leading-relaxed text-rose-950">{{ $prov['error'] ?: __('Provisioning failed.') }}</p>
+                        @if (! empty($prov['auth_failure']))
+                            <p class="mt-3 text-base font-semibold text-rose-950">{{ $prov['auth_title'] ?: $prov['error'] }}</p>
+                            <p class="mt-1.5 text-sm leading-relaxed text-rose-900">{{ $prov['error'] }}</p>
+                            @if (filled($prov['error_detail'] ?? null) && ($prov['error_detail'] ?? '') !== ($prov['error'] ?? ''))
+                                <details class="mt-2 text-xs text-rose-900/80">
+                                    <summary class="cursor-pointer font-semibold">{{ __('Provider response') }}</summary>
+                                    <p class="mt-1 font-mono leading-relaxed">{{ $prov['error_detail'] }}</p>
+                                </details>
+                            @endif
+                        @else
+                            <p class="mt-2 text-sm leading-relaxed text-rose-950">{{ $prov['error'] ?: __('Provisioning failed.') }}</p>
+                        @endif
                         @if (! empty($prov['can_pick_region']))
                             <div class="mt-3">
                                 <x-input-label for="binding_repair_region" :value="__('Choose a region')" />
@@ -202,7 +220,22 @@
                             </p>
                         @endif
                         <div class="mt-3 flex flex-wrap gap-2">
-                            @if (! empty($prov['can_retry']) && method_exists($this, 'retryFailedBindingProvision') && filled($bi['id'] ?? null))
+                            @if (! empty($prov['auth_failure']) && method_exists($this, 'openProviderCredentialModal'))
+                                @if (($prov['auth_provider'] ?? '') === 'digitalocean'
+                                    && filled(config('services.digitalocean_oauth.client_id'))
+                                    && filled(config('services.digitalocean_oauth.client_secret')))
+                                    <a href="{{ route('credentials.oauth.digitalocean.redirect') }}"
+                                        class="inline-flex items-center gap-1.5 rounded-md bg-[#0080FF] px-3 py-2 text-sm font-semibold text-white hover:bg-[#0066CC]">
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                        {{ __('Reconnect DigitalOcean') }}
+                                    </a>
+                                @endif
+                                <button type="button" wire:click="openProviderCredentialModal(@js((string) ($prov['auth_provider'] ?? '')))"
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-rose-800 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-900">
+                                    <x-heroicon-o-key class="h-4 w-4" />
+                                    {{ __('Add a new token') }}
+                                </button>
+                            @elseif (! empty($prov['can_retry']) && method_exists($this, 'retryFailedBindingProvision') && filled($bi['id'] ?? null))
                                 <button type="button" wire:click="retryFailedBindingProvision(@js((string) $bi['id']))"
                                     wire:loading.attr="disabled" wire:target="retryFailedBindingProvision"
                                     class="inline-flex items-center gap-1 rounded-md bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-60">
@@ -302,8 +335,9 @@
                     </div>
                 @endif
 
+                {{-- In-flight only — the failed card already shows the error. --}}
                 @php
-                    $provisionRun = ! empty($prov['console_run_id'])
+                    $provisionRun = ! empty($prov['active']) && ! empty($prov['console_run_id'])
                         ? \App\Models\ConsoleAction::query()->find($prov['console_run_id'])
                         : null;
                 @endphp
@@ -374,15 +408,15 @@
         <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
             @if (is_array($bi) && filled($bi['id'] ?? null) && method_exists($this, 'openDetachBindingConfirmModal'))
                 @if (! empty($bi['can_delete_resource']) && method_exists($this, 'openDetachAndDeleteBindingConfirmModal'))
-                    <x-danger-button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $bi['id']))" x-on:click="$dispatch('close')">
+                    <x-danger-button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $bi['id']))">
                         {{ __('Detach & delete') }}
                     </x-danger-button>
                 @endif
-                <x-secondary-button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $bi['id']))" x-on:click="$dispatch('close')">
+                <x-secondary-button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $bi['id']))">
                     {{ __('Detach') }}
                 </x-secondary-button>
             @endif
-            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+            <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'binding-info-modal')">{{ __('Close') }}</x-secondary-button>
         </div>
     </x-modal>
     @endif
@@ -395,7 +429,7 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'edit' ? __('Edit') : ($bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth']) ? __('Configure') : __('Attach existing'))) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'edit' ? __('Edit') : ($bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth', 'connected_app']) ? __('Configure') : __('Attach existing'))) }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalMode === 'edit' && $bindingModalType === 'redis' ? __('Edit Redis / Valkey') : ($bindingModalLabel ?: __('Binding')) }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -458,7 +492,15 @@
                     @if ($miPrimary && $miExistingPrimary)
                         <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
                             <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>{{ __('This site already has a primary (:name) — it will NOT be replaced. Give this one a connection name (e.g. clickhouse, analytics) to add it alongside, or detach/edit the existing primary first.', ['name' => $miPrimaryLabel]) }}</span>
+                            <span>
+                                @if ($miExistingPrimary->status === 'provisioning')
+                                    {{ __('A primary (:name) is already being provisioned — it is not online yet. Wait for it, or detach that in-progress resource if you want to start over.', ['name' => $miPrimaryLabel]) }}
+                                @elseif ($miExistingPrimary->status === 'error')
+                                    {{ __('A previous primary (:name) provision failed. Retry or detach that one before creating another primary.', ['name' => $miPrimaryLabel]) }}
+                                @else
+                                    {{ __('This site already has a primary (:name) — it will NOT be replaced. Give this one a connection name (e.g. clickhouse, analytics) to add it alongside, or detach/edit the existing primary first.', ['name' => $miPrimaryLabel]) }}
+                                @endif
+                            </span>
                         </p>
                     @elseif ($miPrimary)
                         <p class="mt-1.5 text-xs text-brand-moss">{{ __('Leave blank for the primary — it owns the bare :root_* keys. One primary per site; attaching another replaces it.', ['root' => $miRoot]) }}</p>
@@ -698,7 +740,9 @@
                     </div>
                 </div>
 
-                {{-- Advanced options --}}
+                @if ($selectedDbEngine !== null)
+                {{-- Advanced options — only when a database is picked so the
+                     toggle is never an empty disclosure. --}}
                 <div class="border-t border-brand-ink/10 pt-4">
                     <button type="button" x-on:click="advanced = !advanced"
                         class="flex w-full items-center justify-between text-left text-sm font-medium text-brand-ink hover:text-brand-forest">
@@ -770,11 +814,10 @@
                                 </select>
                             </div>
                         </div>
-                        @elseif ($selectedDbEngine === null)
-                        <p class="text-xs italic text-brand-moss">{{ __('Select a database above to see engine-specific options (charset, strict mode, SSL mode, etc.).') }}</p>
                         @endif
                     </div>
                 </div>
+                @endif
                 @endif
 
                 </div>
@@ -797,10 +840,6 @@
                                      from the Databases tab). It has no standard DB_* block, so give
                                      it a connection name to wire it as a named secondary. --}}
                                 <option value="clickhouse">{{ __('ClickHouse') }}</option>
-                                {{-- Redis here means a managed cluster or a serverless vendor
-                                     (Upstash) — on-box Redis is attached via the Redis resource.
-                                     The placement cards filter to redis-capable backends. --}}
-                                <option value="redis">{{ __('Redis') }}</option>
                                 <option value="sqlite">{{ __('SQLite') }}</option>
                             </select>
                         </div>
@@ -846,7 +885,12 @@
                                 >
                                     <input type="radio" wire:model.live="bindingForm.placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
                                     <span class="min-w-0">
-                                        <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                        <span class="flex flex-wrap items-center gap-2">
+                                            <span class="text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                            @if (! $p['available'] && ($p['note'] ?? '') === __('Coming soon'))
+                                                <span class="shrink-0 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Soon') }}</span>
+                                            @endif
+                                        </span>
                                         <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
                                         @if (($p['key'] ?? '') === 'docker' && ! $p['available'])
                                             @include('livewire.sites.settings.partials.environment._placement-docker-install', ['p' => $p])
@@ -1342,6 +1386,22 @@
                         {{ __('at deploy.') }}
                     </p>
                 </div>
+            @elseif ($bindingModalType === 'connected_app')
+                @php $appProvider = (string) ($bindingForm['provider'] ?? 'slack'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_connected_app_provider" :value="__('App')" />
+                        <select id="binding_connected_app_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="slack">{{ __('Slack') }}</option>
+                            <option value="discord">{{ __('Discord') }}</option>
+                            <option value="telegram">{{ __('Telegram') }}</option>
+                            <option value="google_drive">{{ __('Google Drive') }}</option>
+                            <option value="dropbox">{{ __('Dropbox') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.connected-app-credential-fields', ['appProvider' => $appProvider])
+                    <p class="text-xs text-brand-moss">{{ __('These keys are injected at deploy and kept out of the editable variables list. Save them to reuse on other sites.') }}</p>
+                </div>
             @elseif ($bindingModalType === 'captcha')
                 @php $captchaProvider = (string) ($bindingForm['provider'] ?? 'turnstile'); @endphp
                 <div class="space-y-4">
@@ -1484,7 +1544,12 @@
                                 >
                                     <input type="radio" wire:model.live="bindingForm.placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
                                     <span class="min-w-0">
-                                        <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                        <span class="flex flex-wrap items-center gap-2">
+                                            <span class="text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                            @if (! $p['available'] && ($p['note'] ?? '') === __('Coming soon'))
+                                                <span class="shrink-0 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Soon') }}</span>
+                                            @endif
+                                        </span>
                                         <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
                                         @if (($p['key'] ?? '') === 'docker' && ! $p['available'])
                                             @include('livewire.sites.settings.partials.environment._placement-docker-install', ['p' => $p])
@@ -1944,4 +2009,5 @@
             </x-primary-button>
         </div>
     </x-modal>
+    <livewire:credentials.add-provider-credential-modal capability="compute" />
     @endif

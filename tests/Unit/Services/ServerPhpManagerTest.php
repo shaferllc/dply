@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerPhpManager;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
@@ -322,7 +323,7 @@ it('installs a supported version after revalidating fresh inventory', function (
     expect($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.4']);
 });
 
-it('treats install as success when the version is already present on the server', function () {
+it('re-runs install when the version is already present so required extensions are ensured', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
         'php_inventory' => [
@@ -340,18 +341,26 @@ it('treats install as success when the version is already present on the server'
             'installed_versions' => ['8.3', '8.5'],
             'detected_default_version' => '8.3',
         ]);
-    $manager->shouldNotReceive('executePackageAction');
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->withArgs(fn (Server $refreshedServer, string $action, string $version) => $refreshedServer->is($server) && $action === 'install' && $version === '8.5');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3', '8.5'],
+            'detected_default_version' => '8.3',
+        ]);
 
     $result = $manager->applyPackageAction($server, 'install', '8.5');
 
     $server->refresh();
 
     expect($result['status'])->toBe('succeeded')
-        ->and($result['message'])->toBe('PHP 8.5 is already installed.')
         ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.5']);
 });
 
-it('syncs stale inventory before treating install as already present', function () {
+it('syncs stale inventory then still runs install for an already-present version', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
         'php_inventory' => [
@@ -376,14 +385,22 @@ it('syncs stale inventory before treating install as already present', function 
     $manager->shouldReceive('syncInventorySnapshot')
         ->once()
         ->andReturn(true);
-    $manager->shouldNotReceive('executePackageAction');
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->withArgs(fn (Server $refreshedServer, string $action, string $version) => $refreshedServer->is($server) && $action === 'install' && $version === '8.5');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3', '8.5'],
+            'detected_default_version' => '8.3',
+        ]);
 
     $result = $manager->applyPackageAction($server, 'install', '8.5');
 
     $server->refresh();
 
     expect($result['status'])->toBe('succeeded')
-        ->and($result['message'])->toBe('PHP 8.5 is already installed.')
         ->and($server->meta['php_inventory_refresh']['status'])->toBe('succeeded')
         ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.5']);
 });
@@ -752,7 +769,7 @@ it('reassigns the cli default before uninstalling that version', function () {
         'php_new_site_default_version' => '8.4',
     ]);
 
-    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
+    $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -811,7 +828,7 @@ it('reassigns the remote detected cli default before uninstall even when persist
         'php_new_site_default_version' => '8.4',
     ]);
 
-    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
+    $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -866,7 +883,7 @@ it('reassigns the new site default before uninstalling that version', function (
         'php_new_site_default_version' => '8.3',
     ]);
 
-    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
+    $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -916,7 +933,7 @@ it('blocks uninstall when the version is still a default and no other php versio
         'php_new_site_default_version' => '8.3',
     ]);
 
-    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
+    $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -966,7 +983,7 @@ it('uses a lock ttl that covers the full remote package action timeout', functio
         'server_role' => 'application',
     ]);
 
-    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
+    $lock = Mockery::mock(Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 

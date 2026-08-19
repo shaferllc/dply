@@ -11,6 +11,7 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Support\Sites\OrganizationSecretException;
 use App\Support\Sites\OrganizationSecretManager;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
@@ -28,17 +29,130 @@ trait ManagesLinkedOrganizationSecrets
 
     public ?string $linkSecretWorkspaceId = null;
 
+    public string $pasteSecretKey = '';
+
+    public string $pasteSecretValue = '';
+
+    public string $pasteSecretNotes = '';
+
+    public string $pasteSecretBlob = '';
+
     public function openLinkOrganizationSecretModal(): void
     {
         $this->authorize('update', $this->site);
         $this->showLinkOrganizationSecretModal = true;
         $this->linkSecretSearch = '';
         $this->linkSecretWorkspaceId = $this->site->workspace_id;
+        $this->reset('pasteSecretKey', 'pasteSecretValue', 'pasteSecretNotes', 'pasteSecretBlob');
     }
 
     public function closeLinkOrganizationSecretModal(): void
     {
         $this->showLinkOrganizationSecretModal = false;
+        $this->reset('pasteSecretKey', 'pasteSecretValue', 'pasteSecretNotes', 'pasteSecretBlob');
+    }
+
+    public function pasteOrganizationSecret(OrganizationSecretManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+
+        $org = $this->site->organization;
+        if ($org === null) {
+            $this->toastError(__('This site has no organization.'));
+
+            return;
+        }
+
+        $blob = trim($this->pasteSecretBlob);
+        if ($blob !== '') {
+            $pairs = $manager->parsePastedEnv($blob);
+            if ($pairs === []) {
+                $this->addError('pasteSecretBlob', __('Could not parse any KEY=value lines from that .env snippet.'));
+
+                return;
+            }
+        } else {
+            $this->validate([
+                'pasteSecretKey' => OrganizationSecretManager::KEY_RULE,
+                'pasteSecretValue' => 'required|string|max:16000',
+                'pasteSecretNotes' => 'nullable|string|max:2000',
+            ]);
+            $pairs = [[
+                'key' => $this->pasteSecretKey,
+                'value' => $this->pasteSecretValue,
+                'note' => null,
+            ]];
+        }
+
+        $fallbackNote = trim($this->pasteSecretNotes);
+        $alreadyLinked = $this->site->organizationSecrets()
+            ->pluck('organization_secret_sites.key')
+            ->all();
+
+        $linked = 0;
+        $skipped = 0;
+        try {
+            DB::transaction(function () use ($manager, $org, $pairs, $fallbackNote, $alreadyLinked, &$linked, &$skipped): void {
+                foreach ($pairs as $pair) {
+                    if (in_array($pair['key'], $alreadyLinked, true)) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $note = $fallbackNote !== ''
+                        ? $fallbackNote
+                        : ($pair['note'] ?? __('Pasted on :site', ['site' => $this->site->name]));
+                    $secret = $manager->create($org, $pair['key'], $pair['value'], $note, auth()->user());
+                    $manager->link($this->site, $secret);
+                    $alreadyLinked[] = $pair['key'];
+                    $linked++;
+                }
+            });
+        } catch (OrganizationSecretException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        if ($linked === 0) {
+            $this->toastError(__('Those keys are already linked on this site.'));
+
+            return;
+        }
+
+        $this->reset('pasteSecretKey', 'pasteSecretValue', 'pasteSecretNotes', 'pasteSecretBlob');
+        $this->showLinkOrganizationSecretModal = false;
+        $this->dispatch('close-modal', 'link-organization-secret-modal');
+
+        $message = trans_choice(
+            '{1} Secret saved and linked. The value cannot be read back — it injects on the next deploy.|[2,*] :count secrets saved and linked. Values cannot be read back — they inject on the next deploy.',
+            $linked,
+            ['count' => $linked],
+        );
+        if ($skipped > 0) {
+            $message .= ' '.__(':count already linked, skipped.', ['count' => $skipped]);
+        }
+        $this->toastSuccess($message);
+    }
+
+    /**
+     * Keys that a pasted .env snippet will create. Values are never included.
+     *
+     * @return list<array{key: string, note: ?string, already_linked: bool}>
+     */
+    public function pastedSecretPreview(): array
+    {
+        $pairs = app(OrganizationSecretManager::class)->parsePastedEnv($this->pasteSecretBlob);
+        $linkedKeys = $this->site->organizationSecrets()
+            ->pluck('organization_secret_sites.key')
+            ->all();
+
+        return array_map(static fn (array $pair): array => [
+            'key' => $pair['key'],
+            'note' => $pair['note'],
+            'already_linked' => in_array($pair['key'], $linkedKeys, true),
+        ], $pairs);
     }
 
     public function linkOrganizationSecret(string $secretId, OrganizationSecretManager $manager): void

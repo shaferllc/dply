@@ -1,7 +1,10 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Modules\Remediations\Services\Actions\RebuildWebserverConfigAction;
+use App\Modules\Remediations\Services\Actions\UpgradePhpAction;
+use App\Services\Servers\PhpRedisExtensionScripts;
 
 /*
 |--------------------------------------------------------------------------
@@ -115,7 +118,8 @@ return [
                 'label' => 'Install php-redis and reload PHP-FPM',
                 'recommended' => true,
                 'auto_safe' => true,
-                'script' => <<<'BASH'
+                'script' => implode("\n", [
+                    <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
 PHPVER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || true)
 apt-get update -y || true
@@ -137,24 +141,12 @@ if ! is_loaded; then
   printf 'no\nno\nno\n' | pecl install -f redis 2>&1 | tail -8 || true
 fi
 
-# Enable the extension EXACTLY ONCE. Debian/sury: a single mods-available/redis.ini
-# symlinked per-SAPI by phpenmod. Crucially, strip any stray `extension=redis`
-# PECL appended to the real php.ini files — loading it twice makes PHP-FPM fail to
-# start ("module 'redis' already loaded"), which shows as an nginx 502 on the site.
-if [ -d "/etc/php/${PHPVER}/mods-available" ]; then
-  printf '; phpredis (managed by dply remediation)\nextension=redis.so\n' > "/etc/php/${PHPVER}/mods-available/redis.ini"
-  for sapi in cli fpm apache2; do
-    INI="/etc/php/${PHPVER}/${sapi}/php.ini"
-    [ -f "$INI" ] && sed -i -E '/^[[:space:]]*extension[[:space:]]*=[[:space:]]*"?redis(\.so)?"?[[:space:]]*$/d' "$INI"
-  done
-  phpenmod -v "$PHPVER" redis 2>/dev/null || true
-else
-  PHPINI=$(php -i 2>/dev/null | awk -F'=> ' '/Loaded Configuration File/ {print $2}' | tr -d ' ')
-  if [ -n "$PHPINI" ] && [ -f "$PHPINI" ] && ! grep -qE '^[[:space:]]*extension[[:space:]]*=[[:space:]]*"?redis' "$PHPINI"; then
-    printf 'extension=redis.so\n' >> "$PHPINI"
-  fi
+if [ -d "/etc/php/${PHPVER}/mods-available" ] && [ ! -f "/etc/php/${PHPVER}/mods-available/redis.ini" ]; then
+  printf '; phpredis (managed by dply)\nextension=redis.so\n' > "/etc/php/${PHPVER}/mods-available/redis.ini"
 fi
-
+BASH,
+                    PhpRedisExtensionScripts::dedupeFromDetectedCli(),
+                    <<<'BASH'
 # Restart (not reload) so a master that died from a double-load comes back clean.
 systemctl restart "php${PHPVER}-fpm" 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true
 
@@ -169,6 +161,57 @@ else
   exit 1
 fi
 BASH,
+                ]),
+            ],
+        ],
+    ],
+
+    'php_ext_redis_duplicate' => [
+        'signature' => '/Module ["\']redis["\'] is already loaded/i',
+        'title' => 'PHP is loading the redis extension twice',
+        'explanation' => 'The redis module is enabled in more than one ini file (usually apt’s 20-redis.ini plus a leftover `extension=redis` from PECL in php.ini). PHP warns on every CLI/FPM start, and FPM can fail to boot. dply can keep a single mods-available copy and remove the extras.',
+        'actions' => [
+            [
+                'key' => 'dedupe_phpredis',
+                'label' => 'Remove duplicate redis.ini loads and reload PHP-FPM',
+                'recommended' => true,
+                'auto_safe' => true,
+                'script' => implode("\n", [
+                    PhpRedisExtensionScripts::dedupeFromDetectedCli(),
+                    <<<'BASH'
+PHPVER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || true)
+systemctl restart "php${PHPVER}-fpm" 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true
+if php -v 2>&1 | grep -q 'already loaded'; then
+  echo "A module is still reported as already loaded. Remaining redis directives:" >&2
+  grep -RHnE '^[[:space:]]*extension[[:space:]]*=[[:space:]]*"?redis' /etc/php --include='*.ini' >&2 || true
+  exit 1
+fi
+if ! php -m 2>/dev/null | grep -qi '^redis$'; then
+  echo "Deduped redis inis but the extension is no longer loaded." >&2
+  exit 1
+fi
+echo "phpredis now loads once for PHP ${PHPVER}."
+BASH,
+                ]),
+            ],
+        ],
+    ],
+
+    // Composer refused to install because the box's PHP is older than a
+    // package requires (Laravel 13 / Symfony 8 → >=8.4.1 is the usual case).
+    // Installing the catalog version and switching the site is the fix —
+    // adding a pipeline step would not change the runtime.
+    'php_version_too_low' => [
+        'signature' => '/your php version\s+\([^)]+\) does not satisfy that requirement|requires php\s*(>=|>|\^|~)?\s*\d+\.\d+[^\n]*does not satisfy that requirement/i',
+        'title' => 'This app needs a newer PHP than the server is running',
+        'explanation' => 'Composer could not install dependencies because the current PHP is older than a package requires. dply can install the needed version, make it the CLI default, and switch this site onto it.',
+        'actions' => [
+            [
+                'key' => 'upgrade_php',
+                'label' => 'Upgrade PHP and switch this site',
+                'recommended' => true,
+                'auto_safe' => false,
+                'handler' => UpgradePhpAction::class,
             ],
         ],
     ],

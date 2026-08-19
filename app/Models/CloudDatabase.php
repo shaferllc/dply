@@ -228,11 +228,7 @@ class CloudDatabase extends Model
         $password = (string) ($connection['password'] ?? '');
 
         if ($this->engine === self::ENGINE_REDIS) {
-            return [
-                $prefix.'_HOST' => $host,
-                $prefix.'_PORT' => $port,
-                $prefix.'_PASSWORD' => $password,
-            ];
+            return $this->redisConnectionEnvVars($prefix, $connection, $host, $port, $password);
         }
 
         $vars = [
@@ -264,7 +260,14 @@ class CloudDatabase extends Model
         $prefix = $prefix ?? $this->defaultEnvPrefix();
 
         if ($this->engine === self::ENGINE_REDIS) {
-            return [$prefix.'_HOST', $prefix.'_PORT', $prefix.'_PASSWORD'];
+            return [
+                $prefix.'_HOST',
+                $prefix.'_PORT',
+                $prefix.'_PASSWORD',
+                $prefix.'_USERNAME',
+                $prefix.'_SCHEME',
+                $prefix.'_URL',
+            ];
         }
 
         $keys = [$prefix.'_CONNECTION', $prefix.'_HOST', $prefix.'_PORT', $prefix.'_DATABASE', $prefix.'_USERNAME', $prefix.'_PASSWORD'];
@@ -278,5 +281,65 @@ class CloudDatabase extends Model
     public function isExternal(): bool
     {
         return $this->backend === self::BACKEND_EXTERNAL;
+    }
+
+    /**
+     * DigitalOcean / Upstash managed Redis is TLS-only. A plaintext PhpRedis
+     * dial to :25061 surfaces as "read error on connection" and a 500 after
+     * deploy — inject rediss:// plus REDIS_SCHEME=tls so Laravel's default
+     * `url` / `scheme` config actually handshakes.
+     *
+     * @param  array<string, mixed>  $connection
+     * @return array<string, string>
+     */
+    private function redisConnectionEnvVars(
+        string $prefix,
+        array $connection,
+        string $host,
+        string $port,
+        string $password,
+    ): array {
+        $vars = [
+            $prefix.'_HOST' => $host,
+            $prefix.'_PORT' => $port,
+            $prefix.'_PASSWORD' => $password,
+        ];
+
+        $username = trim((string) ($connection['username'] ?? $connection['user'] ?? ''));
+        if ($username !== '') {
+            $vars[$prefix.'_USERNAME'] = $username;
+        }
+
+        if (! $this->redisRequiresTls($connection, $host)) {
+            return $vars;
+        }
+
+        if ($username === '') {
+            $username = 'default';
+            $vars[$prefix.'_USERNAME'] = $username;
+        }
+
+        $vars[$prefix.'_SCHEME'] = 'tls';
+        $vars[$prefix.'_URL'] = 'rediss://'.rawurlencode($username).':'.rawurlencode($password)
+            .'@'.$host.($port !== '' ? ':'.$port : '');
+
+        return $vars;
+    }
+
+    /**
+     * @param  array<string, mixed>  $connection
+     */
+    private function redisRequiresTls(array $connection, string $host): bool
+    {
+        if (($connection['ssl'] ?? false) === true) {
+            return true;
+        }
+
+        if (in_array($this->backend, [self::BACKEND_DIGITALOCEAN, self::BACKEND_UPSTASH], true)) {
+            return true;
+        }
+
+        return str_contains($host, 'ondigitalocean.com')
+            || str_contains($host, 'upstash.io');
     }
 }

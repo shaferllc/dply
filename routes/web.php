@@ -33,6 +33,7 @@ use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
+use App\Livewire\Admin\Connections as AdminConnections;
 use App\Livewire\Admin\Flags\AllFlags as AdminAllFlags;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
@@ -61,9 +62,9 @@ use App\Livewire\Infrastructure\Domains as InfrastructureDomains;
 use App\Livewire\Infrastructure\EnvDrift as InfrastructureEnvDrift;
 use App\Livewire\Infrastructure\EnvSearch as InfrastructureEnvSearch;
 use App\Livewire\Infrastructure\Health as InfrastructureHealth;
+use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Infrastructure\Intelligence as InfrastructureIntelligence;
 use App\Livewire\Infrastructure\Previews as InfrastructurePreviews;
-use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Notifications\Index as NotificationsIndex;
@@ -520,6 +521,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/organizations/{organization}', AdminOrganizationsShow::class)->name('organizations.show');
             Route::livewire('/beta-invites', AdminBetaInvites::class)->name('beta-invites');
             Route::livewire('/coming-soon-access', AdminComingSoonAccess::class)->name('coming-soon-access');
+            Route::livewire('/connections', AdminConnections::class)->name('connections');
         });
     Route::redirect('/admin/dashboard', '/admin')->middleware('can:viewPlatformAdmin')->name('admin.dashboard');
     Route::middleware('feature:surface.marketplace')->group(function (): void {

@@ -294,8 +294,7 @@
                                 </x-slot:actions>
                             </x-workspace-panel-head>
 
-                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
-
+                            {{-- ResourceMap owns the console banner; a parent include stacked the same run twice. --}}
                             @if ($isContainerWorkspace)
                                 {{-- Container/Cloud sites keep their managed Cloud resources
                                      panel (CloudDatabase/CloudWorker), now embedded in the

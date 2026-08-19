@@ -6,6 +6,7 @@ namespace Tests\Feature\Sites\ProvisioningBindingStatusModalTest;
 
 use App\Enums\ServerProvider;
 use App\Livewire\Sites\ResourceMap;
+use App\Livewire\Sites\SiteSetup;
 use App\Models\CloudDatabase;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
@@ -373,6 +374,56 @@ function provisioningManagedValkeyPrimary(): array
     return [$user, $appServer, $site, $cluster, $binding];
 }
 
+/**
+ * @return array{0: User, 1: Server, 2: Site, 3: CloudDatabase, 4: SiteBinding}
+ */
+function provisioningManagedDatabasePrimary(): array
+{
+    [$user, $appServer, $site] = provisioningMapSite();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $appServer->organization_id,
+        'provider' => 'digitalocean',
+    ]);
+    $appServer->forceFill([
+        'provider' => ServerProvider::DigitalOcean,
+        'provider_credential_id' => $credential->id,
+        'region' => 'sfo3',
+    ])->save();
+
+    $cluster = CloudDatabase::factory()->create([
+        'organization_id' => $appServer->organization_id,
+        'name' => 'dply_io',
+        'engine' => CloudDatabase::ENGINE_POSTGRES,
+        'region' => 'sfo3',
+        'size' => 'db-s-1vcpu-1gb',
+        'status' => CloudDatabase::STATUS_PROVISIONING,
+        'backend_id' => 'do-pg-test',
+        'provider_credential_id' => $credential->id,
+    ]);
+
+    $binding = SiteBinding::query()->create([
+        'site_id' => $site->id,
+        'type' => 'database',
+        'mode' => 'provision_new',
+        'status' => SiteBinding::STATUS_PROVISIONING,
+        'name' => 'primary',
+        'target_type' => 'cloud_database',
+        'target_id' => (string) $cluster->id,
+        'injected_env' => [],
+        'config' => [
+            'engine' => CloudDatabase::ENGINE_POSTGRES,
+            'managed' => true,
+            'placement' => 'managed',
+            'region' => 'sfo3',
+            'size' => 'db-s-1vcpu-1gb',
+        ],
+    ]);
+
+    return [$user, $appServer, $site, $cluster, $binding];
+}
+
 function fakeDoManagedClusterStatus(string $id = 'do-valkey-test', string $status = 'creating'): void
 {
     $layouts = [
@@ -435,6 +486,122 @@ test('provisioning managed redis modal streams cluster console output', function
         ->and($binding->fresh()->config['console_run_id'] ?? null)->toBe($runId);
 });
 
+test('stopping an in-flight managed provision ends the banner and binding', function () {
+    Queue::fake();
+    fakeDoManagedClusterStatus();
+    [$user, $appServer, $site, $cluster, $binding] = provisioningManagedValkeyPrimary();
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $appServer, 'site' => $site])
+        ->call('openBindingInfoModal', (string) $binding->id)
+        ->assertSee(__('Stop'));
+
+    $runId = $component->get('bindingInfo.provision.console_run_id');
+    expect($runId)->not->toBeEmpty();
+
+    $component->call('cancelConsoleActionRun', (string) $runId)
+        ->assertSet('bindingInfo.status', SiteBinding::STATUS_ERROR);
+
+    $run = ConsoleAction::query()->find($runId);
+    expect($run)->not->toBeNull()
+        ->and($run->isInFlight())->toBeFalse()
+        ->and($run->status)->toBe(ConsoleAction::STATUS_FAILED)
+        ->and($run->error)->toBe(__('Stopped.'))
+        ->and($binding->fresh()->status)->toBe(SiteBinding::STATUS_ERROR)
+        ->and($cluster->fresh()->status)->toBe(CloudDatabase::STATUS_FAILED);
+});
+
+test('managed provision job does not keep creating after the binding is stopped', function () {
+    Http::fake();
+    [$user, $appServer, $site, $cluster, $binding] = provisioningManagedValkeyPrimary();
+
+    $binding->forceFill([
+        'status' => SiteBinding::STATUS_ERROR,
+        'last_error' => 'Stopped.',
+    ])->save();
+
+    (new ProvisionManagedDatabaseJob(
+        (string) $cluster->id,
+        (string) $binding->id,
+        (string) $appServer->id,
+    ))->handle(app(DatabaseRouter::class));
+
+    Http::assertNothingSent();
+    expect($cluster->fresh()->status)->toBe(CloudDatabase::STATUS_PROVISIONING)
+        ->and($binding->fresh()->status)->toBe(SiteBinding::STATUS_ERROR);
+});
+
+test('provider auth failure forces a new token instead of retry', function () {
+    Queue::fake();
+    [$user, $appServer, $site, $cluster, $binding] = failedManagedRedisPrimary();
+
+    $error = 'DigitalOcean API failed to create database cluster: Unable to authenticate you (sent engine=mysql version= region=sfo2 size=db-s-1vcpu-2gb)';
+    $binding->forceFill(['last_error' => $error])->save();
+    $cluster->forceFill(['meta' => ['error' => $error]])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $appServer, 'site' => $site])
+        ->assertSee(__('Reconnect'))
+        ->assertDontSee(__('Retry'), false)
+        ->call('openBindingInfoModal', (string) $binding->id)
+        ->assertSet('bindingInfo.provision.auth_failure', true)
+        ->assertSet('bindingInfo.provision.can_retry', false)
+        ->assertSet('bindingInfo.provision.auth_provider', 'digitalocean')
+        ->assertSee(__('Token rejected'))
+        ->assertSee(__('Add a new token'))
+        ->assertDontSee(__('Retry provision'))
+        ->assertDispatched('open-add-provider-credential-modal');
+
+    $component->call('afterProviderCredentialCreatedForBindings', 'digitalocean')
+        ->assertSet('bindingInfo.status', SiteBinding::STATUS_PROVISIONING);
+
+    expect($binding->fresh()->status)->toBe(SiteBinding::STATUS_PROVISIONING);
+
+    Queue::assertPushed(ProvisionManagedDatabaseJob::class);
+});
+
+test('failed managed provision modal does not embed the console error again', function () {
+    [$user, $appServer, $site, $cluster, $binding] = failedManagedRedisPrimary();
+
+    $error = $binding->last_error;
+    expect($error)->not->toBeEmpty();
+
+    $run = ConsoleAction::query()->create([
+        'subject_type' => $site->getMorphClass(),
+        'subject_id' => $site->id,
+        'kind' => ManagedDatabaseProvisionConsole::KIND,
+        'status' => ConsoleAction::STATUS_FAILED,
+        'started_at' => now()->subMinute(),
+        'finished_at' => now(),
+        'label' => ManagedDatabaseProvisionConsole::label($cluster),
+        'error' => $error,
+        'output' => [
+            'v' => 1,
+            'lines' => [[
+                't' => now()->getTimestampMs(),
+                'level' => ConsoleAction::LEVEL_ERROR,
+                'source' => 'digitalocean',
+                'line' => $error,
+            ]],
+        ],
+    ]);
+
+    $config = is_array($binding->config) ? $binding->config : [];
+    $config['console_run_id'] = (string) $run->id;
+    $binding->forceFill(['config' => $config])->save();
+
+    $html = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $appServer, 'site' => $site])
+        ->call('openBindingInfoModal', (string) $binding->id)
+        ->assertSet('bindingInfo.provision.failed', true)
+        ->assertSet('bindingInfo.provision.console_run_id', (string) $run->id)
+        ->assertSee(__('Provision failed'))
+        ->assertSee($error)
+        ->html();
+
+    expect(substr_count($html, 'wire:key="console-action-banner-static"'))->toBe(1);
+});
+
 test('managed provision job writes console poll lines and keeps the same run', function () {
     Queue::fake();
     fakeDoManagedClusterStatus();
@@ -477,6 +644,8 @@ test('managed redis detach confirm offers delete option and a detach-and-delete 
         ->test(ResourceMap::class, ['server' => $appServer, 'site' => $site])
         ->assertSee(__('Detach & delete'))
         ->call('openDetachBindingConfirmModal', (string) $binding->id, 'Redis / Valkey')
+        ->assertDispatched('close-modal', 'binding-info-modal')
+        ->assertSet('bindingInfo', null)
         ->assertSet('showConfirmActionModal', true)
         ->assertSet('confirmActionModalMethod', 'detachBinding')
         ->assertSet('confirmActionModalToggleLabel', __('Also delete the managed Valkey cluster'))
@@ -494,7 +663,30 @@ test('detach and delete tears down the managed redis cluster', function () {
     Livewire::actingAs($user)
         ->test(ResourceMap::class, ['server' => $appServer, 'site' => $site])
         ->call('openDetachAndDeleteBindingConfirmModal', (string) $binding->id, 'Redis / Valkey')
+        ->assertDispatched('close-modal', 'binding-info-modal')
         ->assertSet('confirmActionModalToggle', true)
+        ->call('confirmActionModal', true)
+        ->assertSet('showConfirmActionModal', false);
+
+    expect(SiteBinding::query()->whereKey($binding->id)->exists())->toBeFalse();
+
+    Queue::assertPushed(TeardownCloudDatabaseJob::class, function (TeardownCloudDatabaseJob $job) use ($cluster): bool {
+        return $job->cloudDatabaseId === (string) $cluster->id;
+    });
+});
+
+test('setup wizard can detach and delete a provisioning managed database', function () {
+    Queue::fake();
+    [$user, $appServer, $site, $cluster, $binding] = provisioningManagedDatabasePrimary();
+
+    Livewire::actingAs($user)
+        ->test(SiteSetup::class, ['server' => $appServer, 'site' => $site, 'embedded' => true])
+        ->call('openDetachAndDeleteBindingConfirmModal', (string) $binding->id, 'Database')
+        ->assertDispatched('close-modal', 'binding-info-modal')
+        ->assertSet('bindingInfo', null)
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalToggle', true)
+        ->assertSee(__('Also delete the managed database cluster'))
         ->call('confirmActionModal', true)
         ->assertSet('showConfirmActionModal', false);
 

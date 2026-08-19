@@ -188,7 +188,16 @@
                     </div>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                    @if (! $busyRow)
+                    @if ($run->isCancellable() && method_exists($this, 'cancelConsoleActionRun'))
+                        <button
+                            type="button"
+                            wire:click="cancelConsoleActionRun('{{ $run->id }}')"
+                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
+                        >
+                            <x-heroicon-o-stop class="h-4 w-4" />
+                            {{ __('Stop') }}
+                        </button>
+                    @elseif (! $busyRow)
                         <button
                             type="button"
                             wire:click="dismissConsoleActionRun('{{ $run->id }}')"

@@ -68,6 +68,9 @@ trait ManagesSiteBindings
     /** Last catalog failure for dedicated VM placements; shown on the disabled card. */
     public ?string $dedicatedVmSizeError = null;
 
+    /** Shown after a connected-app .env paste fills matching fields. */
+    public ?string $connectedAppPasteNote = null;
+
     /** Resolved IaaS region for dedicated VM create (after normalizing stale slugs). */
     public ?string $dedicatedVmRegion = null;
 

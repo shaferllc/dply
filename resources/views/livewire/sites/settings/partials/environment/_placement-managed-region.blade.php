@@ -19,5 +19,9 @@
         <p class="mt-1.5 text-xs text-brand-moss">{{ __('Every datacenter DigitalOcean lists for this engine.') }}</p>
     </div>
 @else
-    <p class="text-xs font-medium text-amber-700">{{ __('Could not load managed-database regions from the provider. Reconnect the credential, or pick a different placement.') }}</p>
+    @if (\App\Support\Servers\ManagedDatabaseCatalogFailure::isAuthFailure())
+        @include('livewire.sites.settings.partials.environment._provider-auth-failure')
+    @else
+        <p class="text-xs font-medium text-amber-700">{{ $this->managedDatabaseCatalogError() ?? __('Could not load managed-database regions from the provider. Reconnect the credential, or pick a different placement.') }}</p>
+    @endif
 @endif

@@ -14,7 +14,7 @@
     $hubGroups = SiteBindingCatalog::grouped('vm', $hubBindings);
     $networkedAttached = $hubBindings->filter(fn ($b) => BindingReachability::isNetworked($b->type))->count();
     $provisionTypes = ['database', 'redis', 'storage'];
-    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth'];
+    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth', 'connected_app'];
     $statusBadge = [
         'configured' => 'bg-emerald-100 text-emerald-800',
         'pending' => 'bg-amber-100 text-amber-900',
@@ -566,7 +566,13 @@
                                 : null;
                             $digest = filled($vmServerId) ? ($provisionDigests[$vmServerId] ?? null) : null;
                             $displayError = $isErrored ? $binding->displayError($vmServer instanceof \App\Models\Server ? $vmServer : null) : null;
+                            $authFailure = $isErrored && \App\Support\Providers\ProviderAuthFailure::detected($displayError);
+                            $authProvider = $authFailure ? $this->bindingAuthProvider($binding, $cfg) : null;
+                            if ($authFailure) {
+                                $statusHint = \App\Support\Providers\ProviderAuthFailure::message((string) $authProvider);
+                            }
                             $canRetryProvision = $attached
+                                && ! $authFailure
                                 && method_exists($this, 'canRetryBindingProvision')
                                 && $this->canRetryBindingProvision($binding);
                         @endphp
@@ -775,7 +781,13 @@
 
                             {{-- Actions --}}
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-                                @if ($canRetryProvision && method_exists($this, 'retryFailedBindingProvision'))
+                                @if ($authFailure && method_exists($this, 'openBindingInfoModal'))
+                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                        title="{{ __('Reconnect or add a new API token.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md bg-rose-800 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-900">
+                                        <x-heroicon-o-key class="h-3.5 w-3.5" /> {{ __('Reconnect') }}
+                                    </button>
+                                @elseif ($canRetryProvision && method_exists($this, 'retryFailedBindingProvision'))
                                     <button type="button" wire:click="retryFailedBindingProvision(@js((string) $binding->id))"
                                         wire:loading.attr="disabled" wire:target="retryFailedBindingProvision"
                                         title="{{ __('Retry provisioning this resource.') }}"

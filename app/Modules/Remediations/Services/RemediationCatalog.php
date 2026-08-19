@@ -43,6 +43,30 @@ class RemediationCatalog
         return null;
     }
 
+    /**
+     * Every catalog entry whose signature matches — so the deploy hub can show
+     * each recognized fix in its own card instead of only the first hit.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function matchAll(?string $errorText): array
+    {
+        $text = trim((string) $errorText);
+        if ($text === '') {
+            return [];
+        }
+
+        $hits = [];
+        foreach ($this->all() as $code => $remediation) {
+            $signature = $remediation['signature'] ?? null;
+            if (is_string($signature) && $signature !== '' && @preg_match($signature, $text) === 1) {
+                $hits[] = ['code' => $code] + $remediation;
+            }
+        }
+
+        return $hits;
+    }
+
     /** @return array<string, mixed>|null */
     public function find(string $code): ?array
     {

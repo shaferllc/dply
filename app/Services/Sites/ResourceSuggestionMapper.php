@@ -119,6 +119,18 @@ class ResourceSuggestionMapper
                 'description' => __('Wire up real-time websockets. Connecting the managed relay is billable, so it is never provisioned automatically.'),
                 'note' => __('Never auto-provisions paid infrastructure — you confirm the tier explicitly.'),
             ],
+            [
+                'type' => 'connected_app',
+                'label' => __('Connected apps'),
+                'icon' => 'heroicon-o-puzzle-piece',
+                'default_mode' => 'attach',
+                'satisfying_types' => ['connected_app'],
+                'trigger' => ['SLACK_', 'DISCORD_', 'TELEGRAM_', 'GOOGLE_DRIVE_', 'DROPBOX_'],
+                'owned' => ['SLACK_', 'DISCORD_', 'TELEGRAM_', 'GOOGLE_DRIVE_', 'DROPBOX_'],
+                'headline' => __('Connect Slack, Discord, Drive…'),
+                'description' => __('Attach Slack, Discord, Telegram, Google Drive, or Dropbox keys. They inject at deploy and stay out of the variables editor.'),
+                'note' => null,
+            ],
         ];
     }
 
@@ -128,16 +140,16 @@ class ResourceSuggestionMapper
      * and the default attach/provision mode the wizard should open the modal in.
      *
      * @return array<int, array<string, array|string|null>>
-     *     type: string,
-     *     label: string,
-     *     icon: string,
-     *     default_mode: 'attach'|'provision',
-     *     satisfying_types: list<string>,
-     *     headline: string,
-     *     description: string,
-     *     note: ?string,
-     *     matched_keys: list<string>,
-     * }>
+     *                                                      type: string,
+     *                                                      label: string,
+     *                                                      icon: string,
+     *                                                      default_mode: 'attach'|'provision',
+     *                                                      satisfying_types: list<string>,
+     *                                                      headline: string,
+     *                                                      description: string,
+     *                                                      note: ?string,
+     *                                                      matched_keys: list<string>,
+     *                                                      }>
      */
     public function forSite(Site $site): array
     {
@@ -155,12 +167,12 @@ class ResourceSuggestionMapper
      * Pure mapping from a flat list of env keys to suggestions. Exposed
      * separately so callers with keys in hand (or tests) skip the model.
      *
-     * @param  array<string, mixed> $keys
+     * @param  array<string, mixed>  $keys
      * @return list<array<string, mixed>>
      */
     /**
+     * @param  list<string>  $keys
      * @return list<array<string, mixed>>
-     * @param  list<string> $keys
      */
     public function forKeys(array $keys): array
     {
@@ -205,7 +217,7 @@ class ResourceSuggestionMapper
      * True when $key equals an exact pattern or starts with a prefix pattern.
      * Patterns ending in `_` are treated as prefixes; everything else is exact.
      *
-     * @param  list<string> $patterns
+     * @param  list<string>  $patterns
      */
     private function keyMatches(string $key, array $patterns): bool
     {

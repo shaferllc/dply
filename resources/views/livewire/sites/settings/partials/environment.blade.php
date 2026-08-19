@@ -1,5 +1,6 @@
 @php
     use App\Models\ConsoleAction;
+    use App\Modules\Deploy\Services\SiteBindingManager;
     use App\Services\Sites\DotEnvFileParser;
 
     // Nested inside Deployments / Environment / Setup chrome → hairline strips.
@@ -79,13 +80,18 @@
     }
     // Resource bindings inject their connection variables at deploy (DB_*,
     // REDIS_*, …), so a key a binding supplies with a value is NOT missing even
-    // though it isn't in the editable .env. Count those as present. (The full
-    // binding maps for the UI are built further down.)
+    // though it isn't in the editable .env. Keys the binding OWNS (mail's
+    // MAIL_USERNAME / MAIL_SCHEME even when the provider is Resend/SES) also
+    // count as present — the scanner still sees them in config/mail.php.
+    $bindingManager = app(SiteBindingManager::class);
     foreach ($site->bindings as $presentBinding) {
         foreach ($presentBinding->connectionEnv() as $bindingKey => $bindingValue) {
             if (trim((string) $bindingValue) !== '') {
                 $envPresentKeys[] = (string) $bindingKey;
             }
+        }
+        foreach ($bindingManager->ownedEnvKeys($presentBinding) as $ownedKey) {
+            $envPresentKeys[] = $ownedKey;
         }
     }
     if (method_exists($this, 'linkedOrganizationSecretRows')) {

@@ -43,24 +43,31 @@ class DigitalOceanService
 
 
     /**
+     * Catalog GETs stay short so the create wizard cannot burn the 30s PHP
+     * request budget. Writes (cluster create/resize) often sit idle for
+     * tens of seconds before DigitalOcean sends the first byte — an 8s
+     * cap surfaces as cURL 28 with a valid token.
+     */
+    public static function transferTimeoutSeconds(string $method): int
+    {
+        return in_array(strtolower($method), ['post', 'put', 'patch', 'delete'], true)
+            ? 60
+            : 8;
+    }
+
+    /**
      * @param  array<string, mixed> $bodyOrQuery
      */
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;
-        // Bounded timeouts: connect within 5s, finish within 8s. Without these,
-        // a slow or stuck DO endpoint can consume the request's entire 30s
-        // PHP max-execution-time budget — the server-create wizard hits the
-        // catalog (regions/sizes) on every render, so any stall blocks the
-        // whole page. The catalog calls also cache for 10 minutes upstream,
-        // so this timeout only applies to fresh fetches.
+        $method = strtolower($method);
         $request = Http::withToken($this->token)
             ->acceptJson()
             ->contentType('application/json')
             ->connectTimeout(5)
-            ->timeout(8);
+            ->timeout(self::transferTimeoutSeconds($method));
 
-        $method = strtolower($method);
         if ($method === 'get') {
             return $request->get($url, $bodyOrQuery);
         }

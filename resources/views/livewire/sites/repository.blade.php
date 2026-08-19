@@ -136,10 +136,10 @@
                 </div>
             @endif
 
-            {{-- Embedded (Deployments → Quick deploy / Settings) the host page
-                 renders its own CLI snippet directly below this component —
-                 emitting one here too put two "CLI commands" rows on the page. --}}
-            @unless ($isEmbedded)
+            {{-- Host pages (embedded Repository, or the Set up tab which
+                 already includes the Environment CLI footer) must not emit
+                 a second "CLI commands" row. --}}
+            @unless ($isEmbedded || $activeTab === 'setup')
                 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                     <x-cli-snippet :commands="[
                         ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],

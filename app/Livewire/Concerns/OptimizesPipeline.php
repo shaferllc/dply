@@ -10,6 +10,7 @@ use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Support\Sites\SitePipelineAdvisor;
 use Livewire\Component;
@@ -155,6 +156,12 @@ trait OptimizesPipeline
             return;
         }
 
+        if (($suggestion['action'] ?? '') === 'upgrade_php') {
+            $this->queueSuggestedPhpUpgrade($suggestion);
+
+            return;
+        }
+
         $pipelines = app(SiteDeployPipelineManager::class);
         $pipeline = $pipelines->ensureDefaultPipeline($this->site);
 
@@ -184,6 +191,37 @@ trait OptimizesPipeline
         $this->toastSuccess($already
             ? __('That step is already in the pipeline.')
             : __(':label added to the :phase phase.', ['label' => $suggestion['label'], 'phase' => $suggestion['phase']]));
+    }
+
+    /**
+     * @param  array{label?: string, command?: string|null}  $suggestion
+     */
+    private function queueSuggestedPhpUpgrade(array $suggestion): void
+    {
+        $server = $this->site->server;
+        if ($server === null) {
+            $this->toastError(__('This site has no server to install PHP on.'));
+
+            return;
+        }
+
+        if (method_exists($this, 'queueSiteRemediationApply')) {
+            $this->queueSiteRemediationApply('php_version_too_low', 'upgrade_php');
+
+            return;
+        }
+
+        ApplyRemediationJob::dispatch(
+            (string) $server->id,
+            (string) $this->site->id,
+            'php_version_too_low',
+            'upgrade_php',
+            (string) (auth()->id() ?? '') ?: null,
+        );
+
+        $this->toastSuccess(__('Installing PHP :version — progress shows in the console above. Re-deploy once it finishes.', [
+            'version' => (string) ($suggestion['command'] ?? '8.4'),
+        ]));
     }
 
     /**

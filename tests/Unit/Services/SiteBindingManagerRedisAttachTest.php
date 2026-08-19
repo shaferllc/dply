@@ -182,7 +182,44 @@ test('attaching a managed Redis cluster injects its connection host', function (
         ->and($binding->target_id)->toBe((string) $cluster->id)
         ->and($binding->injected_env['REDIS_HOST'])->toBe('redis-prod.ondigitalocean.com')
         ->and($binding->injected_env['REDIS_PORT'])->toBe('25061')
-        ->and($binding->injected_env['REDIS_PASSWORD'])->toBe('managed-secret');
+        ->and($binding->injected_env['REDIS_PASSWORD'])->toBe('managed-secret')
+        ->and($binding->injected_env['REDIS_SCHEME'])->toBe('tls')
+        ->and($binding->injected_env['REDIS_URL'])->toBe('rediss://default:managed-secret@redis-prod.ondigitalocean.com:25061');
+});
+
+test('a stale managed redis binding still contributes tls env at deploy', function () {
+    [$org, $site] = redisAttachFixture();
+    $cluster = CloudDatabase::factory()->redis()->active()->create([
+        'organization_id' => $org->id,
+        'name' => 'cache-prod',
+        'connection' => [
+            'host' => 'redis-prod.ondigitalocean.com',
+            'port' => 25061,
+            'password' => 'managed-secret',
+        ],
+    ]);
+
+    $binding = SiteBinding::query()->create([
+        'site_id' => $site->id,
+        'type' => 'redis',
+        'mode' => 'attach_existing',
+        'status' => SiteBinding::STATUS_CONFIGURED,
+        'name' => 'primary',
+        'target_type' => 'cloud_database',
+        'target_id' => (string) $cluster->id,
+        'injected_env' => [
+            'REDIS_HOST' => 'redis-prod.ondigitalocean.com',
+            'REDIS_PORT' => '25061',
+            'REDIS_PASSWORD' => 'managed-secret',
+            'REDIS_CLIENT' => 'phpredis',
+        ],
+        'config' => ['engine' => 'redis', 'managed' => true],
+    ]);
+
+    expect($binding->connectionEnv())
+        ->toHaveKey('REDIS_CLIENT', 'phpredis')
+        ->toHaveKey('REDIS_SCHEME', 'tls')
+        ->toHaveKey('REDIS_URL', 'rediss://default:managed-secret@redis-prod.ondigitalocean.com:25061');
 });
 
 test('wireServerCacheBinding injects redis env for a dedicated cache host', function () {

@@ -128,6 +128,8 @@ return [
                     'database.mongodb' => 'MongoDB',
                     'database.clickhouse' => 'ClickHouse',
                     'database.upstash' => 'Upstash Redis',
+                    'database.neon' => 'Neon Postgres',
+                    'database.supabase' => 'Supabase Postgres',
                 ],
             ], $serverWorkspaceSections),
         ],

@@ -70,7 +70,7 @@ class ProvisionManagedDatabaseJob implements ShouldQueue
 
         // The binding was detached (or replaced) while the cluster spun up —
         // stop polling; the orphaned cluster is reaped by teardown elsewhere.
-        if ($binding->status === SiteBinding::STATUS_ERROR && $database->status === CloudDatabase::STATUS_DELETING) {
+        if (! $binding->isProvisioning()) {
             return;
         }
 

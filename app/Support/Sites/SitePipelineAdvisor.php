@@ -29,7 +29,7 @@ final class SitePipelineAdvisor
 
     /**
      * @param  bool  $includeDismissed  Return suggestions the operator has dismissed too (for autofix lookup by key).
-     * @return list<array{key: string, label: string, reason: string, step_type: string, phase: string, command: ?string, priority: string}>
+     * @return list<array{key: string, label: string, reason: string, step_type: string, phase: string, command: ?string, priority: string, action?: string}>
      */
     public static function suggestions(Site $site, bool $includeDismissed = false): array
     {
@@ -59,8 +59,30 @@ final class SitePipelineAdvisor
         $detectedFiles = array_map('strtolower', array_filter((array) ($detection['detected_files'] ?? []), 'is_string'));
         $hasFile = static fn (string $needle): bool => collect($detectedFiles)->contains(static fn (string $f): bool => str_contains($f, $needle));
         $isLaravel = $site->isLaravelFrameworkDetected();
+        $isPhp = $isLaravel || $site->runtimeKey() === 'php';
 
         $out = [];
+
+        // ---- PHP runtime ------------------------------------------------
+        if ($isPhp) {
+            $phpTarget = PhpVersionUpgradePlanner::targetForSite($site);
+            if ($phpTarget !== null) {
+                $current = $site->phpVersion() ?: PhpVersionUpgradePlanner::currentFromOutput((string) ($site->latestDeployment()?->log_output ?? '')) ?: 'this server';
+                $out[] = self::make(
+                    'upgrade_php',
+                    __('Upgrade PHP to :version', ['version' => $phpTarget]),
+                    __('Composer needs PHP :needed, but this site is on :current — the build will fail until the runtime is upgraded.', [
+                        'needed' => $phpTarget,
+                        'current' => $current,
+                    ]),
+                    '',
+                    $phpTarget,
+                    'high',
+                    'runtime',
+                    'upgrade_php',
+                );
+            }
+        }
 
         // ---- Front-end asset build -------------------------------------
         $jsInstallTypes = [
@@ -130,6 +152,13 @@ final class SitePipelineAdvisor
                     static fn (array $s): bool => ! in_array($s['key'], $dismissed, true),
                 ));
             }
+
+            // Composer/install will fail on the current PHP. Showing migrate /
+            // optimize / storage:link (or Optimize pipeline) is noise until
+            // the runtime is upgraded — those steps cannot get past the first
+            // error. Autofix lookup (`$includeDismissed = true`) still sees
+            // every key so a hidden suggestion can be applied by key.
+            $out = self::suppressSecondaryWhenRuntimeBlocked($out);
         }
 
         return $out;
@@ -146,9 +175,41 @@ final class SitePipelineAdvisor
             return 0;
         }
 
-        $activeKeys = array_column(self::suggestions($site, true), 'key');
+        $displayableKeys = array_column(
+            self::suppressSecondaryWhenRuntimeBlocked(self::suggestions($site, true)),
+            'key',
+        );
 
-        return count(array_intersect($dismissed, $activeKeys));
+        return count(array_intersect($dismissed, $displayableKeys));
+    }
+
+    /**
+     * True when the visible list is a PHP upgrade that must finish before
+     * other pipeline suggestions are worth showing.
+     *
+     * @param  list<array<string, mixed>>  $suggestions
+     */
+    public static function hasBlockingRuntimeSuggestion(array $suggestions): bool
+    {
+        return collect($suggestions)->contains(
+            static fn (array $suggestion): bool => ($suggestion['action'] ?? '') === 'upgrade_php',
+        );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $suggestions
+     * @return list<array<string, mixed>>
+     */
+    private static function suppressSecondaryWhenRuntimeBlocked(array $suggestions): array
+    {
+        if (! self::hasBlockingRuntimeSuggestion($suggestions)) {
+            return $suggestions;
+        }
+
+        return array_values(array_filter(
+            $suggestions,
+            static fn (array $suggestion): bool => ($suggestion['action'] ?? '') === 'upgrade_php',
+        ));
     }
 
     /**
@@ -163,18 +224,32 @@ final class SitePipelineAdvisor
     }
 
     /**
-     * @return array{key: string, label: string, reason: string, step_type: string, phase: string, command: ?string, priority: string}
+     * @return array{key: string, label: string, reason: string, step_type: string, phase: string, command: ?string, priority: string, action?: string}
      */
-    private static function make(string $key, string $label, string $reason, string $stepType, ?string $command, string $priority): array
-    {
-        return [
+    private static function make(
+        string $key,
+        string $label,
+        string $reason,
+        string $stepType,
+        ?string $command,
+        string $priority,
+        ?string $phase = null,
+        ?string $action = null,
+    ): array {
+        $row = [
             'key' => $key,
             'label' => $label,
             'reason' => $reason,
             'step_type' => $stepType,
-            'phase' => SiteDeployStep::defaultPhaseFor($stepType),
+            'phase' => $phase ?? SiteDeployStep::defaultPhaseFor($stepType),
             'command' => $command,
             'priority' => $priority,
         ];
+
+        if ($action !== null) {
+            $row['action'] = $action;
+        }
+
+        return $row;
     }
 }

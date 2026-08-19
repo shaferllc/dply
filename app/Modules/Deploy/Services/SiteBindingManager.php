@@ -13,6 +13,7 @@ use App\Modules\Deploy\Services\Concerns\ManagesAiBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesBroadcastingBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesCacheBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesCaptchaBindings;
+use App\Modules\Deploy\Services\Concerns\ManagesConnectedAppBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesDatabaseBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesErrorTrackingBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesLoggingBindings;
@@ -52,6 +53,7 @@ class SiteBindingManager
     use ManagesBroadcastingBindings;
     use ManagesCacheBindings;
     use ManagesCaptchaBindings;
+    use ManagesConnectedAppBindings;
     use ManagesDatabaseBindings;
     use ManagesErrorTrackingBindings;
     use ManagesLoggingBindings;
@@ -142,6 +144,7 @@ class SiteBindingManager
             'search' => $this->attachSearch($site, $params),
             'payments' => $this->attachPayments($site, $params),
             'oauth' => $this->attachOauth($site, $params),
+            'connected_app' => $this->attachConnectedApp($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
         };
@@ -337,7 +340,7 @@ class SiteBindingManager
      *
      * @return list<string>
      */
-    private function ownedEnvKeys(SiteBinding $binding): array
+    public function ownedEnvKeys(SiteBinding $binding): array
     {
         return match ($binding->type) {
             // Only the PRIMARY (default) mailer owns the bare MAIL_* namespace.
@@ -381,8 +384,29 @@ class SiteBindingManager
             'search' => $this->searchOwnedEnvKeys(),
             'payments' => $this->paymentsOwnedEnvKeys(),
             'oauth' => $this->oauthOwnedEnvKeys(),
+            'connected_app' => $this->connectedAppOwnedEnvKeys($binding),
             default => [],
         };
+    }
+
+    /**
+     * Keys every attached binding owns on this site — injected or not.
+     * API mailers do not write MAIL_USERNAME / MAIL_SCHEME, but they still
+     * own the MAIL_* namespace so those keys are not "missing".
+     *
+     * @return list<string>
+     */
+    public function ownedEnvKeysForSite(Site $site): array
+    {
+        $site->loadMissing('bindings');
+        $keys = [];
+        foreach ($site->bindings as $binding) {
+            foreach ($this->ownedEnvKeys($binding) as $key) {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
     }
 
     // ---- shared helpers ---------------------------------------------------

@@ -59,8 +59,19 @@
     @endif
 
     @php
-        $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : [];
+        $pipelineAdvisorSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : [];
+        $deployFixCards = \App\Support\Sites\DeployHubFixes::cards(
+            $site,
+            $latest,
+            $pipelineAdvisorSuggestions,
+            method_exists($this, 'completedFixerKeys') ? $this->completedFixerKeys : [],
+        );
+        $pipelineSuggestions = \App\Support\Sites\DeployHubFixes::pipelineStepSuggestions($pipelineAdvisorSuggestions);
         $pipelineDismissedCount = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::dismissedCount($site) : 0;
+        $pipelineRuntimeBlocked = \App\Support\Sites\SitePipelineAdvisor::hasBlockingRuntimeSuggestion($pipelineAdvisorSuggestions);
+        $watchedConsoleKind = $watchedConsoleRunId
+            ? \App\Models\ConsoleAction::query()->whereKey($watchedConsoleRunId)->value('kind')
+            : null;
         $canAutofixPipeline = method_exists($this, 'addSuggestedPipelineStep');
         $canResumeDeploy = $latest
             && $latest->status === 'failed'
@@ -448,7 +459,7 @@
             </div>
 
             <div wire:loading.remove wire:target="optimizePipeline" class="border-b border-brand-ink/10">
-                @if ($watchedConsoleRunId)
+                @if ($watchedConsoleKind === 'pipeline_optimize')
                     <div class="flex items-center justify-center gap-2 bg-brand-sand/15 px-3 py-2.5 text-xs text-brand-moss sm:px-4">
                         <x-spinner size="sm" />
                         <span>{{ __('Scanning the repo for pipeline steps…') }}</span>
@@ -462,14 +473,16 @@
                                     {{ __('Pipeline check') }}
                                 </p>
                                 <p class="mt-0.5 text-xs font-semibold text-brand-ink">
-                                    @if ($pipelineSuggestions !== [])
+                                    @if ($pipelineRuntimeBlocked)
+                                        {{ __('Runtime must be upgraded first') }}
+                                    @elseif ($pipelineSuggestions !== [])
                                         {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
                                     @else
                                         {{ __('No open suggestions') }}
                                     @endif
                                 </p>
                             </div>
-                            @if ($pipelineSuggestions !== [] && method_exists($this, 'optimizePipeline'))
+                            @if ($pipelineSuggestions !== [] && ! $pipelineRuntimeBlocked && method_exists($this, 'optimizePipeline'))
                                 <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
                                     <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
                                     <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
@@ -480,7 +493,9 @@
                         </div>
 
                         @if ($pipelineSuggestions !== [])
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Add a fix into your pipeline, or Optimize to scan the repo — so a deploy doesn’t succeed while the site breaks.') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ $pipelineRuntimeBlocked
+                                ? __('Composer will fail on this PHP version. Upgrade the runtime first — migrate, optimize, and the rest stay hidden until this succeeds.')
+                                : __('Add a fix into your pipeline, or Optimize to scan the repo — so a deploy doesn’t succeed while the site breaks.') }}</p>
                             <ul class="mt-2 divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10 bg-white">
                                 @foreach ($pipelineSuggestions as $sug)
                                     <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
@@ -546,6 +561,8 @@
             </div>
         @endif
 
+        @include('livewire.sites.partials.deployments._deploy-fix-cards', ['deployFixCards' => $deployFixCards])
+
         <div class="px-3 py-2.5 sm:px-4">
             {{-- While a deploy request is in flight, clear the previous run's
                  timeline right away and show a starting placeholder. The deploy
@@ -588,33 +605,26 @@
                     // On the deploy hub $latest IS the site's latest deployment, so
                     // we only gate on "failed + matched the guided DB remediation".
                     $dbFix = null;
+                    $hubRemediation = null;
                     if ($latest && $latest->status === 'failed' && method_exists($this, 'remediationForDeployment')) {
-                        $rem = $this->remediationForDeployment($latest);
-                        if (is_array($rem) && ($rem['code'] ?? null) === 'database_connection_failed') {
+                        $hubRemediation = $this->remediationForDeployment($latest);
+                        if (is_array($hubRemediation) && ($hubRemediation['code'] ?? null) === 'database_connection_failed') {
                             $dbFix = ['server' => $server, 'site' => $site];
                         }
                     }
                 @endphp
                 @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest, 'dbFix' => $dbFix])
 
-                {{-- Recognized-failure remediation (curated RemediationCatalog
-                     match, e.g. "Rebuild webserver config" for a 502) — rendered
-                     here, with the error it explains, instead of a duplicate card
-                     at the top of the panel. --}}
-                @if ($latest && $latest->status === 'failed')
-                    <div class="mt-4">
-                        @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
-                    </div>
-                @endif
-
-                {{-- Smart fixes for a failed deploy — same inline fix actions the
-                     deploy sidebar offers, driven by the shared coordinator. --}}
+                {{-- Live fixer output only — unique fix cards render above the
+                     timeline. The remediations panel stays on the deployment
+                     permalink, which has no cards rail. --}}
                 @include('livewire.sites.partials._deploy-fixers', [
                     'latest' => $latest,
                     'phases' => $timelinePhases,
                     'server' => $server,
                     'site' => $site,
                     'deployAction' => 'deployNow',
+                    'hideFixerList' => true,
                 ])
             @endif
             </div>

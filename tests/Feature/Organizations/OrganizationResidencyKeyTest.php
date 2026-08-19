@@ -25,6 +25,7 @@ test('customer-held residency key can be reverted to dply-managed', function () 
         ->call('confirmRevertToDplyHeld')
         ->assertSet('confirmActionModalMethod', 'revertToDplyHeldKey')
         ->assertSet('showConfirmActionModal', true)
+        ->assertSee('Revert to a dply-managed key?')
         ->call('confirmActionModal')
         ->assertSet('showConfirmActionModal', false);
 
@@ -51,6 +52,7 @@ test('dply-managed residency key can be rotated in place', function () {
         ->set('tab', 'residency')
         ->call('confirmRotateEncryptionKey')
         ->assertSet('confirmActionModalMethod', 'rotateToNewDplyHeldKey')
+        ->assertSee('Rotate dply-managed key?')
         ->call('confirmActionModal');
 
     $key = $org->secretKey()->first();

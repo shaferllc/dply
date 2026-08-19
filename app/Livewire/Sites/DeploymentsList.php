@@ -1013,6 +1013,8 @@ class DeploymentsList extends Component
 
     public function render(): View
     {
+        $this->resolveWatchedConsoleAction();
+
         // The paginated list + trigger facets feed ONLY the History panel; the
         // distinct/paginate queries are wasted on every other tab. Run them only
         // when History is active so switching to Environment / Webhook / etc.
@@ -1216,12 +1218,20 @@ class DeploymentsList extends Component
 
     public function activeConsoleRun(): ?ConsoleAction
     {
-        if ($this->watchedConsoleRunId === null) {
-            return null;
+        if ($this->watchedConsoleRunId !== null) {
+            $run = ConsoleAction::query()->find($this->watchedConsoleRunId);
+            if ($run !== null && ! $run->isDismissed()) {
+                return $run;
+            }
         }
 
-        $run = ConsoleAction::query()->find($this->watchedConsoleRunId);
+        $remediation = $this->deploymentRemediationRun;
+        if ($remediation instanceof ConsoleAction
+            && $remediation->isInFlight()
+            && ! $remediation->isStale()) {
+            return $remediation;
+        }
 
-        return ($run !== null && ! $run->isDismissed()) ? $run : null;
+        return null;
     }
 }

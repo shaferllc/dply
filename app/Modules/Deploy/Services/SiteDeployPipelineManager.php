@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services;
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
+use App\Support\Sites\DeployPipelineStepDuplicate;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -20,7 +21,17 @@ final class SiteDeployPipelineManager
     public function seedRuntimeDefaults(Site $site, ?string $runtime, ?string $framework = null): void
     {
         $pipeline = $this->ensureDefaultPipeline($site);
+        $this->collapseDuplicatePresetSteps($pipeline);
+
         foreach ($this->runtimeDefaults->defaultsFor($runtime, $framework) as $step) {
+            if (DeployPipelineStepDuplicate::exists(
+                $pipeline,
+                $step['step_type'],
+                $step['custom_command'] ?? null,
+            )) {
+                continue;
+            }
+
             $pipeline->steps()->create([
                 'site_id' => $site->id,
                 'sort_order' => $step['sort_order'],
@@ -30,6 +41,40 @@ final class SiteDeployPipelineManager
                 'timeout_seconds' => $step['timeout_seconds'],
             ]);
         }
+    }
+
+    /**
+     * Keep one row per preset step type (and per custom/npm-run command) in
+     * each phase. Create + Setup both seed defaults, which used to leave
+     * two Composer install steps on the first deploy.
+     */
+    public function collapseDuplicatePresetSteps(SiteDeployPipeline $pipeline): int
+    {
+        $removed = 0;
+        $seen = [];
+
+        foreach ($pipeline->steps()->orderBy('sort_order')->orderBy('id')->get() as $step) {
+            $type = (string) $step->step_type;
+            $phase = (string) ($step->phase ?? SiteDeployStep::PHASE_BUILD);
+            $key = in_array($type, [SiteDeployStep::TYPE_CUSTOM, SiteDeployStep::TYPE_NPM_RUN], true)
+                ? $type.'|'.$phase.'|'.strtolower(trim((string) $step->custom_command))
+                : $type.'|'.$phase;
+
+            if (isset($seen[$key])) {
+                $step->delete();
+                $removed++;
+
+                continue;
+            }
+
+            $seen[$key] = true;
+        }
+
+        if ($removed > 0) {
+            $pipeline->unsetRelation('steps');
+        }
+
+        return $removed;
     }
 
     public function ensureDefaultPipeline(Site $site): SiteDeployPipeline
@@ -310,7 +355,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  list<string> $orderedStepIds
+     * @param  list<string>  $orderedStepIds
      */
     public function reorderSteps(SiteDeployPipeline $pipeline, array $orderedStepIds): void
     {
@@ -323,7 +368,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  list<string> $orderedBuildStepIds
+     * @param  list<string>  $orderedBuildStepIds
      */
     public function reorderBuildSteps(SiteDeployPipeline $pipeline, array $orderedBuildStepIds): void
     {
@@ -334,7 +379,7 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  list<string> $orderedReleaseStepIds
+     * @param  list<string>  $orderedReleaseStepIds
      */
     public function reorderReleaseSteps(SiteDeployPipeline $pipeline, array $orderedReleaseStepIds): void
     {
@@ -427,8 +472,8 @@ final class SiteDeployPipelineManager
     }
 
     /**
-     * @param  list<string> $expectedIds
-     * @param  list<string> $orderedSubset
+     * @param  list<string>  $expectedIds
+     * @param  list<string>  $orderedSubset
      */
     private function validateOrderedSubset(array $expectedIds, array $orderedSubset): void
     {

@@ -6,11 +6,13 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\CorrelatesWindowLogs;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
@@ -28,6 +30,7 @@ class DeploymentDetail extends Component
 {
     use CorrelatesWindowLogs;
     use DispatchesToastNotifications;
+    use SeedsSiteConsoleActions;
     use SurfacesDeploymentRemediation;
 
     public Server $server;
@@ -116,7 +119,7 @@ class DeploymentDetail extends Component
         $breadcrumbs = SiteWorkspaceBreadcrumbs::items($this->server, $this->site, __('Deploy'), 'rocket-launch');
         // Link the trailing "Deploy" crumb back to the deploy hub…
         $lastKey = array_key_last($breadcrumbs);
-        $breadcrumbs[$lastKey]['href'] = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
+        $breadcrumbs[$lastKey]['href'] = ServerlessWorkspaceUrl::forSitesRoute(
             'sites.deployments.index',
             $this->site,
             ['tab' => 'history'],

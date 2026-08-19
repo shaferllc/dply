@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers\Concerns;
 
 use App\Models\Server;
+use App\Services\Servers\PhpRedisExtensionScripts;
 use App\Services\Servers\ServerAptLockBash;
 use App\Support\Sites\SiteFixers;
 
@@ -60,10 +61,16 @@ trait BuildsPhpExtensionScripts
             ]);
         }
 
-        return implode("\n", array_merge($lines, [
+        $tail = [
             "systemctl restart {$fpm} >/dev/null 2>&1 || true",
             $this->extensionVerifyBash($version, $extension),
-        ]));
+        ];
+
+        if ($extension === 'redis') {
+            array_unshift($tail, PhpRedisExtensionScripts::dedupe($version));
+        }
+
+        return implode("\n", array_merge($lines, $tail));
     }
 
     /**
