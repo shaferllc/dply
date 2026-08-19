@@ -53,11 +53,15 @@ final class DatabaseConnectionUriController extends Controller
         $viaTunnel = $request->query('via') === 'tunnel';
         $localPort = (int) $request->query('port', (string) $target->port);
 
-        $uri = $viaTunnel
-            ? $target->uri($password, '127.0.0.1', $localPort)
-            : $target->uri($password);
+        // MySQL's client takes no URI, so its copy-paste command needs the bare
+        // password (fed through MYSQL_PWD, not argv).
+        $body = $request->query('format') === 'password'
+            ? $password
+            : ($viaTunnel
+                ? $target->uri($password, '127.0.0.1', $localPort)
+                : $target->uri($password));
 
-        return response($uri, 200, [
+        return response($body, 200, [
             'Content-Type' => 'text/plain; charset=utf-8',
             'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
             'Referrer-Policy' => 'no-referrer',

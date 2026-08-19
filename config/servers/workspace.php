@@ -174,6 +174,7 @@ return [
             // unit + queue workers) is reachable on worker hosts.
             'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'logs', 'firewall', 'networking', 'ssh', 'files', 'tools', 'settings'],
             'overrides' => [
+                'sites' => ['label' => 'Workload'],
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
                 'worker-pool' => ['group' => 'overview'],
                 'schedule' => ['group' => 'background'],

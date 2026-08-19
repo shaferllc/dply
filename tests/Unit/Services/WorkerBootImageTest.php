@@ -41,6 +41,28 @@ function workerBakeServer(array $overrides = []): Server
     ], $overrides));
 }
 
+it('describes a ready bake on the site workers page', function () {
+    $worker = workerBakeServer();
+    ServerImage::query()->create([
+        'server_id' => $worker->id,
+        'organization_id' => $worker->organization_id,
+        'user_id' => $worker->user_id,
+        'provider' => ServerProvider::DigitalOcean->value,
+        'name' => 'dply-worker-sfo2',
+        'purpose' => ServerImage::PURPOSE_WORKER_BAKE,
+        'status' => ServerImage::STATUS_COMPLETED,
+        'provider_image_id' => '170999',
+        'region' => 'sfo2',
+    ]);
+
+    $note = app(WorkerBootImage::class)->noteFor($worker);
+
+    expect($note['state'])->toBe('ready')
+        ->and($note['title'])->toBe('Saved stack image')
+        ->and($note['name'])->toBe('dply-worker-sfo2')
+        ->and($note['region'])->toBe('sfo2');
+});
+
 it('returns a completed bake image for the same org, provider, and region', function () {
     $worker = workerBakeServer();
     ServerImage::query()->create([

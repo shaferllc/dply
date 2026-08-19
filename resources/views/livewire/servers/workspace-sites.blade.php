@@ -1,11 +1,21 @@
 @php
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    $isWorkerHost = $workerHost->isWorkerHost;
+    $showAddSite = $this->canAddSite && ! $workerHost->isSiteSourced;
     $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
-    $listHeading = $isContainerHost ? __('Container apps') : __('Site directory');
-    $emptyHeadline = $isContainerHost ? __('No container apps yet') : __('No sites yet');
-    $emptyLead = $isContainerHost
-        ? __('Add one to deploy a Git repo onto this host.')
-        : __('Add a site to manage web server config, SSL, Git deploys, and environment files.');
+    $listHeading = $isWorkerHost
+        ? __('Queue workload')
+        : ($isContainerHost ? __('Container apps') : __('Site directory'));
+    $emptyHeadline = $isWorkerHost
+        ? __('No queue workload yet')
+        : ($isContainerHost ? __('No container apps yet') : __('No sites yet'));
+    $emptyLead = $isWorkerHost
+        ? ($workerHost->isSiteSourced
+            ? __('This worker copies the origin site automatically. Open Worker Servers on that site to retry.')
+            : __('Deploy the app onto this worker so it can run queue jobs.'))
+        : ($isContainerHost
+            ? __('Add one to deploy a Git repo onto this host.')
+            : __('Add a site to manage web server config, SSL, Git deploys, and environment files.'));
     $siteCount = $server->sites->count();
     $siteType = $server->siteType();
 @endphp
@@ -13,8 +23,10 @@
 <x-server-workspace-layout
     :server="$server"
     active="sites"
-    :title="__('Sites')"
-    :description="__('Manage sites, databases, automation, and deploy tools for this server.')"
+    :title="$isWorkerHost ? __('Workload') : __('Sites')"
+    :description="$isWorkerHost
+        ? __('Queue workers from deployed code — not a public web front.')
+        : __('Manage sites, databases, automation, and deploy tools for this server.')"
     hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
@@ -24,27 +36,35 @@
         {{-- Merged: page identity + directory in one card (same pattern as Run/Console). --}}
         <section class="dply-card min-w-0 overflow-hidden p-0">
             @php
-                $sitesIcon = match ($siteType) {
-                    'container' => 'heroicon-o-cube-transparent',
-                    'php' => 'heroicon-o-code-bracket',
-                    'static' => 'heroicon-o-photo',
-                    'node' => 'heroicon-o-bolt',
-                    default => 'heroicon-o-globe-alt',
-                };
-                $sitesNote = match ($siteType) {
-                    'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
-                    'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
-                    'static' => __('Host static sites from Git with zero-config builds.'),
-                    'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
-                    default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
-                };
-                $sitesRuntimeLabel = match ($siteType) {
-                    'container' => __('Container'),
-                    'php' => __('VM · PHP'),
-                    'static' => __('VM · Static'),
-                    'node' => __('VM · Node'),
-                    default => ucfirst((string) $server->hostKind()),
-                };
+                $sitesIcon = $isWorkerHost
+                    ? 'heroicon-o-square-3-stack-3d'
+                    : match ($siteType) {
+                        'container' => 'heroicon-o-cube-transparent',
+                        'php' => 'heroicon-o-code-bracket',
+                        'static' => 'heroicon-o-photo',
+                        'node' => 'heroicon-o-bolt',
+                        default => 'heroicon-o-globe-alt',
+                    };
+                $sitesNote = $isWorkerHost
+                    ? ($workerHost->originSite
+                        ? __('Queue workers for :site — same repo and queues, no public site.', ['site' => $workerHost->originSite->name])
+                        : __('Queue workers from deployed code — same repo and queues, no public site.'))
+                    : match ($siteType) {
+                        'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
+                        'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
+                        'static' => __('Host static sites from Git with zero-config builds.'),
+                        'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
+                        default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
+                    };
+                $sitesRuntimeLabel = $isWorkerHost
+                    ? __('Worker')
+                    : match ($siteType) {
+                        'container' => __('Container'),
+                        'php' => __('VM · PHP'),
+                        'static' => __('VM · Static'),
+                        'node' => __('VM · Node'),
+                        default => ucfirst((string) $server->hostKind()),
+                    };
             @endphp
 
             {{-- Dense head, matching the rest of the workspace. The site count,
@@ -53,14 +73,16 @@
             <x-workspace-panel-head
                 dense
                 :icon="$sitesIcon"
-                :title="$isContainerHost ? __('Container apps') : __('Sites')"
-                :count="trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $siteCount, ['count' => $siteCount])
+                :title="$isWorkerHost ? __('Workload') : ($isContainerHost ? __('Container apps') : __('Sites'))"
+                :count="($isWorkerHost
+                    ? trans_choice('{0} no workload|{1} :count workload|[2,*] :count workloads', $siteCount, ['count' => $siteCount])
+                    : trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $siteCount, ['count' => $siteCount]))
                     .' · '.$sitesRuntimeLabel"
                 :note="$sitesNote"
                 class="border-b border-brand-ink/10"
             >
                 <x-slot:actions>
-                    @if ($this->canAddSite)
+                    @if ($showAddSite)
                         <button
                             type="button"
                             wire:click="openAddSiteModal"
@@ -69,7 +91,7 @@
                             <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ $addCtaLabel }}
                         </button>
-                    @else
+                    @elseif (! $workerHost->isSiteSourced)
                         <span
                             class="inline-flex h-6 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-md bg-brand-mist/30 px-2 text-xs font-semibold text-brand-moss"
                             title="{{ $this->addSiteBlockedReason }}"
@@ -81,12 +103,14 @@
                 </x-slot:actions>
             </x-workspace-panel-head>
 
+            @include('livewire.servers.partials._worker-host-banner')
+
             {{-- The blocker used to be a thin tinted line that read as chrome and
                  got skipped, which is worse for a quota block than for any other
                  reason: the ceiling is ORG-wide, so it fires on a server showing
                  "No sites yet" and looks like a bug. Full-bleed callout, where the
                  usage actually is, and a route out. --}}
-            @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
+            @if (! $workerHost->isSiteSourced && ! $this->canAddSite && $this->addSiteBlockedReason !== '')
                 @php
                     $quotaBlock = $this->siteQuotaBlock;
                     $blockOrg = auth()->user()?->currentOrganization();
@@ -160,7 +184,9 @@
                     @endif
                 </div>
                 <p class="mt-1 text-xs text-brand-moss">
-                    @if ($bulkActionsEnabled && ! $isContainerHost)
+                    @if ($isWorkerHost)
+                        {{ __('This is the copied app this worker deploys — queues only, not a public site.') }}
+                    @elseif ($bulkActionsEnabled && ! $isContainerHost)
                         {{ __('Select sites to run bulk actions, or click a row to open that workspace.') }}
                     @else
                         {{ __('Click a row to open that workspace.') }}
@@ -224,7 +250,9 @@
             @if ($server->sites->isEmpty())
                 <div class="px-4 py-8 text-center sm:px-5">
                     <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        @if ($isContainerHost)
+                        @if ($isWorkerHost)
+                            <x-heroicon-o-square-3-stack-3d class="h-6 w-6" aria-hidden="true" />
+                        @elseif ($isContainerHost)
                             <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
                         @else
                             <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
@@ -234,9 +262,9 @@
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                         {{-- "Add a site to…" next to a disabled Add button reads as a
                              broken page; point at the callout above instead. --}}
-                        {{ $this->canAddSite ? $emptyLead : $this->addSiteBlockedReason }}
+                        {{ $showAddSite ? $emptyLead : ($workerHost->isSiteSourced ? $emptyLead : $this->addSiteBlockedReason) }}
                     </p>
-                    @if ($this->canAddSite)
+                    @if ($showAddSite)
                         <button
                             type="button"
                             wire:click="openAddSiteModal"
@@ -245,6 +273,15 @@
                             <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ $addCtaLabel }}
                         </button>
+                    @elseif ($workerHost->isSiteSourced && filled($workerHost->manageUrl))
+                        <a
+                            href="{{ $workerHost->manageUrl }}"
+                            wire:navigate
+                            class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            {{ __('Open Worker Servers') }}
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </a>
                     @endif
                 </div>
             @else
@@ -264,6 +301,7 @@
                             // to this row: a VM site (not a functions/edge runtime)
                             // the viewer may update. The action handlers re-check
                             // this, so a stale click is a safe no-op either way.
+                            $isWorkerReplica = $isWorkerHost || $s->isFleetReplica();
                             $siteDeployable = $server->isVmHost()
                                 && ! $s->usesFunctionsRuntime()
                                 && ! $s->usesEdgeRuntime()
@@ -278,12 +316,13 @@
                             // left bar so the row matches the family pattern.
                             $statusChip = match (true) {
                                 $s->status === \App\Models\Site::STATUS_ERROR => ['tone' => 'border-rose-200 bg-rose-50 text-rose-700', 'icon' => 'm-x-circle', 'label' => __('Error')],
-                                $statusOk => ['tone' => 'border-emerald-200 bg-emerald-50 text-emerald-700', 'icon' => 'm-check-circle', 'label' => __('Ready')],
+                                $statusOk => ['tone' => 'border-emerald-200 bg-emerald-50 text-emerald-700', 'icon' => 'm-check-circle', 'label' => $isWorkerReplica ? __('Running') : __('Ready')],
+                                $isWorkerReplica => ['tone' => 'border-amber-200 bg-amber-50 text-amber-800', 'icon' => 'm-clock', 'label' => __('Installing')],
                                 default => ['tone' => 'border-amber-200 bg-amber-50 text-amber-800', 'icon' => 'm-clock', 'label' => __('Pending')],
                             };
                         @endphp
                         <li wire:key="site-{{ $s->id }}" class="flex items-stretch">
-                            @if ($bulkActionsEnabled && ! $isContainerHost)
+                            @if ($bulkActionsEnabled && ! $isContainerHost && ! $isWorkerReplica)
                                 <label class="flex shrink-0 items-center px-4 sm:px-5">
                                     <input
                                         type="checkbox"
@@ -309,12 +348,18 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $s->isCustom() ? $s->name : $displayHost }}</span>
+                                        @if ($isWorkerReplica)
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">
+                                                <x-heroicon-o-square-3-stack-3d class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Worker') }}
+                                            </span>
+                                        @endif
                                         @if ($s->isCustom())
                                             <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 <x-heroicon-m-wrench-screwdriver class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Custom') }}
                                             </span>
-                                        @elseif ($sslOn)
+                                        @elseif ($sslOn && ! $isWorkerReplica)
                                             <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
                                                 <x-heroicon-s-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('SSL') }}
@@ -399,7 +444,7 @@
                                         </span>
                                         {{ __('Deploy') }}
                                     </button>
-                                    @if ($syncCount > 1)
+                                    @if ($syncCount > 1 && ! $isWorkerReplica)
                                         <button
                                             type="button"
                                             wire:click="deploySyncedSites('{{ $s->id }}')"

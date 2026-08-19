@@ -62,7 +62,19 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
         if (! $pool instanceof WorkerPool) {
             return;
         }
-        $this->resolvedSubject = $pool->primaryServer ?? $pool->sourceServer;
+        // Fall back to a member: a pool whose primary/source server has been
+        // deleted still has members worth probing, and without this the console
+        // action insert fails on a null subject_id and the job dies before it
+        // probes anything — leaving the panel showing stale "Redis down" forever.
+        $this->resolvedSubject = $pool->primaryServer
+            ?? $pool->sourceServer
+            ?? $pool->servers->first();
+
+        if ($this->resolvedSubject === null) {
+            Log::info('worker-pool: stats skipped, pool has no servers', ['pool_id' => $pool->id]);
+
+            return;
+        }
 
         $emit = $this->beginConsoleAction();
 
@@ -128,6 +140,20 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
      */
     private function probe(ExecuteRemoteTaskOnServer $exec, Server $member, string $siteDir): array
     {
+        $bash = self::buildProbeScript($siteDir);
+        $out = $exec->runInlineBash($member, 'worker-pool:stats', $bash, timeoutSeconds: 45, asRoot: false);
+
+        $raw = (string) $out->buffer;
+        $parsed = $this->parse($raw);
+        $parsed['ok'] = $out->exitCode === 0;
+        $parsed['collected_at'] = now()->toIso8601String();
+
+        return [$parsed, $raw];
+    }
+
+    /** The remote probe script. Public so it can be inspected and tested without SSH. */
+    public static function buildProbeScript(string $siteDir): string
+    {
         // Host metrics + worker-process detection come from bash. Redis + queue
         // come from the APP ITSELF (Redis::connection()->info() / Queue::size())
         // — not redis-cli — so the exact host/port/password/TLS the app uses is
@@ -159,7 +185,9 @@ echo "MEM=\$(free -m 2>/dev/null | awk '/^Mem:/{print \$3"/"\$2}' || true)"
 echo "DISK=\$(df -h / 2>/dev/null | awk 'NR==2{print \$3"/"\$2" "\$5}' || true)"
 echo "UPTIME=\$(uptime -p 2>/dev/null | sed 's/^up //' || true)"
 echo "HORIZON_PROCS=\$(pgrep -fc 'artisan horizon' 2>/dev/null || echo 0)"
-echo "QUEUE_PROCS=\$(pgrep -fc 'artisan queue:work' 2>/dev/null || echo 0)"
+# Horizon does not spawn processes named "queue:work", so counting only that
+# reported 0 workers on a box that was visibly draining the queue.
+echo "QUEUE_PROCS=\$(pgrep -f 'artisan (queue:work|horizon:work)' 2>/dev/null | wc -l | tr -d ' ')"
 echo "SYSTEMD_WORKERS=\$(systemctl list-units 'dply-site-*.service' --no-legend --state=running 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
 echo "SV_RUNNING=\$( (sudo -n supervisorctl status 2>/dev/null || supervisorctl status 2>/dev/null || true) | grep -c RUNNING || true)"
 RH=127.0.0.1; RP=6379
@@ -173,25 +201,17 @@ if [ -n "\$DIR" ] && [ -d "\$DIR" ]; then
   echo "--- redis probe (via app Redis::connection) ---"
   # Keep stderr (2>&1) so connection/auth/TLS errors are VISIBLE in the console
   # for debugging — the KEY=VALUE parser ignores any non KEY=VALUE noise.
-  printf '%s' {$redisB64} | base64 -d | php artisan tinker 2>&1 || echo "REDIS_PING=down"
+  # Bootstrapped php -r rather than `artisan tinker`: tinker is a DEV dependency,
+  # so on a production box installed with --no-dev the command does not exist and
+  # every probe reported Redis as down while the app was talking to it happily.
+  php -d display_errors=0 -r "require getcwd().'/vendor/autoload.php'; (require getcwd().'/bootstrap/app.php')->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); eval(base64_decode('{$redisB64}'));" 2>&1 || echo "REDIS_PING=down"
 else
   echo "REDIS_HOST=:"
   echo "REDIS_PING=down (no app dir resolved)"
 fi
 BASH;
 
-        $bash = 'DIR='.escapeshellarg($siteDir)."\n".$probe;
-        $out = $exec->runInlineBash($member, 'worker-pool:stats', $bash, timeoutSeconds: 45, asRoot: false);
-
-        $raw = (string) $out->buffer;
-        $parsed = $this->parse($raw);
-        $parsed['ok'] = $out->exitCode === 0;
-        // Stamp is set by the dispatcher path after return is not possible (jobs
-        // can't use now() deterministically in resume), but a plain wall-clock
-        // read here is fine — this isn't a resumable workflow.
-        $parsed['collected_at'] = now()->toIso8601String();
-
-        return [$parsed, $raw];
+        return 'DIR='.escapeshellarg($siteDir)."\n".$probe;
     }
 
     /**

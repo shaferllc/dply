@@ -9,6 +9,7 @@ use App\Modules\Billing\Services\ServerlessOrganizationUsageReader;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerProviderCostEstimator;
 use App\Support\Servers\CacheServiceNetworkExposure;
+use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +99,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         GetProviderCredentialsForServerType::flushMemo();
+        LinkedOrganizationSecrets::flushMemo();
         CacheServiceNetworkExposure::flushManagedRuleMemo();
         OrganizationBillingStateComputer::flushMemo();
         EdgeOrganizationUsageReader::flushMemo();

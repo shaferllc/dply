@@ -106,11 +106,15 @@ final class OrganizationSecretManager
         $site->organizationSecrets()->attach($secret->id, [
             'key' => $secret->key,
         ]);
+
+        LinkedOrganizationSecrets::flushMemo((string) $site->getKey());
     }
 
     public function unlink(Site $site, OrganizationSecret $secret): void
     {
         $site->organizationSecrets()->detach($secret->id);
+
+        LinkedOrganizationSecrets::flushMemo((string) $site->getKey());
     }
 
     /**

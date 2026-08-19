@@ -88,7 +88,7 @@ class WorkerPoolManager
             throw new RuntimeException(__('Your plan has no room for another server.'));
         }
         if ($site->attachedWorkerPools()->contains(fn (WorkerPool $pool): bool => $pool->isSiteSourced())) {
-            throw new RuntimeException(__('This site already has a worker fleet. Scale that pool instead.'));
+            throw new RuntimeException(__('This site already has workers. Scale that pool instead.'));
         }
 
         $region = trim($region);

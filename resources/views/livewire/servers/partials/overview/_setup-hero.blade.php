@@ -15,6 +15,14 @@
             <span class="inline-flex items-center whitespace-nowrap rounded-full border border-white/10 bg-black/10 px-3 py-1.5 text-xs font-medium text-brand-cream/80">
                 {{ __('Workspace unlocks after setup finishes') }}
             </span>
+            @if ($isWorkerRoleHost)
+                <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-violet-300/40 bg-violet-400/15 px-3 py-1.5 text-xs font-semibold text-violet-100">
+                    <x-heroicon-o-square-3-stack-3d class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ $workerHost->originSite
+                        ? __('Worker server for :site', ['site' => $workerHost->originSite->name])
+                        : __('Worker server') }}
+                </span>
+            @endif
         </div>
 
         <div class="mt-5">

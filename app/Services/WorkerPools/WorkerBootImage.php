@@ -41,25 +41,38 @@ class WorkerBootImage
     }
 
     /**
-     * @return array{state: string, message: string}|null
+     * @return array{state: string, title: string, message: string, name: ?string, region: ?string, when: ?string}|null
      */
     public function noteFor(Server $server): ?array
     {
-        if ($this->readyImage($server) instanceof ServerImage) {
-            return [
-                'state' => 'ready',
-                'message' => __('Later workers in this region boot from a saved image of the stack — setup skips the long package install.'),
-            ];
+        $image = $this->readyImage($server) ?? $this->inFlight($server) ?? $this->failedImage($server);
+        if (! $image instanceof ServerImage) {
+            return null;
         }
 
-        if ($this->inFlight($server) instanceof ServerImage) {
-            return [
+        $meta = [
+            'title' => __('Saved stack image'),
+            'name' => $image->name !== '' ? $image->name : null,
+            'region' => filled($image->region) ? (string) $image->region : null,
+            'when' => $image->updated_at?->diffForHumans(),
+        ];
+
+        return match ($image->status) {
+            ServerImage::STATUS_COMPLETED => $meta + [
+                'state' => 'ready',
+                'message' => __('The next worker in this region boots from this image — setup skips the long package install.'),
+            ],
+            ServerImage::STATUS_FAILED => $meta + [
+                'state' => 'failed',
+                'message' => filled($image->error_message)
+                    ? $image->error_message
+                    : __('Saving the stack image failed. The next worker will install packages from scratch.'),
+            ],
+            default => $meta + [
                 'state' => 'creating',
                 'message' => __('Saving an image of the installed stack so the next worker is faster.'),
-            ];
-        }
-
-        return null;
+            ],
+        };
     }
 
     /**
@@ -136,6 +149,11 @@ class WorkerBootImage
     private function inFlight(Server $server): ?ServerImage
     {
         return $this->lookup($server, [ServerImage::STATUS_PENDING, ServerImage::STATUS_CREATING])?->first();
+    }
+
+    private function failedImage(Server $server): ?ServerImage
+    {
+        return $this->lookup($server, [ServerImage::STATUS_FAILED])?->first();
     }
 
     /**

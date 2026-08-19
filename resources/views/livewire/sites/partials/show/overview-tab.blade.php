@@ -227,7 +227,7 @@
                         @if ($workerPools->isNotEmpty())
                             <div class="mt-5 border-t border-brand-ink/10 pt-5">
                                 <div class="flex items-center justify-between gap-3">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Worker servers') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Worker Servers') }}</p>
                                     <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'worker-fleet']) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage') }} →</a>
                                 </div>
                                 <ul class="mt-2 space-y-2">

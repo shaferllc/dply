@@ -78,8 +78,8 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-user',
             ],
             'worker-fleet' => [
-                'title' => __('Worker servers'),
-                'description' => __('Add worker VMs of this :resource — same code and queue, no webserver. Scale the fleet here.', ['resource' => $resourceNoun]),
+                'title' => __('Worker Servers'),
+                'description' => __('Add worker VMs of this :resource — same code and queue, no webserver. Scale them here and watch the queues they drain.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-square-3-stack-3d',
             ],
             'laravel-stack' => [

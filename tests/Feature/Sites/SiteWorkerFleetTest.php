@@ -7,6 +7,8 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\ReconcileWorkerPoolJob;
+use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\CloudDatabase;
@@ -445,7 +447,7 @@ it('refuses a second site-sourced fleet on the same site', function () {
     $manager->createPoolFromSite($user, $site, 's-1vcpu-1gb', false);
 
     expect(fn () => $manager->createPoolFromSite($user, $site->fresh(), 's-1vcpu-1gb', false))
-        ->toThrow(RuntimeException::class, 'already has a worker fleet');
+        ->toThrow(RuntimeException::class, 'already has workers');
 });
 
 it('replicates the origin site as a hidden fleet replica', function () {
@@ -661,6 +663,47 @@ it('manages a site-sourced fleet on the origin site, not the worker pool page', 
     Livewire::actingAs($user)
         ->test(WorkspaceWorkerPool::class, ['server' => $worker])
         ->assertRedirect($fleetUrl);
+});
+
+it('presents a site-sourced worker as a worker server, not a pending site', function () {
+    Queue::fake();
+    [$user, , , $app, , $site] = fleetReadySite();
+    $pool = app(WorkerPoolManager::class)->createPoolFromSite($user, $site, 's-1vcpu-1gb', false);
+    $worker = $pool->primaryServer;
+    expect($worker)->toBeInstanceOf(Server::class);
+
+    $worker->forceFill([
+        'status' => Server::STATUS_READY,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+    ])->save();
+
+    app(WorkerWorkloadReplayer::class)->replicateOriginSite($site, $worker);
+
+    session(['current_organization_id' => $site->organization_id]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceOverview::class, ['server' => $worker->fresh()])
+        ->assertSee('Worker server')
+        ->assertSee('Queue workers for '.$site->name)
+        ->assertSee('Workload')
+        ->assertSee('Installing')
+        ->assertSee('Worker Servers')
+        ->assertDontSee('Pending')
+        ->assertDontSee('Add your first site')
+        ->assertDontSee('Open Sites');
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSites::class, ['server' => $worker->fresh()])
+        ->assertSee('Worker server')
+        ->assertSee('Workload')
+        ->assertSee('Queue workload')
+        ->assertSee('Installing')
+        ->assertSee('Worker')
+        ->assertSee('Worker Servers')
+        ->assertDontSee('Pending')
+        ->assertDontSee('Add site')
+        ->assertDontSee('Sync ')
+        ->assertDontSee('Deploy PHP/Laravel apps from Git');
 });
 
 it('stops waiting when a worker’s cloud provision already failed', function () {

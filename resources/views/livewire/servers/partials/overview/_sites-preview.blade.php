@@ -4,7 +4,7 @@
         // Site lifecycle status → human label + tone. The raw values are
         // webserver-specific (nginx_active / caddy_active / container_active …),
         // so collapse them into a handful of states an operator actually reads.
-        $siteStatusMeta = function (?string $status): array {
+        $siteStatusMeta = function (?string $status) use ($isWorkerRoleHost): array {
             $s = (string) $status;
             if ($s === '') {
                 return ['label' => __('Unknown'), 'tone' => 'neutral'];
@@ -19,7 +19,7 @@
                 return ['label' => __('Deploying'), 'tone' => 'sky'];
             }
             if (str_ends_with($s, '_provisioning') || str_ends_with($s, '_configured') || in_array($s, ['pending', 'scaffolding', 'awaiting_app'], true)) {
-                return ['label' => __('Setting up'), 'tone' => 'amber'];
+                return ['label' => $isWorkerRoleHost ? __('Installing') : __('Setting up'), 'tone' => 'amber'];
             }
 
             return ['label' => (string) str($s)->headline(), 'tone' => 'neutral'];
@@ -48,14 +48,16 @@
         {{-- The "HOSTING" eyebrow over "Sites" said the same thing twice; the count
              moves to the head's own pill. --}}
         <x-workspace-panel-head
-            icon="heroicon-o-globe-alt"
-            :title="__('Sites')"
-            :note="__('Sites hosted on this server, each with its current status and most recent deploy.')"
+            :icon="$isWorkerRoleHost ? 'heroicon-o-square-3-stack-3d' : 'heroicon-o-globe-alt'"
+            :title="$isWorkerRoleHost ? __('Workload') : __('Sites')"
+            :note="$isWorkerRoleHost
+                ? __('Code this worker deploys to run queues — not a public site.')
+                : __('Sites hosted on this server, each with its current status and most recent deploy.')"
             :count="$siteCount ?: null"
             class="border-b border-brand-ink/10"
         >
             <x-slot:actions>
-                @if (($deployableSiteCount ?? 0) > 0)
+                @if (($deployableSiteCount ?? 0) > 0 && ! $isWorkerRoleHost)
                     {{-- Deploys the one deployable site immediately, or opens the
                          pick-sites modal when there's more than one (WatchesSiteDeploys). --}}
                     {{-- Fixed w-36 (matched on Open Sites below) so the idle→busy
@@ -79,7 +81,7 @@
                     wire:navigate
                 >
                     <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Open Sites') }}
+                    {{ $isWorkerRoleHost ? __('Open Workload') : __('Open Sites') }}
                 </x-secondary-button>
             </x-slot:actions>
         </x-workspace-panel-head>
@@ -122,6 +124,11 @@
                                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $previewSite]) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">
                                     {{ $previewSite->name }}
                                 </a>
+                                @if ($isWorkerRoleHost || $previewSite->isFleetReplica())
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">
+                                        {{ __('Worker') }}
+                                    </span>
+                                @endif
                                 <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $toneBadge[$status['tone']] }}">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $toneDot[$status['tone']] }}"></span>
                                     {{ $status['label'] }}
@@ -134,11 +141,13 @@
                                 @endif
                             </div>
                             <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
-                                @if ($domain)
+                                @if ($domain && ! $isWorkerRoleHost && ! $previewSite->isFleetReplica())
                                     <a href="https://{{ $domain }}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center gap-1 truncate font-mono text-brand-moss hover:text-brand-sage hover:underline">
                                         <span class="truncate">{{ $domain }}</span>
                                         <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     </a>
+                                @elseif ($isWorkerRoleHost)
+                                    <span>{{ __('Queue workload') }}</span>
                                 @endif
                                 @if ($runtimeLabel)
                                     @if ($domain)<span class="text-brand-mist/50">·</span>@endif

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\ServerImage;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
@@ -12,6 +13,7 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\WorkerPools\SiteWorkerFleetOnBoxDaemons;
 use App\Services\WorkerPools\SiteWorkerFleetTrustedSources;
+use App\Services\WorkerPools\WorkerBootImage;
 use App\Services\WorkerPools\WorkerMemberProviderProbe;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerPoolNotifier;
@@ -193,6 +195,16 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                 // half-built box was how a member advanced to deploying while its
                 // box was still being created (and sometimes vanished mid-setup).
                 if ($member->isProvisioningComplete()) {
+                    $bake = app(WorkerBootImage::class)->captureBeforeReplay($member);
+                    if ($bake instanceof ServerImage) {
+                        $emit->info(sprintf(
+                            '%s — stack image %s (%s)',
+                            $member->name,
+                            $bake->name,
+                            $bake->status,
+                        ), 'replay');
+                    }
+
                     $this->markState($member, WorkerPool::MEMBER_REPLAYING);
                     $emit->step('replay', sprintf('%s is ready — replaying workload', $member->name));
                     try {

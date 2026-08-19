@@ -11,30 +11,35 @@
     // container|php|static|node, so that arm is unreachable and the skeleton was
     // showing the wrong note on every single load.
     $skeletonSiteType = $server->siteType();
-    $skeletonSitesNote = match ($skeletonSiteType) {
-        'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
-        'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
-        'static' => __('Host static sites from Git with zero-config builds.'),
-        'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
-        default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
-    };
+    $isWorkerHost = $server->isWorkerHost();
+    $skeletonSitesNote = $isWorkerHost
+        ? __('Queue workers from deployed code — same repo and queues, no public site.')
+        : match ($skeletonSiteType) {
+            'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
+            'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
+            'static' => __('Host static sites from Git with zero-config builds.'),
+            'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
+            default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
+        };
     // The blocked callout is a tall band on the real page. Reserve its height
     // here when the gate is already closed, or the panel visibly jumps down as
     // the hydrate response lands. Same assess() the component uses.
     $skeletonBlocked = ! \App\Support\Sites\SiteCreateAccess::canCreate($server);
-    $skeletonSitesIcon = match ($skeletonSiteType) {
-        'container' => 'heroicon-o-cube-transparent',
-        'php' => 'heroicon-o-code-bracket',
-        'static' => 'heroicon-o-photo',
-        'node' => 'heroicon-o-bolt',
-        default => 'heroicon-o-globe-alt',
-    };
+    $skeletonSitesIcon = $isWorkerHost
+        ? 'heroicon-o-square-3-stack-3d'
+        : match ($skeletonSiteType) {
+            'container' => 'heroicon-o-cube-transparent',
+            'php' => 'heroicon-o-code-bracket',
+            'static' => 'heroicon-o-photo',
+            'node' => 'heroicon-o-bolt',
+            default => 'heroicon-o-globe-alt',
+        };
 @endphp
 
 <x-server-workspace-layout
     :server="$server"
     active="sites"
-    :title="__('Sites')"
+    :title="$isWorkerHost ? __('Workload') : __('Sites')"
     hide-hero
 >
     <div class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
@@ -44,7 +49,7 @@
         <x-workspace-panel-head
             dense
             :icon="$skeletonSitesIcon"
-            :title="$isContainerHost ? __('Container apps') : __('Sites')"
+            :title="$isWorkerHost ? __('Workload') : ($isContainerHost ? __('Container apps') : __('Sites'))"
             :note="$skeletonSitesNote"
             class="border-b border-brand-ink/10"
         />
@@ -66,7 +71,7 @@
             <div class="flex items-center gap-2">
                 <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
-                    {{ $isContainerHost ? __('Container apps') : __('Site directory') }}
+                    {{ $isWorkerHost ? __('Queue workload') : ($isContainerHost ? __('Container apps') : __('Site directory')) }}
                 </p>
             </div>
             <div class="mt-2 h-3 w-48 animate-pulse rounded bg-brand-ink/10"></div>

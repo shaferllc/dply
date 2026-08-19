@@ -286,6 +286,15 @@ class Server extends Model
     }
 
     /**
+     * Provisioned from a site’s Worker Servers page (not a standalone worker
+     * host). Scale/teardown belong on the origin site, not this workspace.
+     */
+    public function isSiteSourcedFleet(): bool
+    {
+        return (bool) data_get($this->meta, 'site_sourced_fleet');
+    }
+
+    /**
      * dply's own control-plane infrastructure (the dogfood boxes — app, worker,
      * database, redis) must never be deletable from the panel: not the cloud
      * host, not the database row. A server is locked when it carries the `dply`

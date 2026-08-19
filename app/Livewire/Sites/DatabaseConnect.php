@@ -72,6 +72,24 @@ class DatabaseConnect extends Component
     /** Minted tunnel session, once the operator has asked to set access up. */
     public string $tunnelSessionId = '';
 
+    /**
+     * Request-scoped memos. A single render asks for the binding, its cluster and
+     * the operator's tunnel alias from several places (each connect command, the
+     * terminal script link, the user picker); without these each one is its own
+     * query and Debugbar fills with duplicates.
+     */
+    private ?SiteBinding $memoBinding = null;
+
+    private ?CloudDatabase $memoCluster = null;
+
+    private ?string $memoAlias = null;
+
+    private bool $memoBindingLoaded = false;
+
+    private bool $memoClusterLoaded = false;
+
+    private bool $memoAliasLoaded = false;
+
     public function mount(Site $site, Server $server, string $bindingId): void
     {
         $this->site = $site;
@@ -142,6 +160,7 @@ class DatabaseConnect extends Component
             return;
         }
 
+        $this->forgetMemos();
         $this->dispatch('toast', type: 'success', message: __('Access granted until :time.', [
             'time' => $record->expires_at->diffForHumans(),
         ]));
@@ -171,6 +190,7 @@ class DatabaseConnect extends Component
             return;
         }
 
+        $this->forgetMemos();
         $this->dispatch('toast', type: 'success', message: __('Access revoked.'));
     }
 
@@ -204,6 +224,7 @@ class DatabaseConnect extends Component
         }
 
         $this->tunnelSessionId = (string) $session->id;
+        $this->forgetMemos();
     }
 
     public function startCreatingUser(): void
@@ -246,18 +267,36 @@ class DatabaseConnect extends Component
         $this->creatingUser = false;
         $this->newUserName = '';
 
+        $this->forgetMemos();
         $this->dispatch('toast', type: 'success', message: __('Created :user.', ['user' => $created['name']]));
     }
 
     public function binding(): ?SiteBinding
     {
-        if ($this->bindingId === '') {
-            return null;
+        if ($this->memoBindingLoaded) {
+            return $this->memoBinding;
         }
 
-        return SiteBinding::query()
+        $this->memoBindingLoaded = true;
+
+        if ($this->bindingId === '') {
+            return $this->memoBinding = null;
+        }
+
+        return $this->memoBinding = SiteBinding::query()
             ->where('site_id', $this->site->id)
             ->find($this->bindingId);
+    }
+
+    /** Drop the memos after a mutation so the following render reads fresh rows. */
+    private function forgetMemos(): void
+    {
+        $this->memoBinding = null;
+        $this->memoCluster = null;
+        $this->memoAlias = null;
+        $this->memoBindingLoaded = false;
+        $this->memoClusterLoaded = false;
+        $this->memoAliasLoaded = false;
     }
 
     public function render(): View
@@ -329,6 +368,7 @@ class DatabaseConnect extends Component
                 : null,
             'launchCommand' => $reason === null ? $this->launchCommand($target) : null,
             'terminalScriptLink' => $this->terminalScriptLink($target),
+            'terminalCommand' => $reason === null ? $this->terminalCommand($target) : null,
             'target' => $target,
             'databaseUsers' => $databaseUsers,
             'canManageUsers' => $canManageUsers,
@@ -360,6 +400,79 @@ class DatabaseConnect extends Component
             'port' => $viaTunnel ? $this->localPort : $target->port,
             'as' => $this->connectAs !== '' ? $this->connectAs : null,
         ]);
+    }
+
+    /**
+     * One paste that ends at a database prompt in the operator's own terminal.
+     *
+     * No download, so none of the macOS quarantine friction a .command carries.
+     * The credential is fetched at run time from a signed URL rather than being
+     * pasted, so it never lands in shell history.
+     */
+    private function terminalCommand(?DatabaseConnectionTarget $target): ?string
+    {
+        if (! $target instanceof DatabaseConnectionTarget || $target->host === '') {
+            return null;
+        }
+
+        $prefix = $this->tunnelPrefix($target);
+        if ($prefix === null) {
+            return null;
+        }
+
+        $uriUrl = escapeshellarg($this->credentialUrl('uri'));
+
+        return $prefix.match (true) {
+            $target->isMysqlFamily() => sprintf(
+                'MYSQL_PWD="$(curl -fsSL %s)" mysql -h 127.0.0.1 -P %d -u %s %s',
+                escapeshellarg($this->credentialUrl('password')),
+                $this->localPort,
+                escapeshellarg($target->username),
+                escapeshellarg($target->database),
+            ),
+            $target->isRedis() => 'redis-cli -u "$(curl -fsSL '.$uriUrl.')"',
+            default => 'psql "$(curl -fsSL '.$uriUrl.')"',
+        };
+    }
+
+    /** Signed URL yielding either the full URI or the bare password. */
+    private function credentialUrl(string $format): string
+    {
+        return URL::temporarySignedRoute('database-connections.uri', now()->addMinutes(10), [
+            'binding' => $this->bindingId,
+            'via' => 'tunnel',
+            'port' => $this->localPort,
+            'as' => $this->connectAs !== '' ? $this->connectAs : null,
+            'format' => $format === 'password' ? 'password' : null,
+        ]);
+    }
+
+    /** `ensure the tunnel is up; ` — shared by the connect commands. */
+    private function tunnelPrefix(DatabaseConnectionTarget $target): ?string
+    {
+        $alias = $this->existingTunnelAlias();
+        $sshTarget = $alias !== null
+            ? $alias
+            : DatabaseJumpHostAccess::sshUserFor($this->server).'@'.$this->server->ip_address;
+
+        if ($sshTarget === '' || $this->server->ip_address === null) {
+            return null;
+        }
+
+        $sshPort = (int) ($this->server->ssh_port ?: 22);
+        $portFlag = $sshPort === 22 ? '' : ' -p '.$sshPort;
+        $identity = $alias !== null ? '' : ' -o IdentitiesOnly=yes -i '.$this->sshKeyPath;
+
+        return sprintf(
+            'nc -z 127.0.0.1 %d 2>/dev/null || ssh -f -N%s%s -L %d:%s:%d %s; ',
+            $this->localPort,
+            $identity,
+            $portFlag,
+            $this->localPort,
+            $target->host,
+            $target->port,
+            $sshTarget,
+        );
     }
 
     /**
@@ -451,14 +564,20 @@ class DatabaseConnect extends Component
      */
     private function existingTunnelAlias(): ?string
     {
+        if ($this->memoAliasLoaded) {
+            return $this->memoAlias;
+        }
+
+        $this->memoAliasLoaded = true;
+
         $user = auth()->user();
         if ($user === null) {
-            return null;
+            return $this->memoAlias = null;
         }
 
         $session = app(TunnelAccessProvisioner::class)->activeFor($this->server, $user);
 
-        return $session !== null ? TunnelAccessProvisioner::aliasFor($session) : null;
+        return $this->memoAlias = $session !== null ? TunnelAccessProvisioner::aliasFor($session) : null;
     }
 
     /**
@@ -510,11 +629,17 @@ class DatabaseConnect extends Component
 
     private function cluster(?SiteBinding $binding): ?CloudDatabase
     {
-        if (! $binding instanceof SiteBinding || $binding->target_type !== 'cloud_database') {
-            return null;
+        if ($this->memoClusterLoaded) {
+            return $this->memoCluster;
         }
 
-        return CloudDatabase::query()->find($binding->target_id);
+        $this->memoClusterLoaded = true;
+
+        if (! $binding instanceof SiteBinding || $binding->target_type !== 'cloud_database') {
+            return $this->memoCluster = null;
+        }
+
+        return $this->memoCluster = CloudDatabase::query()->find($binding->target_id);
     }
 
     /**

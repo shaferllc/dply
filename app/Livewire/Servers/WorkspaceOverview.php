@@ -36,6 +36,7 @@ use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
 use App\Support\Servers\SupervisorQueueProgramTypes;
+use App\Support\Servers\WorkerHostContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -367,6 +368,7 @@ class WorkspaceOverview extends Component
         $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
         $isDatabaseRoleHost = $serverRole === 'database';
         $isWorkerRoleHost = $serverRole === 'worker';
+        $workerHost = WorkerHostContext::for($this->server);
         // Dedicated cache/db boxes never host site code, so their site/stack/deploy
         // cards are hidden. A worker IS an app host (it runs queue workers from the
         // deployed code), so it keeps sites/deploys — it just doesn't serve web traffic.
@@ -486,6 +488,17 @@ class WorkspaceOverview extends Component
                 'done' => $databaseEngineInstalled,
                 'cta_label' => __('Open Database'),
                 'cta_route' => route('servers.databases', $this->server),
+            ];
+        } elseif ($isWorkerRoleHost) {
+            $onboardingSteps[] = [
+                'key' => 'first_site',
+                'label' => __('Install queue workload'),
+                'help' => $workerHost->originSite
+                    ? __('This worker copies :site and runs its queues.', ['site' => $workerHost->originSite->name])
+                    : __('This worker copies the origin site and runs its queues.'),
+                'done' => $sites->count() > 0,
+                'cta_label' => $workerHost->manageUrl ? __('Open Worker Servers') : __('Open Workload'),
+                'cta_route' => $workerHost->manageUrl ?? route('servers.sites', $this->server),
             ];
         } else {
             $onboardingSteps[] = [
@@ -624,7 +637,10 @@ class WorkspaceOverview extends Component
             'latestMetricSnapshot' => $latestMetricSnapshot,
             'sitesPreview' => $sitesPreview,
             'sitesPreviewLatestDeploys' => $sitesPreviewLatestDeploys,
-            'deployableSiteCount' => $this->deployableSitesFor($this->server->loadMissing('sites'))->count(),
+            'deployableSiteCount' => $isWorkerRoleHost
+                ? 0
+                : $this->deployableSitesFor($this->server->loadMissing('sites'))->count(),
+            'workerHost' => $workerHost,
             'onboardingSteps' => $onboardingSteps,
             'onboardingDone' => $onboardingDone,
             'onboardingTotal' => $onboardingTotal,
@@ -637,6 +653,7 @@ class WorkspaceOverview extends Component
             'databaseTileData' => $databaseTileData,
             'isDedicatedServiceRoleHost' => $isDedicatedServiceRoleHost,
             'isDatabaseRoleHost' => $isDatabaseRoleHost,
+            'isWorkerRoleHost' => $isWorkerRoleHost,
         ]);
     }
 

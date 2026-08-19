@@ -22,6 +22,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
+use App\Support\Servers\WorkerHostContext;
 use App\Support\Sites\SiteCreateAccess;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
@@ -478,7 +479,9 @@ class WorkspaceSites extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions'),
+            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions')
+                && ! $this->server->isWorkerHost(),
+            'workerHost' => WorkerHostContext::for($this->server),
         ]);
     }
 }

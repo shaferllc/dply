@@ -9,16 +9,20 @@ use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
 use App\Jobs\CollectWorkerPoolStatsJob;
 use App\Models\Concerns\Site\HasSiteRelationships;
 use App\Models\ConsoleAction;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\SiteWorkerFleetPreflight;
+use App\Services\WorkerPools\WorkerBootImage;
 use App\Services\WorkerPools\WorkerCloneProvisioner;
 use App\Services\WorkerPools\WorkerPoolManager;
+use App\Services\WorkerPools\WorkerProvisionProgress;
 use App\Support\Providers\ProviderAuthFailure;
 use App\Support\Sites\SiteWorkerFleetSize;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 
 /**
@@ -136,14 +140,96 @@ trait ManagesSiteWorkerPool
             }
         }
 
-        return $this->fleetScaleRun()?->isInFlight() === true;
+        if ($this->fleetScaleRun()?->isInFlight() === true) {
+            return true;
+        }
+
+        return ($this->workerBootImageNote()['state'] ?? null) === 'creating';
+    }
+
+    /**
+     * @return array{state: string, title: string, message: string, name: ?string, region: ?string, when: ?string}|null
+     */
+    public function workerBootImageNote(): ?array
+    {
+        $images = app(WorkerBootImage::class);
+        $ready = null;
+        $hasMembers = false;
+
+        foreach ($this->site->attachedWorkerPools() as $pool) {
+            foreach ($pool->servers as $member) {
+                $hasMembers = true;
+                $note = $images->noteFor($member);
+                if ($note === null) {
+                    continue;
+                }
+                if (in_array($note['state'] ?? '', ['creating', 'failed'], true)) {
+                    return $note;
+                }
+                $ready = $note;
+            }
+        }
+
+        if ($ready === null && $this->site->server instanceof Server) {
+            $ready = $images->noteFor($this->site->server);
+        }
+
+        if ($ready !== null) {
+            return $ready;
+        }
+
+        if (! $hasMembers) {
+            return null;
+        }
+
+        return [
+            'state' => 'waiting',
+            'title' => __('Saved stack image'),
+            'message' => __('After the first worker finishes setup we snapshot the box (before the site is copied). The next worker boots from that image.'),
+            'name' => null,
+            'region' => $this->site->server?->region,
+            'when' => null,
+        ];
+    }
+
+    /**
+     * @return array{name: string, message: string}|null
+     */
+    public function fleetCredentialAlert(): ?array
+    {
+        $server = $this->site->server;
+        if (! $server instanceof Server) {
+            return null;
+        }
+
+        $credential = ProviderCredential::preferredForServer($server);
+        if ($credential === null || ! $credential->isUnhealthy()) {
+            return null;
+        }
+
+        $raw = trim((string) $credential->validation_error);
+
+        return [
+            'name' => filled($credential->name) ? (string) $credential->name : $server->provider->label(),
+            'message' => ProviderAuthFailure::detected($raw)
+                ? ProviderAuthFailure::message($server->provider->value)
+                : ($raw !== '' ? $raw : __('This provider token can no longer connect.')),
+        ];
+    }
+
+    /**
+     * @return array{label: string, detail: string, step: int, of: int}|null
+     */
+    public function workerProvisionProgress(Server $member): ?array
+    {
+        return app(WorkerProvisionProgress::class)->for($member);
     }
 
     public function openWorkerProcessModal(string $memberId): void
     {
         $this->authorize('view', $this->site);
         if ($this->resolveFleetMember($memberId) === null) {
-            $this->toastError(__('That worker is not part of this site’s fleet.'));
+            $this->toastError(__('That worker is not part of this site.'));
 
             return;
         }
@@ -168,7 +254,7 @@ trait ManagesSiteWorkerPool
         $this->authorize('update', $this->site);
         $member = $this->resolveFleetMember($memberId);
         if (! $member instanceof Server) {
-            $this->toastError(__('That worker is not part of this site’s fleet.'));
+            $this->toastError(__('That worker is not part of this site.'));
 
             return;
         }
@@ -408,7 +494,7 @@ trait ManagesSiteWorkerPool
         $this->authorize('update', $this->site);
         $pool = $this->resolveAttachedPool($poolId);
         if ($pool === null || ! $pool->isSiteSourced()) {
-            $this->toastError(__('That worker fleet cannot be destroyed from here.'));
+            $this->toastError(__('Those workers cannot be destroyed from here.'));
 
             return;
         }
@@ -429,7 +515,7 @@ trait ManagesSiteWorkerPool
         $this->authorize('update', $this->site);
         $pool = $this->resolveAttachedPool($this->destroyFleetPoolId);
         if ($pool === null || ! $pool->isSiteSourced()) {
-            $this->toastError(__('Worker fleet not found for this site.'));
+            $this->toastError(__('Workers not found for this site.'));
 
             return;
         }
@@ -443,7 +529,7 @@ trait ManagesSiteWorkerPool
         }
 
         $this->closeDestroyFleetModal();
-        $this->toastSuccess(__('Draining and destroying the worker fleet.'));
+        $this->toastSuccess(__('Draining and destroying the workers.'));
     }
 
     public function requestAttachWorkerPool(string $poolId): void
@@ -566,6 +652,79 @@ trait ManagesSiteWorkerPool
         CollectWorkerPoolStatsJob::dispatch((string) $pool->id);
         CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
         $this->toastSuccess(__('Refreshing worker stats over SSH — numbers update in a few seconds.'));
+    }
+
+    public function fleetHasReadyWorkers(): bool
+    {
+        foreach ($this->site->attachedWorkerPools() as $pool) {
+            foreach ($pool->servers as $member) {
+                if ($this->memberIsReadyForWork($member)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function pollFleetWork(): void
+    {
+        $this->authorize('view', $this->site);
+        $this->refreshFleetWorkIfStale();
+    }
+
+    /**
+     * Pull Horizon + per-box process stats once a worker is healthy. Queued
+     * SSH only — never on the render path.
+     */
+    public function refreshFleetWorkIfStale(): void
+    {
+        $this->authorize('view', $this->site);
+
+        foreach ($this->site->attachedWorkerPools() as $pool) {
+            $ready = $pool->servers->contains(fn (Server $member): bool => $this->memberIsReadyForWork($member));
+            if (! $ready) {
+                continue;
+            }
+
+            $hz = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : [];
+            $last = ! empty($hz['last_attempt_at'])
+                ? Carbon::parse((string) $hz['last_attempt_at'])
+                : (! empty($hz['collected_at']) ? Carbon::parse((string) $hz['collected_at']) : null);
+
+            if ($last === null || $last->lte(now()->subSeconds(20))) {
+                $hz['last_attempt_at'] = now()->toIso8601String();
+                $meta = is_array($pool->meta) ? $pool->meta : [];
+                $meta['horizon'] = $hz;
+                $pool->forceFill(['meta' => $meta])->save();
+                CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
+            }
+
+            $this->refreshMemberStatsIfStale($pool);
+        }
+    }
+
+    private function refreshMemberStatsIfStale(WorkerPool $pool): void
+    {
+        $newest = $pool->servers
+            ->map(fn (Server $member) => data_get($member->meta, 'pool.stats.collected_at'))
+            ->filter()
+            ->map(fn ($at) => Carbon::parse((string) $at))
+            ->sort()
+            ->last();
+
+        if ($newest instanceof Carbon && $newest->gt(now()->subSeconds(45))) {
+            return;
+        }
+
+        CollectWorkerPoolStatsJob::dispatch((string) $pool->id);
+    }
+
+    private function memberIsReadyForWork(Server $member): bool
+    {
+        return $member->isProvisioningComplete()
+            && $member->status !== Server::STATUS_ERROR
+            && $member->poolMemberState() !== WorkerPool::MEMBER_ERRORED;
     }
 
     /** Add one worker to an attached pool. */

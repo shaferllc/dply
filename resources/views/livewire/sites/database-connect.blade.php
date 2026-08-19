@@ -127,17 +127,20 @@
 
                         <p class="mt-4 {{ $labelCls }}">{{ __('Step 2 · connect') }}</p>
                         <p class="mt-1 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Opens the tunnel if it is not already running, then launches TablePlus.') }}
+                            {{ __('Either command opens the tunnel if it is not already running, then connects. Credentials are fetched when the command runs, so they never enter your shell history.') }}
                         </p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <label for="connect-local-port-{{ $bindingId }}" class="text-xs text-brand-moss">{{ __('Local port') }}</label>
                             <input id="connect-local-port-{{ $bindingId }}" type="number" min="1024" max="65535" wire:model.live.debounce.400ms="localPort" class="{{ $inputCls }} w-24" />
                         </div>
-                        @if ($launchCommand)
-                            <div class="mt-2 min-w-0">
-                                <x-cli-snippet :command="$launchCommand" :summary="__('Run:')" />
-                            </div>
-                        @endif
+                        <div class="mt-2 min-w-0 space-y-2">
+                            @if ($launchCommand)
+                                <x-cli-snippet :command="$launchCommand" :summary="__('…in TablePlus:')" />
+                            @endif
+                            @if ($terminalCommand)
+                                <x-cli-snippet :command="$terminalCommand" :summary="__('…at a terminal prompt:')" />
+                            @endif
+                        </div>
                     @endif
 
                     {{-- The tunnel leads when one is available: it is the path that
@@ -151,7 +154,13 @@
                                 <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                                 {{ __('Open in TablePlus') }}
                             </a>
-                            <span class="text-xs text-brand-moss">{{ __('via the tunnel above') }}</span>
+                        @endif
+
+                        @if ($terminalScriptLink)
+                            <a href="{{ $terminalScriptLink }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                <x-heroicon-o-command-line class="h-4 w-4" />
+                                {{ __('Open in Terminal') }}
+                            </a>
                         @endif
 
                         @if ($directLink)
@@ -177,6 +186,12 @@
                             </a>
                         @endif
                     </div>
+
+                    @if ($terminalScriptLink)
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('“Open in Terminal” downloads a .command file — macOS blocks downloaded scripts on first run, so right-click it and choose Open the first time.') }}
+                        </p>
+                    @endif
                 </div>
 
                 {{-- Direct access, only where it applies --}}

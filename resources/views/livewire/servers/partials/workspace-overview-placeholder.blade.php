@@ -12,10 +12,12 @@
     // Same derivation as workspace-overview.blade.php / WorkspaceOverview::render.
     $serverRole = (string) ($server->meta['server_role'] ?? '');
     $isDedicatedServiceRoleHost = in_array($serverRole, ['redis', 'valkey', 'database'], true);
+    $isWorkerRoleHost = $serverRole === 'worker';
 
-    // Mirrors the $heroFacts list: Provider / Region / Size / Status / IP,
+    // Mirrors the $heroFacts list: Role (worker) / Provider / Region / Size / Status / IP,
     // plus Private IP when set, plus SSH.
-    $factLabels = [__('Provider'), __('Region'), __('Size'), __('Status'), __('IP')];
+    $factLabels = $isWorkerRoleHost ? [__('Role')] : [];
+    $factLabels = array_merge($factLabels, [__('Provider'), __('Region'), __('Size'), __('Status'), __('IP')]);
     if ($server->private_ip_address) {
         $factLabels[] = __('Private IP');
     }
@@ -39,9 +41,16 @@
                  stand-ins for the note and the two action pills. --}}
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
                 <h2 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
-                    <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    @if ($isWorkerRoleHost)
+                        <x-heroicon-o-square-3-stack-3d class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    @else
+                        <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    @endif
                     {{ $server->name }}
                 </h2>
+                @if ($isWorkerRoleHost)
+                    <span class="inline-flex shrink-0 items-center rounded-full bg-white px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ __('Worker server') }}</span>
+                @endif
                 <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
                 <span class="h-3 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></span>
                 <div class="ml-auto flex shrink-0 items-center gap-1.5">

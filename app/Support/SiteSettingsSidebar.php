@@ -220,7 +220,7 @@ final class SiteSettingsSidebar
             // Worker SERVERS (the app's worker pool) — detect + scale up/down. A
             // Settings section (no route); the panel shows attached pools or an
             // empty state. Distinct from 'daemons' (Supervisor processes on THIS box).
-            ['id' => 'worker-fleet', 'label' => __('Worker servers'), 'icon' => 'heroicon-o-square-3-stack-3d', 'group' => 'background'],
+            ['id' => 'worker-fleet', 'label' => __('Worker Servers'), 'icon' => 'heroicon-o-square-3-stack-3d', 'group' => 'background'],
             ['id' => 'services', 'label' => __('Services'), 'icon' => 'heroicon-o-cpu-chip', 'group' => 'background', 'route' => 'sites.services'],
             ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'sites.backups', 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ];

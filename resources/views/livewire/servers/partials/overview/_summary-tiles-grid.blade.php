@@ -50,7 +50,7 @@
 
     $summaryTiles = [
         ['label' => __('Health'), 'href' => route('servers.monitor', $server), 'value' => $healthValue, 'meta' => $healthMeta],
-        ['label' => __('Sites'), 'href' => route('servers.sites', $server), 'value' => $siteCount, 'mono' => true, 'meta' => $deployingMeta],
+        ['label' => $isWorkerRoleHost ? __('Workload') : __('Sites'), 'href' => route('servers.sites', $server), 'value' => $siteCount, 'mono' => true, 'meta' => $deployingMeta],
     ];
 
     if (! $isWorkerRoleHost) {

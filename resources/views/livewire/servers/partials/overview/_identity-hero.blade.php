@@ -30,13 +30,17 @@
     $factLabel = 'text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist';
     $factValue = 'mt-1 truncate text-sm font-medium text-brand-ink';
 
-    $heroFacts = [
+    $heroFacts = [];
+    if ($isWorkerRoleHost) {
+        $heroFacts[] = ['label' => __('Role'), 'value' => __('Worker')];
+    }
+    $heroFacts = array_merge($heroFacts, [
         ['label' => __('Provider'), 'value' => $heroProvider],
         ['label' => __('Region'), 'value' => $heroRegion],
         ['label' => __('Size'), 'value' => $heroSize, 'mono' => true],
         ['label' => __('Status'), 'value' => $heroStatus],
         ['label' => __('IP'), 'value' => $heroIp, 'mono' => true, 'select' => true, 'copy' => true],
-    ];
+    ]);
 
     if ($server->private_ip_address) {
         $heroFacts[] = ['label' => __('Private IP'), 'value' => $server->private_ip_address, 'mono' => true, 'select' => true, 'copy' => true];
@@ -51,11 +55,16 @@
          now, so it rides beside the name instead of taking its own row. --}}
     <x-workspace-panel-head
         dense
-        icon="heroicon-o-server-stack"
+        :icon="$isWorkerRoleHost ? 'heroicon-o-square-3-stack-3d' : 'heroicon-o-server-stack'"
         :title="$server->name"
-        :note="$healthSummary['last_checked_at']
-            ? __('Reachability checked :ago.', ['ago' => $healthSummary['last_checked_at']->diffForHumans()])
-            : __('No reachability check has run for this machine yet.')"
+        :count="$isWorkerRoleHost ? __('Worker server') : null"
+        :note="$isWorkerRoleHost
+            ? ($workerHost->originSite
+                ? __('Queue workers for :site — not a public web front.', ['site' => $workerHost->originSite->name])
+                : __('Queue workers from deployed code — not a public web front.'))
+            : ($healthSummary['last_checked_at']
+                ? __('Reachability checked :ago.', ['ago' => $healthSummary['last_checked_at']->diffForHumans()])
+                : __('No reachability check has run for this machine yet.'))"
         class="border-b border-brand-ink/10"
     >
         <x-slot:actions>
@@ -83,6 +92,8 @@
             @endfeature
         </x-slot:actions>
     </x-workspace-panel-head>
+
+    @include('livewire.servers.partials._worker-host-banner')
 
     <div class="px-3 py-3 sm:px-4">
         <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -136,7 +147,7 @@
                         PHP <span class="ml-1 font-mono text-xs text-brand-moss">{{ $installedStack->phpVersion }}</span>
                     </span>
                 @endif
-                @if ($installedStack->webserver)
+                @if ($installedStack->webserver && ! $isWorkerRoleHost)
                     <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
                         {{ str($installedStack->webserver)->headline() }}
                     </span>

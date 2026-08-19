@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Jobs\RunSiteFixerJob;
+use App\Livewire\Sites\DeployControl;
+use App\Livewire\Sites\DeploymentsList;
 use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Carbon;
@@ -17,8 +19,8 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * The single home for the deploy actions + state that the main Deploy page
- * ({@see \App\Livewire\Sites\DeploymentsList}) and the deploy sidebar
- * ({@see \App\Livewire\Sites\DeployControl}) both drive. Before this, each
+ * ({@see DeploymentsList}) and the deploy sidebar
+ * ({@see DeployControl}) both drive. Before this, each
  * component re-implemented "is a deploy running", the seed-lock-and-dispatch
  * primitive, the Sync fan-out, and the smart-fix runner — so the two surfaces
  * drifted (different poll intervals, duplicated logic) and could both fire a
@@ -46,8 +48,8 @@ class SiteDeployCoordinator
 
     /**
      * Request-scoped {@see status()} snapshots, keyed by site id. The Deploy tab
-     * renders the sidebar ({@see \App\Livewire\Sites\DeployControl}) and the
-     * Deploy page ({@see \App\Livewire\Sites\DeploymentsList}) in one request and
+     * renders the sidebar ({@see DeployControl}) and the
+     * Deploy page ({@see DeploymentsList}) in one request and
      * each reads the snapshot, so without this the latest-deployment, in-flight
      * fixer (console_actions), and sync-peer SELECTs ran twice. The coordinator
      * is bound `scoped`, so the memo is reset per request/job; the write paths
@@ -66,6 +68,16 @@ class SiteDeployCoordinator
      * @var array<string, ?ConsoleAction>
      */
     private array $fixerMemo = [];
+
+    /**
+     * Request-scoped latest-deployment lookups, keyed by site id. Same reason as
+     * the memos above: the site workspace asks for it from more than one place in
+     * a single render, so the site_deployments SELECT ran once per call site.
+     * {@see forget()} drops it on write.
+     *
+     * @var array<string, ?SiteDeployment>
+     */
+    private array $latestMemo = [];
 
     /**
      * Seed the optimistic deploy marker and queue the deploy on a worker. SSH
@@ -212,12 +224,17 @@ class SiteDeployCoordinator
     public function forget(Site $site): void
     {
         $key = (string) $site->id;
-        unset($this->statusMemo[$key], $this->fixerMemo[$key]);
+        unset($this->statusMemo[$key], $this->fixerMemo[$key], $this->latestMemo[$key]);
     }
 
     public function latestDeployment(Site $site): ?SiteDeployment
     {
-        return $site->deployments()->latest()->first();
+        $key = (string) $site->id;
+        if (array_key_exists($key, $this->latestMemo)) {
+            return $this->latestMemo[$key];
+        }
+
+        return $this->latestMemo[$key] = $site->deployments()->latest()->first();
     }
 
     /**
@@ -303,7 +320,7 @@ class SiteDeployCoordinator
      * surfaces read the same checkboxes.
      *
      * @param  list<string>  $peerIds
-     * @return list<string>  the stored (validated) selection
+     * @return list<string> the stored (validated) selection
      */
     public function setSelectedPeerIds(Site $context, array $peerIds): array
     {

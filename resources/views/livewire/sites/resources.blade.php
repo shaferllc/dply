@@ -71,7 +71,7 @@
         <div @class([$card, 'mb-6' => ! $isEmbedded])>
             <div class="flex items-baseline justify-between gap-3">
                 <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Worker servers') }}</h2>
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Worker Servers') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Dedicated worker server pool(s) on this site\'s private network that drain its queues. Scale up when the backlog grows, down when it\'s quiet.') }}</p>
                 </div>
             </div>

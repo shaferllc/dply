@@ -12,14 +12,48 @@
     $rowBtn = 'inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50';
 @endphp
 
-<div class="min-w-0">
-    @if ($this->fleetIsInstalling())
-        <div wire:poll.4s class="hidden" aria-hidden="true"></div>
+<div class="min-w-0" wire:init="refreshFleetWorkIfStale">
+    @if ($this->fleetIsInstalling() || $this->fleetHasReadyWorkers())
+        <div wire:poll.8s="pollFleetWork" class="hidden" aria-hidden="true"></div>
     @endif
 
     @if ($bootNote = $this->workerBootImageNote())
-        <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
-            <p class="text-sm text-brand-moss">{{ $bootNote['message'] }}</p>
+        <div @class([
+            'border-b px-5 py-3 sm:px-6',
+            'border-brand-ink/10 bg-brand-sand/25' => ($bootNote['state'] ?? '') !== 'failed',
+            'border-rose-200 bg-rose-50' => ($bootNote['state'] ?? '') === 'failed',
+        ])>
+            <div class="flex flex-wrap items-center gap-2">
+                <p @class([
+                    'text-sm font-semibold',
+                    'text-brand-ink' => ($bootNote['state'] ?? '') !== 'failed',
+                    'text-rose-900' => ($bootNote['state'] ?? '') === 'failed',
+                ])>{{ $bootNote['title'] ?? __('Saved stack image') }}</p>
+                <span @class([
+                    'rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
+                    'bg-emerald-100 text-emerald-800' => ($bootNote['state'] ?? '') === 'ready',
+                    'bg-sky-100 text-sky-800' => ($bootNote['state'] ?? '') === 'creating',
+                    'bg-rose-100 text-rose-800' => ($bootNote['state'] ?? '') === 'failed',
+                    'bg-brand-sand/70 text-brand-moss' => ($bootNote['state'] ?? '') === 'waiting',
+                ])>
+                    {{ match ($bootNote['state'] ?? '') {
+                        'ready' => __('Ready'),
+                        'creating' => __('Saving'),
+                        'failed' => __('Failed'),
+                        default => __('Pending'),
+                    } }}
+                </span>
+            </div>
+            @if ($bootNote['name'] || $bootNote['region'] || $bootNote['when'])
+                <p class="mt-0.5 font-mono text-xs text-brand-mist">
+                    {{ collect([$bootNote['name'] ?? null, $bootNote['region'] ?? null, $bootNote['when'] ?? null])->filter()->implode(' · ') }}
+                </p>
+            @endif
+            <p @class([
+                'mt-1 text-sm',
+                'text-brand-moss' => ($bootNote['state'] ?? '') !== 'failed',
+                'text-rose-800' => ($bootNote['state'] ?? '') === 'failed',
+            ])>{{ $bootNote['message'] }}</p>
         </div>
     @endif
 
@@ -105,7 +139,7 @@
                                     type="button"
                                     wire:click="openDestroyFleetModal(@js((string) $pool->id))"
                                     class="{{ $rowBtn }}"
-                                >{{ __('Destroy fleet') }}</button>
+                                >{{ __('Destroy workers') }}</button>
                             @elseif (in_array($pool->id, $explicitPoolIds, true))
                                 <button
                                     type="button"
@@ -132,21 +166,103 @@
                     </div>
                 @endcan
 
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-ink/10 px-5 py-2 text-xs text-brand-moss sm:px-6">
-                    <span><span class="font-semibold text-brand-ink">{{ $hz['pending'] ?? '—' }}</span> {{ __('in queue') }}</span>
-                    <span><span class="font-semibold text-brand-ink">{{ $hz['jobs_per_minute'] ?? '—' }}</span> {{ __('jobs/min') }}</span>
-                    <span>{{ __('processed') }} <span class="font-medium text-brand-ink">{{ $hz['processed'] ?? '—' }}</span></span>
-                    <span>{{ __('failed') }} <span class="font-medium text-brand-ink">{{ $hz['failed'] ?? '—' }}</span></span>
-                    <span>{{ trans_choice(':n process|:n processes', $poolProcs, ['n' => $poolProcs]) }}</span>
-                    @if ($collectedAt)
-                        <span class="text-brand-mist">{{ \Illuminate\Support\Carbon::parse($collectedAt)->diffForHumans() }}</span>
+                @php
+                    $hzAt = ! empty($hz['collected_at']) ? \Illuminate\Support\Carbon::parse($hz['collected_at']) : ($collectedAt ? \Illuminate\Support\Carbon::parse($collectedAt) : null);
+                    $hzInstalled = ($hz['horizon_installed'] ?? null) !== false;
+                    $hzStatus = $hz['status'] ?? null;
+                    $workload = is_array($hz['workload'] ?? null) ? $hz['workload'] : [];
+                    $recentJobs = array_slice(is_array($hz['recent_jobs'] ?? null) ? $hz['recent_jobs'] : [], 0, 8);
+                    $pendingJobs = array_slice(is_array($hz['pending_jobs'] ?? null) ? $hz['pending_jobs'] : [], 0, 8);
+                    $failedJobs = array_slice(is_array($hz['failed_jobs'] ?? null) ? $hz['failed_jobs'] : [], 0, 5);
+                    $fmtAge = function ($seconds) {
+                        if ($seconds === null) {
+                            return null;
+                        }
+                        $s = (int) round((float) $seconds);
+                        if ($s < 60) {
+                            return $s.'s ago';
+                        }
+                        if ($s < 3600) {
+                            return floor($s / 60).'m ago';
+                        }
+
+                        return floor($s / 3600).'h ago';
+                    };
+                    $jobTone = fn (string $s) => match (strtolower($s)) {
+                        'completed' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                        'failed' => 'bg-rose-50 text-rose-700 ring-rose-200',
+                        'reserved', 'running' => 'bg-sky-50 text-sky-700 ring-sky-200',
+                        'pending' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                        default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/15',
+                    };
+                @endphp
+                <div class="border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
+                        <span class="text-sm font-semibold text-brand-ink">{{ __('Work') }}</span>
+                        @if ($hzStatus)
+                            <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $hzStatus }}</span>
+                        @endif
+                        <span><span class="font-semibold text-brand-ink">{{ $hz['pending'] ?? '—' }}</span> {{ __('in queue') }}</span>
+                        <span><span class="font-semibold text-brand-ink">{{ $hz['jobs_per_minute'] ?? '—' }}</span> {{ __('jobs/min') }}</span>
+                        <span>{{ __('processed') }} <span class="font-medium text-brand-ink">{{ $hz['completed'] ?? ($hz['processed'] ?? '—') }}</span></span>
+                        <span>{{ __('failed') }} <span class="font-medium text-brand-ink">{{ $hz['failed_total'] ?? ($hz['failed'] ?? '—') }}</span></span>
+                        <span>{{ trans_choice(':n process|:n processes', $poolProcs, ['n' => $poolProcs]) }}</span>
+                        @if ($hzAt)
+                            <span class="text-brand-mist">{{ $hzAt->diffForHumans() }}</span>
+                        @endif
+                        @can('update', $site)
+                            <button type="button" wire:click="refreshWorkerStats(@js((string) $pool->id))" wire:loading.attr="disabled" wire:target="refreshWorkerStats" class="{{ $rowBtn }} ml-auto">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshWorkerStats" />
+                                {{ __('Refresh') }}
+                            </button>
+                        @endcan
+                    </div>
+                    @if (! $hzAt && $members->contains(fn ($m) => $m->isProvisioningComplete()))
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Pulling queue activity from the workers — this updates on its own once the first snapshot lands.') }}</p>
+                    @elseif (($hz['horizon_installed'] ?? null) === false)
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('This app does not ship Horizon. Process counts still come from each worker; install laravel/horizon for per-queue jobs.') }}</p>
                     @endif
-                    @can('update', $site)
-                        <button type="button" wire:click="refreshWorkerStats(@js((string) $pool->id))" wire:loading.attr="disabled" wire:target="refreshWorkerStats" class="{{ $rowBtn }} ml-auto">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshWorkerStats" />
-                            {{ __('Refresh') }}
-                        </button>
-                    @endcan
+                    @if ($hzInstalled && $workload !== [])
+                        <ul class="mt-2 divide-y divide-brand-ink/5 rounded-lg border border-brand-ink/10">
+                            @foreach ($workload as $queue)
+                                <li class="flex flex-wrap items-center gap-2 px-3 py-1.5 text-xs">
+                                    <span class="font-mono font-medium text-brand-ink">{{ $queue['name'] ?? '?' }}</span>
+                                    <span class="text-brand-moss">{{ __(':n waiting', ['n' => $queue['length'] ?? '—']) }}</span>
+                                    <span class="ml-auto tabular-nums text-brand-mist">{{ trans_choice(':n process|:n processes', (int) ($queue['processes'] ?? 0), ['n' => (int) ($queue['processes'] ?? 0)]) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    @if ($pendingJobs !== [] || $recentJobs !== [] || $failedJobs !== [])
+                        <div class="mt-2 space-y-2">
+                            @foreach ([
+                                ['rows' => $pendingJobs, 'title' => __('Pending')],
+                                ['rows' => $recentJobs, 'title' => __('Recent')],
+                                ['rows' => $failedJobs, 'title' => __('Failed')],
+                            ] as $list)
+                                @continue($list['rows'] === [])
+                                <div>
+                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $list['title'] }}</p>
+                                    <ul class="mt-1 divide-y divide-brand-ink/5">
+                                        @foreach ($list['rows'] as $job)
+                                            <li class="flex flex-wrap items-center gap-2 py-1">
+                                                <span class="truncate text-xs font-medium text-brand-ink">{{ $job['name'] ?? 'job' }}</span>
+                                                <span class="rounded bg-brand-sand/70 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $job['queue'] ?? '?' }}</span>
+                                                @if (! empty($job['status']))
+                                                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $jobTone((string) $job['status']) }}">{{ $job['status'] }}</span>
+                                                @endif
+                                                @if (($job['age'] ?? null) !== null)
+                                                    <span class="ml-auto text-xs text-brand-mist">{{ $fmtAge($job['age']) }}</span>
+                                                @elseif (! empty($job['failed_at']))
+                                                    <span class="ml-auto text-xs text-brand-mist">{{ $job['failed_at'] }}</span>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
 
                 <ul class="divide-y divide-brand-ink/5">
@@ -158,6 +274,9 @@
                                 || $member->poolMemberState() === \App\Models\WorkerPool::MEMBER_ERRORED;
                             $memberFailure = $memberFailed ? $this->workerProvisionFailure($member) : null;
                             $memberProgress = $memberFailed ? null : $this->workerProvisionProgress($member);
+                            $installPct = $memberProgress !== null
+                                ? (int) round(((int) $memberProgress['step'] / max(1, (int) $memberProgress['of'])) * 100)
+                                : null;
                         @endphp
                         <li class="flex flex-wrap items-center gap-3 px-5 py-2 sm:px-6" wire:key="pool-member-{{ $member->id }}">
                             <div class="min-w-0 flex-1">
@@ -176,7 +295,6 @@
                                         <span class="rounded-md bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800">{{ __('failed') }}</span>
                                     @elseif ($memberProgress)
                                         <span class="text-xs font-medium text-brand-moss">{{ $memberProgress['label'] }}</span>
-                                        <span class="text-xs tabular-nums text-brand-mist">{{ __(':step of :of', ['step' => $memberProgress['step'], 'of' => $memberProgress['of']]) }}</span>
                                     @elseif ($member->poolMemberState() && $member->poolMemberState() !== \App\Models\WorkerPool::MEMBER_ACTIVE)
                                         <span class="text-xs text-brand-mist">{{ $member->poolMemberState() }}</span>
                                     @endif
@@ -186,22 +304,42 @@
                                 @else
                                     @if ($memberProgress)
                                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $memberProgress['detail'] }}</p>
+                                        <div
+                                            class="mt-1.5 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-brand-ink/10"
+                                            role="progressbar"
+                                            aria-valuenow="{{ $memberProgress['step'] }}"
+                                            aria-valuemin="0"
+                                            aria-valuemax="{{ $memberProgress['of'] }}"
+                                            aria-label="{{ __('Install progress') }}"
+                                        >
+                                            <div class="h-full rounded-full bg-brand-forest motion-safe:transition-[width] motion-safe:duration-500" style="width: {{ $installPct }}%"></div>
+                                        </div>
                                     @endif
                                     <p class="mt-0.5 truncate font-mono text-xs text-brand-mist">{{ $member->ip_address ?? '—' }} · {{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</p>
                                 @endif
                             </div>
-                            <div class="flex items-center gap-2" title="{{ __('Worker processes on this box — its share of the pool\'s drain capacity.') }}">
-                                <span class="text-xs text-brand-moss">{{ trans_choice(':n process|:n processes', $mProcs, ['n' => $mProcs]) }}</span>
-                                <div class="h-1.5 w-20 overflow-hidden rounded-full bg-brand-sand/60">
-                                    <div class="h-full rounded-full bg-violet-500" style="width: {{ $share }}%"></div>
+                            @if ($memberProgress)
+                                <div class="flex items-center gap-2" title="{{ __('Install progress') }}">
+                                    <span class="text-xs text-brand-moss">{{ __(':step of :of', ['step' => $memberProgress['step'], 'of' => $memberProgress['of']]) }}</span>
+                                    <div class="h-1.5 w-20 overflow-hidden rounded-full bg-brand-sand/60">
+                                        <div class="h-full rounded-full bg-brand-forest" style="width: {{ $installPct }}%"></div>
+                                    </div>
+                                    <span class="w-8 text-right text-xs font-medium tabular-nums text-brand-mist">{{ $installPct }}%</span>
                                 </div>
-                                <span class="w-8 text-right text-xs font-medium tabular-nums text-brand-mist">{{ $share }}%</span>
-                            </div>
+                            @else
+                                <div class="flex items-center gap-2" title="{{ __('Worker processes on this box — its share of the pool\'s drain capacity.') }}">
+                                    <span class="text-xs text-brand-moss">{{ trans_choice(':n process|:n processes', $mProcs, ['n' => $mProcs]) }}</span>
+                                    <div class="h-1.5 w-20 overflow-hidden rounded-full bg-brand-sand/60">
+                                        <div class="h-full rounded-full bg-violet-500" style="width: {{ $share }}%"></div>
+                                    </div>
+                                    <span class="w-8 text-right text-xs font-medium tabular-nums text-brand-mist">{{ $share }}%</span>
+                                </div>
+                            @endif
                             <button
                                 type="button"
                                 wire:click="openWorkerProcessModal(@js((string) $member->id))"
                                 class="{{ $rowBtn }} shrink-0"
-                            >{{ $memberFailed ? __('View error') : ($member->isProvisioningComplete() && $member->poolMemberState() === \App\Models\WorkerPool::MEMBER_ACTIVE ? __('View process') : __('View install')) }}</button>
+                            >{{ $memberFailed ? __('View error') : ($member->isProvisioningComplete() && $member->poolMemberState() === \App\Models\WorkerPool::MEMBER_ACTIVE ? __('View work') : __('View install')) }}</button>
                             @if ($memberFailed && blank($member->provider_id))
                                 <button
                                     type="button"
@@ -399,9 +537,9 @@
         >
             <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
             <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
-                <x-dialog-shell :title="__('Destroy worker fleet')" title-id="destroy-fleet-modal-title">
+                <x-dialog-shell :title="__('Destroy workers')" title-id="destroy-fleet-modal-title">
                     <div class="space-y-4">
-                        <p class="text-sm leading-relaxed text-brand-moss">{{ __('Drain and destroy every worker VM in this fleet. You cannot scale to zero — this is how the fleet goes away.') }}</p>
+                        <p class="text-sm leading-relaxed text-brand-moss">{{ __('Drain and destroy every worker VM for this site. You cannot scale to zero — this is how the workers go away.') }}</p>
                         <label class="flex items-start gap-2 text-sm text-brand-ink">
                             <input type="checkbox" wire:model="destroyFleetRestoreOnBox" class="mt-0.5 rounded border-brand-ink/15 text-brand-forest shadow-sm focus:ring-brand-forest">
                             <span>{{ __('Start Horizon / queue workers on this web box again so jobs keep draining.') }}</span>
@@ -409,7 +547,7 @@
                     </div>
                     <x-slot:footer>
                         <x-secondary-button type="button" x-on:click="close()">{{ __('Cancel') }}</x-secondary-button>
-                        <x-danger-button type="button" wire:click="confirmDestroyFleet">{{ __('Destroy fleet') }}</x-danger-button>
+                        <x-danger-button type="button" wire:click="confirmDestroyFleet">{{ __('Destroy workers') }}</x-danger-button>
                     </x-slot:footer>
                 </x-dialog-shell>
             </div>
@@ -431,6 +569,11 @@
             \App\Models\WorkerPool::MEMBER_REPLAYING,
             \App\Models\WorkerPool::MEMBER_DEPLOYING,
         ], true);
+        $processReady = $processMember && ! $processFailed && ! $installing && ! $deploying;
+        $processStats = $processReady ? (is_array(data_get($processMember->meta, 'pool.stats')) ? data_get($processMember->meta, 'pool.stats') : []) : [];
+        $processPool = $processMember?->workerPool;
+        $processHz = $processPool && is_array($processPool->meta['horizon'] ?? null) ? $processPool->meta['horizon'] : [];
+        $processRecent = array_slice(is_array($processHz['recent_jobs'] ?? null) ? $processHz['recent_jobs'] : [], 0, 8);
     @endphp
     @teleport('body')
         <div
@@ -453,7 +596,7 @@
             <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
             <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
                 <x-dialog-shell
-                    :title="$processMember?->name ?: __('Worker process')"
+                    :title="$processMember?->name ?: __('Worker')"
                     title-id="worker-process-modal-title"
                     max-width="2xl"
                 >
@@ -469,7 +612,7 @@
                                             ? __('Cloud create, SSH, setup script, then this site’s release.')
                                             : ($deploying
                                                 ? __('The box is up. Deploying this site’s release and starting queue workers.')
-                                                : __('Install and deploy for this worker.'))) }}
+                                                : __('This box drains this site’s queues. Scale and watch work on this page.'))) }}
                                 </p>
                                 <a
                                     href="{{ $installing || $processFailed ? route('servers.journey', $processMember) : route('servers.show', $processMember) }}"
@@ -497,11 +640,56 @@
                                 </div>
                             @endif
 
-                            <livewire:sites.worker-provision-path
-                                :server="$processMember"
-                                :origin-site-id="(string) $site->id"
-                                :key="'worker-path-'.$processMember->id"
-                            />
+                            @if ($processReady)
+                                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-ink/5 sm:grid-cols-4">
+                                    @foreach ([
+                                        ['k' => __('Horizon'), 'v' => $processStats['horizon_procs'] ?? '—'],
+                                        ['k' => __('Queue workers'), 'v' => $processStats['queue_procs'] ?? '—'],
+                                        ['k' => __('Load'), 'v' => $processStats['load'] ?? '—'],
+                                        ['k' => __('Redis'), 'v' => $processStats['redis_ping'] ?? '—'],
+                                    ] as $tile)
+                                        <div class="bg-white px-3 py-2">
+                                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['k'] }}</dt>
+                                            <dd class="mt-0.5 text-sm font-semibold tabular-nums text-brand-ink">{{ $tile['v'] }}</dd>
+                                        </div>
+                                    @endforeach
+                                </dl>
+                                @if ($processRecent !== [])
+                                    <div>
+                                        <p class="text-xs font-semibold text-brand-ink">{{ __('Recent jobs on this pool') }}</p>
+                                        <ul class="mt-1.5 divide-y divide-brand-ink/5">
+                                            @foreach ($processRecent as $job)
+                                                <li class="flex flex-wrap items-center gap-2 py-1">
+                                                    <span class="truncate text-xs font-medium text-brand-ink">{{ $job['name'] ?? 'job' }}</span>
+                                                    <span class="rounded bg-brand-sand/70 px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $job['queue'] ?? '?' }}</span>
+                                                    @if (! empty($job['status']))
+                                                        <span class="text-xs text-brand-mist">{{ $job['status'] }}</span>
+                                                    @endif
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+                            @endif
+
+                            @if ($processReady)
+                                <details class="rounded-lg border border-brand-ink/10">
+                                    <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-brand-ink">{{ __('Install path') }}</summary>
+                                    <div class="border-t border-brand-ink/10 px-3 py-2">
+                                        <livewire:sites.worker-provision-path
+                                            :server="$processMember"
+                                            :origin-site-id="(string) $site->id"
+                                            :key="'worker-path-'.$processMember->id"
+                                        />
+                                    </div>
+                                </details>
+                            @else
+                                <livewire:sites.worker-provision-path
+                                    :server="$processMember"
+                                    :origin-site-id="(string) $site->id"
+                                    :key="'worker-path-'.$processMember->id"
+                                />
+                            @endif
                         </div>
                     @endif
 
