@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
+use App\Modules\Database\Jobs\AllowReplicaServersOnManagedDatabasesJob;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use Illuminate\Support\Str;
@@ -167,6 +168,12 @@ class WorkerWorkloadReplayer
                 $framework !== '' ? $framework : null,
             );
         }
+
+        // A hosted (managed) database locks its trusted sources to the server
+        // present when it was provisioned, so a replica on a new droplet cannot
+        // reach it — right credentials, connection times out. Allowlist the new
+        // server as soon as it exists rather than waiting for a deploy.
+        AllowReplicaServersOnManagedDatabasesJob::dispatch((string) $sourceSite->id);
 
         // Provision the site (caddy + worker page for a worker host). The first
         // deploy is owned by the reconciler, which fires it only once this site

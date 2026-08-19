@@ -641,19 +641,68 @@
                             @endif
 
                             @if ($processReady)
-                                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-ink/5 sm:grid-cols-4">
-                                    @foreach ([
-                                        ['k' => __('Horizon'), 'v' => $processStats['horizon_procs'] ?? '—'],
-                                        ['k' => __('Queue workers'), 'v' => $processStats['queue_procs'] ?? '—'],
-                                        ['k' => __('Load'), 'v' => $processStats['load'] ?? '—'],
-                                        ['k' => __('Redis'), 'v' => $processStats['redis_ping'] ?? '—'],
-                                    ] as $tile)
-                                        <div class="bg-white px-3 py-2">
-                                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['k'] }}</dt>
-                                            <dd class="mt-0.5 text-sm font-semibold tabular-nums text-brand-ink">{{ $tile['v'] }}</dd>
+                                @php
+                                    // The probe already collects all of this; only four were ever
+                                    // surfaced, so a worker looked opaque even when healthy.
+                                    $redisUp = ($processStats['redis_ping'] ?? '') === 'PONG';
+                                    $redisUptime = (int) ($processStats['redis_uptime'] ?? 0);
+                                    $statGroups = [
+                                        __('Workers') => [
+                                            ['k' => __('Horizon'), 'v' => $processStats['horizon_procs'] ?? '—'],
+                                            ['k' => __('Queue workers'), 'v' => $processStats['queue_procs'] ?? '—'],
+                                            ['k' => __('Systemd units'), 'v' => $processStats['systemd_workers'] ?? '—'],
+                                            ['k' => __('Queue depth'), 'v' => $processStats['queue_size'] ?? '—'],
+                                        ],
+                                        __('Host') => [
+                                            ['k' => __('Load'), 'v' => $processStats['load'] ?? '—'],
+                                            ['k' => __('vCPUs'), 'v' => $processStats['cpus'] ?? '—'],
+                                            ['k' => __('Memory'), 'v' => ($processStats['mem'] ?? '') !== '' ? $processStats['mem'].' MB' : '—'],
+                                            ['k' => __('Disk'), 'v' => $processStats['disk'] ?? '—'],
+                                            ['k' => __('Uptime'), 'v' => $processStats['uptime'] ?? '—'],
+                                        ],
+                                        __('Redis') => [
+                                            ['k' => __('Status'), 'v' => $redisUp ? __('Connected') : ($processStats['redis_ping'] ?? '—'), 'tone' => $redisUp ? 'ok' : 'bad'],
+                                            ['k' => __('Memory'), 'v' => $processStats['redis_mem'] ?? '—'],
+                                            ['k' => __('Peak'), 'v' => $processStats['redis_peak'] ?? '—'],
+                                            ['k' => __('Clients'), 'v' => $processStats['redis_clients'] ?? '—'],
+                                            ['k' => __('Ops/sec'), 'v' => $processStats['redis_ops'] ?? '—'],
+                                            ['k' => __('Keys'), 'v' => $processStats['redis_keys'] ?? '—'],
+                                            ['k' => __('Uptime'), 'v' => $redisUptime > 0 ? \Carbon\CarbonInterval::seconds($redisUptime)->cascade()->forHumans(['short' => true, 'parts' => 2]) : '—'],
+                                        ],
+                                    ];
+                                @endphp
+
+                                <div class="space-y-2.5">
+                                    @foreach ($statGroups as $groupLabel => $tiles)
+                                        <div>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $groupLabel }}</p>
+                                            <dl class="mt-1 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-ink/5 sm:grid-cols-4">
+                                                @foreach ($tiles as $tile)
+                                                    <div class="bg-white px-3 py-2">
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $tile['k'] }}</dt>
+                                                        <dd @class([
+                                                            'mt-0.5 truncate text-sm font-semibold tabular-nums',
+                                                            'text-brand-ink' => ($tile['tone'] ?? '') === '',
+                                                            'text-emerald-700' => ($tile['tone'] ?? '') === 'ok',
+                                                            'text-rose-700' => ($tile['tone'] ?? '') === 'bad',
+                                                        ])>{{ $tile['v'] }}</dd>
+                                                    </div>
+                                                @endforeach
+                                            </dl>
                                         </div>
                                     @endforeach
-                                </dl>
+
+                                    @if (! empty($processStats['redis_host']))
+                                        <p class="truncate font-mono text-2xs text-brand-mist" title="{{ $processStats['redis_host'] }}">
+                                            {{ __('Redis endpoint:') }} {{ $processStats['redis_host'] }}
+                                        </p>
+                                    @endif
+                                    @if (! empty($processStats['collected_at']))
+                                        <p class="text-2xs text-brand-mist">
+                                            {{ __('Measured :when', ['when' => \Illuminate\Support\Carbon::parse($processStats['collected_at'])->diffForHumans()]) }}
+                                        </p>
+                                    @endif
+                                </div>
                                 @if ($processRecent !== [])
                                     <div>
                                         <p class="text-xs font-semibold text-brand-ink">{{ __('Recent jobs on this pool') }}</p>
