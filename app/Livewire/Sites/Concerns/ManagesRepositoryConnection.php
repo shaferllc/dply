@@ -9,10 +9,10 @@ use App\Livewire\Sites\Commits;
 use App\Livewire\Sites\Files;
 use App\Models\Site;
 use App\Modules\Deploy\Services\SiteQuickDeployCommitPoller;
-use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -23,8 +23,6 @@ use Illuminate\Support\Str;
  */
 trait ManagesRepositoryConnection
 {
-
-
     /**
      * One-shot deploy-branch self-heal. A site can carry a guessed default
      * ("main") that doesn't exist on the remote (whose default is, say,
@@ -328,6 +326,12 @@ trait ManagesRepositoryConnection
             ? $resolver->forId(auth()->user(), $this->source_control_account_id)
             : null;
         $account ??= $resolver->forSite($this->site, auth()->user(), $provider);
+
+        // Webhook creation needs admin:repo_hook, which fine-grained PATs rarely
+        // carry — so prefer an OAuth identity here even when the repo itself was
+        // connected with a token. Without this the app advised "connect via
+        // OAuth instead" while still using the PAT that had just been refused.
+        $account = $resolver->forWebhooks(auth()->user(), $provider, $account);
 
         if ($account === null) {
             $this->toastError(__('Link a :provider account before enabling quick deploy.', ['provider' => ucfirst($provider)]));

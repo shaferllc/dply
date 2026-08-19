@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\SourceControl\Services;
 
-use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\GitProviderToken;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 
 /**
  * Central lookup for {@see GitIdentity} instances. Wizards persist a bare
@@ -185,6 +185,33 @@ class GitIdentityResolver
      * code paths (commits fetcher, repo reader) that don't care which
      * specific account the operator picked — they just need a usable token.
      */
+    /**
+     * The identity to use for WEBHOOK operations.
+     *
+     * Reading a repo works fine with a PAT, but creating a push hook needs
+     * admin:repo_hook — a scope fine-grained PATs usually lack, which GitHub
+     * reports as "Resource not accessible by personal access token". dply's own
+     * OAuth flow always requests that scope, so an OAuth identity is preferred
+     * here even when the repo was connected with a token. The caller's choice is
+     * still honoured when no OAuth account exists.
+     */
+    public function forWebhooks(User $user, string $provider, ?GitIdentity $preferred = null): ?GitIdentity
+    {
+        $oauth = SocialAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('provider', $provider)
+            ->whereNotNull('access_token')
+            ->where('access_token', '!=', '')
+            ->orderBy('id')
+            ->first();
+
+        if ($oauth instanceof GitIdentity && $oauth->accessToken() !== '') {
+            return $oauth;
+        }
+
+        return $preferred ?? $this->forUserProvider($user, $provider);
+    }
+
     public function forUserProvider(User $user, string $provider): ?GitIdentity
     {
         $oauth = SocialAccount::query()
