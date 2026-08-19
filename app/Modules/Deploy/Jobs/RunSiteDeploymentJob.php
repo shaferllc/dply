@@ -17,6 +17,7 @@ use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
+use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Modules\Notifications\Services\DeployDigestBuffer;
@@ -555,6 +556,11 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $hasReplicas) {
             return;
         }
+
+        // Deploy configuration is the primary's to own, so project it before the
+        // env fan-out: a replica should run the same pipeline, from the same
+        // repo and ref, as the site it replicates.
+        app(WorkerReplicaDeployConfigSync::class)->syncReplicasOf($this->site);
 
         SyncWorkerPoolEnvJob::dispatch((string) $this->site->id, $this->auditUserId);
     }

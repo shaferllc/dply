@@ -9,6 +9,7 @@ use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use Illuminate\Support\Str;
 
 /**
@@ -152,13 +153,20 @@ class WorkerWorkloadReplayer
         $this->replicateProcesses($sourceSite, $newSite, $asReplica);
         $this->replicateBindings($sourceSite, $newSite);
 
-        // Seed the deploy pipeline from runtime defaults (mirrors normal create).
-        $framework = (string) ($sourceSite->meta['framework'] ?? '');
-        $this->pipelines->seedRuntimeDefaults(
-            $newSite,
-            $newSite->runtime,
-            $framework !== '' ? $framework : null,
-        );
+        // Inherit the PRIMARY's deploy pipeline rather than seeding generic
+        // runtime defaults — a replica that deploys differently from the site it
+        // replicates is not a replica. Falls back to defaults only when the
+        // primary has no pipeline of its own to copy.
+        $projected = app(WorkerReplicaDeployConfigSync::class)->sync($sourceSite, $newSite);
+
+        if (! $projected) {
+            $framework = (string) ($sourceSite->meta['framework'] ?? '');
+            $this->pipelines->seedRuntimeDefaults(
+                $newSite,
+                $newSite->runtime,
+                $framework !== '' ? $framework : null,
+            );
+        }
 
         // Provision the site (caddy + worker page for a worker host). The first
         // deploy is owned by the reconciler, which fires it only once this site
