@@ -140,6 +140,7 @@ DB_DATABASE=$(envval DB_DATABASE)
 DB_USERNAME=$(envval DB_USERNAME)
 DB_PASSWORD=$(envval DB_PASSWORD)
 DB_HOST=$(envval DB_HOST)
+DB_PORT=$(envval DB_PORT)
 BACKUP_DIR="storage/app/dply-pre-migrate-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 FILE="$BACKUP_DIR/pre-migrate.sql"
@@ -147,12 +148,16 @@ case "$DB_CONNECTION" in
   pgsql)
     command -v pg_dump >/dev/null 2>&1 || { echo "pg_dump not installed — skipping pre-migrate backup."; exit 0; }
     export PGPASSWORD="$DB_PASSWORD"
-    pg_dump -h "${DB_HOST:-127.0.0.1}" -U "$DB_USERNAME" "$DB_DATABASE" -f "$FILE"
+    # DB_PORT matters: managed clusters do not listen on 5432 (DigitalOcean uses
+    # 25060), so omitting it sent the dump to the default port and the deploy
+    # hung on a filtered connection until something timed it out.
+    export PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-15}"
+    pg_dump -h "${DB_HOST:-127.0.0.1}" -p "${DB_PORT:-5432}" -U "$DB_USERNAME" "$DB_DATABASE" -f "$FILE"
     echo "Pre-migrate backup written to $FILE" ;;
   mysql|mariadb)
     command -v mysqldump >/dev/null 2>&1 || { echo "mysqldump not installed — skipping pre-migrate backup."; exit 0; }
     export MYSQL_PWD="$DB_PASSWORD"
-    mysqldump -h "${DB_HOST:-127.0.0.1}" -u "$DB_USERNAME" "$DB_DATABASE" > "$FILE"
+    mysqldump -h "${DB_HOST:-127.0.0.1}" -P "${DB_PORT:-3306}" --connect-timeout=15 -u "$DB_USERNAME" "$DB_DATABASE" > "$FILE"
     echo "Pre-migrate backup written to $FILE" ;;
   *)
     echo "No server-side SQL dump for DB_CONNECTION='${DB_CONNECTION:-unset}' — skipping pre-migrate backup."
