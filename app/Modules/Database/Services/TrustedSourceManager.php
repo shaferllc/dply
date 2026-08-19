@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Database\Services;
 
+use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\CloudDatabaseTrustedSource;
+use App\Models\Server;
 use App\Models\User;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\DatabaseConnectionTarget;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -136,6 +139,84 @@ class TrustedSourceManager
         ]);
 
         return $record;
+    }
+
+    /**
+     * Ensure a server can reach this cluster.
+     *
+     * Worker-pool replicas run the same app as the primary and need the same
+     * database access, but network lockdown only ever allowlisted the ONE server
+     * present at provision time — so a replica could hold perfect credentials and
+     * still connect-timeout. Unlike an operator IP this entry is permanent and
+     * untracked, which also keeps the reaper away from it.
+     */
+    public function allowServer(CloudDatabase $database, Server $server): bool
+    {
+        if (! $this->supports($database)) {
+            return false;
+        }
+
+        $clusterId = (string) $database->backend_id;
+
+        try {
+            return match ((string) $database->backend) {
+                CloudDatabase::BACKEND_DIGITALOCEAN => $this->allowServerDigitalOcean($database, $clusterId, $server),
+                CloudDatabase::BACKEND_VULTR => $this->allowServerVultr($database, $clusterId, $server),
+                default => false,
+            };
+        } catch (\Throwable $e) {
+            Log::warning('database.trusted_sources.allow_server_failed', [
+                'cloud_database_id' => (string) $database->id,
+                'server_id' => (string) $server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function allowServerDigitalOcean(CloudDatabase $database, string $clusterId, Server $server): bool
+    {
+        $service = $this->digitalOcean($database);
+        $existing = $service->getDatabaseTrustedSources($clusterId);
+
+        // Prefer the droplet id — it survives IP churn, which is what the
+        // provisioner does for the primary.
+        $rule = filled($server->provider_id) && $server->provider === ServerProvider::DigitalOcean
+            ? ['type' => 'droplet', 'value' => (string) $server->provider_id]
+            : (filled($server->ip_address) ? ['type' => 'ip_addr', 'value' => (string) $server->ip_address] : null);
+
+        if ($rule === null) {
+            return false;
+        }
+
+        foreach ($existing as $row) {
+            if ($row['type'] === $rule['type'] && $row['value'] === $rule['value']) {
+                return false;
+            }
+        }
+
+        $service->setDatabaseTrustedSources($clusterId, [...$existing, $rule]);
+
+        return true;
+    }
+
+    private function allowServerVultr(CloudDatabase $database, string $clusterId, Server $server): bool
+    {
+        $ip = trim((string) $server->ip_address);
+        if ($ip === '') {
+            return false;
+        }
+
+        $service = $this->vultr($database);
+        $existing = $service->getDatabaseTrustedSources($clusterId);
+        if (in_array($ip, $existing, true)) {
+            return false;
+        }
+
+        $service->setDatabaseTrustedSources($clusterId, [...$existing, $ip]);
+
+        return true;
     }
 
     public function revoke(CloudDatabaseTrustedSource $record, ?User $actor = null): void

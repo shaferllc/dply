@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\User;
+use App\Modules\Database\Jobs\AllowReplicaServersOnManagedDatabasesJob;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
@@ -563,6 +564,11 @@ class RunSiteDeploymentJob implements ShouldQueue
         app(WorkerReplicaDeployConfigSync::class)->syncReplicasOf($this->site);
 
         SyncWorkerPoolEnvJob::dispatch((string) $this->site->id, $this->auditUserId);
+
+        // Credentials alone are not enough: managed clusters lock their trusted
+        // sources to the server present at provision time, so a replica must be
+        // allowlisted or it holds the right password and still times out.
+        AllowReplicaServersOnManagedDatabasesJob::dispatch((string) $this->site->id);
     }
 
     /**

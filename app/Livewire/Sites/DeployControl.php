@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\GuardsBilledDeploys;
+use App\Livewire\Sites\Concerns\ResolvesWorkspaceSiteBinding;
 use App\Models\ConsoleAction;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;
@@ -18,6 +19,7 @@ use App\Support\Sites\DeployConsoleRows;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -25,8 +27,8 @@ use Livewire\Component;
 /**
  * Persistent "Deploy" button + live console, mounted in the shared breadcrumb
  * chrome so a deploy can be kicked off — and watched — from ANY site-workspace
- * page (not just the Deploy tab). Resolves the current site from the route, so
- * it's self-contained.
+ * page (not just the Deploy tab). Accepts an explicit site/server prop so lazy
+ * parents still resolve after remount; falls back to the page route.
  *
  * Deploy / Sync / smart-fix all run through {@see SiteDeployCoordinator}, the
  * same service the main Deploy page ({@see DeploymentsList}) uses, and both
@@ -37,13 +39,14 @@ use Livewire\Component;
  * Livewire #[Computed] methods are read as properties in PHP and Blade;
  * PHPStan cannot see that magic, so the contract is stated here.
  *
- * @property-read \App\Services\Sites\DeployStatus|null $status
+ * @property-read DeployStatus|null $status
  * @property-read list<array<string, mixed>> $syncRows
  */
 class DeployControl extends Component
 {
     use DispatchesToastNotifications;
     use GuardsBilledDeploys;
+    use ResolvesWorkspaceSiteBinding;
 
     public ?Site $site = null;
 
@@ -60,13 +63,10 @@ class DeployControl extends Component
     /** Peer site ids launched in the active sync batch — drives the live console. */
     public array $syncedSiteIds = [];
 
-    public function mount(): void
+    public function mount(?Site $site = null, ?Server $server = null): void
     {
-        $site = request()->route('site');
-        $server = request()->route('server');
-
-        $this->site = $site instanceof Site ? $site : null;
-        $this->server = $server instanceof Server ? $server : $this->site?->server;
+        $this->site = $this->resolveBoundSite($site);
+        $this->server = $this->resolveBoundServer($server);
 
         if ($this->site === null) {
             return;
@@ -134,7 +134,7 @@ class DeployControl extends Component
             && $this->server->isVmHost()
             && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
-            && \Illuminate\Support\Facades\Gate::allows('update', $this->site);
+            && Gate::allows('update', $this->site);
     }
 
     public function deploy(): void
@@ -146,7 +146,7 @@ class DeployControl extends Component
             return;
         }
 
-        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+        Gate::authorize('update', $this->site);
 
         $queued = app(SiteDeployCoordinator::class)->deploy(
             $this->site,
@@ -241,7 +241,7 @@ class DeployControl extends Component
         if ($this->site === null) {
             return;
         }
-        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+        Gate::authorize('update', $this->site);
 
         $run = app(SiteDeployCoordinator::class)->runFixer($this->site, $key, (string) (auth()->id() ?? ''));
         if ($run === null) {
@@ -362,7 +362,7 @@ class DeployControl extends Component
         if ($this->blockedByDeployPause($this->site)) {
             return;
         }
-        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+        Gate::authorize('update', $this->site);
 
         $scheduled = app(ScheduleSiteDeploy::class)->schedule($this->site, $when, auth()->id());
         if ($scheduled === null) {
@@ -380,7 +380,7 @@ class DeployControl extends Component
         if ($this->site === null) {
             return;
         }
-        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+        Gate::authorize('update', $this->site);
 
         app(ScheduleSiteDeploy::class)->cancelPending($this->site);
 

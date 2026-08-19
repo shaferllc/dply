@@ -11,7 +11,7 @@
     @endif
 
     <div class="dply-page-shell pt-6">
-        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" />
+        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" :site="$site" />
     </div>
 
     <div class="dply-page-shell pt-4">

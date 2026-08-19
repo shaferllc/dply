@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-08-19T15:45:57.345122Z",
+  "lastUpdated": "2026-08-19T20:52:14.486427Z",
   "transcripts": [
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/1c4fccfb-2a66-4916-9c30-1a37e02ae1c7/1c4fccfb-2a66-4916-9c30-1a37e02ae1c7.jsonl",
@@ -228,19 +228,34 @@
       "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
     },
     {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/57d9ef5e-132d-4f5b-8c42-3b3ca79feaf2/57d9ef5e-132d-4f5b-8c42-3b3ca79feaf2.jsonl",
+      "mtimeMs": 1787172681758.0085,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/57d9ef5e-132d-4f5b-8c42-3b3ca79feaf2/subagents/098425cf-6a66-4cd7-b6e0-59f0a234928b.jsonl",
+      "mtimeMs": 1787172619419.6438,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
+    },
+    {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/645403f0-02e4-4fb5-83bd-7d1870515e8e/645403f0-02e4-4fb5-83bd-7d1870515e8e.jsonl",
       "mtimeMs": 1786823134792.0034,
       "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/67bbe507-9306-47a5-ac83-66ba410f355d.jsonl",
-      "mtimeMs": 1787154224412.359,
-      "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
+      "mtimeMs": 1787167802281.477,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/subagents/1cf11c91-8fb3-4117-8078-efec311f9e23.jsonl",
       "mtimeMs": 1787098000984.875,
       "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/subagents/292ab48b-92f3-4158-848e-a13e95964a6b.jsonl",
+      "mtimeMs": 1787162426704.8184,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/subagents/2bab0ad4-1700-42bd-8fa5-899ab85e3dd2.jsonl",
@@ -264,8 +279,18 @@
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/subagents/f5b9b8fa-9ab3-4cdc-848e-b5804b5e270c.jsonl",
-      "mtimeMs": 1787154249017.846,
-      "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
+      "mtimeMs": 1787154362269.9756,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/67bbe507-9306-47a5-ac83-66ba410f355d/subagents/f6d9a4c7-ccae-44d6-8906-1467b6db371f.jsonl",
+      "mtimeMs": 1787166968280.3047,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/681b8494-fe46-4d6f-af23-e7b01e674cf5/681b8494-fe46-4d6f-af23-e7b01e674cf5.jsonl",
+      "mtimeMs": 1787169316227.5615,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/702142bb-d286-42f4-ada6-d7bb7f17327c/702142bb-d286-42f4-ada6-d7bb7f17327c.jsonl",
@@ -746,6 +771,11 @@
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/ea931cbf-d264-41cf-8743-9996db50db27/ea931cbf-d264-41cf-8743-9996db50db27.jsonl",
       "mtimeMs": 1787076845279.8098,
       "lastProcessedAt": "2026-08-19T15:45:57.345122Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/f4d9b766-a00b-48ed-a9ab-a24d9ad1ac64/f4d9b766-a00b-48ed-a9ab-a24d9ad1ac64.jsonl",
+      "mtimeMs": 1787163276734.6084,
+      "lastProcessedAt": "2026-08-19T20:52:14.486427Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply-project-dply/agent-transcripts/f9dceabc-5346-4861-a4d7-62ed18fab099/f9dceabc-5346-4861-a4d7-62ed18fab099.jsonl",

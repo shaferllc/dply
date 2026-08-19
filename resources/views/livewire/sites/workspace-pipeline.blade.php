@@ -15,6 +15,7 @@
         <div class="min-w-0 lg:col-span-9">
             <x-breadcrumb-trail
                 :items="$settingsBreadcrumbs"
+                :site="$site"
                 doc-contextual
                 :contextual-doc-slug="$contextualDocSlug"
             />

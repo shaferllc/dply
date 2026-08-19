@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\ResolvesWorkspaceSiteBinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
@@ -19,7 +20,8 @@ use Livewire\Component;
  * A lightweight "quick edit .env" slide-over, mounted next to the persistent
  * Deploy button in the breadcrumb chrome so the whole .env can be edited — and
  * pushed — from ANY site-workspace page without navigating to the Environment
- * page. Resolves the site from the route, mirroring {@see DeployControl}.
+ * page. Accepts an explicit site/server prop (lazy remount safe), mirroring
+ * {@see DeployControl}.
  *
  * The drawer edits the full env cache as raw text (a complete rewrite, exactly
  * like the Environment page's "Edit all"), then coalesces the server push
@@ -30,6 +32,7 @@ use Livewire\Component;
 class EnvQuickEdit extends Component
 {
     use DispatchesToastNotifications;
+    use ResolvesWorkspaceSiteBinding;
     use WatchesConsoleActionOutcomes;
 
     public ?Site $site = null;
@@ -39,13 +42,10 @@ class EnvQuickEdit extends Component
     /** Editable buffer for the drawer — the full .env as text. */
     public string $env_text = '';
 
-    public function mount(): void
+    public function mount(?Site $site = null, ?Server $server = null): void
     {
-        $site = request()->route('site');
-        $server = request()->route('server');
-
-        $this->site = $site instanceof Site ? $site : null;
-        $this->server = $server instanceof Server ? $server : $this->site?->server;
+        $this->site = $this->resolveBoundSite($site);
+        $this->server = $this->resolveBoundServer($server);
     }
 
     #[Computed]

@@ -213,8 +213,8 @@
                 {{-- Deploy from anywhere: a persistent Deploy button + live
                      console for the site in scope, next to Documentation. --}}
                 @if ($breadcrumbSite instanceof \App\Models\Site)
-                    <livewire:sites.deploy-control :key="'deploy-control-'.$breadcrumbSite->id" />
-                    <livewire:sites.env-quick-edit :key="'env-quick-edit-'.$breadcrumbSite->id" />
+                    <livewire:sites.deploy-control :site="$breadcrumbSite" :server="$breadcrumbSite->server" :key="'deploy-control-'.$breadcrumbSite->id" />
+                    <livewire:sites.env-quick-edit :site="$breadcrumbSite" :server="$breadcrumbSite->server" :key="'env-quick-edit-'.$breadcrumbSite->id" />
                 @endif
                 @if ($docContextual)
                     <x-docs-link :slug="$resolvedContextualDocSlug">

@@ -12,6 +12,7 @@
     <div class="dply-page-shell pt-6">
         <x-breadcrumb-trail
             :items="$siteHeaderBreadcrumbs"
+            :site="$site"
             doc-contextual
         />
     </div>
