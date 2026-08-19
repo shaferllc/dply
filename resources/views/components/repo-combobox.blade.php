@@ -42,6 +42,26 @@
         open: false,
         search: '',
         active: 0,
+        panelStyle: '',
+        /**
+         * Measure the trigger and pin the teleported panel to it. Flips above
+         * when there is not room below, so a field near the viewport bottom does
+         * not open off-screen.
+         */
+        positionPanel() {
+            const trigger = this.$refs.trigger;
+            if (! trigger) return;
+            const r = trigger.getBoundingClientRect();
+            const gap = 8;
+            const desired = 320;
+            const below = window.innerHeight - r.bottom;
+            const flip = below < desired && r.top > below;
+            const vertical = flip
+                ? `bottom:${window.innerHeight - r.top + gap}px;`
+                : `top:${r.bottom + gap}px;`;
+            const maxH = Math.max(160, (flip ? r.top : below) - gap * 2);
+            this.panelStyle = `left:${r.left}px; width:${r.width}px; ${vertical} max-height:${maxH}px; overflow:auto;`;
+        },
         prop: @js($property),
         repos: @js($normalized),
         get filtered() {
@@ -51,7 +71,7 @@
         },
         get current() { return $wire.get(this.prop); },
         toggle() { this.open ? this.close() : this.openList(); },
-        openList() { this.open = true; this.active = 0; this.$nextTick(() => this.$refs.repoSearch && this.$refs.repoSearch.focus()); },
+        openList() { this.open = true; this.active = 0; this.$nextTick(() => this.positionPanel()); this.$nextTick(() => this.$refs.repoSearch && this.$refs.repoSearch.focus()); },
         close() { this.open = false; this.search = ''; },
         move(delta) {
             const n = this.filtered.length;
@@ -87,14 +107,24 @@
         <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" aria-hidden="true" />
     </button>
 
-    <div
-        x-cloak
-        x-show="open"
-        x-transition.origin.top
-        x-on:click.outside="close()"
-        role="listbox"
-        class="absolute z-20 mt-2 w-full rounded-2xl border border-brand-ink/10 bg-white p-2 shadow-xl shadow-brand-ink/10"
-    >
+    {{-- Fixed + teleported to body: every create/settings surface wraps this in
+         x-profile-shell, which is overflow-hidden (it clips the sand header's
+         rounded corners), so an absolutely-positioned panel gets cut off at the
+         card edge. Position is measured from the trigger and kept in sync while
+         open. --}}
+    <template x-teleport="body">
+        <div
+            x-cloak
+            x-show="open"
+            x-transition.origin.top
+            x-on:click.outside="close()"
+            x-effect="open && positionPanel()"
+            x-on:resize.window="open && positionPanel()"
+            x-on:scroll.window.passive="open && positionPanel()"
+            role="listbox"
+            x-bind:style="panelStyle"
+            class="fixed z-[120] rounded-2xl border border-brand-ink/10 bg-white p-2 shadow-xl shadow-brand-ink/10"
+        >
         <div class="relative">
             <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-moss" aria-hidden="true" />
             <input
@@ -129,6 +159,7 @@
                 ></button>
             </template>
             <p x-show="filtered.length === 0" class="px-3 py-2 text-xs text-brand-moss">{{ $emptyMessage }}</p>
+            </div>
         </div>
-    </div>
+    </template>
 </div>

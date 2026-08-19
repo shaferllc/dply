@@ -7,11 +7,53 @@
                 />
 
                 @if ($vaultRows !== [])
+                    @can('update', $organization)
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                            <label class="inline-flex items-center gap-2 text-xs font-semibold text-brand-moss">
+                                <input
+                                    type="checkbox"
+                                    class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
+                                    wire:click="toggleAllVaultSecrets"
+                                    @checked(count($selected_secret_ids) === count($vaultRows))
+                                />
+                                {{ __('Select all') }}
+                            </label>
+
+                            @if ($selected_secret_ids !== [])
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-xs text-brand-moss">
+                                        {{ trans_choice('{1} :count selected|[2,*] :count selected', count($selected_secret_ids), ['count' => count($selected_secret_ids)]) }}
+                                    </span>
+                                    <button type="button" wire:click="clearVaultSelection" class="text-xs text-brand-moss hover:text-brand-ink">
+                                        {{ __('Clear') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-6 items-center rounded-md bg-rose-600 px-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-700"
+                                        wire:click="openConfirmActionModal('deleteSelectedVaultSecrets', @js([]), @js(__('Delete selected secrets')), @js(trans_choice('{1} Delete :count secret? It unlinks from every site, and those sites drop the key on the next deploy.|[2,*] Delete :count secrets? They unlink from every site, and those sites drop the keys on the next deploy.', count($selected_secret_ids), ['count' => count($selected_secret_ids)])), @js(__('Delete')), true)"
+                                    >
+                                        {{ __('Delete selected') }}
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endcan
+
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($vaultRows as $row)
                             <li class="px-3 py-2 sm:px-4" wire:key="vault-{{ $row['id'] }}">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div class="min-w-0">
+                                    <div class="flex min-w-0 items-start gap-2.5">
+                                        @can('update', $organization)
+                                            <input
+                                                type="checkbox"
+                                                class="mt-0.5 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
+                                                value="{{ $row['id'] }}"
+                                                wire:model.live="selected_secret_ids"
+                                                aria-label="{{ __('Select :key', ['key' => $row['key']]) }}"
+                                            />
+                                        @endcan
+                                        <div class="min-w-0">
                                         <p class="font-mono text-sm font-semibold text-brand-ink">{{ $row['key'] }}</p>
                                         <p class="truncate text-xs text-brand-moss">
                                             {{ $row['notes'] ?: __('No note') }}
@@ -22,6 +64,7 @@
                                             @endif
                                             <span class="text-brand-mist">· {{ __('write-only') }}</span>
                                         </p>
+                                        </div>
                                     </div>
                                     @can('update', $organization)
                                         <div class="flex flex-wrap items-center gap-1.5">

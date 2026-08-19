@@ -33,6 +33,9 @@ trait ManagesOrganizationVaultSecrets
 
     public string $rotate_value = '';
 
+    /** @var list<string> Secret ids ticked for a bulk action. */
+    public array $selected_secret_ids = [];
+
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['secrets', 'residency'], true) ? $tab : 'secrets';
@@ -97,6 +100,54 @@ trait ManagesOrganizationVaultSecrets
         $secret = $this->secretForOrg($secretId);
         $manager->delete($secret);
         $this->toastSuccess(__('Secret deleted. Linked sites will drop the key on the next deploy.'));
+    }
+
+    /** Tick or untick every secret currently listed. */
+    public function toggleAllVaultSecrets(): void
+    {
+        $ids = array_column($this->vaultSecretRows(), 'id');
+
+        $this->selected_secret_ids = count($this->selected_secret_ids) === count($ids) ? [] : $ids;
+    }
+
+    public function clearVaultSelection(): void
+    {
+        $this->selected_secret_ids = [];
+    }
+
+    /**
+     * Delete every ticked secret.
+     *
+     * Ids are re-resolved through secretForOrg(), so a tampered id from another
+     * organization 404s rather than being deleted.
+     */
+    public function deleteSelectedVaultSecrets(OrganizationSecretManager $manager): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $ids = array_values(array_unique(array_filter($this->selected_secret_ids)));
+        if ($ids === []) {
+            return;
+        }
+
+        $deleted = 0;
+        foreach ($ids as $id) {
+            try {
+                $manager->delete($this->secretForOrg((string) $id));
+                $deleted++;
+            } catch (\Throwable) {
+                // One bad id must not abandon the rest of the batch.
+                continue;
+            }
+        }
+
+        $this->selected_secret_ids = [];
+
+        $this->toastSuccess(trans_choice(
+            '{1} :count secret deleted. Linked sites drop the key on the next deploy.|[2,*] :count secrets deleted. Linked sites drop those keys on the next deploy.',
+            $deleted,
+            ['count' => $deleted],
+        ));
     }
 
     /**
