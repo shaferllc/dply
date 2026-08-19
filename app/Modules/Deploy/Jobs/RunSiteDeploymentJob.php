@@ -95,6 +95,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (ProductLineKillSwitches::blocksVmSiteDeploy($this->site)) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -107,6 +108,27 @@ class RunSiteDeploymentJob implements ShouldQueue
             ]);
             $this->auditDeploy($deployment);
             $this->clearIdempotencyInflight();
+
+            return;
+        }
+
+        if ($this->site->isConvertingAtomicLayout()) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_ALREADY_RUNNING,
+                'exit_code' => null,
+                'log_output' => 'This site is converting to a zero-downtime layout. Wait for that to finish before deploying.',
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            Cache::forget('site-deploy-active:'.$this->site->id);
 
             return;
         }
@@ -126,6 +148,7 @@ class RunSiteDeploymentJob implements ShouldQueue
 
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -150,6 +173,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $policyDecision['allowed']) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -175,6 +199,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $lock->get()) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,

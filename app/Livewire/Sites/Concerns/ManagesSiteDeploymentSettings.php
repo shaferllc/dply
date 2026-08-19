@@ -9,6 +9,8 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Sites\AtomicLayoutRequestResult;
+use App\Services\Sites\SiteAtomicLayoutRequester;
 use Illuminate\Validation\Rule;
 
 /**
@@ -77,50 +79,42 @@ trait ManagesSiteDeploymentSettings
             'zero_downtime_enabled' => 'boolean',
         ]);
 
-        $previousStrategy = (string) ($this->site->deploy_strategy ?? 'simple');
-        $newStrategy = $this->zero_downtime_enabled ? 'atomic' : 'simple';
-
-        $updates = ['deploy_strategy' => $newStrategy];
-        // This crude toggle only knows flat vs atomic. Realign deploy_method to
-        // match ONLY when the strategy actually flips, so it never clobbers a
-        // deliberate maintenance/recreate choice on an unrelated save.
-        if ($previousStrategy !== $newStrategy) {
-            $updates['deploy_method'] = DeploymentMethod::fromStrategy($newStrategy)->value;
-        }
-
-        $this->site->update($updates);
-        $this->site->refresh();
-        $this->deploy_strategy = $newStrategy;
-        $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
-
-        $message = __('Zero downtime deployment settings saved.');
-
-        if ($previousStrategy === $newStrategy) {
-            $this->toastSuccess($message);
+        if ($this->zero_downtime_enabled) {
+            $this->openConfirmAtomicLayoutConvert();
 
             return;
         }
 
-        // Arm a one-time on-disk layout migration. The NEXT successful deploy
-        // builds the new layout and archives the old one (flat checkout ⇄ atomic
-        // releases) via SiteDeployLayoutMigrator — so switching the type can't
-        // leave a hybrid behind. See docs/DEPLOYMENT_METHODS.md.
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['deploy_layout_migration'] = [
-            'from' => $previousStrategy === 'atomic' ? 'atomic' : 'flat',
-            'to' => $newStrategy === 'atomic' ? 'atomic' : 'flat',
-            'armed_at' => now()->toIso8601String(),
-        ];
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->applyAtomicLayoutRequest(app(SiteAtomicLayoutRequester::class)->requestFlat($this->site));
+    }
 
-        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
-            ApplySiteWebserverConfigJob::dispatch($this->site->id);
-            $this->toastSuccess($message.' '.__('Webserver config queued.'));
+    public function confirmEnableZeroDowntime(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->applyAtomicLayoutRequest(
+            app(SiteAtomicLayoutRequester::class)->requestAtomic($this->site, auth()->id(), confirmed: true)
+        );
+    }
+
+    public function openConfirmAtomicLayoutConvert(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $result = app(SiteAtomicLayoutRequester::class)->requestAtomic($this->site, auth()->id(), confirmed: false);
+        if ($result->status !== 'needs_confirm') {
+            $this->applyAtomicLayoutRequest($result);
 
             return;
         }
 
-        $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.'));
+        $this->openConfirmActionModal(
+            method: 'confirmEnableZeroDowntime',
+            arguments: [],
+            title: __('Convert to zero-downtime?'),
+            message: __('This copies the live checkout into a releases directory (needs free disk for a second copy), converts worker hosts first, then this site. Deploys stay locked until it finishes. The site stays on simple deploys until conversion succeeds.'),
+            confirmLabel: __('Convert to zero-downtime'),
+            destructive: false,
+        );
     }
 
     /**
@@ -143,11 +137,9 @@ trait ManagesSiteDeploymentSettings
     }
 
     /**
-     * Persist the chosen {@see DeploymentMethod}: write `deploy_method`, keep the
-     * legacy `deploy_strategy` / `zero_downtime_enabled` mirrors in sync, and arm
-     * a one-time on-disk layout migration when the placement actually changes
-     * (flat ⇄ atomic). The migration runs at the END of the next successful
-     * deploy via SiteDeployLayoutMigrator — see docs/DEPLOYMENT_METHODS.md.
+     * Persist the chosen {@see DeploymentMethod}. A flat→atomic switch queues
+     * {@see \App\Services\Sites\SiteAtomicLayoutRequester} (column flips after
+     * convert). Atomic→flat is armed for the next deploy.
      */
     public function saveDeploymentMethod(): void
     {
@@ -184,6 +176,18 @@ trait ManagesSiteDeploymentSettings
         // We grab this before update() flips deploy_strategy.
         $preSwitchEnvPath = $this->site->effectiveEnvFilePath();
 
+        if ($previousLayout !== $newLayout && $newLayout === 'atomic') {
+            $this->openConfirmAtomicLayoutConvert();
+
+            return;
+        }
+
+        if ($previousLayout !== $newLayout && $newLayout === 'flat') {
+            $this->applyAtomicLayoutRequest(app(SiteAtomicLayoutRequester::class)->requestFlat($this->site));
+
+            return;
+        }
+
         $this->site->update([
             'deploy_method' => $method->value,
             'deploy_strategy' => $newStrategy,
@@ -191,51 +195,52 @@ trait ManagesSiteDeploymentSettings
         $this->site->refresh();
         $this->deploy_method = $method->value;
         $this->deploy_strategy = $newStrategy;
-        $this->zero_downtime_enabled = $newStrategy === 'atomic';
-
-        $message = __('Deployment method saved.');
+        $this->zero_downtime_enabled = $newStrategy === 'atomic' || $this->site->isConvertingAtomicLayout();
 
         if ($previousMethod === $method) {
-            $this->toastSuccess($message);
+            $this->toastSuccess(__('Deployment method saved.'));
 
             return;
         }
 
-        // Arm the layout migration only when the on-disk layout family changes;
-        // e.g. atomic → maintenance (or → blue-green) keeps the atomic tree and
-        // needs no migration.
-        if ($previousLayout !== $newLayout) {
-            $meta = is_array($this->site->meta) ? $this->site->meta : [];
-            $meta['deploy_layout_migration'] = [
-                'from' => $previousLayout,
-                'to' => $newLayout,
-                'armed_at' => now()->toIso8601String(),
-            ];
-            $this->site->forceFill(['meta' => $meta])->save();
-
-            // Carry the live on-disk env into the canonical store so the new
-            // layout's first deploy can push it (and the env gate sees it).
-            // onlyIfEmpty so we never overwrite an operator-managed env_file_content;
-            // when it's already populated the gate's env_file_content fallback
-            // (RequiredEnvEvaluator) already covers the switch.
-            if ($this->site->server?->hostCapabilities()->supportsEnvPushToHost()) {
-                SyncEnvFromServerJob::dispatch(
-                    siteId: $this->site->id,
-                    userId: auth()->id(),
-                    envPathOverride: $preSwitchEnvPath,
-                    onlyIfEmpty: true,
-                );
-            }
+        // Same-family switch (e.g. atomic → maintenance) keeps the on-disk tree.
+        if ($this->site->server?->hostCapabilities()->supportsEnvPushToHost() && $preSwitchEnvPath !== $this->site->effectiveEnvFilePath()) {
+            SyncEnvFromServerJob::dispatch(
+                siteId: $this->site->id,
+                userId: auth()->id(),
+                envPathOverride: $preSwitchEnvPath,
+                onlyIfEmpty: true,
+            );
         }
 
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {
             ApplySiteWebserverConfigJob::dispatch($this->site->id);
-            $this->toastSuccess($message.' '.__('Webserver config queued.'));
+            $this->toastSuccess(__('Deployment method saved.').' '.__('Webserver config queued.'));
 
             return;
         }
 
-        $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this method.'));
+        $this->toastSuccess(__('Deployment method saved.'));
+    }
+
+    protected function applyAtomicLayoutRequest(AtomicLayoutRequestResult $result): void
+    {
+        $this->site->refresh();
+        $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
+        $this->zero_downtime_enabled = $this->site->isAtomicDeploys()
+            || $this->site->isConvertingAtomicLayout();
+        if ($this->site->isDisablingAtomicLayout()) {
+            $this->zero_downtime_enabled = false;
+        }
+
+        if ($result->ok) {
+            $this->toastSuccess($result->message);
+
+            return;
+        }
+
+        $this->toastError($result->message);
     }
 
     public function saveEphemeralDeployCredentials(): void

@@ -265,6 +265,18 @@
                 </dt>
                 <dd class="mt-1.5 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
             </div>
+            {{-- Which box this ran on. A site can deploy to its primary AND every
+                 worker replica, so "it failed" is only actionable once you know
+                 which machine failed. --}}
+            <div class="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                    <x-heroicon-m-server class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Server') }}
+                </dt>
+                <dd class="mt-1.5 truncate text-brand-ink" title="{{ $latest?->server?->name }}">
+                    {{ $latest?->server?->name ?: ($latest?->server_id ? __('unknown') : '—') }}
+                </dd>
+            </div>
         </dl>
 
         @if ($latest && $latest->status === 'failed')
@@ -682,6 +694,9 @@
                     $facts[] = ['label' => __('Status'), 'value' => ucfirst($deployedDeployment->status), 'class' => 'text-xs font-semibold text-emerald-700'];
                     $facts[] = ['label' => __('Deployed'), 'value' => $deployedAt?->diffForHumans(), 'class' => 'text-xs text-brand-ink', 'title' => $deployedAt?->toDayDateTimeString()];
                     $facts[] = ['label' => __('Trigger'), 'value' => ucfirst((string) ($deployedDeployment->trigger ?? '—')), 'class' => 'text-xs text-brand-ink'];
+                    if ($deployedDeployment->server?->name) {
+                        $facts[] = ['label' => __('Server'), 'value' => $deployedDeployment->server->name, 'class' => 'text-xs text-brand-ink'];
+                    }
                     if ($deployedDurationMs > 0) {
                         $facts[] = ['label' => __('Duration'), 'value' => number_format($deployedDurationMs / 1000, 1).'s', 'class' => 'font-mono text-xs text-brand-ink'];
                     }

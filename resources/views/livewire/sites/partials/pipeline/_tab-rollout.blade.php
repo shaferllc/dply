@@ -30,9 +30,16 @@
                 :title="__('Zero downtime deployment')"
                 :note="__('New release directory + symlink swap. Off = simple in-place git deploy.')"
             />
-            <div class="{{ $panelBody }}">
+            <div class="{{ $panelBody }} space-y-2">
+                @if ($site->isConvertingAtomicLayout())
+                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">{{ __('Converting to a releases layout… Deploys are locked until this finishes.') }}</p>
+                @elseif ($site->isDisablingAtomicLayout())
+                    <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs font-semibold text-brand-ink">{{ __('Disabling on next deploy. The next deploy uses the simple engine; the site stays atomic until that deploy succeeds.') }}</p>
+                @elseif ($site->atomicLayoutStatus() === 'failed')
+                    <p class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900">{{ __('Layout conversion failed. Retry from this toggle — the disk was left as-is.') }}</p>
+                @endif
                 <label class="flex items-start gap-2.5">
-                    <input type="checkbox" wire:model="zero_downtime_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                    <input type="checkbox" wire:model="zero_downtime_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" @disabled($site->isConvertingAtomicLayout())>
                     <span class="text-xs font-semibold text-brand-ink">{{ __('Enable zero-downtime rollout') }}</span>
                 </label>
                 <x-input-error :messages="$errors->get('zero_downtime_enabled')" class="mt-1" />

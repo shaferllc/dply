@@ -56,25 +56,23 @@ availableFor(Site)`):
 Unsupported methods are hidden (not shown-then-errored), matching
 [[feedback_cloud_seamless_surface]].
 
-## Switching methods — auto-migrate on next deploy (decided)
+## Switching methods — convert on enable, migrate on disable (decided)
 
-Changing the method only flips columns + re-applies the nginx docroot. The
-**on-disk layout transition is armed** in `meta['deploy_layout_migration'] =
-{from, to, armed_at}` and executed by `SiteDeployLayoutMigrator` at the END of
-the next **successful** deploy (after activate + health pass — never before, so a
-failed deploy can't destroy the old layout):
+**Enable (flat → atomic)** runs immediately via `SiteAtomicLayoutRequester` +
+`ConvertSiteToAtomicLayoutJob`. The strategy column stays `simple` until convert
+finishes (workers first, then web). Confirm in the UI (or an explicit API flag).
+Deploys are locked while converting. Per host: copy the live tree into
+`releases/<ts>` when flat; repair-in-place when already atomic; archive leftover
+root when hybrid. Seed `shared/.env` + `shared/storage` and attach them before
+nginx/units are pointed at `current`.
 
-- `flat → atomic`: first atomic release is built + `current` flipped; then the
-  leftover flat checkout at the root (`.git`, `app/`, `vendor/`, root `.env`, …)
-  is cleaned, leaving root = `current`/`releases`/`shared`/`repo`/`.dply`.
-- `atomic → flat`: materialize `shared/.env` → root `.env`, then remove
-  `releases/`/`current`/`shared`. The simple deploy checks out in place at root.
-- to/from `blue_green`/`image`: establish/tear down the relevant trees/images.
+**Disable (atomic → flat)** is armed in `meta['deploy_layout_migration']` +
+`atomic_layout.status=disabling`. The column stays `atomic` until the next
+deploy, which **forces the simple engine**, then `SiteDeployLayoutMigrator`
+archives `releases/`/`current`/`shared` and the column flips to `simple`.
 
 Cleanup is **archive-then-prune** (`<root>/.dply-layout-archive-<ts>/`) so a bad
-migration is reversible; retention = keep last N archives. This is the same
-cleanup that retires prod's flat-checkout hybrid: arming the migration on the
-control-plane site makes its next deploy self-heal the root.
+migration is reversible; retention = keep last N archives.
 
 ## Phasing
 

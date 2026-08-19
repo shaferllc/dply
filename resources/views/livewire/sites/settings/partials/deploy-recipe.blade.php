@@ -325,7 +325,7 @@
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activate') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment method') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How each deploy lands the new release and moves traffic to it. Changing the method takes effect on the next deploy; the on-disk layout migrates automatically once that deploy succeeds.') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How each deploy lands the new release and moves traffic to it. Enabling no-downtime converts the live checkout into releases/ before the method flips; disabling waits for the next deploy.') }}</p>
                         </div>
                     </div>
                 </div>

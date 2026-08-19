@@ -265,6 +265,10 @@ class SiteDeployCoordinator
             return true;
         }
 
+        if ($site->isConvertingAtomicLayout()) {
+            return true;
+        }
+
         $lock = $this->deployLockInfo($site);
         $startedAt = isset($lock['started_at']) ? Carbon::parse($lock['started_at']) : null;
         if ($startedAt === null) {

@@ -6,6 +6,7 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\WorkerPool;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\WorkerPools\WorkerMemberHealthGate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -112,6 +113,18 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
                 $meta = $member->meta;
                 $meta['pool'] = array_merge($meta['pool'] ?? [], ['stats' => $stats]);
                 $member->forceFill(['meta' => $meta])->save();
+
+                // A member that cannot reach its backends still RESERVES jobs and
+                // fails them — including the remediation jobs meant to repair it.
+                // Pause it here, on the freshest measurement we will ever have.
+                $action = app(WorkerMemberHealthGate::class)->apply($member->fresh());
+                if ($action !== null) {
+                    $emit(
+                        sprintf('%s — %s (queue consumption %s)', $member->name, $action, $action === 'paused' ? 'stopped' : 'restored'),
+                        $action === 'paused' ? 'warn' : 'success',
+                        'stats',
+                    );
+                }
             }
 
             $this->completeConsoleAction();

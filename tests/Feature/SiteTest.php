@@ -6,6 +6,7 @@ use App\Contracts\DeployEngine;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\ConvertSiteToAtomicLayoutJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
@@ -1552,7 +1553,10 @@ test('vm site pipeline can save rollout settings', function () {
         ->set('zero_downtime_enabled', true)
         ->call('saveZeroDowntimeDeployment')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Zero downtime deployment settings saved. Webserver config queued.', type: 'success')
+        ->assertSet('showConfirmActionModal', true)
+        ->call('confirmActionModal')
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', message: 'Converting to zero-downtime. Deploys are locked until this finishes.', type: 'success')
         ->set('releases_to_keep', 8)
         ->set('deployment_environment', 'staging')
         ->set('octane_port', '8080')
@@ -1565,11 +1569,13 @@ test('vm site pipeline can save rollout settings', function () {
         // pipeline Rollout tab.
         ->assertDispatched('notify', message: 'Rollout settings saved.', type: 'success');
 
-    Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    Bus::assertDispatched(ConvertSiteToAtomicLayoutJob::class, fn (ConvertSiteToAtomicLayoutJob $job): bool => $job->siteId === $site->id);
+    Bus::assertNotDispatched(ApplySiteWebserverConfigJob::class);
 
     $site->refresh();
 
-    expect($site->deploy_strategy)->toBe('atomic');
+    expect($site->deploy_strategy)->toBe('simple')
+        ->and($site->isConvertingAtomicLayout())->toBeTrue();
     expect($site->releases_to_keep)->toBe(8);
     expect($site->deployment_environment)->toBe('staging');
     expect($site->octane_port)->toBe(8080);

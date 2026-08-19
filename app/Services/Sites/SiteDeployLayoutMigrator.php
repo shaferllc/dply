@@ -62,6 +62,16 @@ class SiteDeployLayoutMigrator
     }
 
     /**
+     * Archive leftover flat files at the site root after current is serving.
+     */
+    public function archiveLeftoverFlatRoot(SshConnection $ssh, string $base, string $timestamp): string
+    {
+        $archive = rtrim($base, '/').'/.dply-layout-archive-'.$timestamp;
+
+        return $this->flatToAtomic($ssh, $base, $archive).$this->pruneArchives($ssh, $base);
+    }
+
+    /**
      * Archive the leftover flat checkout at the root, leaving only the atomic
      * tree (current / releases / shared / repo / .dply). The atomic deploy has
      * already built+activated a release, so nothing served reads the root files.

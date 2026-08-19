@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Enums\DeploymentMethod;
 use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\Server;
 use App\Models\Site;
@@ -151,18 +150,13 @@ class WorkspacePipeline extends Show
 
         $previousStrategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $newStrategy = $this->zero_downtime_enabled ? 'atomic' : 'simple';
+        $strategyChanging = $previousStrategy !== $newStrategy
+            || ($this->zero_downtime_enabled && $this->site->isDisablingAtomicLayout())
+            || (! $this->zero_downtime_enabled && $this->site->isAtomicDeploys());
 
         $updates = [
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
-            'deploy_strategy' => $newStrategy,
         ];
-
-        // Keep deploy_method aligned to the flat/atomic flip, but only when the
-        // strategy actually changes — preserves a maintenance/recreate choice
-        // across saves that didn't touch the zero-downtime toggle.
-        if ($previousStrategy !== $newStrategy) {
-            $updates['deploy_method'] = DeploymentMethod::fromStrategy($newStrategy)->value;
-        }
 
         if (ephemeral_deploy_credentials_active($this->site->organization)) {
             $this->validate(['ephemeral_deploy_credentials_enabled' => 'boolean']);
@@ -174,11 +168,24 @@ class WorkspacePipeline extends Show
         $this->site->update($updates);
         $this->site->refresh();
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
-        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
 
         $this->savePipelineAnchorScripts();
         $this->saveOpenPipelineStepFromWorkspace();
         $this->saveDeploymentSettings(toast: false);
+
+        if ($strategyChanging && $this->zero_downtime_enabled) {
+            $this->openConfirmAtomicLayoutConvert();
+
+            return;
+        }
+
+        if ($strategyChanging && ! $this->zero_downtime_enabled) {
+            $this->saveZeroDowntimeDeployment();
+
+            return;
+        }
+
+        $this->zero_downtime_enabled = $this->site->isAtomicDeploys() || $this->site->isConvertingAtomicLayout();
         $this->toastSuccess(__('Pipeline settings saved.'));
     }
 
@@ -190,21 +197,8 @@ class WorkspacePipeline extends Show
     public function enableZeroDowntimeDeploys(): void
     {
         $this->authorize('update', $this->site);
-
-        $previousStrategy = (string) ($this->site->deploy_strategy ?? 'simple');
-        $updates = ['deploy_strategy' => 'atomic'];
-        // Only realign deploy_method when coming from flat; if already atomic the
-        // site may be on maintenance/recreate and we must not downgrade it.
-        if ($previousStrategy !== 'atomic') {
-            $updates['deploy_method'] = DeploymentMethod::Atomic->value;
-        }
-
-        $this->site->update($updates);
-        $this->site->refresh();
-        $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
-        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
-
-        $this->toastSuccess(__('Zero-downtime (atomic) deploys enabled.'));
+        $this->zero_downtime_enabled = true;
+        $this->openConfirmAtomicLayoutConvert();
     }
 
     /**

@@ -111,7 +111,13 @@ class SiteGitDeployer
      */
     private function runInner(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
-        if (($site->deploy_strategy ?? 'simple') === 'atomic') {
+        if ($site->isConvertingAtomicLayout()) {
+            throw new \RuntimeException('This site is converting to a zero-downtime layout. Wait for that to finish before deploying.');
+        }
+
+        $forceFlat = $site->isDisablingAtomicLayout();
+
+        if (($site->deploy_strategy ?? 'simple') === 'atomic' && ! $forceFlat) {
             return app(AtomicSiteDeployer::class)->deploy($site, $deployment, $resume);
         }
 
@@ -397,6 +403,17 @@ class SiteGitDeployer
             $log .= app(SiteDeployLayoutMigrator::class)->migrateIfArmed($site, $ssh, gmdate('YmdHis'));
         } catch (\Throwable $e) {
             $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
+        }
+
+        if ($forceFlat) {
+            app(SiteAtomicLayoutRequester::class)->markFlattened($site);
+            $site->refresh();
+            $log .= "\n[dply] deploy_strategy → simple (disable transition complete)\n";
+            try {
+                $log .= app(SiteWebserverConfigApplier::class)->apply($site);
+            } catch (\Throwable $e) {
+                $log .= "\n[dply] webserver reapply after flatten skipped: ".$e->getMessage()."\n";
+            }
         }
 
         return ['output' => $log, 'sha' => $sha];

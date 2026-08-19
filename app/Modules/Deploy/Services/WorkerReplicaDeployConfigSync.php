@@ -60,6 +60,10 @@ class WorkerReplicaDeployConfigSync
     {
         $updates = [];
         foreach (self::INHERITED_COLUMNS as $column) {
+            if ($column === 'deploy_strategy' && $replica->isDisablingAtomicLayout()) {
+                continue;
+            }
+
             $value = $primary->getAttribute($column);
             if ($replica->getAttribute($column) !== $value) {
                 $updates[$column] = $value;

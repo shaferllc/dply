@@ -157,7 +157,11 @@ class Show extends Component
         $this->env_file_path_override = (string) ($this->site->env_file_path ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
-        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
+        $this->zero_downtime_enabled = $this->site->isAtomicDeploys()
+            || $this->site->isConvertingAtomicLayout();
+        if ($this->site->isDisablingAtomicLayout()) {
+            $this->zero_downtime_enabled = false;
+        }
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
         $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
         $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);

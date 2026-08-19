@@ -8,10 +8,13 @@ use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineStarterApplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
 test('starter applier replaces steps and applies atomic rollout', function () {
+    Queue::fake();
+
     $site = Site::factory()->create([
         'deploy_strategy' => 'simple',
         'meta' => [
@@ -42,7 +45,8 @@ test('starter applier replaces steps and applies atomic rollout', function () {
     $site->refresh();
     $pipeline->refresh()->load('steps');
 
-    expect($site->deploy_strategy)->toBe('atomic')
+    expect($site->deploy_strategy)->toBe('simple')
+        ->and($site->isConvertingAtomicLayout())->toBeTrue()
         ->and((bool) data_get($site->meta, 'deploy_health_enabled'))->toBeTrue()
         ->and($pipeline->steps)->toHaveCount(4)
         ->and($pipeline->steps->where('step_type', SiteDeployStep::TYPE_CUSTOM)->count())->toBe(0);

@@ -19,6 +19,12 @@ return [
     |   - cancellable: in-flight Stop button (managed creates that outlive a killed worker)
     */
     'kinds' => [
+        'atomic_layout_convert' => [
+            'running' => 'Converting :host to a releases layout …',
+            'completed' => 'Zero-downtime layout is ready.',
+            'failed' => 'Layout conversion failed.',
+            'stale' => 'Layout conversion did not finish.',
+        ],
         'webserver_config' => [
             'running' => 'Applying webserver config to :host …',
             'completed' => 'Webserver config applied.',
@@ -405,7 +411,7 @@ return [
         // disk-usage `du` over SSH; surface its progress banner here so the
         // "tracking in the console" toast isn't a dead end.
         'general' => ['disk_usage_measure'],
-        'settings' => ['webserver_config'],
+        'settings' => ['webserver_config', 'atomic_layout_convert'],
         'routing' => ['webserver_config', 'ssl', 'dns_apply', 'tenant_dns'],
         'certificates' => ['ssl', 'webserver_config'],
         'runtime' => ['webserver_config'],

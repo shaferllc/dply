@@ -642,9 +642,10 @@ test('pipeline workspace applies starter to empty pipeline without modal', funct
         ->set('pipelineTab', 'steps')
         ->call('openApplyStarterModal', 'laravel-zero-downtime')
         ->assertSet('show_apply_starter_modal', false)
-        ->assertSet('deploy_strategy', 'atomic');
+        ->assertSet('deploy_strategy', 'simple');
 
-    expect($pipeline->fresh()->steps)->not->toBeEmpty();
+    expect($pipeline->fresh()->steps)->not->toBeEmpty()
+        ->and($site->fresh()->isConvertingAtomicLayout())->toBeTrue();
 });
 
 test('pipeline workspace applies zero downtime starter with release steps for php site without detection', function () {
@@ -670,7 +671,9 @@ test('pipeline workspace applies zero downtime starter with release steps for ph
         ->set('pipelineTab', 'steps')
         ->call('openApplyStarterModal', 'zero-downtime')
         ->assertSet('show_apply_starter_modal', false)
-        ->assertSet('deploy_strategy', 'atomic');
+        ->assertSet('deploy_strategy', 'simple');
+
+    expect($site->fresh()->isConvertingAtomicLayout())->toBeTrue();
 
     $steps = $pipeline->fresh()->steps;
     expect($steps->where('phase', SiteDeployStep::PHASE_RELEASE)->count())->toBeGreaterThan(0);
