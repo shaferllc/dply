@@ -193,6 +193,11 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 continue;
             }
 
+            // Site-sourced fleets are managed on the origin site, not this box.
+            if (($item['key'] ?? null) === 'worker-pool' && (bool) data_get($server->meta, 'site_sourced_fleet')) {
+                continue;
+            }
+
             $feature = $item['feature'] ?? null;
             $previewFeature = $item['preview_feature'] ?? null;
             $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);

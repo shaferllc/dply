@@ -448,9 +448,7 @@
 
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
         <x-cli-snippet :commands="[
-            ['label' => __('Check status'), 'command' => 'dply sites:ssl:status '.$site->slug],
-            ['label' => __('Issue cert'), 'command' => 'dply sites:ssl:issue '.$site->slug],
-            ['label' => __('Force renew'), 'command' => 'dply sites:ssl:renew '.$site->slug],
+            ['label' => __('Diagnose TLS'), 'command' => 'php artisan dply:ssl:diagnose '.$site->slug],
         ]" />
     </div>
 </section>

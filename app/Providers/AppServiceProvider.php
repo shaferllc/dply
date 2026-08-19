@@ -90,6 +90,7 @@ use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\LookoutProjectBillingObserver;
 use App\Observers\ServerObserver;
+use App\Observers\SiteWorkerFleetObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Policies\IncidentPolicy;
@@ -503,6 +504,7 @@ class AppServiceProvider extends ServiceProvider
         Server::observe(ServerObserver::class);
         Site::observe(ImportSiteWakeupObserver::class);
         Site::observe(SiteBillingObserver::class);
+        Site::observe(SiteWorkerFleetObserver::class);
         RealtimeApp::observe(RealtimeAppBillingObserver::class);
         LookoutProject::observe(LookoutProjectBillingObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);

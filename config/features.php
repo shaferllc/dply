@@ -269,29 +269,27 @@ return [
     'surface' => [
 
         /*
-        | PARKED — Cloud apps, Edge, and Serverless are pulled from the product
-        | for now; we bring them back later. Hard `false` rather than
-        | env(..., false) on purpose: an env var or a stale `features` row
-        | flipping one of these back on mid-park is exactly the failure we
-        | don't want, and the flags carry no per-org rollout while parked.
+        | Cloud apps are live again (create / index / workspace). Set
+        | FEATURE_SURFACE_CLOUD=false to park it.
         |
-        | To restore: put back the env() calls below, and re-enable the flag
-        | for the org(s) from /admin/flags (the platform-scope + per-org rows
-        | were set to false when they were parked).
+        | Edge stays parked. Hard `false` rather than env(..., false) on
+        | purpose: an env var or a stale `features` row flipping it back on
+        | mid-park is the failure we don't want.
         |
-        |   'cloud'              => env('FEATURE_SURFACE_CLOUD', true),
-        |   'edge'               => env('FEATURE_SURFACE_EDGE', true),
-        |   'serverless'         => env('FEATURE_SURFACE_SERVERLESS', true),
-        |   'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
+        |   'edge'  => env('FEATURE_SURFACE_EDGE', true),
+        |
+        | Serverless is live again (create / index / workspace). Set
+        | FEATURE_SURFACE_SERVERLESS=false to park it. Managed delivery
+        | (dply-hosted FaaS, no customer DO token) is FEATURE_SURFACE_SERVERLESS_MANAGED.
         |
         | Off means the route groups 404 (routes/web.php `feature:surface.*`)
         | and every nav entry falls to its "Coming soon" branch. Webhooks and
         | scheduled jobs stay live regardless — see the note above.
         */
-        'cloud' => false,
+        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
         'edge' => false,
-        'serverless' => false,
-        'serverless_managed' => false,
+        'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
+        'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
 
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
         'projects' => env('FEATURE_SURFACE_PROJECTS', true),

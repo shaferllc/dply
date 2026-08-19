@@ -213,6 +213,18 @@ trait ManagesSiteAccessGate
             return;
         }
 
+        // Off with nothing actually on the vhost (no credentials, no form
+        // passwords) is a DB-only flip — don't re-apply or toast "turned off".
+        if ($method === SiteAccessGate::METHOD_OFF && ! $this->accessGateHasLiveProtection()) {
+            if ($live !== SiteAccessGate::METHOD_OFF) {
+                app(SiteAccessGateService::class)->disable($this->site);
+                $this->site->load(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+            }
+            $this->access_gate_method = SiteAccessGate::METHOD_OFF;
+
+            return;
+        }
+
         if ($method === SiteAccessGate::METHOD_FORM_PASSWORD && $live !== SiteAccessGate::METHOD_FORM_PASSWORD) {
             if ($live === SiteAccessGate::METHOD_BASIC_AUTH && $this->site->enforceableBasicAuthUsers()->isNotEmpty()) {
                 $this->openConfirmActionModal(
@@ -280,11 +292,15 @@ trait ManagesSiteAccessGate
         $service = app(SiteAccessGateService::class);
 
         if ($method === SiteAccessGate::METHOD_OFF) {
+            $hadLiveProtection = $this->accessGateHasLiveProtection();
             $service->markAllBasicAuthUsersForRemoval($this->site);
             $service->disable($this->site);
             $this->access_gate_method = SiteAccessGate::METHOD_OFF;
-            $this->site->load(['accessGate', 'basicAuthUsers']);
-            $this->finalizeRoutingMutation(__('Access protection turned off.'));
+            $this->site->load(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+
+            if ($hadLiveProtection) {
+                $this->finalizeRoutingMutation(__('Access protection turned off.'));
+            }
 
             return;
         }
@@ -649,5 +665,15 @@ trait ManagesSiteAccessGate
             $message,
             __('Importing credentials to :host …', ['host' => $this->site->server->name ?? $this->site->name]),
         );
+    }
+
+    /**
+     * True when the vhost would actually enforce a gate today — credentials
+     * or an active form password. A method tile alone does not count.
+     */
+    protected function accessGateHasLiveProtection(): bool
+    {
+        return $this->site->enforceableBasicAuthUsers()->isNotEmpty()
+            || $this->site->usesFormPasswordGate();
     }
 }

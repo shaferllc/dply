@@ -50,6 +50,7 @@ use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use App\Modules\Cloud\Console\CloudPollStatusCommand;
+use App\Modules\Database\Console\ReapExpiredTrustedSourcesCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
 use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
@@ -400,6 +401,12 @@ final class DplySchedule
         $schedule->command(ProcessSshKeyRotationRemindersCommand::class)->dailyAt('08:30');
 
         $schedule->command(RevokeExpiredServerSshSessionsCommand::class)->everyFiveMinutes();
+
+        // Same idea, one layer out: an operator IP left on a managed cluster's
+        // allowlist is a standing hole pointing at a dynamic address.
+        $schedule->command(ReapExpiredTrustedSourcesCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
 
         $schedule->command(ProcessInsightDigestQueueCommand::class)->dailyAt('08:00');
         $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly'])->weeklyOn(1, '08:15');

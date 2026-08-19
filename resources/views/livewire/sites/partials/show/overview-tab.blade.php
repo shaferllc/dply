@@ -228,7 +228,7 @@
                             <div class="mt-5 border-t border-brand-ink/10 pt-5">
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Worker servers') }}</p>
-                                    <a href="{{ route('sites.resources', [$site->server, $site]) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage') }} →</a>
+                                    <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'worker-fleet']) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage') }} →</a>
                                 </div>
                                 <ul class="mt-2 space-y-2">
                                     @foreach ($workerPools as $pool)
@@ -241,9 +241,7 @@
                                                     <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
                                                     <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $pool->status }}</span>
                                                 </div>
-                                                @if ($primary)
-                                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Scale') }} →</a>
-                                                @endif
+                                                <a href="{{ $pool->workspaceUrl() }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Scale') }} →</a>
                                             </div>
                                         </li>
                                     @endforeach

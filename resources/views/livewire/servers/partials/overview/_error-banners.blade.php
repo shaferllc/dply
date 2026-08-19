@@ -8,9 +8,38 @@
             :title="__('Provisioning failed at :provider', ['provider' => $provisionError['provider'] ?? 'the provider'])"
             class="border-b border-brand-ink/10"
         />
-        <div class="bg-rose-50/70 px-3 py-2 sm:px-4">
+        <div class="min-w-0 overflow-hidden bg-rose-50/70 px-3 py-2 sm:px-4">
             <div class="min-w-0">
-                    <p class="text-xs leading-relaxed text-brand-moss">{{ $provisionError['message'] ?? __('Unknown error.') }}</p>
+                    @php($provisionErrorMessage = $provisionError['message'] ?? __('Unknown error.'))
+                    {{-- Provider errors arrive as one unbroken string often enough
+                         that without an explicit wrap they push the card past the
+                         viewport. Clamped to two lines with the full text one
+                         click away. --}}
+                    <div class="flex min-w-0 items-start gap-2" x-data="{ expanded: false, copied: false }">
+                        <p
+                            class="min-w-0 flex-1 break-words text-xs leading-relaxed text-brand-moss"
+                            :class="expanded ? '' : 'line-clamp-2'"
+                        >{{ $provisionErrorMessage }}</p>
+                        <div class="flex shrink-0 items-center gap-1">
+                            <button
+                                type="button"
+                                x-on:click="expanded = ! expanded"
+                                class="rounded p-0.5 text-brand-mist hover:bg-rose-100 hover:text-brand-ink"
+                                :title="expanded ? '{{ __('Show less') }}' : '{{ __('Show full error') }}'"
+                            >
+                                <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition" ::class="expanded && 'rotate-180'" />
+                            </button>
+                            <button
+                                type="button"
+                                x-on:click="navigator.clipboard.writeText(@js($provisionErrorMessage)); copied = true; setTimeout(() => copied = false, 1500)"
+                                class="rounded p-0.5 text-brand-mist hover:bg-rose-100 hover:text-brand-ink"
+                                :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy error') }}'"
+                            >
+                                <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="!copied" />
+                                <x-heroicon-o-check class="h-3.5 w-3.5 text-brand-forest" x-show="copied" x-cloak />
+                            </button>
+                        </div>
+                    </div>
                     <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
                         @if (! empty($provisionError['region']))
                             <span><strong class="text-brand-ink">{{ __('Region') }}:</strong> {{ $provisionError['region'] }}</span>

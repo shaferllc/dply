@@ -295,7 +295,8 @@ class VultrService
 
     /**
      * Get public IPv4 from instance.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getPublicIp(array $instance): ?string
     {
@@ -310,7 +311,8 @@ class VultrService
      * isn't on a private network); VPC attachments live under `vpcs[].subnet`.
      * Returns null when the instance has no private networking — same null-safe
      * contract as {@see DigitalOceanService::getDropletPrivateIp()}.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getPrivateIp(array $instance): ?string
     {
@@ -333,7 +335,8 @@ class VultrService
      * The id of the VPC the instance is attached to (Vultr instances are NOT on a
      * private network by default — this is null unless one was attached). The id
      * is the identity used to record the instance's private network.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getInstanceVpcId(array $instance): ?string
     {
@@ -357,7 +360,8 @@ class VultrService
     /**
      * Best-effort CIDR for the attached VPC (subnet + mask). Null when the mask
      * isn't present — recording by VPC id alone still enables peering.
-     * @param  array<string, mixed> $instance
+     *
+     * @param  array<string, mixed>  $instance
      */
     public static function getInstanceVpcRange(array $instance): ?string
     {
@@ -721,7 +725,7 @@ class VultrService
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      */
     protected function request(string $method, string $path, array $body = []): Response
     {
@@ -827,6 +831,36 @@ class VultrService
     }
 
     /**
+     * Read the cluster's current trusted-IP allowlist.
+     *
+     * {@see setDatabaseTrustedSources()} replaces the list wholesale, so a caller
+     * adding one address must read first and send the union — otherwise the app
+     * server's own IP is dropped and the live site loses its database.
+     *
+     * UNVERIFIED: unlike DigitalOcean's firewall-scoped endpoint, Vultr's setter
+     * PUTs the whole cluster object with only `trusted_ips` populated. Whether
+     * omitted fields are preserved has not been confirmed against the live API —
+     * see the verification note on the connect feature before relying on it.
+     *
+     * @return list<string>
+     */
+    public function getDatabaseTrustedSources(string $id): array
+    {
+        $response = $this->request('get', '/databases/'.$id);
+        $this->assertSuccess($response, 'get database trusted ips');
+
+        $ips = [];
+        foreach ((array) $response->json('database.trusted_ips', []) as $ip) {
+            $ip = trim((string) $ip);
+            if ($ip !== '') {
+                $ips[] = $ip;
+            }
+        }
+
+        return $ips;
+    }
+
+    /**
      * Delete a managed database. Idempotent — a 404 means it's already gone.
      */
     public function deleteDatabaseCluster(string $id): bool
@@ -845,7 +879,6 @@ class VultrService
      * consumes (status + a host/port/user/password/database connection block,
      * empty while the cluster is still configuring).
      *
-     * @param  mixed  $database
      * @return array{id: string, status: string, connection: array<string, mixed>}
      */
     private function normalizeDatabaseCluster(mixed $database): array

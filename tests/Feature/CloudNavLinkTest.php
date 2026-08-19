@@ -53,7 +53,7 @@ test('browse dropdown includes compute apps and org sections', function () {
         ->assertSee('Sites')
         ->assertSee('Organizations')
         ->assertSee(route('servers.index'), false)
-        // surface.serverless defaults off — Coming soon teaser has no href.
+        ->assertSee(route('serverless.index'), false)
         ->assertSee(route('edge.index'), false)
         ->assertSee(route('sites.index'), false)
         ->assertSee(route('organizations.index'), false);

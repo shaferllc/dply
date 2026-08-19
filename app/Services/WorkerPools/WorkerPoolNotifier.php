@@ -87,7 +87,7 @@ class WorkerPoolNotifier
             return;
         }
 
-        $url = route('servers.worker-pool', $server, absolute: true);
+        $url = $pool->workspaceUrl(absolute: true);
         $metadata = array_merge(['pool_id' => (string) $pool->id, 'pool_name' => $pool->name], $metadata);
 
         // In-app inbox + broadcast + webhook subscriptions (the publisher does

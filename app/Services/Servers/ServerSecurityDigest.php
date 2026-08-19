@@ -27,6 +27,8 @@ final class ServerSecurityDigest
         $authInvalidUser = isset($snapshot['auth_invalid_user_lines']) ? (int) $snapshot['auth_invalid_user_lines'] : null;
         $authFailedPassword = isset($snapshot['auth_failed_password_lines']) ? (int) $snapshot['auth_failed_password_lines'] : null;
         $authFailedRecent = isset($snapshot['auth_failed_recent']) ? (int) $snapshot['auth_failed_recent'] : null;
+        $authFailed24h = isset($snapshot['auth_failed_24h_lines']) ? (int) $snapshot['auth_failed_24h_lines'] : null;
+        $authFailed24hIps = isset($snapshot['auth_failed_24h_ips']) ? (int) $snapshot['auth_failed_24h_ips'] : null;
         $fail2banActive = is_string($snapshot['fail2ban_active'] ?? null) ? $snapshot['fail2ban_active'] : null;
         $jails = is_array($snapshot['fail2ban_jails'] ?? null) ? $snapshot['fail2ban_jails'] : [];
         $jailRows = is_array($snapshot['fail2ban_jail_rows'] ?? null) ? $snapshot['fail2ban_jail_rows'] : [];
@@ -38,7 +40,7 @@ final class ServerSecurityDigest
 
         $alerts = array_merge(
             $this->scanAlerts($neverScanned, $stale),
-            $this->authAlerts($authFailed, $authFailedRecent, $server),
+            $this->authAlerts($authFailed24hIps, $authFailed24h, $server),
             $this->fail2banAlerts($fail2banActive, $bannedNow, $server),
             $this->hardeningAlerts($sshdPasswordAuth, $sshdPermitRoot, $ufwActive, $server),
         );
@@ -63,8 +65,8 @@ final class ServerSecurityDigest
             }
         }
 
-        $warningThreshold = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 50));
-        $criticalThreshold = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 200));
+        $warningThreshold = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 15));
+        $criticalThreshold = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 40));
 
         return [
             'overall' => $overall,
@@ -73,6 +75,8 @@ final class ServerSecurityDigest
             'summary' => [
                 'auth_failed_total' => $authFailed,
                 'auth_failed_recent' => $authFailedRecent,
+                'auth_failed_24h' => $authFailed24h,
+                'auth_failed_24h_ips' => $authFailed24hIps,
                 'auth_invalid_user' => $authInvalidUser,
                 'auth_failed_password' => $authFailedPassword,
                 'banned_now' => $bannedNow,
@@ -91,7 +95,9 @@ final class ServerSecurityDigest
                 'invalid_user_lines' => $authInvalidUser,
                 'failed_password_lines' => $authFailedPassword,
                 'recent_lines' => $authFailedRecent,
-                'severity' => $this->authSeverity($authFailed),
+                'failed_24h_lines' => $authFailed24h,
+                'failed_24h_ips' => $authFailed24hIps,
+                'severity' => $this->authSeverity($authFailed24hIps),
             ],
             'fail2ban' => [
                 'active' => $fail2banActive,
@@ -151,46 +157,41 @@ final class ServerSecurityDigest
     /**
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
-    private function authAlerts(?int $failedLines, ?int $recentLines, Server $server): array
+    private function authAlerts(?int $uniqueIps24h, ?int $lines24h, Server $server): array
     {
-        $alerts = [];
-        $warning = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 50));
-        $critical = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 200));
-        $recentWarning = max(1, (int) config('server_security_digest.thresholds.auth_failed_recent_warning', 25));
-
-        if ($failedLines === null) {
+        if ($uniqueIps24h === null) {
             return [];
         }
 
-        if ($failedLines >= $critical) {
-            $alerts[] = [
+        $warning = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 15));
+        $critical = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 40));
+
+        if ($uniqueIps24h >= $critical) {
+            return [[
                 'severity' => 'critical',
                 'title' => __('High SSH auth failure volume'),
-                'message' => __(':count Failed password / Invalid user lines in auth.log — review system logs.', ['count' => $failedLines]),
+                'message' => __(':ips distinct IPs failed SSH in the last 24 hours (:lines matching lines) — confirm fail2ban is jailing them.', [
+                    'ips' => $uniqueIps24h,
+                    'lines' => $lines24h ?? $uniqueIps24h,
+                ]),
                 'href' => route('servers.logs', $server),
                 'link_label' => __('Open logs'),
-            ];
-        } elseif ($failedLines >= $warning) {
-            $alerts[] = [
+            ]];
+        }
+
+        if ($uniqueIps24h >= $warning) {
+            return [[
                 'severity' => 'warning',
                 'title' => __('Elevated SSH auth failures'),
-                'message' => __(':count matching lines in auth.log — confirm fail2ban is banning offenders.', ['count' => $failedLines]),
+                'message' => __(':ips distinct IPs failed SSH in the last 24 hours — confirm fail2ban is banning offenders.', [
+                    'ips' => $uniqueIps24h,
+                ]),
                 'href' => route('servers.logs', $server),
                 'link_label' => __('Open logs'),
-            ];
+            ]];
         }
 
-        if ($recentLines !== null && $recentLines >= $recentWarning && ($failedLines < $warning)) {
-            $alerts[] = [
-                'severity' => 'warning',
-                'title' => __('Recent brute-force burst'),
-                'message' => __(':count matching lines in the last ~5000 auth.log entries — watch for ongoing scans.', ['count' => $recentLines]),
-                'href' => route('servers.logs', $server),
-                'link_label' => __('Open logs'),
-            ];
-        }
-
-        return $alerts;
+        return [];
     }
 
     /**
@@ -289,8 +290,8 @@ final class ServerSecurityDigest
             return 'unknown';
         }
 
-        $warning = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 50));
-        $critical = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 200));
+        $warning = max(1, (int) config('server_security_digest.thresholds.auth_failed_warning', 15));
+        $critical = max(1, (int) config('server_security_digest.thresholds.auth_failed_critical', 40));
 
         if ($failedLines >= $critical) {
             return 'critical';

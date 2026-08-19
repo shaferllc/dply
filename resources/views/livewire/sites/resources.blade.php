@@ -85,9 +85,7 @@
                                 <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
                                 <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $pool->status }}</span>
                             </div>
-                            @if ($primary)
-                                <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Scale / manage') }} →</a>
-                            @endif
+                            <a href="{{ $pool->workspaceUrl() }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Scale / manage') }} →</a>
                         </div>
                         <ul class="mt-2 divide-y divide-brand-ink/8">
                             @foreach ($pool->servers as $member)

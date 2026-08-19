@@ -1205,9 +1205,10 @@
 
     <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
-        ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
-        ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
-        ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'php artisan dply:site:tenant-add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
+        ['label' => __('Remove'), 'command' => 'php artisan dply:site:tenant-remove '.$site->slug.' acme.example.com'],
+        ['label' => __('List'), 'command' => 'php artisan dply:site:tenant-list '.$site->slug],
+        ['label' => __('Reconcile tenant DNS'), 'command' => 'php artisan dply:tenants:reconcile-dns'],
     ]" />
 </div>
 

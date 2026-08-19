@@ -47,10 +47,13 @@
         <span x-show="copied" x-cloak class="ml-1 text-2xs font-medium text-emerald-700">{{ __('Copied') }}</span>
     </footer>
 @elseif ($resolvedTone === 'details' && $rows !== [])
-    {{-- Flush disclosure — no nested rounded card (merged chrome footers). --}}
+    {{-- Flush disclosure — no nested rounded card (merged chrome footers).
+         wire:ignore.self keeps the browser `open` attribute across Livewire
+         polls (log viewer, etc.); without it the disclosure snaps shut. --}}
     <details
         {{ $attributes->class(['text-xs text-brand-moss']) }}
         data-cli-snippet="details"
+        wire:ignore.self
     >
         <summary class="cursor-pointer select-none font-semibold text-brand-ink">{{ $detailsSummary }}</summary>
         @if ($intro)
@@ -82,6 +85,7 @@
     <details
         {{ $attributes->class(['text-xs text-brand-moss']) }}
         data-cli-snippet="stub"
+        wire:ignore.self
     >
         <summary class="cursor-pointer select-none font-semibold text-brand-ink">{{ $detailsSummary }}</summary>
         <p class="mt-2 text-brand-moss">{{ $summary === null ? $stubMessage : ($intro ?? $stubMessage) }}</p>

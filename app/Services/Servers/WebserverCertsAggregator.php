@@ -55,6 +55,9 @@ class WebserverCertsAggregator
      */
     private const SEARCH_PATHS = [
         '/etc/letsencrypt/live',
+        // Where imported / ZeroSSL material is uploaded. Omitting it meant those
+        // certs were never scanned, so they could not even show a live expiry.
+        '/etc/dply/certs',
         '/var/lib/caddy/.local/share/caddy/certificates',
         '/etc/haproxy/certs',
         '/etc/nginx/ssl',
@@ -130,7 +133,6 @@ class WebserverCertsAggregator
      * The cached sweep for a server, or null when nothing is cached yet (no SSH).
      * This is the read side the Livewire surfaces poll; the SSH work happens in
      * {@see ScanServerLiveCertsJob} via {@see scanAndCache()}.
-     *
      */
     public function cached(Server $server): ?array
     {
@@ -198,7 +200,6 @@ class WebserverCertsAggregator
      * Synchronous cache-or-scan. Retained for non-request callers (and tests);
      * request/Livewire surfaces use {@see cached()} + {@see dispatchScan()} so
      * the 20s SSH probe never runs in the page request.
-     *
      */
     public function aggregate(Server $server, bool $forceFresh = false): array
     {
@@ -294,7 +295,7 @@ class WebserverCertsAggregator
      * A "[read/total] name · Nd" progress frame naming the cert just read, with
      * its days-until-expiry when we got one — so each frame is informative.
      *
-     * @param  list<string> $chunk
+     * @param  list<string>  $chunk
      * @param  list<array<string, mixed>>  $rows
      */
     private function frameLine(int $read, int $total, array $chunk, array $rows): string
@@ -345,7 +346,7 @@ BASH;
      * `path|subject|issuer|notAfter` line each (the format {@see parseScanOutput}
      * consumes). Unreadable/non-cert files are skipped silently.
      *
-     * @param  list<string> $files
+     * @param  list<string>  $files
      */
     private function buildReadScript(array $files): string
     {
@@ -471,7 +472,7 @@ BASH;
      * cache backends that might JSON-encode, we re-create the carbon
      * objects from `not_after` on the way back out.
      *
-     * @param  array<string, mixed> $cached
+     * @param  array<string, mixed>  $cached
      * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function rehydrate(array $cached): array

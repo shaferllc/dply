@@ -13,14 +13,29 @@ final class ServerSecurityDigestScript
     {
         return <<<'SH'
 printf "DIGEST_BEGIN\n"
-failed=$(grep -E "Failed password|Invalid user" /var/log/auth.log 2>/dev/null | wc -l | tr -d " ")
+auth_fail_lines() { grep -E "Failed password|Invalid user" || true; }
+auth_fail_ips() { sed -n 's/.* from \([^ ]*\).*/\1/p' | sort -u; }
+failed=$(cat /var/log/auth.log 2>/dev/null | auth_fail_lines | wc -l | tr -d " ")
 printf "auth_failed_lines=%s\n" "${failed:-0}"
 invalid=$(grep -c "Invalid user" /var/log/auth.log 2>/dev/null || echo 0)
 password=$(grep -c "Failed password" /var/log/auth.log 2>/dev/null || echo 0)
 printf "auth_invalid_user_lines=%s\n" "${invalid:-0}"
 printf "auth_failed_password_lines=%s\n" "${password:-0}"
-recent=$(tail -n 5000 /var/log/auth.log 2>/dev/null | grep -E "Failed password|Invalid user" | wc -l | tr -d " ")
+recent_src=$(tail -n 5000 /var/log/auth.log 2>/dev/null)
+recent=$(printf '%s\n' "$recent_src" | auth_fail_lines | wc -l | tr -d " ")
 printf "auth_failed_recent=%s\n" "${recent:-0}"
+journal_24h=$(journalctl SYSLOG_IDENTIFIER=sshd --since "24 hours ago" --no-pager -q 2>/dev/null || true)
+if ! printf '%s' "$journal_24h" | grep -q .; then
+  journal_24h=$(journalctl -u ssh -u sshd --since "24 hours ago" --no-pager -q 2>/dev/null || true)
+fi
+window_src="$journal_24h"
+if ! printf '%s' "$window_src" | grep -q .; then
+  window_src="$recent_src"
+fi
+failed_24h=$(printf '%s\n' "$window_src" | auth_fail_lines | wc -l | tr -d " ")
+ips_24h=$(printf '%s\n' "$window_src" | auth_fail_lines | auth_fail_ips | wc -l | tr -d " ")
+printf "auth_failed_24h_lines=%s\n" "${failed_24h:-0}"
+printf "auth_failed_24h_ips=%s\n" "${ips_24h:-0}"
 if command -v ufw >/dev/null 2>&1; then
   ufw_status=$(ufw status 2>/dev/null | head -n 1 | sed 's/^Status: //')
   printf "ufw_active=%s\n" "${ufw_status:-unknown}"
@@ -55,8 +70,8 @@ SH;
     }
 
     /**
+     * @param  array<string, mixed>  $existingMeta
      * @return array<string, mixed>
-     * @param  array<string, mixed> $existingMeta
      */
     public function parse(string $output, array $existingMeta = []): array
     {
@@ -64,6 +79,8 @@ SH;
         $authInvalidUser = 0;
         $authFailedPassword = 0;
         $authFailedRecent = 0;
+        $authFailed24h = null;
+        $authFailed24hIps = null;
         $ufwActive = null;
         $sshdPasswordAuth = null;
         $sshdPermitRoot = null;
@@ -132,6 +149,12 @@ SH;
             if (str_starts_with($line, 'auth_failed_recent=')) {
                 $authFailedRecent = max(0, (int) substr($line, strlen('auth_failed_recent=')));
             }
+            if (str_starts_with($line, 'auth_failed_24h_lines=')) {
+                $authFailed24h = max(0, (int) substr($line, strlen('auth_failed_24h_lines=')));
+            }
+            if (str_starts_with($line, 'auth_failed_24h_ips=')) {
+                $authFailed24hIps = max(0, (int) substr($line, strlen('auth_failed_24h_ips=')));
+            }
             if (str_starts_with($line, 'ufw_active=')) {
                 $ufwActive = substr($line, strlen('ufw_active='));
             }
@@ -146,13 +169,15 @@ SH;
             }
         }
 
-        $meta = ($existingMeta );
+        $meta = ($existingMeta);
         $meta['security_digest_snapshot'] = [
             'checked_at' => now()->toIso8601String(),
             'auth_failed_lines' => $authFailed,
             'auth_invalid_user_lines' => $authInvalidUser,
             'auth_failed_password_lines' => $authFailedPassword,
             'auth_failed_recent' => $authFailedRecent,
+            'auth_failed_24h_lines' => $authFailed24h,
+            'auth_failed_24h_ips' => $authFailed24hIps,
             'ufw_active' => $ufwActive,
             'sshd_password_auth' => $sshdPasswordAuth,
             'sshd_permit_root' => $sshdPermitRoot,

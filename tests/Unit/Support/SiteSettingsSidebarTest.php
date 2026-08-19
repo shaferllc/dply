@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Support\SiteSettingsSidebarTest;
 
 use App\Models\Server;
+use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Support\SiteSettingsSidebar;
 
 function makeVmServer(): Server
@@ -282,6 +285,63 @@ test('static edge site hides worker-only sidebar items', function () {
         ->and($ids)->not->toContain('edge-jobs')
         ->and($ids)->toContain('edge-forms')
         ->and($ids)->toContain('edge-firewall');
+});
+
+test('database tab is hidden when the site has no engines or databases', function () {
+    $server = makeVmServer();
+    $site = makeSite($server);
+    $site->setRelation('serverDatabases', collect());
+    $site->setRelation('bindings', collect());
+    $server->setRelation('databaseEngines', collect());
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->not->toContain('database');
+});
+
+test('database tab appears when the server has a running engine', function () {
+    $server = makeVmServer();
+    $site = makeSite($server);
+    $site->setRelation('serverDatabases', collect());
+    $site->setRelation('bindings', collect());
+
+    $engine = new ServerDatabaseEngine;
+    $engine->status = ServerDatabaseEngine::STATUS_RUNNING;
+    $server->setRelation('databaseEngines', collect([$engine]));
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('database');
+});
+
+test('database tab appears when the site has a hosted database binding', function () {
+    $server = makeVmServer();
+    $site = makeSite($server);
+    $site->setRelation('serverDatabases', collect());
+    $server->setRelation('databaseEngines', collect());
+
+    $binding = new SiteBinding([
+        'type' => 'database',
+        'target_type' => 'cloud_database',
+        'config' => ['placement' => 'managed', 'managed' => true],
+    ]);
+    $site->setRelation('bindings', collect([$binding]));
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('database');
+});
+
+test('database tab appears when the site has a linked on-box database', function () {
+    $server = makeVmServer();
+    $site = makeSite($server);
+    $site->setRelation('bindings', collect());
+    $server->setRelation('databaseEngines', collect());
+    $site->setRelation('serverDatabases', collect([new ServerDatabase]));
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('database');
 });
 
 test('ssr edge site shows worker-only sidebar items', function () {

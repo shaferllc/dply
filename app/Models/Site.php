@@ -18,6 +18,7 @@ use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Support\Sites\SiteRelationPurger;
 use Database\Factories\SiteFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -66,7 +67,7 @@ use Illuminate\Support\Str;
  * @property ?string $deploy_script_id
  * @property string $deploy_strategy
  * @property string|null $deploy_method
- * @property int $releases_to_keep  smallint in the schema
+ * @property int $releases_to_keep smallint in the schema
  * @property ?string $nginx_extra_raw
  * @property bool $engine_http_cache_enabled
  * @property ?string $octane_port
@@ -501,6 +502,38 @@ class Site extends Model
             $q->where('type', SiteType::Container)
                 ->orWhereNotNull('container_backend');
         });
+    }
+
+    /**
+     * Hide site-sourced worker-fleet replicas from the Sites inventory.
+     *
+     * @param  Builder<Site>  $query
+     */
+    public function scopeVisibleInSiteIndex(Builder $query): void
+    {
+        $query->whereRaw("coalesce(meta->>'fleet_replica_of_site_id', '') = ''");
+    }
+
+    public function isFleetReplica(): bool
+    {
+        return filled(data_get($this->meta, 'fleet_replica_of_site_id'));
+    }
+
+    /**
+     * Hidden worker-host copies of this site (same repo, drain the same queue).
+     *
+     * @return Collection<int, Site>
+     */
+    public function fleetReplicaSites()
+    {
+        if ($this->organization_id === null || $this->isFleetReplica()) {
+            return static::query()->whereRaw('1 = 0')->get();
+        }
+
+        return static::query()
+            ->where('organization_id', $this->organization_id)
+            ->where('meta->fleet_replica_of_site_id', $this->id)
+            ->get();
     }
 
     protected function slugTaken(): bool

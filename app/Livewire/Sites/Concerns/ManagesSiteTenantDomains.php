@@ -368,18 +368,39 @@ trait ManagesSiteTenantDomains
             return;
         }
 
-        $certificate = app(CertificateRequestService::class)->create([
-            'site_id' => $this->site->id,
-            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
-            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
-            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
-            'domains_json' => [$hostname],
-            'status' => SiteCertificate::STATUS_PENDING,
-            'requested_settings' => [
-                'source' => 'tenant_ssl',
-                'tenant_domain_id' => (string) $tenant->id,
-            ],
-        ]);
+        $requests = app(CertificateRequestService::class);
+
+        // The guard above already returned for anything in flight or active, so
+        // a match here is a previously failed attempt for this exact tenant.
+        // Re-running that row keeps one row per tenant hostname — inserting a
+        // fresh one leaves two rows racing for the same certbot lineage.
+        $certificate = $requests->findReusable(
+            $this->site,
+            [$hostname],
+            SiteCertificate::PROVIDER_LETSENCRYPT,
+            SiteCertificate::CHALLENGE_HTTP,
+            'tenant_ssl',
+        );
+
+        if ($certificate !== null) {
+            $certificate->forceFill([
+                'status' => SiteCertificate::STATUS_PENDING,
+                'last_output' => null,
+            ])->save();
+        } else {
+            $certificate = $requests->create([
+                'site_id' => $this->site->id,
+                'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+                'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+                'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+                'domains_json' => [$hostname],
+                'status' => SiteCertificate::STATUS_PENDING,
+                'requested_settings' => [
+                    'source' => 'tenant_ssl',
+                    'tenant_domain_id' => (string) $tenant->id,
+                ],
+            ]);
+        }
 
         ExecuteSiteCertificateJob::dispatch((string) $certificate->id);
         $this->toastSuccess(__('SSL requested for :host.', ['host' => $hostname]));

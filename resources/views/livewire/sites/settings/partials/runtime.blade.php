@@ -1,5 +1,5 @@
 @php
-    $resolvedDetection = $site->resolvedRuntimeAppDetection();
+    $resolvedDetection = $site->resolvedRuntimeAppDetection() ?? [];
     $detectedFramework = strtolower((string) ($resolvedDetection['framework'] ?? ''));
     $detectionSourceLabel = match ($resolvedDetection['source'] ?? null) {
         'docker' => __('Docker inspection'),
@@ -44,53 +44,129 @@
     $pillBase = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1';
     $btnBase = 'dply-btn dply-btn-xs dply-btn-outline';
     $linkBase = 'text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline';
+    $detectedFrameworkLabel = filled($resolvedDetection['framework'] ?? null)
+        ? (string) str((string) $resolvedDetection['framework'])->replace('_', ' ')->title()
+        : '';
+    $detectedLanguageLabel = filled($resolvedDetection['language'] ?? null)
+        ? (string) str((string) $resolvedDetection['language'])->replace('_', ' ')->title()
+        : '';
+    $showDetectedLanguage = $detectedLanguageLabel !== ''
+        && strcasecmp($detectedLanguageLabel, $runtimeLabel) !== 0;
     $workersSchedulersNote = (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
-        ? __('Queue workers and Horizon run under Workers. Scheduled tasks use Cron or the Laravel tab.')
+        ? __('Queue workers live on Workers. Scheduled tasks live on Cron.')
         : ($site->isRailsFrameworkDetected()
-            ? __('Sidekiq and Solid Queue run under Workers. Optional systemd workers are on Services.')
-            : __('App servers: set start command and port above. Workers use systemd (Services) or Supervisor (Workers).'));
+            ? __('Sidekiq lives on Workers. Optional systemd workers are on Services.')
+            : __('Background processes live on Workers, Cron, or Services.'));
+    $runtimeCliVersion = $runtimeVersion !== '' ? $runtimeVersion : match ($runtimeKey) {
+        'php' => '8.4',
+        'ruby' => '3.3',
+        default => '22',
+    };
+    $runtimeCliCommands = match ($runtimeKey) {
+        'php' => [
+            ['label' => __('Set PHP version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=php --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+            ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+        ],
+        'ruby' => [
+            ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+            ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+        ],
+        'static' => [
+            ['label' => __('Set static runtime'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=static'],
+            ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+            ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+        ],
+        default => [
+            ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime='.($runtimeKey !== '' ? $runtimeKey : 'node').' --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
+            ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+            ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+            ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' '.($runtimeKey !== '' ? $runtimeKey : 'node').' '.$runtimeCliVersion],
+        ],
+    };
 @endphp
 
-{{-- Language & version --}}
+{{-- What it runs: language, detection, path --}}
 <section class="border-b border-brand-ink/10">
     <x-workspace-panel-head
-        dense
         class="border-b border-brand-ink/10"
         icon="heroicon-o-cube-transparent"
-        :title="__('Language & version')"
-        :note="__('Per-language tuning lives on the PHP, Ruby, or Static tab when applicable.')"
+        :title="__('What it runs')"
+        :note="__('Language, detected framework, and the checkout path on this server.')"
     >
         <x-slot:actions>
             <span class="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 font-mono text-xs font-semibold {{ $runtimeDisplay === __('Not set') ? 'text-brand-moss' : 'text-brand-ink' }} ring-1 ring-brand-ink/10">{{ $runtimeDisplay }}</span>
+            @if ($resolvedDetection && ! empty($resolvedDetection['confidence']))
+                <span class="{{ $pillBase }} shrink-0 bg-white text-brand-moss ring-brand-ink/10">{{ strtoupper((string) $resolvedDetection['confidence']) }}</span>
+            @endif
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    @if ($site->internal_port || $site->start_command || $showAppPortEditor)
-        <div class="{{ $panelBody }} space-y-2.5">
-            @if ($site->internal_port || $site->start_command)
-                <dl class="grid gap-2 sm:grid-cols-2">
-                    @if ($site->internal_port)
-                        <x-fact-row :label="__('Internal port')" value="127.0.0.1:{{ $site->internal_port }}" />
-                    @endif
-                    @if ($site->start_command)
-                        <x-fact-row :label="__('Start command')" :value="$site->start_command" class="sm:col-span-2" />
-                    @endif
-                </dl>
+    <div class="{{ $panelBody }} space-y-2.5">
+        <dl class="grid gap-2 sm:grid-cols-2">
+            @if ($detectedFrameworkLabel !== '')
+                <x-fact-row :label="__('Framework')" :value="$detectedFrameworkLabel" :mono="false" />
             @endif
+            @if ($showDetectedLanguage)
+                <x-fact-row :label="__('Language')" :value="$detectedLanguageLabel" :mono="false" />
+            @endif
+            <x-fact-row :label="__('Working directory')" :value="$site->effectiveRepositoryPath()" class="sm:col-span-2" />
+            @if ($detectionSourceLabel !== '')
+                <x-fact-row :label="__('Detected from')" :value="$detectionSourceLabel" :mono="false" tone="muted" class="sm:col-span-2" />
+            @endif
+            @if ($site->internal_port)
+                <x-fact-row :label="__('Internal port')" value="127.0.0.1:{{ $site->internal_port }}" />
+            @endif
+            @if ($site->start_command)
+                <x-fact-row :label="__('Start command')" :value="$site->start_command" class="sm:col-span-2" />
+            @endif
+            @if (! empty($resolvedDetection['laravel_octane']))
+                <x-fact-row :label="__('Laravel Octane')" :mono="false" class="sm:col-span-2">
+                    @if ($site->usesOctaneRuntime())
+                        {{ __('Enabled — serving on port :port', ['port' => $site->octane_port]) }}
+                    @else
+                        {{ __('Package detected — set an Octane port under Laravel settings to enable.') }}
+                    @endif
+                </x-fact-row>
+            @endif
+            @if (! empty($resolvedDetection['laravel_horizon']))
+                <x-fact-row :label="__('Laravel Horizon')" :value="__('Detected in composer.json')" :mono="false" />
+            @endif
+            @if (! empty($resolvedDetection['laravel_pulse']))
+                <x-fact-row :label="__('Laravel Pulse')" :value="__('Detected in composer.json')" :mono="false" />
+            @endif
+            @if (! empty($resolvedDetection['laravel_reverb']))
+                <x-fact-row :label="__('Laravel Reverb')" :value="__('Detected in composer.json')" :mono="false" />
+            @endif
+        </dl>
 
-            @if ($showAppPortEditor)
-                <form wire:submit="saveRuntimePreferences" class="flex flex-wrap items-end gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
-                    <div class="min-w-0">
-                        <x-input-label for="runtime_app_port_input" :value="__('App listens on (localhost)')" class="!text-xs" />
-                        <x-text-input id="runtime_app_port_input" type="number" wire:model="runtime_app_port" class="mt-1 block w-[8rem] font-mono text-sm" placeholder="3000" min="1" max="65535" />
-                        <x-input-error :messages="$errors->get('runtime_app_port')" class="mt-1" />
-                    </div>
-                    <x-primary-button size="sm" type="submit">{{ __('Save') }}</x-primary-button>
-                    <p class="w-full text-xs text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('Reverse proxy target: Node, Rails/Puma, Python, or container app port.') }}</p>
-                </form>
-            @endif
-        </div>
-    @endif
+        @if (! $resolvedDetection)
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
+                <span class="font-semibold text-brand-ink">{{ __('No repository inspection yet.') }}</span>
+                {{ __('After a deploy, framework signals from your repo will show up here.') }}
+            </p>
+        @elseif (! empty($resolvedDetection['warnings']))
+            <div class="space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                @foreach ($resolvedDetection['warnings'] as $warning)
+                    <p>{{ $warning }}</p>
+                @endforeach
+            </div>
+        @endif
+
+        @if ($showAppPortEditor)
+            <form wire:submit="saveRuntimePreferences" class="flex flex-wrap items-end gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
+                <div class="min-w-0">
+                    <x-input-label for="runtime_app_port_input" :value="__('App listens on (localhost)')" class="!text-xs" />
+                    <x-text-input id="runtime_app_port_input" type="number" wire:model="runtime_app_port" class="mt-1 block w-[8rem] font-mono text-sm" placeholder="3000" min="1" max="65535" />
+                    <x-input-error :messages="$errors->get('runtime_app_port')" class="mt-1" />
+                </div>
+                <x-primary-button size="sm" type="submit">{{ __('Save') }}</x-primary-button>
+                <p class="w-full text-xs text-brand-moss sm:w-auto sm:flex-1 sm:text-right">{{ __('The webserver proxies to this localhost port.') }}</p>
+            </form>
+        @endif
+    </div>
 </section>
 
 {{-- Live runtime health (deferred via wire:init): FPM pool or app-server port --}}
@@ -107,11 +183,10 @@
     @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
         <x-workspace-panel-head
-            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-bolt"
             :title="__('PHP-FPM pool')"
-            :note="__('Live status and request-handling limits. Tune numbers on the PHP tab.')"
+            :note="__('How many workers are handling requests right now.')"
         >
             <x-slot:actions>
                 @if (! $runtimeHealthLoaded)
@@ -199,11 +274,10 @@
     @php $appPort = (int) $site->app_port; @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
         <x-workspace-panel-head
-            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-signal"
             :title="__('App server port')"
-            :note="__('Whether the app process accepts connections on its localhost reverse-proxy target.')"
+            :note="__('Whether the app accepts connections on its localhost proxy target.')"
         >
             <x-slot:actions>
                 @if (! $runtimeHealthLoaded)
@@ -281,11 +355,10 @@
     @endphp
     <section class="border-b border-brand-ink/10" wire:init="loadOpcacheStatus">
         <x-workspace-panel-head
-            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-cpu-chip"
             :title="__('OPcache')"
-            :note="__('Live bytecode cache for FPM workers. Flush after out-of-band code changes.')"
+            :note="__('Bytecode cache for this site’s FPM workers. Flush after you change files outside a deploy.')"
         >
             <x-slot:actions>
                 @if (! $opcacheStatusLoaded)
@@ -405,11 +478,10 @@
     @endphp
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head
-            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-adjustments-horizontal"
-            :title="__('Effective PHP limits')"
-            :note="__('“Default” = PHP built-in; plain values are your overrides.')"
+            :title="__('PHP limits')"
+            :note="__('Memory, time, and upload caps for this site. Values marked default are PHP’s built-ins.')"
         >
             <x-slot:actions>
                 <a href="{{ $phpTabUrl }}" wire:navigate class="{{ $linkBase }}">{{ __('Edit') }} →</a>
@@ -423,7 +495,7 @@
                     <x-fact-row :label="$limit['label']" :tone="$isOverride ? 'default' : 'muted'">
                         {{ $isOverride ? $limit['value'] : $limit['default'] }}
                         @unless ($isOverride)
-                            <span class="ml-1 rounded bg-brand-sand/70 px-1 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('default') }}</span>
+                            <span class="ml-1 rounded bg-brand-sand/70 px-1 py-0.5 text-xxs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('default') }}</span>
                         @endunless
                     </x-fact-row>
                 @endforeach
@@ -436,11 +508,10 @@
 @if (! empty($runtimeRecentErrors) && count($runtimeRecentErrors) > 0)
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head
-            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-exclamation-triangle"
             :title="__('Recent errors')"
-            :note="__('Latest issues for this site. Full history on the Errors tab.')"
+            :note="__('Latest issues for this site. Full history is on Errors.')"
         >
             <x-slot:actions>
                 <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('View all') }} →</a>
@@ -467,92 +538,30 @@
     </section>
 @endif
 
-{{-- Repository detection --}}
-<section class="border-b border-brand-ink/10">
-    <x-workspace-panel-head
-        dense
-        class="border-b border-brand-ink/10"
-        icon="heroicon-o-magnifying-glass-circle"
-        :title="__('Repository detection')"
-        :note="__('Inferred from your repository on deploy and container inspect.')"
-    >
-        @if ($resolvedDetection && ! empty($resolvedDetection['confidence']))
-            <x-slot:actions>
-                <span class="{{ $pillBase }} shrink-0 bg-white text-brand-moss ring-brand-ink/10">{{ strtoupper((string) $resolvedDetection['confidence']) }}</span>
-            </x-slot:actions>
-        @endif
-    </x-workspace-panel-head>
-
-    <div class="{{ $panelBody }}">
-        @if ($resolvedDetection)
-            <dl class="grid gap-2 sm:grid-cols-2">
-                <x-fact-row :label="__('Framework')" :value="str((string) ($resolvedDetection['framework'] ?? '—'))->replace('_', ' ')->title()" :mono="false" />
-                <x-fact-row :label="__('Language')" :value="str((string) ($resolvedDetection['language'] ?? '—'))->replace('_', ' ')->title()" :mono="false" />
-                @if ($detectionSourceLabel !== '')
-                    <x-fact-row :label="__('Source')" :value="$detectionSourceLabel" :mono="false" tone="muted" class="sm:col-span-2" />
-                @endif
-                @if (! empty($resolvedDetection['laravel_octane']))
-                    <x-fact-row :label="__('Laravel Octane')" :mono="false" class="sm:col-span-2">
-                        @if ($site->usesOctaneRuntime())
-                            {{ __('Enabled — serving on port :port', ['port' => $site->octane_port]) }}
-                        @else
-                            {{ __('Package detected (`laravel/octane` in composer.json) — set an Octane port under Laravel settings to enable') }}
-                        @endif
-                    </x-fact-row>
-                @endif
-                @if (! empty($resolvedDetection['laravel_horizon']))
-                    <x-fact-row :label="__('Laravel Horizon')" :value="__('Yes — `laravel/horizon` in composer.json')" :mono="false" class="sm:col-span-2" />
-                @endif
-                @if (! empty($resolvedDetection['laravel_pulse']))
-                    <x-fact-row :label="__('Laravel Pulse')" :value="__('Yes — `laravel/pulse` in composer.json')" :mono="false" class="sm:col-span-2" />
-                @endif
-                @if (! empty($resolvedDetection['laravel_reverb']))
-                    <x-fact-row :label="__('Laravel Reverb')" :value="__('Yes — `laravel/reverb` in composer.json')" :mono="false" class="sm:col-span-2" />
-                @endif
-            </dl>
-            @if (! empty($resolvedDetection['warnings']))
-                <div class="mt-2 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    @foreach ($resolvedDetection['warnings'] as $warning)
-                        <p>{{ $warning }}</p>
-                    @endforeach
-                </div>
-            @endif
-        @else
-            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
-                <span class="font-semibold text-brand-ink">{{ __('No repository inspection yet.') }}</span>
-                {{ __('After a deploy or container inspect, framework and language signals from your repo will appear here.') }}
-            </p>
-        @endif
-    </div>
-</section>
-
-{{-- Workers & schedulers callout (links only — manage under Daemons / Cron) --}}
+{{-- Workers & schedules (links only — manage under Daemons / Cron) --}}
 @if ($site->type !== \App\Enums\SiteType::Static)
-<section class="border-b border-brand-ink/10">
-    <x-workspace-panel-head
-        dense
-        class="border-b border-brand-ink/10"
-        icon="heroicon-o-arrow-path"
-        :title="__('Workers & schedulers')"
-        :note="$workersSchedulersNote"
-    >
-        <x-slot:actions>
-            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Workers') }} →</a>
-                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Cron') }} →</a>
-                @if (\App\Models\Site::supportsSystemdServices($site, $server))
-                    <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Services') }} →</a>
-                @endif
-                @if ($site->isLaravelFrameworkDetected())
-                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Laravel') }} →</a>
-                @endif
-                @if ($site->isRailsFrameworkDetected())
-                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'rails-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Rails') }} →</a>
-                @endif
+    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+        <div class="min-w-0 flex-1 basis-72">
+            <div class="flex items-center gap-2">
+                <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Workers & schedules') }}</p>
             </div>
-        </x-slot:actions>
-    </x-workspace-panel-head>
-</section>
+            <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $workersSchedulersNote }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Workers') }} →</a>
+            <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Cron') }} →</a>
+            @if (\App\Models\Site::supportsSystemdServices($site, $server))
+                <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="{{ $linkBase }}">{{ __('Services') }} →</a>
+            @endif
+            @if ($site->isLaravelFrameworkDetected())
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Laravel') }} →</a>
+            @endif
+            @if ($site->isRailsFrameworkDetected())
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'rails-stack']) }}" wire:navigate class="{{ $linkBase }}">{{ __('Rails') }} →</a>
+            @endif
+        </div>
+    </div>
 @endif
 
 {{-- Docker --}}
@@ -560,11 +569,10 @@
     @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
         <section class="border-b border-brand-ink/10">
             <x-workspace-panel-head
-                dense
                 class="border-b border-brand-ink/10"
                 icon="heroicon-o-cube"
                 :title="__('Docker discovery')"
-                :note="__('Saved from the live Docker runtime — hostname, IP, and container identity.')"
+                :note="__('Hostname, IP, and container identity from the live Docker runtime.')"
             >
                 @if (! empty($dockerRuntimeDetails['collected_at']))
                     <x-slot:actions>
@@ -616,11 +624,10 @@
     @if ($site->usesLocalDockerHostRuntime())
         <section class="border-b border-brand-ink/10">
             <x-workspace-panel-head
-                dense
                 class="border-b border-brand-ink/10"
                 icon="heroicon-o-arrows-pointing-out"
                 :title="__('Container lifecycle')"
-                :note="__('Lifecycle and inspection. Output and logs live on the Logs tab.')"
+                :note="__('Start, stop, and inspect this container. Output lives on Logs.')"
             />
 
             <div class="{{ $panelBody }} flex flex-wrap items-center gap-1.5">
@@ -641,22 +648,7 @@
     @endif
 @endif
 
-{{-- Working directory --}}
-<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
-    <div class="flex shrink-0 items-center gap-1.5">
-        <x-heroicon-o-folder class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-        <span class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Working directory') }}</span>
-    </div>
-    <code class="min-w-0 break-all font-mono text-xs text-brand-ink">{{ $site->effectiveRepositoryPath() }}</code>
-</div>
-
 {{-- CLI --}}
 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
-    <x-cli-snippet :commands="[
-        ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=node --runtime-version=22'],
-        ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
-        ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
-        ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
-        ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' node 22'],
-    ]" />
+    <x-cli-snippet :commands="$runtimeCliCommands" />
 </div>

@@ -14,7 +14,7 @@ class CertificateRequestService
     ) {}
 
     /**
-     * @param  array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes): SiteCertificate
     {
@@ -103,6 +103,57 @@ class CertificateRequestService
                 'source' => 'preview_auto_ssl',
             ],
         ]);
+    }
+
+    /**
+     * An existing row this request should re-run instead of duplicating.
+     *
+     * Every "Add SSL" click used to insert a new row. Combined with certbot
+     * exiting 0 on "not yet due for renewal", that left two rows both claiming
+     * ACTIVE for the same lineage — and the TLS resolver then emitted two :443
+     * blocks with overlapping server_name, which nginx resolves arbitrarily.
+     *
+     * @param  list<string>  $domains
+     */
+    public function findReusable(
+        Site $site,
+        array $domains,
+        string $providerType,
+        string $challengeType,
+        ?string $source = null,
+    ): ?SiteCertificate {
+        $wanted = self::normalizeDomains($domains);
+        if ($wanted === []) {
+            return null;
+        }
+
+        return SiteCertificate::query()
+            ->where('site_id', $site->id)
+            ->where('provider_type', $providerType)
+            ->where('challenge_type', $challengeType)
+            ->where('status', '!=', SiteCertificate::STATUS_REMOVED)
+            ->when($source !== null, fn ($q) => $q->where('requested_settings->source', $source))
+            ->latest('updated_at')
+            ->get()
+            // Compared in PHP: domains_json is a JSON column and set equality is
+            // not portable across the drivers this app runs on.
+            ->first(fn (SiteCertificate $candidate): bool => self::normalizeDomains($candidate->domainHostnames()) === $wanted);
+    }
+
+    /**
+     * @param  list<string>  $domains
+     * @return list<string>
+     */
+    private static function normalizeDomains(array $domains): array
+    {
+        $normalized = array_values(array_unique(array_filter(array_map(
+            static fn (string $domain): string => strtolower(trim($domain)),
+            $domains,
+        ))));
+
+        sort($normalized);
+
+        return $normalized;
     }
 
     public function removeArtifacts(SiteCertificate $certificate): void

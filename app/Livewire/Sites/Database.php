@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\CreateSiteDatabaseJob;
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -20,13 +19,15 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseExtraUser;
 use App\Models\Site;
-use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Services\DatabaseBackupDownloader;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use App\Support\Sites\SiteDatabaseWorkspace;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -688,6 +689,7 @@ class Database extends Component
 
         return view('livewire.sites.database', [
             'consoleRun' => $this->latestConsoleRun(),
+            'remoteDatabases' => SiteDatabaseWorkspace::remoteConfigurableSummaries($this->site),
             'notifChannels' => $onNotifications ? $this->assignableDatabaseNotificationChannels() : collect(),
             'notifSubscriptions' => $onNotifications ? $this->databaseNotificationSubscriptions() : collect(),
             'notifEventLabels' => $onNotifications ? $this->databaseEventLabels() : [],

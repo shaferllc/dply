@@ -47,7 +47,7 @@ class Index extends Component
         }
         $serverIds = $serversQuery->pluck('id');
 
-        return Site::query()->whereIn('server_id', $serverIds);
+        return Site::query()->visibleInSiteIndex()->whereIn('server_id', $serverIds);
     }
 
     protected function applyFilters(Builder $query): Builder

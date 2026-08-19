@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\SiteCacheDirectivesBuilder;
+use App\Services\Sites\SiteCachingStatsReader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -129,6 +130,53 @@ test('methods are inert until the master toggle is on', function (): void {
     expect($site->cachingConfig()['methods'])->toContain('nginx_http');
     expect($site->hasCachingMethod('nginx_http'))->toBeFalse();
     expect(app(SiteCacheDirectivesBuilder::class)->nginxFastcgiDirectives($site))->toBe('');
+});
+
+test('enabled cache layers show live stats after load', function (): void {
+    [$user, $server, $site] = siteCachingWorkspaceFixtures();
+
+    $reader = $this->createMock(SiteCachingStatsReader::class);
+    $reader->expects($this->once())
+        ->method('collect')
+        ->with($this->callback(fn (Site $s) => $s->is($site)), ['opcache'])
+        ->willReturn([
+            'opcache' => [
+                'ok' => true,
+                'enabled' => true,
+                'memory_used' => 32 * 1048576,
+                'memory_free' => 96 * 1048576,
+                'memory_wasted' => 0,
+                'num_cached_keys' => 400,
+                'max_cached_keys' => 4000,
+                'num_cached_scripts' => 120,
+                'hits' => 900,
+                'misses' => 100,
+                'hit_rate' => 90.0,
+                'oom_restarts' => 0,
+            ],
+        ]);
+    $this->app->instance(SiteCachingStatsReader::class, $reader);
+
+    Livewire::actingAs($user)
+        ->test(Caching::class, ['server' => $server, 'site' => $site])
+        ->set('enabled', true)
+        ->call('toggleMethod', 'opcache')
+        ->assertSee(__('Live stats'))
+        ->call('loadCacheStats')
+        ->assertSet('cacheStatsLoaded', true)
+        ->assertSee(__('PHP OPcache'))
+        ->assertSee('90%')
+        ->assertSee(__('Hit rate'));
+});
+
+test('live stats stay hidden until caching is enabled', function (): void {
+    [$user, $server, $site] = siteCachingWorkspaceFixtures();
+
+    Livewire::actingAs($user)
+        ->test(Caching::class, ['server' => $server, 'site' => $site])
+        ->set('enabled', false)
+        ->call('toggleMethod', 'opcache')
+        ->assertDontSee(__('Live stats'));
 });
 
 test('varnish panel exposes no per-site ttl input', function (): void {

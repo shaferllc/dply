@@ -56,7 +56,16 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
             app(SiteWebserverConfigApplier::class)->apply($site);
         }
 
-        $cmd = LetsEncryptCertbotCommandBuilder::build($site, $domains, $email);
+        // Reuse the lineage this row already issued under, so a renewal replaces
+        // the material in place instead of spawning a parallel -0001 directory.
+        $certName = is_string($certificate->meta['certbot_cert_name'] ?? null)
+            && $certificate->meta['certbot_cert_name'] !== ''
+                ? $certificate->meta['certbot_cert_name']
+                : LetsEncryptCertbotCommandBuilder::lineageFor($domains);
+
+        $forceRenewal = (bool) ($certificate->requested_settings['force_renewal'] ?? false);
+
+        $cmd = LetsEncryptCertbotCommandBuilder::build($site, $domains, $email, $certName, $forceRenewal);
 
         $ssh = new SshConnection($server);
         $output = $ssh->exec(
@@ -66,14 +75,40 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
         $exitCode = preg_match('/DPLY_EXIT:(\d+)/', $output, $matches) ? (int) $matches[1] : 1;
         $ok = $exitCode === 0;
 
+        // certbot exits 0 without writing anything when the lineage is still
+        // good. Stamping last_installed_at here would date a cert that was never
+        // touched ahead of the one actually on disk, and the TLS resolver orders
+        // by exactly that column.
+        $renewalSkipped = $ok && CertbotOutputParser::notYetDueForRenewal($output);
+
+        // Pinning --cert-name means the lineage directory is known up front, so
+        // the material can be dated without guessing at it later. The paths are
+        // deliberately NOT persisted yet — the TLS resolver still derives them
+        // itself, and removeArtifacts() would start rm -f'ing live symlinks.
+        $expiresAt = $certificate->expires_at;
+        if ($ok && $certName !== '') {
+            $expiresAt = app(CertificateExpiryReader::class)->readFromPath(
+                $server,
+                '/etc/letsencrypt/live/'.$certName.'/fullchain.pem',
+                $ssh,
+            ) ?? $expiresAt;
+        }
+
         $certificate->forceFill([
             'status' => $ok ? SiteCertificate::STATUS_ACTIVE : SiteCertificate::STATUS_FAILED,
             'last_output' => $output,
-            'last_installed_at' => $ok ? now() : $certificate->last_installed_at,
+            'last_installed_at' => $ok && ! $renewalSkipped ? now() : $certificate->last_installed_at,
+            'expires_at' => $expiresAt,
+            'meta' => array_merge($certificate->meta ?? [], [
+                'certbot_cert_name' => $certName,
+                'expires_at_source' => $expiresAt !== null ? 'issuance' : null,
+                'expiry_checked_at' => $ok ? now()->toIso8601String() : ($certificate->meta['expiry_checked_at'] ?? null),
+            ]),
             'applied_settings' => array_merge($certificate->applied_settings ?? [], [
                 'domains' => $domains,
                 'http3_requested' => (bool) $certificate->enable_http3,
                 'http3_applied' => false,
+                'renewal_skipped' => $renewalSkipped,
             ]),
         ])->save();
 

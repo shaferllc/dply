@@ -15,10 +15,17 @@ final class LetsEncryptCertbotCommandBuilder
 {
     /**
      * @param  list<string>  $domains
+     * @param  string|null  $certName  certbot lineage to pin via --cert-name;
+     *                                 defaults to {@see lineageFor()}
      */
-    public static function build(Site $site, array $domains, string $email): string
-    {
-        $certbot = self::certbotInvocation($site, $domains, $email);
+    public static function build(
+        Site $site,
+        array $domains,
+        string $email,
+        ?string $certName = null,
+        bool $forceRenewal = false,
+    ): string {
+        $certbot = self::certbotInvocation($site, $domains, $email, $certName ?? self::lineageFor($domains), $forceRenewal);
 
         if (! self::usesWebrootPath($site)) {
             return self::ensureCertbotInstalled($site).self::wrapNginxPreflight($site, $certbot);
@@ -30,6 +37,21 @@ final class LetsEncryptCertbotCommandBuilder
             : '';
 
         return self::ensureCertbotInstalled($site)."set -e\nmkdir -p {$webroot}/.well-known/acme-challenge\n{$preflight}{$certbot}";
+    }
+
+    /**
+     * The certbot lineage name for a domain set. Deliberately the first domain,
+     * because that is what the TLS resolver derives /etc/letsencrypt/live/<dir>
+     * from. Left unpinned, certbot invents its own name and silently appends
+     * -0001 whenever the requested SAN set differs from an existing lineage —
+     * so the material lands in a directory the generated vhost never points at,
+     * and the site keeps serving the stale cert.
+     *
+     * @param  list<string>  $domains
+     */
+    public static function lineageFor(array $domains): string
+    {
+        return strtolower(trim($domains[0] ?? ''));
     }
 
     /**
@@ -101,11 +123,18 @@ final class LetsEncryptCertbotCommandBuilder
     /**
      * @param  list<string>  $domains
      */
-    private static function certbotInvocation(Site $site, array $domains, string $email): string
-    {
+    private static function certbotInvocation(
+        Site $site,
+        array $domains,
+        string $email,
+        string $certName,
+        bool $forceRenewal,
+    ): string {
         $flags = collect($domains)
             ->map(fn (string $domain): string => '-d '.escapeshellarg($domain))
             ->implode(' ');
+
+        $flags .= self::lineageFlags($certName, $forceRenewal);
 
         if (self::usesWebrootChallenge($site)) {
             return sprintf(
@@ -134,6 +163,23 @@ final class LetsEncryptCertbotCommandBuilder
                 escapeshellarg($email),
             ),
         };
+    }
+
+    /**
+     * --cert-name pins the lineage (see {@see lineageFor()}). --expand lets a
+     * pinned lineage take on extra SANs (e.g. adding the www variant) instead of
+     * erroring under --non-interactive. --keep-until-expiring makes a repeat
+     * request a no-op rather than a needless re-issue against ACME rate limits;
+     * a deliberate force-renew overrides it.
+     */
+    private static function lineageFlags(string $certName, bool $forceRenewal): string
+    {
+        if ($certName === '') {
+            return $forceRenewal ? ' --force-renewal' : '';
+        }
+
+        return ' --cert-name '.escapeshellarg($certName).' --expand'
+            .($forceRenewal ? ' --force-renewal' : ' --keep-until-expiring');
     }
 
     /**

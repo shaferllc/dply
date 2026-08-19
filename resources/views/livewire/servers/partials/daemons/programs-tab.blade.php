@@ -23,7 +23,8 @@
                 <p class="mt-1 max-w-3xl text-sm text-sky-800">{{ __('These run as systemd units (dply’s native worker mechanism), so they don’t show in the Supervisor program list below. Manage them where they were created — adding a Supervisor program here would create a SECOND, parallel worker.') }}</p>
             </div>
             @if (! empty($serverIsWorkerHost))
-                <a href="{{ route('servers.worker-pool', $server) }}" wire:navigate class="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-700">{{ __('Open Worker Pool') }}</a>
+                @php $openPool = $server->workerPool; @endphp
+                <a href="{{ $openPool?->workspaceUrl() ?? route('servers.worker-pool', $server) }}" wire:navigate class="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-700">{{ __('Open Worker Pool') }}</a>
             @endif
         </div>
         <div class="divide-y divide-sky-100">

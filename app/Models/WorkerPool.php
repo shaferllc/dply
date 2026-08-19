@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -29,8 +30,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read ?Server $primaryServer
  * @property-read Collection<int, Server> $servers
  * @property-read Collection<int, Server> $replicas
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class WorkerPool extends Model
 {
@@ -108,6 +109,61 @@ class WorkerPool extends Model
     public function usesSupervisor(): bool
     {
         return $this->processManager() === self::PM_SUPERVISOR;
+    }
+
+    /** True when this pool was created from a web site (not an existing worker host). */
+    public function isSiteSourced(): bool
+    {
+        return filled(data_get($this->meta, 'origin_site_id'));
+    }
+
+    public function originSiteId(): ?string
+    {
+        $id = data_get($this->meta, 'origin_site_id');
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    public function originSite(): ?Site
+    {
+        $id = $this->originSiteId();
+
+        return $id !== null ? Site::query()->find($id) : null;
+    }
+
+    /**
+     * Site-sourced fleets are managed on the origin site’s Worker servers
+     * page, not the generic server Worker Pool workspace.
+     */
+    public function workspaceUrl(bool $absolute = true): string
+    {
+        if ($this->isSiteSourced()) {
+            $origin = $this->originSite();
+            if ($origin instanceof Site && filled($origin->server_id)) {
+                return route('sites.show', [
+                    'server' => $origin->server_id,
+                    'site' => $origin,
+                    'section' => 'worker-fleet',
+                ], $absolute);
+            }
+        }
+
+        $server = $this->primaryServer ?? $this->sourceServer;
+        if ($server instanceof Server) {
+            return route('servers.worker-pool', $server, $absolute);
+        }
+
+        return url('/');
+    }
+
+    public function shouldStopOnBoxWorkers(): bool
+    {
+        return (bool) data_get($this->meta, 'stop_onbox_on_ready', false);
+    }
+
+    public function shouldRestoreOnBoxWorkers(): bool
+    {
+        return (bool) data_get($this->meta, 'restore_onbox_on_destroy', true);
     }
 
     /** @return BelongsTo<Organization, $this> */

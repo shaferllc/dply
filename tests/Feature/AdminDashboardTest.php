@@ -117,10 +117,11 @@ test('edge product line page shows delivery emergency and surface flags', functi
 test('orgs inherit config defaults for gated surfaces', function () {
     $org = Organization::factory()->create();
 
-    // Non-BYO surfaces + hyperscale providers default off in config/features.php
-    // (FEATURE_* env / per-org override to enable).
-    expect(Feature::for($org)->active('surface.serverless'))->toBeFalse();
-    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
+    // Cloud + Serverless are live (config default on). Edge stays parked.
+    // Hyperscale providers still default off.
+    expect(Feature::for($org)->active('surface.serverless'))->toBeTrue();
+    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
+    expect(Feature::for($org)->active('surface.edge'))->toBeFalse();
     expect(Feature::for($org)->active('provider.aws'))->toBeFalse();
 });
 

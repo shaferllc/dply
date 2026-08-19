@@ -42,20 +42,91 @@
             </div>
         </div>
     @else
+        @php
+            $gateWhat = __('The webserver checks visitors before a request reaches this site. Pick one method — switching clears the other on the next apply. This does not replace app login (Laravel sessions, WordPress, etc.).');
+            $formGatePasswordCount = $site->accessGatePasswords
+                ->reject(fn ($row) => $row->isPendingRemoval())
+                ->count();
+            $statusLine = match ($accessMethod) {
+                'basic_auth' => $entryCount === 0
+                    ? __('HTTP basic auth is selected, but nothing is enforced until you add a credential and the webserver apply finishes.')
+                    : trans_choice(
+                        '{1} HTTP basic auth is live — the browser asks for a username and password. :count credential · :paths.|[2,*] HTTP basic auth is live — the browser asks for a username and password. :count credentials · :paths.',
+                        $entryCount,
+                        [
+                            'count' => $entryCount,
+                            'paths' => $protectedPaths->isEmpty()
+                                ? __('no paths yet')
+                                : $protectedPaths->map(fn ($p) => $p === '/' ? __('whole site') : $p)->implode(', '),
+                        ],
+                    ),
+                'form_password' => $formGatePasswordCount === 0
+                    ? __('Password gate is selected — visitors will see a login page after apply, but only once you add a labeled password. Cookie lasts 24 hours. Site-wide only.')
+                    : trans_choice(
+                        '{1} Password gate is live — visitors see a login page, then a 24-hour cookie. :count named password. Site-wide only.|[2,*] Password gate is live — visitors see a login page, then a 24-hour cookie. :count named passwords. Site-wide only.',
+                        $formGatePasswordCount,
+                        ['count' => $formGatePasswordCount],
+                    ),
+                default => __('No extra gate. Visitors reach the app (and any app-level login) directly.'),
+            };
+        @endphp
+
+        <details
+            wire:ignore.self
+            class="group border-b border-brand-ink/10 bg-brand-sand/15"
+        >
+            <summary class="flex cursor-pointer list-none items-start justify-between gap-3 px-5 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('How this works') }}</span>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
+                    </span>
+                    <span class="mt-1.5 block text-sm leading-relaxed text-brand-moss group-open:hidden">{{ $gateWhat }}</span>
+                </span>
+            </summary>
+            <div class="border-t border-brand-ink/10 px-5 pb-4 pt-3 sm:px-6">
+                <p class="text-sm leading-relaxed text-brand-ink">{{ $gateWhat }}</p>
+                <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-brand-moss">
+                    <li>{{ __('Choose Off, HTTP basic auth, or Password gate. Only one is active.') }}</li>
+                    <li>{{ __('Add credentials (or labeled gate passwords). Nothing is live until the webserver apply in the banner finishes.') }}</li>
+                    <li>{{ __('Visitors hit the gate first. HTTP basic uses the browser dialog and optional path prefixes (/wp-admin). The password gate is a branded page + 24-hour cookie, site-wide only.') }}</li>
+                    <li>{{ __('Turn it off, or remove the last credential, to clear the gate on the next apply.') }}</li>
+                </ol>
+                <ul class="mt-3 space-y-1.5 border-t border-brand-ink/10 pt-3 text-xs leading-relaxed text-brand-moss">
+                    <li class="flex gap-2">
+                        <x-heroicon-o-light-bulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Sync imports leftover .htpasswd files from the site repo so you can manage them here.') }}</span>
+                    </li>
+                    <li class="flex gap-2">
+                        <x-heroicon-o-light-bulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Password-gate logins record label, IP, and time on the server — open Login log after someone signs in.') }}</span>
+                    </li>
+                    <li class="flex gap-2">
+                        <x-heroicon-o-light-bulb class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Pair this with a staging hostname under Routing. Edge preview protection is a separate product.') }}</span>
+                    </li>
+                </ul>
+            </div>
+        </details>
+
+        <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Current status') }}</p>
+            <p class="mt-1 text-sm leading-relaxed text-brand-ink">{{ $statusLine }}</p>
+        </div>
+
         <section class="border-b border-brand-ink/10">
             <x-workspace-panel-head
-                dense
                 class="border-b border-brand-ink/10"
                 icon="heroicon-o-shield-check"
                 :title="__('How visitors authenticate')"
-                :note="__('Only one method active. Changes apply via the webserver job in the banner.')"
+                :note="__('One method at a time. The selected tile is what the next webserver apply writes to the vhost.')"
             />
-            <div class="grid gap-2 px-3 py-2.5 sm:grid-cols-3 sm:px-4">
+            <div class="grid gap-3 px-5 py-4 sm:grid-cols-3 sm:px-6">
                 <button
                     type="button"
                     wire:click="selectAccessGateMethod('off')"
                     @class([
-                        'rounded-lg border px-3 py-2.5 text-left transition',
+                        'rounded-lg border px-4 py-3.5 text-left transition',
                         'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'off',
                         'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'off',
                     ])
@@ -64,13 +135,13 @@
                         <x-heroicon-o-x-circle class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</p>
                     </div>
-                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('No gate — visitors reach the app directly.') }}</p>
+                    <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">{{ __('No extra prompt. Visitors reach the app — and any login the app already has.') }}</p>
                 </button>
                 <button
                     type="button"
                     wire:click="selectAccessGateMethod('basic_auth')"
                     @class([
-                        'rounded-lg border px-3 py-2.5 text-left transition',
+                        'rounded-lg border px-4 py-3.5 text-left transition',
                         'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'basic_auth',
                         'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'basic_auth',
                     ])
@@ -79,14 +150,14 @@
                         <x-heroicon-o-lock-closed class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('HTTP basic auth') }}</p>
                     </div>
-                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Browser popup, multiple users, optional path prefixes.') }}</p>
+                    <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">{{ __('Native browser username/password dialog. Multiple users, optional prefixes like /wp-admin.') }}</p>
                 </button>
                 <button
                     type="button"
                     wire:click="selectAccessGateMethod('form_password')"
                     @disabled(! $supportsFormGate)
                     @class([
-                        'rounded-lg border px-3 py-2.5 text-left transition',
+                        'rounded-lg border px-4 py-3.5 text-left transition',
                         'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'form_password',
                         'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'form_password',
                         'cursor-not-allowed opacity-60' => ! $supportsFormGate,
@@ -96,11 +167,11 @@
                         <x-heroicon-o-key class="h-4 w-4 text-brand-mist" />
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Password gate') }}</p>
                     </div>
-                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                    <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">
                         @if ($supportsFormGate)
-                            {{ __('Styled login page + cookie — no browser basic-auth dialog.') }}
+                            {{ __('Branded login page and a 24-hour cookie — no browser dialog. Site-wide only; labels show in the login log.') }}
                         @else
-                            {{ __('Coming soon for OpenLiteSpeed.') }}
+                            {{ __('Coming soon for OpenLiteSpeed. Use HTTP basic auth on this engine for now.') }}
                         @endif
                     </p>
                 </button>
@@ -119,7 +190,7 @@
                     class="border-b border-brand-ink/10"
                     icon="heroicon-o-key"
                     :title="__('Named gate passwords')"
-                    :note="trans_choice('{0} No passwords yet — cookie lasts 24h after login.|{1} :count password · cookie lasts 24h.|[2,*] :count passwords · cookie lasts 24h.', $gatePasswordCount, ['count' => $gatePasswordCount])"
+                    :note="trans_choice('{0} No passwords yet — add one, then apply, to show the login page. Cookie lasts 24h.|{1} :count password · cookie lasts 24h · site-wide.|[2,*] :count passwords · cookie lasts 24h · site-wide.', $gatePasswordCount, ['count' => $gatePasswordCount])"
                 >
                     <x-slot:actions>
                         <button
@@ -182,8 +253,9 @@
                         @endforeach
                     </ul>
                 @else
-                    <div class="px-3 py-4 sm:px-4">
-                        <p class="text-sm text-brand-moss">{{ __('No gate passwords yet. Add one to enable the login form — until then the site will not require the gate on apply.') }}</p>
+                    <div class="px-5 py-5 sm:px-6">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No gate passwords yet.') }}</p>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Add a labeled password (a person or team name) so logins are attributable. The login page is not required until at least one password is saved and the webserver apply finishes.') }}</p>
                     </div>
                 @endif
             </section>
@@ -193,8 +265,8 @@
                     dense
                     class="border-b border-brand-ink/10"
                     icon="heroicon-o-clock"
-                    :title="__('Login log')"
-                    :note="__('Successful logins with label, IP, and time.')"
+                    :title="__('Recent gate logins')"
+                    :note="__('Successful password-gate logins recorded on the server — label, IP, hostname, and time.')"
                 />
 
                 @if (! $form_gate_login_log_loaded)
@@ -625,14 +697,14 @@
                 class="border-b border-brand-ink/10"
                 icon="heroicon-o-key"
                 :title="__('Credentials')"
-                :note="__('Rotate or remove — applied on the next webserver config write.')"
+                    :note="__('Rotate or remove a user. Changes write on the next webserver apply — watch the banner above.')"
                 :count="trans_choice('{0} 0|{1} :count|[2,*] :count', $entryCount, ['count' => $entryCount])"
             />
 
             @if ($entryCount === 0)
-                <div class="px-3 py-5 text-center sm:px-4">
+                <div class="px-5 py-5 sm:px-6">
                     <p class="text-sm font-medium text-brand-ink">{{ __('No credentials yet.') }}</p>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Add a credential above to start gating this site.') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Add a username and password to start gating this site. Use / for the whole site, or a prefix like /wp-admin when this engine supports path scopes. Sync if an .htpasswd already lives in the repo.') }}</p>
                 </div>
             @else
                 <div class="divide-y divide-brand-ink/8">

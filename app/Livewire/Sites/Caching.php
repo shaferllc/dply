@@ -9,8 +9,10 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Sites\SiteCachingStatsReader;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
@@ -29,6 +31,7 @@ use Livewire\Component;
  * so the contract is stated here.
  *
  * @property-read list<string> $availableMethods
+ * @property-read list<string> $activeStatMethods
  */
 #[Layout('layouts.app')]
 class Caching extends Component
@@ -77,6 +80,16 @@ class Caching extends Component
     public bool $varnish_enabled = false;
 
     public string $varnish_ttl_default = '120s';
+
+    /**
+     * Live layer stats (OPcache / nginx disk / Varnish). Loaded via wire:init
+     * — never on first paint.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $cacheStats = null;
+
+    public bool $cacheStatsLoaded = false;
 
     public function mount(Server $server, Site $site): void
     {
@@ -158,6 +171,63 @@ class Caching extends Component
     public function getAvailableMethodsProperty(): array
     {
         return $this->site->availableCachingMethods();
+    }
+
+    /**
+     * Enabled methods that expose live stats (master toggle must be on).
+     *
+     * @return list<string>
+     */
+    public function getActiveStatMethodsProperty(): array
+    {
+        if (! $this->enabled) {
+            return [];
+        }
+
+        return array_values(array_intersect(
+            $this->methods,
+            $this->availableMethods,
+            ['opcache', 'nginx_http', 'varnish'],
+        ));
+    }
+
+    public function loadCacheStats(SiteCachingStatsReader $reader): void
+    {
+        $this->cacheStatsLoaded = true;
+        $this->cacheStats = null;
+
+        $methods = $this->activeStatMethods;
+        if ($methods === []) {
+            return;
+        }
+
+        try {
+            $this->cacheStats = Cache::remember(
+                $this->cacheStatsCacheKey($methods),
+                15,
+                fn () => $reader->collect($this->site, $methods),
+            );
+        } catch (\Throwable) {
+            $this->cacheStats = null;
+        }
+    }
+
+    public function refreshCacheStats(SiteCachingStatsReader $reader): void
+    {
+        Cache::forget($this->cacheStatsCacheKey($this->activeStatMethods));
+        $this->cacheStatsLoaded = false;
+        $this->loadCacheStats($reader);
+    }
+
+    /**
+     * @param  list<string>  $methods
+     */
+    private function cacheStatsCacheKey(array $methods): string
+    {
+        $sorted = $methods;
+        sort($sorted);
+
+        return 'dply.site-caching-stats:'.$this->site->id.':'.implode(',', $sorted);
     }
 
     public function toggleMethod(string $method): void

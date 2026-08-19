@@ -137,7 +137,7 @@ final class ServerSecurityDigestScanner
     }
 
     /**
-     * @param  array<string, mixed> $report
+     * @param  array<string, mixed>  $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array
@@ -156,7 +156,9 @@ final class ServerSecurityDigestScanner
         }
 
         $summary = $report['summary'] ?? [];
-        if (isset($summary['auth_failed_total'])) {
+        if (isset($summary['auth_failed_24h_ips'])) {
+            $lines[] = __('SSH failures (24h): :ips IPs', ['ips' => $summary['auth_failed_24h_ips']]);
+        } elseif (isset($summary['auth_failed_total'])) {
             $lines[] = __('auth.log failures: :count', ['count' => $summary['auth_failed_total']]);
         }
 

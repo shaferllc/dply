@@ -30,6 +30,8 @@ final class ServerSshSessionManager
         string $publicKey,
         Carbon $expiresAt,
         string $targetLinuxUser = '',
+        string $keyOptions = '',
+        ?string $privateKey = null,
     ): ServerSshSession {
         $organization = $server->organization;
         if (! $organization instanceof Organization) {
@@ -64,6 +66,7 @@ final class ServerSshSessionManager
             'target_linux_user' => trim($targetLinuxUser),
             'expires_at' => $expiresAt,
             'provisioned_at' => now(),
+            'private_key' => $privateKey,
         ]);
 
         $authorizedKey = ServerAuthorizedKey::query()->create([
@@ -73,6 +76,7 @@ final class ServerSshSessionManager
             'managed_key_id' => $session->id,
             'name' => $this->keyName($session),
             'public_key' => $line,
+            'key_options' => trim($keyOptions) !== '' ? trim($keyOptions) : null,
             'review_after' => $expiresAt->toDateString(),
         ]);
 

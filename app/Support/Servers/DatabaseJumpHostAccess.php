@@ -56,30 +56,96 @@ final class DatabaseJumpHostAccess
     /**
      * Tunnel + client commands for reaching $db (on $dbServer) through $jumpHost.
      *
+     * Kept for the on-box Networking tab; delegates to the target-based API.
+     *
      * @return array{tunnel: string, connect: string, local_port: int}
      */
     public static function commandsFor(ServerDatabase $db, Server $dbServer, Server $jumpHost, int $enginePort, int $localPort): array
     {
-        $user = trim((string) $jumpHost->ssh_user) !== '' ? trim((string) $jumpHost->ssh_user) : 'deploy';
-        $target = trim((string) $dbServer->private_ip_address) !== ''
+        $host = trim((string) $dbServer->private_ip_address) !== ''
             ? trim((string) $dbServer->private_ip_address)
             : trim((string) $dbServer->ip_address);
 
+        return self::tunnelCommandsFor(
+            DatabaseConnectionTarget::fromServerDatabase($db, $host, $enginePort),
+            $jumpHost,
+            $localPort,
+        );
+    }
+
+    /**
+     * Tunnel + client commands for reaching any database through $jumpHost.
+     *
+     * @return array{tunnel: string, connect: string, uri: string, local_port: int}
+     */
+    public static function tunnelCommandsFor(
+        DatabaseConnectionTarget $target,
+        Server $jumpHost,
+        int $localPort,
+        ?string $identityFile = null,
+    ): array {
         return [
-            'tunnel' => sprintf('ssh -L %d:%s:%d %s@%s', $localPort, $target, $enginePort, $user, $jumpHost->ip_address),
-            'connect' => self::clientConnect($db, $localPort),
+            'tunnel' => sprintf(
+                'ssh%s%s -L %d:%s:%d %s@%s',
+                self::identityFlags($identityFile),
+                self::sshPortFlag($jumpHost),
+                $localPort,
+                $target->host,
+                $target->port,
+                self::sshUserFor($jumpHost),
+                $jumpHost->ip_address,
+            ),
+            'connect' => $target->clientCommand('127.0.0.1', $localPort),
+            'uri' => $target->uri(null, '127.0.0.1', $localPort),
             'local_port' => $localPort,
         ];
     }
 
-    private static function clientConnect(ServerDatabase $db, int $localPort): string
+    /**
+     * ssh_user is NOT NULL with a 'root' default, and SshConnection falls back to
+     * root too — so root, not 'deploy', is the correct last resort here.
+     */
+    public static function sshUserFor(Server $jumpHost): string
     {
-        $user = (string) ($db->username ?? 'app');
+        $user = trim((string) $jumpHost->ssh_user);
 
-        return match ($db->engine) {
-            'mysql', 'mariadb' => sprintf('mysql -h 127.0.0.1 -P %d -u %s -p %s', $localPort, $user, $db->name),
-            default => sprintf('psql "host=127.0.0.1 port=%d user=%s dbname=%s"', $localPort, $user, $db->name),
-        };
+        return $user !== '' ? $user : 'root';
+    }
+
+    /**
+     * Pin the identity so ssh offers exactly one key.
+     *
+     * Without this, ssh walks every key in the agent in turn and a developer
+     * carrying more than a handful trips the server's MaxAuthTries (6 by
+     * default) before the right one is reached — surfacing as the misleading
+     * "Too many authentication failures", which reads like a credentials
+     * problem rather than an ordering one. IdentitiesOnly stops the agent from
+     * adding its own keys back into the offer list.
+     */
+    private static function identityFlags(?string $identityFile): string
+    {
+        $identityFile = trim((string) $identityFile);
+        if ($identityFile === '') {
+            return '';
+        }
+
+        // A leading ~ must stay unquoted or the shell will not expand it, and
+        // `ssh -i '~/.ssh/id_ed25519'` fails looking for a literal ~ directory.
+        // Only skip quoting for paths that cannot mean anything else.
+        $safeUnquoted = preg_match('#^[~/][A-Za-z0-9._/-]*$#', $identityFile) === 1;
+
+        return ' -o IdentitiesOnly=yes -i '.($safeUnquoted ? $identityFile : escapeshellarg($identityFile));
+    }
+
+    /**
+     * servers.ssh_port is a real column and non-22 ports are supported, so an
+     * emitted command that omits -p is simply wrong for those hosts.
+     */
+    private static function sshPortFlag(Server $jumpHost): string
+    {
+        $port = (int) ($jumpHost->ssh_port ?: 22);
+
+        return $port === 22 ? '' : ' -p '.$port;
     }
 
     /**

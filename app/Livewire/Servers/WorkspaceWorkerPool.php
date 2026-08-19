@@ -132,6 +132,11 @@ class WorkspaceWorkerPool extends Component
         $this->bootWorkspace($server);
 
         $pool = $this->pool();
+        if ($pool instanceof WorkerPool && $pool->isSiteSourced()) {
+            $this->redirect($pool->workspaceUrl(), navigate: true);
+
+            return;
+        }
         if ($pool) {
             $this->desired_count = $pool->desired_count;
             $this->pool_name = $pool->name;

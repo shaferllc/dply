@@ -39,6 +39,32 @@ test('add form gate password dispatches webserver apply job and persists gate ro
     Bus::assertDispatched(ApplySiteWebserverConfigJob::class);
 });
 
+test('selecting off when already off does not re-apply the webserver', function (): void {
+    Bus::fake();
+    [$user, $server, $site] = makeAccessGateSettingsSite();
+
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'basic-auth'])
+        ->call('selectAccessGateMethod', SiteAccessGate::METHOD_OFF)
+        ->assertSet('access_gate_method', SiteAccessGate::METHOD_OFF);
+
+    Bus::assertNotDispatched(ApplySiteWebserverConfigJob::class);
+});
+
+test('selecting off after an empty basic-auth tile does not re-apply the webserver', function (): void {
+    Bus::fake();
+    [$user, $server, $site] = makeAccessGateSettingsSite();
+
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'basic-auth'])
+        ->call('selectAccessGateMethod', SiteAccessGate::METHOD_BASIC_AUTH)
+        ->call('selectAccessGateMethod', SiteAccessGate::METHOD_OFF)
+        ->assertSet('access_gate_method', SiteAccessGate::METHOD_OFF);
+
+    Bus::assertNotDispatched(ApplySiteWebserverConfigJob::class);
+    expect($site->fresh()->resolvedAccessGateMethod())->toBe(SiteAccessGate::METHOD_OFF);
+});
+
 test('authentication page shows password gate method selector', function (): void {
     [$user, $server, $site] = makeAccessGateSettingsSite();
 
@@ -47,7 +73,9 @@ test('authentication page shows password gate method selector', function (): voi
         ->set('access_gate_method', SiteAccessGate::METHOD_FORM_PASSWORD)
         ->assertSee('Password gate')
         ->assertSee('HTTP basic auth')
-        ->assertSee('Login log');
+        ->assertSee('Recent gate logins')
+        ->assertSee('How this works')
+        ->assertSee('Current status');
 });
 
 /**

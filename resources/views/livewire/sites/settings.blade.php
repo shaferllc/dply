@@ -1,5 +1,5 @@
 @php
-    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'logs', 'notifications', 'basic-auth', 'danger'];
+    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'logs', 'notifications', 'basic-auth', 'danger', 'worker-fleet'];
     $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>
@@ -198,13 +198,13 @@
                     @elseif ($section === 'runtime')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
                             <x-workspace-panel-head
-                                dense
                                 class="border-b border-brand-ink/10"
                                 :icon="$sectionHeader['icon']"
                                 :title="$sectionHeader['title']"
                                 :note="$sectionDescription"
                             >
                                 <x-slot:actions>
+                                    <x-docs-link slug="vm-site-runtime">{{ __('Guide') }}</x-docs-link>
                                     @include('livewire.sites.partials.header-role-badge')
                                 </x-slot:actions>
                             </x-workspace-panel-head>
@@ -278,7 +278,33 @@
                     @elseif ($section === 'wordpress')
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
                     @elseif ($section === 'worker-fleet')
-                        @include('livewire.sites.settings.partials.worker-fleet')
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @can('update', $site)
+                                        @if ($site->attachedWorkerPools()->isEmpty())
+                                            <button type="button" wire:click="openAddWorkerModal" wire:loading.attr="disabled" wire:target="openAddWorkerModal" class="dply-btn dply-btn-xs dply-btn-outline">
+                                                {{ __('Add worker') }}
+                                            </button>
+                                        @endif
+                                    @endcan
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+
+                            @include('livewire.sites.settings.partials.worker-fleet')
+
+                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+                                <x-cli-snippet tone="stub" />
+                            </div>
+                        </section>
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')
@@ -392,13 +418,13 @@
                     @elseif ($section === 'basic-auth')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
                             <x-workspace-panel-head
-                                dense
                                 class="border-b border-brand-ink/10"
                                 :icon="$sectionHeader['icon']"
                                 :title="$sectionHeader['title']"
                                 :note="$sectionDescription"
                             >
                                 <x-slot:actions>
+                                    <x-docs-link slug="vm-site-authentication">{{ __('Guide') }}</x-docs-link>
                                     @include('livewire.sites.partials.header-role-badge')
                                 </x-slot:actions>
                             </x-workspace-panel-head>

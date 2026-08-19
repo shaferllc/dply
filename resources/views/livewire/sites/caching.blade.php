@@ -245,6 +245,14 @@
                     </form>
                 @endif
 
+                @if (! empty($available) && $enabled && $this->activeStatMethods !== [])
+                    @include('livewire.sites.partials.caching-live-stats', [
+                        'activeStatMethods' => $this->activeStatMethods,
+                        'cacheStats' => $cacheStats,
+                        'cacheStatsLoaded' => $cacheStatsLoaded,
+                    ])
+                @endif
+
                 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
                     <x-cli-snippet :commands="[
                         ['label' => __('Show site caching'), 'command' => 'dply sites:caching:show '.$site->slug],

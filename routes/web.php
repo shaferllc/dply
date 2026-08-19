@@ -24,6 +24,8 @@ use App\Http\Controllers\ServerlessQueueWakeController;
 use App\Http\Controllers\ServerlessWorkspaceController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\Sites\DatabaseConnectLinkController;
+use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
@@ -931,6 +933,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
+    // Hands a credential-bearing connection URI to a desktop database client.
+    // Signed AND session-authorized: a leaked link alone cannot reach the secret.
+    Route::get('servers/{server}/sites/{site}/databases/{binding}/connect-link', DatabaseConnectLinkController::class)
+        ->middleware('signed')
+        ->name('sites.databases.connect-link');
+    // One-shot installer for a purpose-minted, permitopen-restricted tunnel key.
+    Route::get('servers/{server}/sites/{site}/databases/{binding}/tunnel-install', DatabaseTunnelInstallController::class)
+        ->middleware('signed')
+        ->name('sites.databases.tunnel-install');
     // Quick downloads now queue + stage to the download bucket; this signed,
     // login-gated route streams the staged artifact once then deletes it.
     Route::get('quick-downloads/{quickDownload}/fetch', [QuickDownloadController::class, 'fetch'])

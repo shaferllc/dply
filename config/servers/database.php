@@ -100,6 +100,31 @@ return [
     'credential_share_max_views' => (int) env('SERVER_DATABASE_SHARE_MAX_VIEWS', 3),
 
     /**
+     * How long an operator's IP stays on a managed cluster's trusted-source list
+     * before {@see ReapExpiredTrustedSourcesCommand} strips it. Laptop addresses
+     * are dynamic, so an entry that never expires is a standing hole pointing at
+     * an address the operator may no longer hold.
+     */
+    'trusted_source_ttl_hours' => (int) env('DPLY_DB_TRUSTED_SOURCE_TTL_HOURS', 8),
+
+    /**
+     * Lifetime of a purpose-minted database-tunnel SSH key. Short by default:
+     * it exists for a working session, not indefinitely.
+     */
+    'tunnel_access_ttl_hours' => (int) env('DPLY_DB_TUNNEL_ACCESS_TTL_HOURS', 12),
+
+    /**
+     * Kill switch for writes to a managed cluster's trusted-source list. Both
+     * providers' APIs replace the whole rule set, so a bug here can cut a live
+     * site off from its database — this turns the capability off fleet-wide
+     * without a deploy.
+     */
+    'trusted_source_writes' => filter_var(
+        env('DPLY_DB_TRUSTED_SOURCE_WRITES', true),
+        FILTER_VALIDATE_BOOLEAN,
+    ),
+
+    /**
      * Organization JSON defaults for {@see Organization::mergedDatabaseWorkspaceSettings()}.
      * Per-org overrides live in organizations.database_workspace_settings.
      *

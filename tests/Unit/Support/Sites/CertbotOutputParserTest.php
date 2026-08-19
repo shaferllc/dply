@@ -24,3 +24,31 @@ test('certbot output parser prefers dply preflight hints', function (): void {
     expect(CertbotOutputParser::failureSummary($output))
         ->toContain('[dply] ACME preflight failed');
 });
+
+test('a skipped renewal is recognised from certbot output', function (string $output): void {
+    expect(CertbotOutputParser::notYetDueForRenewal($output))->toBeTrue();
+})->with([
+    'classic phrasing' => [
+        "Certificate not yet due for renewal; no action taken.\nDPLY_EXIT:0",
+    ],
+    'keep-until-expiring phrasing' => [
+        "Keeping the existing certificate\nDPLY_EXIT:0",
+    ],
+    'wrapped across whitespace' => [
+        "Certificate is not yet due for renewal\n\nDPLY_EXIT:0",
+    ],
+]);
+
+test('a real issuance is not mistaken for a skipped renewal', function (string $output): void {
+    expect(CertbotOutputParser::notYetDueForRenewal($output))->toBeFalse();
+})->with([
+    'fresh issue' => [
+        "Successfully received certificate.\nCertificate is saved at: /etc/letsencrypt/live/app.example.com/fullchain.pem\nDPLY_EXIT:0",
+    ],
+    'forced renewal' => [
+        "Renewing an existing certificate for app.example.com\nDPLY_EXIT:0",
+    ],
+    'failure' => [
+        "Error: some challenge failed\nDPLY_EXIT:1",
+    ],
+]);

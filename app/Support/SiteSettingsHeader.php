@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 
@@ -63,13 +64,23 @@ final class SiteSettingsHeader
                 'title' => __('Runtime'),
                 'description' => $site->usesFunctionsRuntime()
                     ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
-                    : __('What this :resource runs and how — language, processes, detection, and per-language tuning (PHP, Ruby, or Static) on the tabs below.', ['resource' => $resourceNoun]),
+                    : match (true) {
+                        $site->type === SiteType::Php || (string) ($site->runtime ?? '') === 'php' => __('How this site runs on the box — PHP version, FPM workers, OPcache, and request limits. Tune them on the PHP tab.'),
+                        (string) ($site->runtime ?? '') === 'ruby' => __('How this site runs on the box — Ruby version, processes, and detection. Tune them on the Ruby tab.'),
+                        (string) ($site->runtime ?? '') === 'static' => __('How this static site is served — detection, document root, and static-file settings.'),
+                        default => __('How this :resource runs on the box — language, live processes, and what we detected from the repo.', ['resource' => $resourceNoun]),
+                    },
                 'icon' => 'heroicon-o-cube-transparent',
             ],
             'system-user' => [
                 'title' => __('System user'),
                 'description' => __('The Linux user that owns this :resource on the server, plus permissions and sudo controls.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-user',
+            ],
+            'worker-fleet' => [
+                'title' => __('Worker servers'),
+                'description' => __('Add worker VMs of this :resource — same code and queue, no webserver. Scale the fleet here.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-square-3-stack-3d',
             ],
             'laravel-stack' => [
                 'title' => __('Laravel'),
@@ -102,8 +113,8 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-bell',
             ],
             'basic-auth' => [
-                'title' => __('HTTP basic authentication'),
-                'description' => __('Username and password gate that the webserver checks before letting a request reach this :resource.', ['resource' => $resourceNoun]),
+                'title' => __('Authentication'),
+                'description' => __('Lock this :resource behind one visitor gate at the webserver — HTTP basic auth or a branded password page — before the app (or its own login) ever runs.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-lock-closed',
             ],
             'cli' => [

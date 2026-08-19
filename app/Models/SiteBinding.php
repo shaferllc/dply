@@ -178,6 +178,37 @@ class SiteBinding extends Model
     }
 
     /**
+     * Hosted / remote database the operator can still configure (managed
+     * cluster, dedicated DB VM, serverless vendor, or an external host).
+     * On-box and same-server Docker placements are not remote.
+     */
+    public function isRemoteConfigurableDatabase(): bool
+    {
+        if ($this->type !== 'database') {
+            return false;
+        }
+
+        if ($this->target_type === 'cloud_database') {
+            return true;
+        }
+
+        $config = is_array($this->config) ? $this->config : [];
+        if (! empty($config['managed']) || ($config['placement'] ?? '') === 'managed') {
+            return true;
+        }
+
+        $placement = strtolower(trim((string) ($config['placement'] ?? '')));
+        if ($placement !== '' && ! in_array($placement, ['on_box', 'same_server', 'docker'], true)) {
+            return true;
+        }
+
+        $env = is_array($this->injected_env) ? $this->injected_env : [];
+        $host = strtolower(trim((string) ($config['host'] ?? $env['DB_HOST'] ?? '')));
+
+        return $host !== '' && ! in_array($host, ['127.0.0.1', 'localhost', '::1'], true);
+    }
+
+    /**
      * Dedicated VM this binding is waiting on (database box or Redis-only
      * cache host). Null for managed/on-server placements.
      */

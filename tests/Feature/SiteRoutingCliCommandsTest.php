@@ -271,3 +271,26 @@ function makeSite(): Site
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 }
+
+test('advertised artisan commands in workspace views actually exist', function (string $view): void {
+    $source = file_get_contents(base_path($view));
+    expect($source)->not->toBeFalse();
+
+    preg_match_all('/php artisan (dply:[a-z0-9:-]+)/i', (string) $source, $matches);
+    $advertised = array_values(array_unique($matches[1]));
+
+    expect($advertised)->not->toBeEmpty("No artisan commands advertised in {$view}");
+
+    $registered = array_keys(Artisan::all());
+
+    foreach ($advertised as $command) {
+        // These snippets are copy-paste instructions for operators; advertising
+        // a command that was never implemented sends them to a "command not
+        // found" dead end.
+        expect(in_array($command, $registered, true))
+            ->toBeTrue("{$view} advertises missing command {$command}");
+    }
+})->with([
+    'routing / tenants' => ['resources/views/livewire/sites/settings/partials/routing.blade.php'],
+    'certificates' => ['resources/views/livewire/sites/settings/partials/certificates.blade.php'],
+]);

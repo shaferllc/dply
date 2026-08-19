@@ -557,6 +557,39 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
+     * Read a cluster's current trusted sources.
+     *
+     * {@see setDatabaseTrustedSources()} replaces the entire rule set, so any
+     * caller adding a single entry MUST read first and send the union — omitting
+     * the app server's rule would cut the live site off from its own database.
+     *
+     * Rules are returned in the shape the setter expects, so a read → append →
+     * write round trip needs no translation.
+     *
+     * @return list<array{type: string, value: string}>
+     */
+    public function getDatabaseTrustedSources(string $clusterId): array
+    {
+        $response = $this->request('get', '/databases/'.$clusterId.'/firewall');
+        $this->assertSuccess($response, 'get database trusted sources');
+
+        $rules = [];
+        foreach ((array) $response->json('rules', []) as $rule) {
+            if (! is_array($rule)) {
+                continue;
+            }
+
+            $type = trim((string) ($rule['type'] ?? ''));
+            $value = trim((string) ($rule['value'] ?? ''));
+            if ($type !== '' && $value !== '') {
+                $rules[] = ['type' => $type, 'value' => $value];
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
      * Delete a DigitalOcean Managed Database cluster. Returns true on a
      * successful delete (204), false on a 404 (already gone) so teardown
      * is idempotent — mirrors {@see deleteKubernetesCluster()}.

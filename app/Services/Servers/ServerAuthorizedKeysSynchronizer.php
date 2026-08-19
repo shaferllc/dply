@@ -134,7 +134,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  list<string> $targets
+     * @param  list<string>  $targets
      * @return array<string, mixed>
      */
     protected function buildSyncPayload(Server $server, array $targets): array
@@ -185,7 +185,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  list<string> $targets
+     * @param  list<string>  $targets
      */
     protected function persistSyncedTargets(Server $server, array $targets): void
     {
@@ -264,9 +264,15 @@ class ServerAuthorizedKeysSynchronizer
         $lines = [];
         foreach ($rows as $row) {
             $key = trim((string) $row->public_key);
-            if ($key !== '') {
-                $lines[] = $key;
+            if ($key === '') {
+                continue;
             }
+
+            // Options (permitopen, no-pty, …) are stored apart from the key so
+            // the key itself stays fingerprintable; they are only re-joined here,
+            // at the point the authorized_keys line is written.
+            $options = trim((string) ($row->key_options ?? ''));
+            $lines[] = $options !== '' ? $options.' '.$key : $key;
         }
 
         if ($targetUser === $connectionUser) {

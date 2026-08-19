@@ -147,10 +147,75 @@ test('edit inside releases warns before saving', function () {
     ])
         ->set('path', '/home/dply/site.com/releases/2026-05-11')
         ->call('startEdit', '.env')
-        ->assertSet('editingInsideReleases', true)
+        ->assertSet('editingWillBeOverwrittenOnDeploy', true)
         ->call('saveEdit', false)
-        ->assertSet('pendingReleaseWarning', true);
+        ->assertSet('pendingOverwriteWarning', true);
 });
+
+test('edit in a simple checkout warns before saving', function () {
+    $user = actingOrgUser('owner');
+    [$server, $site] = readyServerWithSite($user, ['deploy_strategy' => 'simple']);
+
+    $reader = $this->createMock(ServerFileBrowserRemoteReader::class);
+    $reader->method('list')->willReturn(new FileBrowserListing('/home/dply/site.com/app', [], false, 0));
+    $reader->method('read')->willReturn(new FileBrowserFileRead(
+        path: '/home/dply/site.com/app/helpers.php',
+        size: 20,
+        mtime: 1715000000,
+        sha256: str_repeat('b', 64),
+        mime: 'text/x-php',
+        isBinary: false,
+        content: '<?php',
+    ));
+    $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
+
+    $writer = $this->createMock(ServerFileBrowserAtomicWriter::class);
+    $writer->expects($this->never())->method('write');
+    $this->app->instance(ServerFileBrowserAtomicWriter::class, $writer);
+
+    $this->actingAs($user);
+
+    Livewire::test(Files::class, [
+        'server' => $server,
+        'site' => $site->fresh(),
+    ])
+        ->set('path', '/home/dply/site.com/app')
+        ->call('startEdit', 'helpers.php')
+        ->assertSet('editingWillBeOverwrittenOnDeploy', true)
+        ->assertSee('The next deploy will overwrite this file')
+        ->call('saveEdit', false)
+        ->assertSet('pendingOverwriteWarning', true);
+});
+
+test('edit under shared does not warn about deploy overwrite', function () {
+    $user = actingOrgUser('owner');
+    [$server, $site] = readyServerWithSite($user);
+
+    $reader = $this->createMock(ServerFileBrowserRemoteReader::class);
+    $reader->method('list')->willReturn(new FileBrowserListing('/home/dply/site.com/shared', [], false, 0));
+    $reader->method('read')->willReturn(new FileBrowserFileRead(
+        path: '/home/dply/site.com/shared/.env',
+        size: 12,
+        mtime: 1715000000,
+        sha256: str_repeat('a', 64),
+        mime: 'text/plain',
+        isBinary: false,
+        content: 'APP_ENV=prod',
+    ));
+    $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
+
+    $this->actingAs($user);
+
+    Livewire::test(Files::class, [
+        'server' => $server,
+        'site' => $site->fresh(),
+    ])
+        ->set('path', '/home/dply/site.com/shared')
+        ->call('startEdit', '.env')
+        ->assertSet('editingWillBeOverwrittenOnDeploy', false)
+        ->assertDontSee('The next deploy will overwrite this file');
+});
+
 test('save conflict when remote sha drifted', function () {
     $user = actingOrgUser('owner');
     [$server, $site] = readyServerWithSite($user);

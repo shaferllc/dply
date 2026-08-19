@@ -19,13 +19,7 @@ trait DismissesConsoleActionRun
 
     public function dismissConsoleActionRun(string $runId): void
     {
-        $subject = $this->consoleActionSubject();
-
-        $row = ConsoleAction::query()
-            ->where('id', $runId)
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey())
-            ->first();
+        $row = $this->findOwnedConsoleAction($runId);
 
         if ($row === null) {
             return;
@@ -40,13 +34,7 @@ trait DismissesConsoleActionRun
 
     public function cancelConsoleActionRun(string $runId): void
     {
-        $subject = $this->consoleActionSubject();
-
-        $row = ConsoleAction::query()
-            ->where('id', $runId)
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey())
-            ->first();
+        $row = $this->findOwnedConsoleAction($runId);
 
         if ($row === null || ! $row->isCancellable()) {
             return;
@@ -64,5 +52,32 @@ trait DismissesConsoleActionRun
                 'error' => __('Stopped.'),
             ])->save();
         }
+    }
+
+    private function findOwnedConsoleAction(string $runId): ?ConsoleAction
+    {
+        $extra = method_exists($this, 'additionalConsoleActionSubjects')
+            ? $this->additionalConsoleActionSubjects()
+            : [];
+        $subjects = array_values(array_filter(
+            [$this->consoleActionSubject(), ...$extra],
+            fn (mixed $subject): bool => $subject instanceof Model,
+        ));
+
+        if ($subjects === []) {
+            return null;
+        }
+
+        return ConsoleAction::query()
+            ->where('id', $runId)
+            ->where(function ($query) use ($subjects): void {
+                foreach ($subjects as $subject) {
+                    $query->orWhere(function ($inner) use ($subject): void {
+                        $inner->where('subject_type', $subject->getMorphClass())
+                            ->where('subject_id', $subject->getKey());
+                    });
+                }
+            })
+            ->first();
     }
 }

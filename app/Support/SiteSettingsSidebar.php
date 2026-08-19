@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeSiteHasWorker;
+use App\Support\Sites\SiteDatabaseWorkspace;
 use Laravel\Pennant\Feature;
 
 /**
@@ -191,6 +192,7 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'files' || $supportsSsh)
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'database' || SiteDatabaseWorkspace::shouldShowTab($site, $server))
                 // Hide gated items when neither the full feature nor its coming-soon
                 // preview is active (e.g. Schedule, Backups).
                 ->filter(fn (array $item): bool => self::sidebarItemVisible($item))
@@ -343,7 +345,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed> $item
+     * @param  array<string, mixed>  $item
      */
     private static function sidebarItemVisible(array $item): bool
     {
@@ -362,7 +364,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed> $item
+     * @param  array<string, mixed>  $item
      * @return array<string, mixed>
      */
     private static function markPreviewOnly(array $item): array

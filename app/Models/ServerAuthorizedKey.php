@@ -19,8 +19,8 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $synced_at
  * @property string $target_linux_user
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerAuthorizedKey extends Model
 {
@@ -33,6 +33,7 @@ class ServerAuthorizedKey extends Model
         'managed_key_id',
         'name',
         'public_key',
+        'key_options',
         'synced_at',
         'review_after',
     ];

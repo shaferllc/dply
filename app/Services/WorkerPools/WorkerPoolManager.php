@@ -67,6 +67,105 @@ class WorkerPoolManager
     }
 
     /**
+     * Provision the first worker VM from a web site and attach a site-sourced pool.
+     */
+    public function createPoolFromSite(User $actor, Site $site, string $size, bool $stopOnBoxWorkers, string $region = ''): WorkerPool
+    {
+        $preflight = app(SiteWorkerFleetPreflight::class)->evaluate($site);
+        if (! $preflight->ok) {
+            throw new RuntimeException($preflight->message);
+        }
+
+        $app = $site->server;
+        if (! $app instanceof Server) {
+            throw new RuntimeException(__('This site has no server to place workers next to.'));
+        }
+        if ($app->provider_credential_id === null) {
+            throw new RuntimeException(__('This server has no provider credential to provision a worker from.'));
+        }
+        $org = $site->organization;
+        if ($org !== null && ! $org->canCreateServer()) {
+            throw new RuntimeException(__('Your plan has no room for another server.'));
+        }
+        if ($site->attachedWorkerPools()->contains(fn (WorkerPool $pool): bool => $pool->isSiteSourced())) {
+            throw new RuntimeException(__('This site already has a worker fleet. Scale that pool instead.'));
+        }
+
+        $region = trim($region);
+        if (! $preflight->allowsRemoteRegion || $region === '') {
+            $region = (string) $app->region;
+        }
+
+        $pool = WorkerPool::query()->create([
+            'organization_id' => $site->organization_id,
+            'name' => trim((string) $site->name) !== '' ? $site->name.' workers' : $app->name.' workers',
+            'source_server_id' => $app->id,
+            'primary_server_id' => null,
+            'desired_count' => 1,
+            'max_size' => 10,
+            'status' => WorkerPool::STATUS_SCALING,
+            'meta' => [
+                'horizon_config' => WorkerPoolHorizonConfig::defaults(new WorkerPool),
+                'origin_site_id' => (string) $site->id,
+                'stop_onbox_on_ready' => $stopOnBoxWorkers,
+                'restore_onbox_on_destroy' => true,
+                'created_by_user_id' => (string) $actor->id,
+            ],
+        ]);
+
+        try {
+            $worker = $this->cloneProvisioner->provisionWorkerFromApp($pool, $app, $size, $region);
+        } catch (RuntimeException $e) {
+            $pool->delete();
+
+            throw $e;
+        }
+
+        $pool->forceFill(['primary_server_id' => $worker->id])->save();
+        $site->workerPools()->syncWithoutDetaching([(string) $pool->id]);
+        ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+
+        return $pool->fresh() ?? $pool;
+    }
+
+    /**
+     * Destroy every member of a site-sourced pool (including the primary worker)
+     * and optionally put queue workers back on the web site.
+     */
+    public function dissolveSiteSourcedPool(WorkerPool $pool, bool $restoreOnBox, ?User $actor = null): int
+    {
+        if (! $pool->isSiteSourced()) {
+            throw new RuntimeException(__('That pool was not created from a site.'));
+        }
+
+        $origin = Site::query()->find($pool->originSiteId());
+        $pool->load('servers');
+
+        Server::query()->where('worker_pool_id', $pool->id)->update(['pool_role' => WorkerPool::ROLE_REPLICA]);
+        $pool->forceFill(['primary_server_id' => null])->save();
+
+        $drained = 0;
+        foreach ($pool->servers as $member) {
+            $meta = is_array($member->meta) ? $member->meta : [];
+            $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => WorkerPool::MEMBER_DRAINING]);
+            $member->forceFill([
+                'meta' => $meta,
+                'pool_role' => WorkerPool::ROLE_REPLICA,
+            ])->save();
+            DrainAndDestroyWorkerJob::dispatch((string) $member->id, $actor?->id);
+            $drained++;
+        }
+
+        if ($restoreOnBox && $origin instanceof Site) {
+            app(SiteWorkerFleetOnBoxDaemons::class)->restore($origin);
+        }
+
+        $pool->delete();
+
+        return $drained;
+    }
+
+    /**
      * Set the target member count (including the primary) and kick the reconciler.
      * Rejects values above max_size or below 1.
      */
@@ -255,7 +354,9 @@ class WorkerPoolManager
     {
         $pool->load('servers');
         $primaryApp = $this->appSiteForMember($pool->primaryServer ?? $pool->sourceServer);
-        $useHorizon = $primaryApp !== null && ! empty(($primaryApp->resolvedRuntimeAppDetection() ?? [])['laravel_horizon']);
+        $origin = $pool->isSiteSourced() ? Site::query()->find($pool->originSiteId()) : null;
+        $detectionSite = $origin instanceof Site ? $origin : $primaryApp;
+        $useHorizon = $detectionSite !== null && ! empty(($detectionSite->resolvedRuntimeAppDetection() ?? [])['laravel_horizon']);
 
         $command = $useHorizon ? 'php artisan horizon' : 'php artisan queue:work';
         $name = $useHorizon ? 'horizon' : 'worker';

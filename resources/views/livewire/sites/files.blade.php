@@ -405,7 +405,35 @@
                         {{ __('Binary file — preview unavailable. Use Download.') }}
                     </div>
                 @else
-                    <pre class="max-h-[60vh] overflow-auto rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3 text-xs leading-relaxed text-brand-ink"><code>{{ $viewingContent }}</code></pre>
+                    <div
+                        wire:key="site-file-view-{{ $viewingPath }}"
+                        wire:ignore
+                        x-data="{
+                            editor: null,
+                            async init() {
+                                const mountEditor = window.dplyEnsureFileBrowserEditor
+                                    ? await window.dplyEnsureFileBrowserEditor()
+                                    : null;
+                                if (! mountEditor) return;
+                                this.editor = mountEditor(this.$refs.viewerMount, {
+                                    content: this.$wire.viewingContent ?? '',
+                                    mime: this.$wire.viewingMime ?? '',
+                                    path: this.$wire.viewingPath ?? '',
+                                    readOnly: true,
+                                });
+                            },
+                            destroy() {
+                                this.editor?.destroy();
+                                this.editor = null;
+                            },
+                        }"
+                        x-init="init()"
+                        class="overflow-hidden rounded-md border border-brand-ink/15"
+                    >
+                        <div x-ref="viewerMount" class="h-[60vh] overflow-hidden">
+                            <pre x-show="!editor" class="h-full overflow-auto bg-brand-ink/5 p-3 text-xs leading-relaxed text-brand-ink"><code>{{ $viewingContent }}</code></pre>
+                        </div>
+                    </div>
                 @endif
             </div>
         </x-modal>
@@ -426,45 +454,72 @@
                     <button type="button" wire:click="closeEditModal" class="text-sm text-brand-moss hover:underline">{{ __('Cancel') }}</button>
                 </div>
 
-                @if ($editingInsideReleases)
+                @if ($editingWillBeOverwrittenOnDeploy)
                     <div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        {{ __('This file lives inside a release directory. The next deploy will create a new release dir and this change will be lost. To make a durable change, edit the version under shared/ or in your repo.') }}
+                        {{ __('The next deploy will overwrite this file. Change it in your repository to keep it, or (on zero-downtime sites) under shared/.') }}
                     </div>
                 @endif
 
                 <div
+                    wire:key="site-file-edit-{{ $editingPath }}"
+                    wire:ignore
                     x-data="{
                         editor: null,
                         async init() {
                             const mountEditor = window.dplyEnsureFileBrowserEditor
                                 ? await window.dplyEnsureFileBrowserEditor()
                                 : null;
-                            if (! mountEditor) return;
-                            this.editor = mountEditor(this.$refs.editorMount, {
-                                content: this.$wire.editingContent ?? '',
-                                mime: this.$wire.editingMime ?? '',
-                                path: this.$wire.editingPath ?? '',
-                                onChange: (val) => { this.$wire.set('editingContent', val, true); },
-                            });
+                            if (! mountEditor || ! this.$refs.editorMount) return;
+                            try {
+                                this.editor = mountEditor(this.$refs.editorMount, {
+                                    content: this.$wire.editingContent ?? '',
+                                    mime: this.$wire.editingMime ?? '',
+                                    path: this.$wire.editingPath ?? '',
+                                    onChange: (val) => { this.$wire.set('editingContent', val, false); },
+                                });
+                            } catch (e) {
+                                this.editor = null;
+                                console.warn('File editor failed to mount', e);
+                            }
+                        },
+                        applyServerBuffer() {
+                            if (! this.editor) return;
+                            const next = this.$wire.editingContent ?? '';
+                            const current = this.editor.view.state.doc.toString();
+                            if (next === '' && current.trim() !== '') return;
+                            if (next !== current) {
+                                this.editor.setContent(next);
+                            }
+                        },
+                        destroy() {
+                            this.editor?.destroy();
+                            this.editor = null;
                         },
                     }"
                     x-init="init()"
-                    x-on:livewire-update.window="if (editor) editor.setContent($wire.editingContent ?? '')"
-                    class="rounded-md border border-brand-ink/15"
+                    x-on:livewire:update.window="applyServerBuffer()"
+                    class="overflow-hidden rounded-md border border-brand-ink/15"
                 >
-                    <div x-ref="editorMount" class="min-h-[40vh]">
+                    {{-- Explicit height so CodeMirror's height:100% has a containing
+                         block. min-h alone collapses the editor to an empty box.
+                         wire:model cannot bind inside wire:ignore — seed from Blade
+                         and sync via $wire.set so a failed mount still shows text. --}}
+                    <div x-ref="editorMount" class="h-[50vh] overflow-hidden">
                         <textarea
-                            x-show="!editor"
-                            wire:model="editingContent"
-                            class="block w-full min-h-[40vh] font-mono text-xs leading-relaxed p-3 focus:outline-none"
-                        ></textarea>
+                            x-show="! editor"
+                            @input="$wire.set('editingContent', $event.target.value, false)"
+                            class="block h-full w-full resize-none border-0 bg-white p-3 font-mono text-xs leading-relaxed text-brand-ink focus:outline-none"
+                            spellcheck="false"
+                            autocomplete="off"
+                            autocapitalize="off"
+                        >{{ $editingContent ?? '' }}</textarea>
                     </div>
                 </div>
 
-                @if ($pendingReleaseWarning)
+                @if ($pendingOverwriteWarning)
                     <div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-                        <p class="font-semibold">{{ __('Saving inside a release directory') }}</p>
-                        <p class="mt-1 text-xs">{{ __('Confirm you want to save here. The next deploy will create a new release directory and this change will be wiped.') }}</p>
+                        <p class="font-semibold">{{ __('This file will be overwritten on the next deploy') }}</p>
+                        <p class="mt-1 text-xs">{{ __('Confirm you want to save here. The next deploy will replace this path and this change will be lost.') }}</p>
                         <div class="mt-3 flex gap-2">
                             <x-primary-button
                                 size="sm"
@@ -480,7 +535,7 @@
                                     {{ __('Saving…') }}
                                 </span>
                             </x-primary-button>
-                            <x-secondary-button size="xs" type="button" wire:click="$set('pendingReleaseWarning', false)">{{ __('Back to editor') }}</x-secondary-button>
+                            <x-secondary-button size="xs" type="button" wire:click="$set('pendingOverwriteWarning', false)">{{ __('Back to editor') }}</x-secondary-button>
                         </div>
                     </div>
                 @else

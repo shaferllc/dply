@@ -10,6 +10,8 @@ use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\WorkerPools\SiteWorkerFleetOnBoxDaemons;
+use App\Services\WorkerPools\SiteWorkerFleetTrustedSources;
 use App\Services\WorkerPools\WorkerMemberProviderProbe;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerPoolNotifier;
@@ -110,6 +112,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         ConsoleEmitter $emit,
     ): void {
         $source = $this->resolvedSubject;
+        $originSite = $pool->isSiteSourced() ? Site::query()->find($pool->originSiteId()) : null;
 
         // 1) Converge member count to desired.
         $active = $pool->activeMemberCount();
@@ -167,7 +170,9 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         $activated = false;
         foreach ($pool->fresh('servers')->servers as $member) {
             $state = $member->poolMemberState();
-            if ($member->isPoolPrimary()) {
+            // Traditional pools already have workload on the primary. Site-sourced
+            // primaries are empty worker VMs and must be replayed from the web site.
+            if ($member->isPoolPrimary() && ! $pool->isSiteSourced()) {
                 continue;
             }
             if ($state === WorkerPool::MEMBER_DRAINING) {
@@ -179,6 +184,9 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             }
 
             if ($state === WorkerPool::MEMBER_PROVISIONING) {
+                if ($this->markFailedCloudProvision($member, $pool, $emit)) {
+                    continue;
+                }
                 // Gate on full provisioning (status ready AND setup done), NOT just
                 // isReady(): `status` flips to ready the moment the IP is known,
                 // long before the OS setup script finishes. Replaying onto a
@@ -188,7 +196,11 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                     $this->markState($member, WorkerPool::MEMBER_REPLAYING);
                     $emit->step('replay', sprintf('%s is ready — replaying workload', $member->name));
                     try {
-                        $replayer->replicate($source, $member, asReplica: true);
+                        if ($originSite instanceof Site) {
+                            $replayer->replicateOriginSite($originSite, $member);
+                        } else {
+                            $replayer->replicate($source, $member, asReplica: true);
+                        }
                         // Replay recorded pending_deploys on the member; move to
                         // DEPLOYING so the deploy step below picks it up once each
                         // site finishes provisioning.
@@ -239,6 +251,23 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             $emit->step('workers', 'new member active — ensuring queue daemons + Horizon config across the pool');
             try {
                 $result = $manager->ensureWorkersAcrossPool($pool->fresh('servers'));
+                if ($originSite instanceof Site && $pool->shouldStopOnBoxWorkers() && data_get($originSite->meta, 'fleet_paused_onbox') === null) {
+                    $paused = app(SiteWorkerFleetOnBoxDaemons::class)->pause($originSite);
+                    if ($paused > 0) {
+                        $emit->info(sprintf('paused %d on-box queue process(es) on the web site', $paused), 'workers');
+                    }
+                }
+                if ($originSite instanceof Site) {
+                    foreach ($pool->fresh('servers')->servers as $member) {
+                        if ($member->poolMemberState() !== WorkerPool::MEMBER_ACTIVE) {
+                            continue;
+                        }
+                        $granted = app(SiteWorkerFleetTrustedSources::class)->grantForMember($originSite, $member);
+                        if ($granted > 0) {
+                            $emit->info(sprintf('allowed %s on %d managed database(s)', $member->name, $granted), 'workers');
+                        }
+                    }
+                }
                 $emit->success(sprintf(
                     'ensured %s daemon on %d member(s)',
                     $result['daemon'],
@@ -256,6 +285,20 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
         // 3) Settle status / re-dispatch while work remains.
         $pool->refresh();
+        $pool->load('servers');
+        $hasFailedProvision = $pool->servers->contains(
+            fn (Server $member): bool => $member->status === Server::STATUS_ERROR
+                || $member->poolMemberState() === WorkerPool::MEMBER_ERRORED,
+        );
+        if ($hasFailedProvision && ! $inFlight) {
+            $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+            $emit->error('a worker failed to provision — the fleet did not come up', 'provision');
+            $this->failConsoleAction('A worker failed to provision. No droplet was created.');
+            app(WorkerPoolNotifier::class)->scaleFailed($pool->fresh() ?? $pool, 'A worker failed to provision.');
+
+            return;
+        }
+
         $stillScaling = $inFlight || $pool->activeMemberCount() < $pool->desired_count;
 
         if (! $stillScaling) {
@@ -323,6 +366,29 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         $member->forceFill(['meta' => $meta])->save();
 
         return $remaining === [];
+    }
+
+    /**
+     * Cloud create already failed (no provider_id). Stop looping "still
+     * provisioning at the provider" — there is no droplet to wait on.
+     */
+    private function markFailedCloudProvision(Server $member, WorkerPool $pool, ConsoleEmitter $emit): bool
+    {
+        if ($member->status !== Server::STATUS_ERROR) {
+            return false;
+        }
+
+        $this->markState($member, WorkerPool::MEMBER_ERRORED);
+        $detail = trim((string) data_get($member->meta, 'provision_error.message'));
+        $emit->error(
+            $detail !== ''
+                ? sprintf('%s provision failed: %s', $member->name, $detail)
+                : sprintf('%s provision failed at the provider — no droplet was created.', $member->name),
+            'provision',
+        );
+        $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+
+        return true;
     }
 
     private function markState(Server $member, string $state): void

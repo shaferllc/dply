@@ -242,15 +242,15 @@
                         :columns="3"
                         :stats="[
                             [
-                                'label' => __('auth.log failures'),
-                                'value' => $auth['failed_lines'] ?? '—',
+                                'label' => __('Distinct IPs (24h)'),
+                                'value' => $auth['failed_24h_ips'] ?? '—',
                                 'tone' => $severityTone,
-                                'hint' => __('Total Failed password + Invalid user'),
+                                'hint' => __('Unique source IPs with a failed SSH auth in the last 24 hours'),
                             ],
                             [
-                                'label' => __('Recent burst'),
-                                'value' => $auth['recent_lines'] ?? '—',
-                                'hint' => __('Last ~5000 auth.log lines'),
+                                'label' => __('Lifetime auth.log'),
+                                'value' => $auth['failed_lines'] ?? '—',
+                                'hint' => __('All Failed password + Invalid user lines still in auth.log (scanners accumulate)'),
                             ],
                             [
                                 'label' => __('fail2ban'),
@@ -286,10 +286,9 @@
                         dense
                         icon="heroicon-o-document-text"
                         :title="__('Brute-force indicators')"
-                        :note="__('Warning ≥ :warning · Critical ≥ :critical · Recent burst ≥ :recent', [
-                            'warning' => $summary['warning_threshold'] ?? 50,
-                            'critical' => $summary['critical_threshold'] ?? 200,
-                            'recent' => config('server_security_digest.thresholds.auth_failed_recent_warning', 25),
+                        :note="__('Alert on distinct IPs in 24h — warning ≥ :warning · critical ≥ :critical', [
+                            'warning' => $summary['warning_threshold'] ?? 15,
+                            'critical' => $summary['critical_threshold'] ?? 40,
                         ])"
                         class="border-b border-brand-ink/10"
                     >
@@ -310,12 +309,12 @@
                         :columns="3"
                         :stats="[
                             [
-                                'label' => __('Invalid user attempts'),
-                                'value' => $auth['invalid_user_lines'] ?? '—',
+                                'label' => __('Distinct IPs (24h)'),
+                                'value' => $auth['failed_24h_ips'] ?? '—',
                             ],
                             [
-                                'label' => __('Failed password attempts'),
-                                'value' => $auth['failed_password_lines'] ?? '—',
+                                'label' => __('Matching lines (24h)'),
+                                'value' => $auth['failed_24h_lines'] ?? '—',
                             ],
                             [
                                 'label' => __('Volume severity'),

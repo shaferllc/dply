@@ -27,8 +27,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?User $createdBy
  * @property-read ?ServerAuthorizedKey $serverAuthorizedKey
  * @property-read ?ServerAuthorizedKey $authorizedKey
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerSshSession extends Model
 {
@@ -41,6 +41,8 @@ class ServerSshSession extends Model
         'server_authorized_key_id',
         'name',
         'public_key_fingerprint',
+        'private_key',
+        'delivered_at',
         'target_linux_user',
         'expires_at',
         'provisioned_at',
@@ -54,6 +56,10 @@ class ServerSshSession extends Model
             'expires_at' => 'datetime',
             'provisioned_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            // Minted tunnel keys only: handed over once by the install script,
+            // then cleared. Never populated for operator-supplied keys.
+            'private_key' => 'encrypted',
         ];
     }
 

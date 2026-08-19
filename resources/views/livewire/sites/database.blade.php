@@ -18,6 +18,11 @@
     $linkable = $this->linkableDatabases;
     $isMysqlFamily = \App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($new_db_engine);
     $isSqlite = \App\Support\Servers\DatabaseWorkspaceEngines::family($new_db_engine) === 'sqlite';
+    $remoteDatabases = $remoteDatabases ?? [];
+    $hasRemoteDatabases = $remoteDatabases !== [];
+    $databaseNote = $hasRemoteDatabases && $installedEngines === []
+        ? __('Configure the hosted database attached to this site, or install an engine on this server to create one here.')
+        : __('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.');
 @endphp
 
 {{-- Standalone Database page — merged chrome (no floating hero). --}}
@@ -38,7 +43,7 @@
                     class="border-b border-brand-ink/10"
                     icon="heroicon-o-circle-stack"
                     :title="__('Database')"
-                    :note="__('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.')"
+                    :note="$databaseNote"
                 />
 
                 @if ($watchedConsoleRunId)
@@ -79,35 +84,32 @@
                 </div>
 
                 {{-- Engine capabilities are an SSH probe, so the panel paints a
-                     skeleton and wire:init fetches them after first paint. The
-                     same skeleton doubles as the tab-switch loading state. --}}
+                     skeleton and wire:init fetches them after first paint. Hosted
+                     / remote bindings are already in the control plane, so the
+                     Databases tab can render those without waiting. --}}
                 @unless ($capabilitiesLoaded)
-                    <div wire:init="loadDatabaseCapabilities">
+                    <div wire:init="loadDatabaseCapabilities" @class(['hidden' => $dbTab === 'databases' && $hasRemoteDatabases])>
+                        @unless ($dbTab === 'databases' && $hasRemoteDatabases)
+                            @include('livewire.sites.partials._panel-skeleton')
+                        @endunless
+                    </div>
+                @endunless
+                @if ($capabilitiesLoaded)
+                    <div class="hidden" wire:loading.class.remove="hidden" wire:target="setDatabaseTab">
                         @include('livewire.sites.partials._panel-skeleton')
                     </div>
-                @else
-                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setDatabaseTab">
-                    @include('livewire.sites.partials._panel-skeleton')
-                </div>
-                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0" wire:loading.class="hidden" wire:target="setDatabaseTab">
+                @endif
+                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0" @if ($capabilitiesLoaded) wire:loading.class="hidden" wire:target="setDatabaseTab" @endif>
                 @if ($dbTab === 'notifications')
-                    @include('livewire.sites.partials.database.notifications-tab')
-                @elseif (empty($installedEngines))
-                    <div class="px-5 py-8 text-center sm:px-6">
-                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
-                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
-                        </div>
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('No database engine installed') }}</h3>
-                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
-                            {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
-                        </p>
-                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
-                            {{ __('Manage server databases') }}
-                        </x-primary-button>
-                    </div>
-                @else
-                    @if ($dbTab === 'databases')
+                    @if ($capabilitiesLoaded)
+                        @include('livewire.sites.partials.database.notifications-tab')
+                    @endif
+                @elseif ($dbTab === 'databases')
+                    @if ($hasRemoteDatabases)
+                        @include('livewire.sites.partials.database.remote-databases')
+                    @endif
+
+                    @if ($capabilitiesLoaded && $installedEngines !== [])
                     <section class="border-b border-brand-ink/10">
                         <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
                             <x-heroicon-o-circle-stack class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -243,9 +245,23 @@
                             </ul>
                         @endif
                     </section>
+                    @elseif ($capabilitiesLoaded && ! $hasRemoteDatabases)
+                    <div class="px-5 py-8 text-center sm:px-6">
+                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
+                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
+                        </div>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('No database engine installed') }}</h3>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
+                        </p>
+                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                            {{ __('Manage server databases') }}
+                        </x-primary-button>
+                    </div>
                     @endif
-
-                    @if ($dbTab === 'create')
+                @elseif ($dbTab === 'create')
+                    @if ($capabilitiesLoaded && $installedEngines !== [])
                     <form wire:submit="createDatabase" class="border-b border-brand-ink/10">
                         <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
                             <x-heroicon-o-plus-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -365,10 +381,27 @@
                             </div>
                         </form>
                     @endif
+                    @elseif ($capabilitiesLoaded)
+                    <div class="px-5 py-8 text-center sm:px-6">
+                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
+                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
+                        </div>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Create on this server') }}</h3>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            @if ($hasRemoteDatabases)
+                                {{ __('This server has no database engine installed. Configure the hosted database from the Databases tab, or install an engine here to also create one on this server.') }}
+                            @else
+                                {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
+                            @endif
+                        </p>
+                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                            {{ __('Manage server databases') }}
+                        </x-primary-button>
+                    </div>
                     @endif
                 @endif
                 </div>
-                @endunless
 
                 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                     <x-cli-snippet :commands="[

@@ -1007,11 +1007,9 @@
                                 </div>
                             </div>
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-                                @if ($primary)
-                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
-                                    </a>
-                                @endif
+                                <a href="{{ $pool->workspaceUrl() }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
+                                </a>
                             </div>
                         </div>
                     @endforeach
