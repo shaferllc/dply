@@ -77,7 +77,10 @@
     {{-- Required-env checks are off for this site (operator chose to ignore
          missing vars). Muted reminder with a one-click re-enable. --}}
     @if ($supportsEnvPush && $envGateOff)
-        <div class="mx-5 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-xs text-brand-moss sm:mx-6">
+        {{-- Flush hairline strip, not an inset card: it sits directly beneath the
+             full-width console banner, and a floating rounded box there reads as
+             belonging to the banner rather than to the panel. --}}
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-2.5 text-xs text-brand-moss sm:px-6">
             <span class="inline-flex items-center gap-1.5">
                 <x-heroicon-o-no-symbol class="h-3.5 w-3.5 text-brand-mist" />
                 {{ __('Required-variable checks are off for this site — deploys won\'t be blocked by missing env.') }}

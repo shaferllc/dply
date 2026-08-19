@@ -133,30 +133,22 @@
             $phaseKey = (string) ($phase['key'] ?? $loop->index);
         @endphp
         <li
-            class="relative pl-12"
+            class="relative flex gap-3"
             wire:key="phase-{{ $phaseKey }}-{{ $forceShowOutput ? 'out' : 'hid' }}"
             @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif
         >
             {{-- Rail segment beneath this node, tinted by this phase's outcome so
                  the line reads as "done" (green) up to the active node, then fades
                  to gray for what's still ahead. Hidden on the last phase. --}}
-            @unless ($loop->last)
-                <span aria-hidden="true" @class([
-                    'absolute left-[14px] top-8 bottom-0 w-0.5 -translate-x-1/2 rounded-full',
-                    'bg-emerald-400/70' => $st === 'success',
-                    'bg-rose-400/70' => $st === 'failed',
-                    'bg-gradient-to-b from-amber-400 to-brand-ink/10' => $st === 'running',
-                    'bg-brand-ink/[0.08]' => in_array($st, ['skipped', 'pending'], true),
-                ])></span>
-            @endunless
-
-            <div @class([
-                'flex min-h-8 flex-col justify-center',
-                'pb-6' => ! $loop->last,
-            ])>
+            {{-- Fixed-width gutter holding the node and the rail beneath it. Both
+                 are centred in the same 28px column, so the line always meets the
+                 middle of the circle — the previous absolute positioning measured
+                 the rail against the row's padding box and drifted right by the
+                 row's left padding. --}}
+            <div class="relative flex w-7 shrink-0 flex-col items-center">
                 {{-- Phase node --}}
                 <span @class([
-                    'absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shadow-sm',
+                    'relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm',
                     'bg-emerald-500 text-white' => $st === 'success',
                     'bg-rose-500 text-white' => $st === 'failed',
                     'bg-amber-400 text-white ring-4 ring-amber-100' => $st === 'running',
@@ -181,6 +173,23 @@
                     @endswitch
                 </span>
 
+                {{-- Rail beneath the node, tinted by this phase's outcome so the
+                     line reads as "done" up to the active node. --}}
+                @unless ($loop->last)
+                    <span aria-hidden="true" @class([
+                        'w-0.5 flex-1 rounded-full',
+                        'bg-emerald-400/70' => $st === 'success',
+                        'bg-rose-400/70' => $st === 'failed',
+                        'bg-gradient-to-b from-amber-400 to-brand-ink/10' => $st === 'running',
+                        'bg-brand-ink/[0.08]' => in_array($st, ['skipped', 'pending'], true),
+                    ])></span>
+                @endunless
+            </div>
+
+            <div @class([
+                'min-w-0 flex-1',
+                'pb-6' => ! $loop->last,
+            ])>
                 {{-- Phase header — clickable to expand/collapse its steps. --}}
                 <div @if ($hasSteps) x-on:click="open = ! open" role="button" tabindex="0" x-on:keydown.enter.prevent="open = ! open" x-on:keydown.space.prevent="open = ! open" @endif @class([
                     'flex flex-wrap items-center gap-x-2.5 gap-y-1',
