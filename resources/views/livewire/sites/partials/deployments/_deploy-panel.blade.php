@@ -65,6 +65,7 @@
             $latest,
             $pipelineAdvisorSuggestions,
             method_exists($this, 'completedFixerKeys') ? $this->completedFixerKeys : [],
+            $this->fixerRunKey ?? null,
         );
         $pipelineSuggestions = \App\Support\Sites\DeployHubFixes::pipelineStepSuggestions($pipelineAdvisorSuggestions);
         $pipelineDismissedCount = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::dismissedCount($site) : 0;
@@ -83,13 +84,13 @@
 
     <section class="border-b border-brand-ink/10">
         {{-- Ship / deploy is the hero strip — immediately under the tab rail. --}}
-        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
             <div class="min-w-0 flex-1 basis-72">
                 <div class="flex items-center gap-2">
                     <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ship the current branch') }}</h2>
                 </div>
-                <p class="mt-0.5 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
                     @if ($latest)
                         @if ($isRunning)
                             {{ __('A deploy is currently running. Watch the phase timeline below.') }}
@@ -156,12 +157,12 @@
         </div>
 
         @if ($this->deployLockInfo ?? null)
-            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-950 sm:px-4">
-                <p class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden="true" />
+            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 sm:px-5">
+                <p class="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <x-heroicon-m-bolt class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
                     <strong class="font-semibold">{{ __('Deployment in progress') }}</strong>
                     @if (! empty($this->deployLockInfo['deployment_id']))
-                        <span class="font-mono text-xs text-amber-800">#{{ $this->deployLockInfo['deployment_id'] }}</span>
+                        <span class="max-w-[10rem] truncate font-mono text-xs text-amber-800" title="#{{ $this->deployLockInfo['deployment_id'] }}">#{{ $this->deployLockInfo['deployment_id'] }}</span>
                     @endif
                     <span class="text-amber-800/90">{{ __('Queued deploys may appear as skipped until this finishes.') }}</span>
                 </p>
@@ -175,7 +176,7 @@
 
         @if ($this->pendingScheduledDeploy)
             @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/80 bg-amber-50/70 px-3 py-1.5 sm:px-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/80 bg-amber-50/70 px-4 py-3 sm:px-5">
                 <p class="flex items-center gap-2 text-xs text-amber-900">
                     <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0 text-amber-700" />
                     <span>
@@ -191,12 +192,12 @@
         @endif
 
         <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/[0.06] text-sm sm:grid-cols-4">
-            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
-                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+            <div class="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Deployed commit') }}
                 </dt>
-                <dd class="mt-1 truncate">
+                <dd class="mt-1.5 truncate">
                     @if ($shortSha)
                         <button
                             type="button"
@@ -214,15 +215,15 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
-                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+            <div class="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-signal class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Status') }}
                 </dt>
-                <dd class="mt-1">
+                <dd class="mt-1.5">
                     @if ($latest)
                         <span @class([
-                            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                             'bg-emerald-50 text-emerald-800 ring-emerald-200' => $latest->status === 'success',
                             'bg-rose-50 text-rose-800 ring-rose-200' => $latest->status === 'failed',
                             'bg-amber-50 text-amber-900 ring-amber-200' => $latest->status === 'running',
@@ -242,12 +243,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
-                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+            <div class="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Duration') }}
                 </dt>
-                <dd class="mt-1 font-mono text-xs tabular-nums text-brand-ink">
+                <dd class="mt-1.5 font-mono text-xs tabular-nums text-brand-ink">
                     @if ($totalDurationMs > 0)
                         {{ number_format($totalDurationMs / 1000, 1) }}s
                     @elseif ($latest?->started_at && $latest?->finished_at)
@@ -257,12 +258,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-3 py-2 sm:px-4">
-                <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+            <div class="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Trigger') }}
                 </dt>
-                <dd class="mt-1 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
+                <dd class="mt-1.5 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
             </div>
         </dl>
 
@@ -527,7 +528,7 @@
                                                     wire:click="dismissPipelineSuggestion(@js($sug['key']))"
                                                     wire:loading.attr="disabled"
                                                     wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
-                                                    class="inline-flex items-center justify-center rounded-lg border border-transparent p-1.5 text-brand-mist transition-colors hover:border-brand-ink/10 hover:bg-brand-sand/40 hover:text-brand-moss disabled:opacity-60"
+                                                    class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60"
                                                     title="{{ __('Dismiss this suggestion') }}"
                                                     aria-label="{{ __('Dismiss :label', ['label' => $sug['label']]) }}"
                                                 >
@@ -561,9 +562,13 @@
             </div>
         @endif
 
-        @include('livewire.sites.partials.deployments._deploy-fix-cards', ['deployFixCards' => $deployFixCards])
+        @include('livewire.sites.partials.deployments._deploy-fix-cards', [
+            'deployFixCards' => $deployFixCards,
+            'deployAction' => 'deployNow',
+            'embedFixerOutput' => true,
+        ])
 
-        <div class="px-3 py-2.5 sm:px-4">
+        <div class="px-4 py-5 sm:px-5">
             {{-- While a deploy request is in flight, clear the previous run's
                  timeline right away and show a starting placeholder. The deploy
                  runs synchronously, so this state holds for the whole request
@@ -588,8 +593,8 @@
                     {{ __('No phase timeline yet — your first deploy will appear here.') }}
                 </div>
             @else
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Phase timeline') }}</p>
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Phase timeline') }}</p>
                     <a
                         href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $latest]) }}"
                         wire:navigate
@@ -625,6 +630,10 @@
                     'site' => $site,
                     'deployAction' => 'deployNow',
                     'hideFixerList' => true,
+                    'hideFixerOutput' => collect($deployFixCards)->contains(
+                        fn (array $card): bool => ($card['source'] ?? '') === 'fixer'
+                            && ($card['id'] ?? null) === ($this->fixerRunKey ?? null)
+                    ),
                 ])
             @endif
             </div>

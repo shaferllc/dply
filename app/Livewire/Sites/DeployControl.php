@@ -76,7 +76,7 @@ class DeployControl extends Component
 
         // Re-attach to an in-flight smart-fix so its "Processing…" state + live
         // output survive a page reload (the job keeps running regardless).
-        $fixer = $coordinator->inFlightFixer($this->site);
+        $fixer = $coordinator->latestFixer($this->site);
         if ($fixer !== null) {
             $this->fixerRunId = (string) $fixer->id;
             $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
@@ -296,7 +296,7 @@ class DeployControl extends Component
         $this->syncedSiteIds = $coordinator->syncBatch($this->site)['ids'] ?? $this->syncedSiteIds;
 
         if ($this->fixerRunId === null) {
-            $fixer = $coordinator->inFlightFixer($this->site);
+            $fixer = $coordinator->latestFixer($this->site);
             if ($fixer !== null) {
                 $this->fixerRunId = (string) $fixer->id;
                 $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);

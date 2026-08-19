@@ -129,7 +129,7 @@
                                     && strcasecmp(substr((string) $lastDeployedSha, 0, 7), substr($c['sha'], 0, 7)) === 0;
                                 $when = $this->relativeTime($c['committed_at'] ?? null);
                             @endphp
-                            <li class="flex flex-wrap items-start justify-between gap-4 px-6 py-4 transition-colors hover:bg-brand-sand/20 sm:px-8">
+                            <li class="flex flex-wrap items-start justify-between gap-4 px-6 py-5 transition-colors hover:bg-brand-sand/20 sm:px-8">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="font-mono text-xs font-semibold text-brand-sage bg-brand-sand/60 px-1.5 py-0.5 rounded">{{ $c['short_sha'] }}</span>
@@ -166,9 +166,14 @@
                         @endforeach
                     </ul>
                 @endif
-            </section>
 
-            <x-cli-snippet :command="'dply sites:commits '.$site->slug" />
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                    ]" />
+                </div>
+            </section>
         </main>
     </div>
 </div>

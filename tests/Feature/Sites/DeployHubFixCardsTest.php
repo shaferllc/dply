@@ -74,6 +74,35 @@ test('the deploy hub shows php upgrade and phpredis as separate cards', function
         ->assertDontSee('Install the PHP Redis extension');
 });
 
+test('fixer output renders inside the fix card not below the timeline', function () {
+    [$user, $server, $site] = deployHubFixCardsSite();
+    $site->latestDeployment()?->update([
+        'log_output' => 'psql: command not found',
+    ]);
+
+    \App\Models\ConsoleAction::query()->create([
+        'subject_type' => $site->getMorphClass(),
+        'subject_id' => $site->id,
+        'kind' => 'site_remediate',
+        'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+        'label' => 'Install the Postgres client (psql)',
+        'output' => [
+            'v' => 1,
+            'lines' => [
+                ['t' => 1, 'level' => 'step', 'source' => 'fix', 'line' => 'Reading package lists...'],
+                ['t' => 2, 'level' => 'step', 'source' => 'fix', 'line' => 'Building dependency tree...'],
+            ],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Install the Postgres client (psql)')
+        ->assertSee('psql is not installed — migrate uses it to load the schema dump.')
+        ->assertSee('Building dependency tree...')
+        ->assertSeeHtml('data-deploy-fix="install_pg_client"');
+});
+
 test('applying the redis card still works when php is the first catalog match', function () {
     Queue::fake();
     [$user, $server, $site] = deployHubFixCardsSite();

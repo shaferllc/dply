@@ -72,10 +72,15 @@
                         :busy-label="__('Deploying…')"
                     />
                 @endif
-                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm ring-1 ring-inset ring-brand-ink/15 transition hover:bg-brand-sand/40">
-                    <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-secondary-button
+                    size="sm"
+                    class="w-36"
+                    :href="route('servers.sites', $server)"
+                    wire:navigate
+                >
+                    <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Open Sites') }}
-                </a>
+                </x-secondary-button>
             </x-slot:actions>
         </x-workspace-panel-head>
         <ul class="divide-y divide-brand-ink/10">

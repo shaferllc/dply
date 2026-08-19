@@ -9,6 +9,7 @@ use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -71,6 +72,7 @@ class DoManagedBackend implements DatabaseBackend
             $database->backendSizeSlug(),
             $this->clusterName($database),
             $database->backendEngineVersion(),
+            ProviderResourceTags::forCloudDatabase($database),
         );
 
         $database->forceFill(['backend_id' => (string) $cluster['id']])->save();
@@ -85,6 +87,7 @@ class DoManagedBackend implements DatabaseBackend
         }
 
         $cluster = $service->getDatabaseCluster((string) $database->backend_id);
+        $this->ensureProviderTags($service, $database, $cluster);
         $connection = $cluster['connection'];
 
         return [
@@ -109,12 +112,15 @@ class DoManagedBackend implements DatabaseBackend
             $rules[] = ['type' => 'ip_addr', 'value' => (string) $server->ip_address];
         }
 
+        $service = $this->service($database);
+        $this->ensureProviderTags($service, $database, []);
+
         if ($rules === []) {
             return;
         }
 
         try {
-            $this->service($database)->setDatabaseTrustedSources((string) $database->backend_id, $rules);
+            $service->setDatabaseTrustedSources((string) $database->backend_id, $rules);
         } catch (\Throwable $e) {
             // Lockdown is best-effort: a failure here must not strand an
             // otherwise-online database. Log and leave it on the provider
@@ -148,6 +154,25 @@ class DoManagedBackend implements DatabaseBackend
         }
 
         $service->resizeDatabaseCluster((string) $database->backend_id, $size);
+    }
+
+    /**
+     * @param  array{tags?: list<string>}  $cluster
+     */
+    private function ensureProviderTags(DigitalOceanService $service, CloudDatabase $database, array $cluster): void
+    {
+        try {
+            $service->ensureDatabaseClusterTags(
+                (string) $database->backend_id,
+                ProviderResourceTags::forCloudDatabase($database),
+                $cluster['tags'] ?? [],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('database.do_managed.tags_failed', [
+                'cloud_database_id' => $database->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function service(CloudDatabase $database): DigitalOceanService

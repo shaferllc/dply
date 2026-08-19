@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Enums\ServerProvider;
 use App\Jobs\FixSiteBindingConnectivityJob;
+use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\AiCredential;
@@ -23,6 +24,7 @@ use App\Models\SearchCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseEngine;
 use App\Models\ServerManageAction;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
@@ -42,6 +44,9 @@ use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Servers\ServerManageScriptQueuer;
 use App\Support\Providers\ProviderAuthFailure;
+use App\Support\Servers\DatabaseEngineAvailability;
+use App\Support\Servers\DatabaseEngineInfo;
+use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DatabaseNameGenerator;
 use App\Support\Servers\DedicatedVmPlacement;
 use App\Support\Servers\ManagedDatabaseCatalogFailure;
@@ -72,6 +77,9 @@ trait ManagesSiteBindingActions
 {
     /** Site-scoped console run while Docker Engine is installing from the binding modal. */
     public ?string $dockerInstallRunId = null;
+
+    /** Site-scoped console run while an on-box database engine is installing from the binding modal. */
+    public ?string $onBoxEngineInstallRunId = null;
 
     public function openBindingModal(string $type, string $mode = 'attach', ?string $bindingId = null): void
     {
@@ -124,6 +132,7 @@ trait ManagesSiteBindingActions
         $this->dedicatedVmSizeError = null;
         if (in_array($type, ['database', 'redis'], true) && $this->bindingModalMode === 'provision') {
             $this->loadDedicatedVmSizes();
+            $this->syncOnBoxPlacementDefault();
         }
 
         $this->dispatch('open-modal', 'site-binding-modal');
@@ -163,6 +172,8 @@ trait ManagesSiteBindingActions
         if ($placement !== '' && $compatible !== [] && ! in_array($placement, $compatible, true)) {
             $this->bindingForm['placement'] = '';
         }
+
+        $this->syncOnBoxPlacementDefault();
     }
 
     /**
@@ -400,29 +411,248 @@ trait ManagesSiteBindingActions
     }
 
     /**
-     * Placement options for the "Provision new database" modal: always
-     * on-box, plus a co-located managed cluster when the server's provider
-     * offers one (DigitalOcean today). Each option carries the engines it
-     * supports so the modal can filter as the operator picks an engine, and
-     * an `available` flag (false when the managed backend exists but no
-     * provider credential is connected). Region and cost stay off the cards
-     * until the operator picks that placement.
+     * Confirm before installing the selected database engine from the
+     * "On this server" placement card.
+     */
+    public function confirmInstallDatabaseEngineOnServer(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $engine = $this->onBoxInstallableEngine((string) ($this->bindingForm['engine'] ?? ''));
+        if ($engine === null) {
+            $this->toastError(__('Pick a database engine to install on this server.'));
+
+            return;
+        }
+
+        if (DatabaseEngineAvailability::isComingSoon($engine)) {
+            $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
+                'engine' => $this->onBoxEngineLabel($engine),
+            ]));
+
+            return;
+        }
+
+        $label = $this->onBoxEngineLabel($engine);
+        $this->openConfirmActionModal(
+            'installDatabaseEngineOnServer',
+            [],
+            __('Install :engine', ['engine' => $label]),
+            __('Install :engine on this server? You can provision the database here once the install finishes.', ['engine' => $label]),
+            __('Install :engine', ['engine' => $label]),
+            false,
+        );
+    }
+
+    /**
+     * Queue the same Databases-workspace engine install without leaving the binding modal.
+     */
+    public function installDatabaseEngineOnServer(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $user = auth()->user();
+        if ($user !== null && ($user->currentOrganization()?->userIsDeployer($user) ?? false)) {
+            $this->toastError(__('Deployers cannot install packages on servers.'));
+
+            return;
+        }
+
+        $engine = $this->onBoxInstallableEngine((string) ($this->bindingForm['engine'] ?? ''));
+        if ($engine === null || ! in_array($engine, DatabaseEngineInstallScripts::supportedEngines(), true)) {
+            $this->toastError(__('Unsupported database engine.'));
+
+            return;
+        }
+
+        if (DatabaseEngineAvailability::isComingSoon($engine)) {
+            $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
+                'engine' => $this->onBoxEngineLabel($engine),
+            ]));
+
+            return;
+        }
+
+        $server = $this->site->server;
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        $server->refresh();
+        $this->syncBindingServer($server);
+
+        if ($this->onBoxDatabaseEnginePresent($server, $engine)) {
+            $this->bindingForm['placement'] = 'on_box';
+            $this->toastSuccess(__(':engine is already installed on this server.', [
+                'engine' => $this->onBoxEngineLabel($engine),
+            ]));
+
+            return;
+        }
+
+        if ($this->onBoxDatabaseEngineInstalling($server, $engine)) {
+            $this->toastSuccess(__(':engine is already installing on this server.', [
+                'engine' => $this->onBoxEngineLabel($engine),
+            ]));
+
+            return;
+        }
+
+        if (! $server->isReady() || ! filled($server->ip_address) || ! filled($server->ssh_private_key)) {
+            $this->toastError(__('Provisioning and SSH must be ready before installing a database engine.'));
+
+            return;
+        }
+
+        $existing = ServerDatabaseEngine::query()
+            ->where('server_id', $server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if ($existing instanceof ServerDatabaseEngine && $existing->status === ServerDatabaseEngine::STATUS_RUNNING) {
+            $this->bindingForm['placement'] = 'on_box';
+            $this->toastSuccess(__(':engine is already installed on this server.', [
+                'engine' => $this->onBoxEngineLabel($engine),
+            ]));
+
+            return;
+        }
+
+        $row = $existing ?? ServerDatabaseEngine::query()->create([
+            'server_id' => $server->id,
+            'engine' => $engine,
+            'status' => ServerDatabaseEngine::STATUS_PENDING,
+            'is_default' => ServerDatabaseEngine::query()->where('server_id', $server->id)->doesntExist(),
+            'port' => ServerDatabaseEngine::defaultPortFor($engine),
+        ]);
+
+        if (! in_array($row->status, [
+            ServerDatabaseEngine::STATUS_PENDING,
+            ServerDatabaseEngine::STATUS_FAILED,
+            ServerDatabaseEngine::STATUS_STOPPED,
+        ], true)) {
+            $this->toastError(__('Install is already in progress.'));
+
+            return;
+        }
+
+        $row->forceFill([
+            'status' => ServerDatabaseEngine::STATUS_PENDING,
+            'error_message' => null,
+        ])->save();
+
+        $label = $this->onBoxEngineLabel($engine);
+        ConsoleAction::query()->create([
+            'subject_type' => $row->getMorphClass(),
+            'subject_id' => $row->getKey(),
+            'kind' => 'db_engine_install',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'user_id' => $user?->id,
+            'label' => __('Installing :engine on :host …', [
+                'engine' => $label,
+                'host' => $server->name,
+            ]),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+
+        $run = $this->seedBindingConsoleAction(
+            'db_engine_install',
+            __('Installing :engine on this server', ['engine' => $label]),
+        );
+        $run->forceFill([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+        ])->save();
+        $this->onBoxEngineInstallRunId = (string) $run->id;
+
+        InstallDatabaseEngineJob::dispatch((string) $row->id, $user?->id !== null ? (string) $user->id : null);
+        $this->toastSuccess(__('Installing :engine on this server — this page stays open until it finishes.', [
+            'engine' => $label,
+        ]));
+    }
+
+    /**
+     * Poll target while an on-box database engine is installing from the placement picker.
+     */
+    public function syncOnBoxDatabaseInstallProgress(): void
+    {
+        $server = $this->site->server;
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        $engine = $this->onBoxInstallableEngine((string) ($this->bindingForm['engine'] ?? ''));
+        if ($engine === null) {
+            return;
+        }
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $server->id)
+            ->whereIn('engine', $this->onBoxEngineKeys($engine))
+            ->latest('updated_at')
+            ->first();
+
+        if (! $row instanceof ServerDatabaseEngine) {
+            return;
+        }
+
+        if ($this->onBoxEngineInstallRunId === null) {
+            return;
+        }
+
+        if ($row->status === ServerDatabaseEngine::STATUS_RUNNING) {
+            $this->finishOnBoxEngineInstall($row, success: true);
+
+            return;
+        }
+
+        if ($row->status === ServerDatabaseEngine::STATUS_FAILED) {
+            $this->finishOnBoxEngineInstall($row, success: false);
+        }
+    }
+
+    /**
+     * Placement options for the "Provision new database" modal. On-box is
+     * selectable only when that engine is already installed; otherwise the
+     * card offers an in-place install. A co-located managed cluster is added
+     * when the server's provider offers one (DigitalOcean today). Each option
+     * carries the engines it supports so the modal can filter as the operator
+     * picks an engine, and an `available` flag (false when the engine is
+     * missing, or the managed backend has no provider credential). Region and
+     * cost stay off the cards until the operator picks that placement.
      *
      * @return list<array{key: string, label: string, sublabel: string, available: bool, note: ?string, engines: list<string>, installing?: bool, install_action?: bool, serverless?: bool, regions?: list<array{value: string, label: string}>, account_label?: ?string, account_required?: bool, estimated_monthly_cost?: int|null}>
      */
     public function databasePlacements(): array
     {
+        $chosenEngine = strtolower(trim((string) ($this->bindingForm['engine'] ?? 'mysql')));
+        $onBoxPresent = $this->onBoxDatabaseEnginePresent($server = $this->site->server, $chosenEngine);
+        $onBoxInstalling = $server instanceof Server && $this->onBoxDatabaseEngineInstalling($server, $chosenEngine);
+        $onBoxComingSoon = DatabaseEngineAvailability::isComingSoon($this->onBoxInstallableEngine($chosenEngine) ?? $chosenEngine);
+        $onBoxLabel = $this->onBoxEngineLabel($chosenEngine);
+
         $options = [[
             'key' => 'on_box',
             'label' => __('On this server'),
             'sublabel' => __('Free · shares the box'),
-            'available' => true,
-            'note' => null,
+            'available' => $onBoxPresent,
+            'note' => $onBoxPresent
+                ? null
+                : ($onBoxComingSoon
+                    ? __('Coming soon')
+                    : ($onBoxInstalling
+                        ? __('Installing :engine…', ['engine' => $onBoxLabel])
+                        : __(':engine is not installed on this server yet.', ['engine' => $onBoxLabel]))),
             'engines' => ['mysql', 'postgres', 'clickhouse', 'sqlite'],
+            'engine_label' => $onBoxLabel,
+            'installing' => $onBoxInstalling,
+            'install_action' => $server instanceof Server
+                && ! $onBoxPresent
+                && ! $onBoxComingSoon
+                && $this->onBoxInstallableEngine($chosenEngine) !== null,
         ]];
 
-        $server = $this->site->server;
-        if ($server === null) {
+        if (! $server instanceof Server) {
             return $options;
         }
 
@@ -668,6 +898,7 @@ trait ManagesSiteBindingActions
         $this->dedicatedVmSizeError = null;
         if (in_array($this->bindingModalType, ['database', 'redis'], true) && $mode === 'provision') {
             $this->loadDedicatedVmSizes();
+            $this->syncOnBoxPlacementDefault();
         }
 
         $this->resetErrorBag();
@@ -848,6 +1079,12 @@ trait ManagesSiteBindingActions
                     'placement' => $match['label'],
                     'engine' => $engine,
                 ]));
+
+                return;
+            }
+
+            if (empty($match['available'])) {
+                $this->toastError((string) ($match['note'] ?: __('That placement is not available yet.')));
 
                 return;
             }
@@ -2396,6 +2633,147 @@ trait ManagesSiteBindingActions
                 }
             }
         }
+    }
+
+    /**
+     * Default on-box when that engine is installed; clear it when it is not so
+     * the radio cannot stay selected on a disabled card.
+     */
+    private function syncOnBoxPlacementDefault(): void
+    {
+        if ($this->bindingModalType !== 'database' || $this->bindingModalMode !== 'provision') {
+            return;
+        }
+
+        $onBox = collect($this->databasePlacements())->firstWhere('key', 'on_box');
+        $available = (bool) ($onBox['available'] ?? false);
+        $placement = (string) ($this->bindingForm['placement'] ?? '');
+
+        if ($placement === 'on_box' && ! $available) {
+            $this->bindingForm['placement'] = '';
+
+            return;
+        }
+
+        if ($placement === '' && $available) {
+            $this->bindingForm['placement'] = 'on_box';
+        }
+    }
+
+    /**
+     * Canonical install key for the provision engine picker (MySQL / MariaDB
+     * installs MySQL; SQLite needs no package).
+     */
+    private function onBoxInstallableEngine(string $engine): ?string
+    {
+        return match (strtolower(trim($engine))) {
+            'mysql', 'mariadb' => 'mysql',
+            'postgres', 'postgresql', 'pg' => 'postgres',
+            'clickhouse' => 'clickhouse',
+            default => null,
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function onBoxEngineKeys(string $engine): array
+    {
+        return match (strtolower(trim($engine))) {
+            'mysql', 'mariadb' => ['mysql', 'mariadb'],
+            'postgres', 'postgresql', 'pg' => ['postgres'],
+            'clickhouse' => ['clickhouse'],
+            default => [strtolower(trim($engine))],
+        };
+    }
+
+    private function onBoxEngineLabel(string $engine): string
+    {
+        $installable = $this->onBoxInstallableEngine($engine) ?? strtolower(trim($engine));
+
+        return (string) (DatabaseEngineInfo::for($installable)['label'] ?? ucfirst($installable));
+    }
+
+    private function onBoxDatabaseEnginePresent(?Server $server, string $engine): bool
+    {
+        if (strtolower(trim($engine)) === 'sqlite') {
+            return true;
+        }
+
+        if (! $server instanceof Server) {
+            return false;
+        }
+
+        $keys = $this->onBoxEngineKeys($engine);
+
+        if (ServerDatabaseEngine::query()
+            ->where('server_id', $server->id)
+            ->whereIn('engine', $keys)
+            ->where('status', ServerDatabaseEngine::STATUS_RUNNING)
+            ->exists()) {
+            return true;
+        }
+
+        return ServerDatabase::query()
+            ->where('server_id', $server->id)
+            ->whereIn('engine', $keys)
+            ->exists();
+    }
+
+    private function onBoxDatabaseEngineInstalling(Server $server, string $engine): bool
+    {
+        if ($this->onBoxEngineInstallRunId !== null) {
+            return true;
+        }
+
+        $installable = $this->onBoxInstallableEngine($engine);
+        if ($installable === null) {
+            return false;
+        }
+
+        return ServerDatabaseEngine::query()
+            ->where('server_id', $server->id)
+            ->whereIn('engine', $this->onBoxEngineKeys($installable))
+            ->whereIn('status', [
+                ServerDatabaseEngine::STATUS_PENDING,
+                ServerDatabaseEngine::STATUS_INSTALLING,
+            ])
+            ->exists();
+    }
+
+    private function finishOnBoxEngineInstall(ServerDatabaseEngine $row, bool $success): void
+    {
+        $label = $this->onBoxEngineLabel($row->engine);
+        $run = $this->onBoxEngineInstallRunId !== null
+            ? ConsoleAction::query()->find($this->onBoxEngineInstallRunId)
+            : null;
+
+        if ($success) {
+            if ($run instanceof ConsoleAction && $run->isInFlight()) {
+                $run->forceFill([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                ])->save();
+            }
+            $placement = (string) ($this->bindingForm['placement'] ?? '');
+            if ($placement === '' || $placement === 'on_box') {
+                $this->bindingForm['placement'] = 'on_box';
+            }
+            $this->onBoxEngineInstallRunId = null;
+            $this->toastSuccess(__(':engine is installed — you can select this option now.', ['engine' => $label]));
+
+            return;
+        }
+
+        if ($run instanceof ConsoleAction && $run->isInFlight()) {
+            $run->forceFill([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'error' => $row->error_message,
+                'finished_at' => now(),
+            ])->save();
+        }
+        $this->onBoxEngineInstallRunId = null;
+        $this->toastError($row->error_message ?: __(':engine install failed.', ['engine' => $label]));
     }
 
     protected function dockerInstallIsInFlight(Server $server): bool

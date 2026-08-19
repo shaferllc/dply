@@ -299,7 +299,10 @@ trait ManagesDoFunctionsDatabases
         return array_values(array_unique($normalized));
     }
 
-    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null): array
+    /**
+     * @param  list<string>  $tags
+     */
+    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null, array $tags = []): array
     {
         $constrained = $this->constrainDatabaseCreateToCatalog($engine, $region, $size, $version);
 
@@ -312,6 +315,10 @@ trait ManagesDoFunctionsDatabases
         ];
         if ($constrained['version'] !== '') {
             $payload['version'] = $constrained['version'];
+        }
+        $tags = $this->normalizeDatabaseTags($tags);
+        if ($tags !== []) {
+            $payload['tags'] = $tags;
         }
 
         try {
@@ -470,6 +477,77 @@ trait ManagesDoFunctionsDatabases
      *
      * @param  list<array{type: string, value: string}>  $rules
      */
+    /**
+     * Attach tags to an existing cluster (DigitalOcean's create accepts tags,
+     * but a cluster minted before we sent them — or a create that dropped
+     * them — still needs the Tags API). Creating a tag name that already
+     * exists is a no-op.
+     *
+     * @param  list<string>  $tags
+     */
+    public function tagDatabaseCluster(string $clusterId, array $tags): void
+    {
+        $clusterId = trim($clusterId);
+        $tags = $this->normalizeDatabaseTags($tags);
+        if ($clusterId === '' || $tags === []) {
+            return;
+        }
+
+        foreach ($tags as $tag) {
+            $created = $this->request('post', '/tags', ['name' => $tag]);
+            if (! $created->successful() && ! in_array($created->status(), [409, 422], true)) {
+                $this->assertSuccess($created, 'create tag '.$tag);
+            }
+
+            $attached = $this->request('post', '/tags/'.rawurlencode($tag).'/resources', [
+                'resources' => [[
+                    'resource_id' => $clusterId,
+                    'resource_type' => 'database',
+                ]],
+            ]);
+            if (! $attached->successful() && $attached->status() !== 409) {
+                $this->assertSuccess($attached, 'tag database cluster');
+            }
+        }
+    }
+
+    /**
+     * @param  list<string>  $wanted
+     * @param  list<string>  $existing
+     */
+    public function ensureDatabaseClusterTags(string $clusterId, array $wanted, array $existing = []): void
+    {
+        $missing = array_values(array_diff(
+            $this->normalizeDatabaseTags($wanted),
+            $this->normalizeDatabaseTags($existing),
+        ));
+        if ($missing === []) {
+            return;
+        }
+
+        $this->tagDatabaseCluster($clusterId, $missing);
+    }
+
+    /**
+     * @param  list<mixed>  $tags
+     * @return list<string>
+     */
+    private function normalizeDatabaseTags(array $tags): array
+    {
+        $normalized = [];
+        foreach ($tags as $tag) {
+            if (! is_string($tag) && ! is_int($tag)) {
+                continue;
+            }
+            $tag = trim((string) $tag);
+            if ($tag !== '') {
+                $normalized[] = $tag;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     public function setDatabaseTrustedSources(string $clusterId, array $rules): void
     {
         $response = $this->request('put', '/databases/'.$clusterId.'/firewall', [
@@ -495,7 +573,7 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
-     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     * @return array{id: string, status: string, engine: string, tags: list<string>, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     private function normalizeDatabaseCluster(mixed $database): array
     {
@@ -506,6 +584,7 @@ trait ManagesDoFunctionsDatabases
             'id' => (string) ($database['id'] ?? ''),
             'status' => (string) ($database['status'] ?? ''),
             'engine' => (string) ($database['engine'] ?? ''),
+            'tags' => $this->normalizeDatabaseTags(is_array($database['tags'] ?? null) ? $database['tags'] : []),
             'connection' => [
                 'host' => (string) ($connection['host'] ?? ''),
                 'port' => (int) ($connection['port'] ?? 0),

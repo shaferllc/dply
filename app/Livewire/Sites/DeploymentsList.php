@@ -276,8 +276,9 @@ class DeploymentsList extends Component
         $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
         $this->syncSelectionSeeded = true;
 
-        // Re-attach to an in-flight smart-fix so its state survives a reload.
-        $fixer = $coordinator->inFlightFixer($this->site);
+        // Re-attach to the current smart-fix (in-flight or just finished) so
+        // live output stays in the Fix card across a reload.
+        $fixer = $coordinator->latestFixer($this->site);
         if ($fixer !== null) {
             $this->fixerRunId = (string) $fixer->id;
             $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
@@ -1001,7 +1002,7 @@ class DeploymentsList extends Component
         $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
 
         if ($this->fixerRunId === null) {
-            $fixer = $coordinator->inFlightFixer($this->site);
+            $fixer = $coordinator->latestFixer($this->site);
             if ($fixer !== null) {
                 $this->fixerRunId = (string) $fixer->id;
                 $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);

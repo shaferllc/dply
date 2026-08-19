@@ -421,8 +421,8 @@ return [
         // without these kinds the run has nowhere to show on this page (the
         // in-partial console-banner suppresses itself when section ===
         // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'managed_db_provision', 'managed_db_resize'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'managed_db_provision', 'managed_db_resize'],
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
     ],
 
     /*

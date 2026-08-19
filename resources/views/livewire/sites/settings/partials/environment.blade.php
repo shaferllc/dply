@@ -290,21 +290,13 @@
 
     @if ($showAttention)
         <section @class([$card, 'overflow-hidden'])>
-            {{-- Header in the app's own idiom (see the General page): a tinted
-                 icon tile, title and description on white with real padding —
-                 not a tinted band with an uppercase eyebrow, which is a shape
-                 nothing else here uses. --}}
-            <div class="flex items-start gap-3 px-5 py-4 sm:px-6">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200/70">
-                    <x-heroicon-o-bell-alert class="h-4.5 w-4.5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-base font-semibold tracking-tight text-brand-ink">{{ __('Needs attention') }}</h2>
-                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">
-                        {{ __('Configuration dply flagged before the first deploy. Fixing these here writes straight to the site\'s .env.') }}
-                    </p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-bell-alert"
+                :title="__('Needs attention')"
+                :note="__('Configuration dply flagged before the first deploy. Fixing these here writes straight to the site\'s .env.')"
+                tone="amber"
+            />
             <div>
                 @if ($attentionConsoleRun)
                     <div
@@ -341,11 +333,11 @@
 
     @include('livewire.sites.settings.partials.environment.add-missing-env-modal')
 
+    @include('livewire.sites.settings.partials.environment.variables-list')
+
     @include('livewire.sites.partials.linked-organization-secrets', ['secretsCard' => $card])
 
     @include('livewire.sites.settings.partials.environment.inherited')
-
-    @include('livewire.sites.settings.partials.environment.variables-list')
 
     @include('livewire.sites.settings.partials.environment.view-all-modal')
 

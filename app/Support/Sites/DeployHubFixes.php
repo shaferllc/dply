@@ -41,6 +41,7 @@ final class DeployHubFixes
     /**
      * @param  list<array<string, mixed>>  $pipelineSuggestions
      * @param  list<string>  $completedFixerKeys
+     * @param  string|null  $activeFixerKey  Keep this completed fixer card so live output stays in the Fix, not under the timeline.
      * @return list<array<string, mixed>>
      */
     public static function cards(
@@ -48,6 +49,7 @@ final class DeployHubFixes
         ?SiteDeployment $latest = null,
         array $pipelineSuggestions = [],
         array $completedFixerKeys = [],
+        ?string $activeFixerKey = null,
     ): array {
         $latest ??= $site->latestDeployment();
 
@@ -133,7 +135,7 @@ final class DeployHubFixes
 
         foreach (SiteFixers::detect($failureText) as $fixer) {
             $key = (string) $fixer['key'];
-            if (isset($claimed[$key])) {
+            if (isset($claimed[$key]) && $key !== $activeFixerKey) {
                 continue;
             }
 

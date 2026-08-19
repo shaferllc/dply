@@ -345,6 +345,34 @@ class SiteDeployCoordinator
     }
 
     /**
+     * In-flight fixer, or the latest completed/failed one since the last
+     * deploy — so the Fix card can keep showing output after a reload.
+     */
+    public function latestFixer(Site $site): ?ConsoleAction
+    {
+        $inFlight = $this->inFlightFixer($site);
+        if ($inFlight !== null) {
+            return $inFlight;
+        }
+
+        $latest = $this->latestDeployment($site);
+        $since = $latest?->finished_at ?? $latest?->created_at;
+
+        $query = ConsoleAction::query()
+            ->where('subject_type', $site->getMorphClass())
+            ->where('subject_id', $site->id)
+            ->where('kind', 'site_remediate')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->latest();
+
+        if ($since !== null) {
+            $query->where('created_at', '>=', $since);
+        }
+
+        return $query->first();
+    }
+
+    /**
      * Fixer keys already run since the latest deploy finished — dropped from the
      * "Suggested fixes" list so a fix isn't offered twice. Scoped to fixes run
      * after the deploy so a recurrence still surfaces the fix again.

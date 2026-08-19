@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
+use App\Models\CloudDatabase;
 use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteBinding;
 
 /**
  * Canonical provider-side tags stamped on every VM dply creates.
@@ -37,6 +40,12 @@ final class ProviderResourceTags
     /** Prefix for the per-server identity tag. */
     public const PREFIX = self::MARKER.'-';
 
+    /** Prefix for the per-site identity tag on related provider resources. */
+    public const SITE_PREFIX = self::MARKER.'-site-';
+
+    /** Marker for a managed database / cache cluster (vs a VM). */
+    public const KIND_DATABASE = self::MARKER.'-database';
+
     /** Label key carrying the server ULID on key/value providers. */
     public const SERVER_ID_KEY = self::PREFIX.'server-id';
 
@@ -49,6 +58,74 @@ final class ProviderResourceTags
     public static function forServer(Server $server): string
     {
         return self::PREFIX.$server->getKey();
+    }
+
+    /**
+     * The per-site identity tag — `dply-site-<site ulid>`.
+     */
+    public static function forSite(Site $site): string
+    {
+        return self::SITE_PREFIX.$site->getKey();
+    }
+
+    /**
+     * Flat tags for a managed database / Valkey cluster in the provider
+     * console. Always includes {@see MARKER} and {@see KIND_DATABASE}, plus
+     * the related server and site when we know them — so the droplet and
+     * its cluster share `dply-<server id>` and can be filtered together.
+     *
+     * @return list<string>
+     */
+    public static function forManagedDatabase(?Server $server = null, ?Site $site = null): array
+    {
+        $tags = [self::MARKER, self::KIND_DATABASE];
+
+        if ($server instanceof Server) {
+            $tags[] = self::forServer($server);
+        }
+
+        if ($site instanceof Site) {
+            $tags[] = self::forSite($site);
+        }
+
+        return array_values(array_unique($tags));
+    }
+
+    /**
+     * Resolve the site (and therefore its server) a CloudDatabase was
+     * provisioned for, then return {@see forManagedDatabase()}.
+     *
+     * @return list<string>
+     */
+    public static function forCloudDatabase(CloudDatabase $database): array
+    {
+        $site = self::siteForCloudDatabase($database);
+
+        return self::forManagedDatabase($site?->server, $site);
+    }
+
+    private static function siteForCloudDatabase(CloudDatabase $database): ?Site
+    {
+        $siteId = trim((string) (data_get($database->meta, 'provisioned_for_site_id') ?? ''));
+        if ($siteId !== '') {
+            $site = Site::query()->find($siteId);
+            if ($site instanceof Site) {
+                return $site;
+            }
+        }
+
+        $database->loadMissing('sites.server');
+        $attached = $database->sites->first();
+        if ($attached instanceof Site) {
+            return $attached;
+        }
+
+        $binding = SiteBinding::query()
+            ->where('target_type', 'cloud_database')
+            ->where('target_id', $database->id)
+            ->first();
+
+        return $binding?->site;
     }
 
     /**

@@ -66,11 +66,33 @@
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div
                         class="relative min-w-0 flex-1"
-                        x-data
-                        x-on:click.outside="$wire.closeLogSourceMenu()"
+                        x-data="{
+                            position: { top: 0, left: 0, width: 0 },
+                            compute() {
+                                const trigger = this.$refs.logSourceTrigger;
+                                if (! trigger) {
+                                    return;
+                                }
+                                const r = trigger.getBoundingClientRect();
+                                const width = Math.min(Math.max(r.width, 320), window.innerWidth - 32);
+                                this.position = {
+                                    top: r.bottom + 6,
+                                    left: Math.max(16, Math.min(r.left, window.innerWidth - width - 16)),
+                                    width,
+                                };
+                            },
+                        }"
+                        x-on:click.outside="
+                            const menu = document.getElementById('log-source-menu');
+                            if (menu && menu.contains($event.target)) {
+                                return;
+                            }
+                            $wire.closeLogSourceMenu();
+                        "
                     >
                         <button
                             type="button"
+                            x-ref="logSourceTrigger"
                             wire:click="toggleLogSourceMenu"
                             title="{{ __('Log source') }}"
                             class="flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-left text-xs font-medium leading-snug text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
@@ -88,9 +110,14 @@
                             </span>
                         </button>
                         @if ($logSourceMenuOpen)
+                            <template x-teleport="body">
                             <div
-                                wire:transition
-                                class="absolute start-0 z-50 mt-1.5 w-[min(calc(100vw-2rem),32rem)] max-h-[min(70dvh,28rem)] overflow-y-auto dply-flyout-panel p-3"
+                                id="log-source-menu"
+                                x-init="compute()"
+                                x-on:scroll.window.passive="compute()"
+                                x-on:resize.window.passive="compute()"
+                                x-bind:style="`top: ${position.top}px; left: ${position.left}px; width: ${position.width}px;`"
+                                class="fixed z-[80] max-h-[min(70dvh,28rem)] overflow-y-auto dply-flyout-panel p-3"
                                 role="listbox"
                                 @click.stop
                             >
@@ -131,6 +158,7 @@
                                     @endforeach
                                 </nav>
                             </div>
+                            </template>
                         @endif
                     </div>
                     <div class="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -165,11 +193,33 @@
                         </button>
                         <div
                             class="relative min-w-0"
-                            x-data
-                            x-on:click.outside="$wire.closeLogOptionsMenu()"
+                            x-data="{
+                                position: { top: 0, left: 0, width: 0 },
+                                compute() {
+                                    const trigger = this.$refs.logOptionsTrigger;
+                                    if (! trigger) {
+                                        return;
+                                    }
+                                    const r = trigger.getBoundingClientRect();
+                                    const width = Math.min(32 * 16, window.innerWidth - 32);
+                                    this.position = {
+                                        top: r.bottom + 8,
+                                        left: Math.max(16, Math.min(r.right - width, window.innerWidth - width - 16)),
+                                        width,
+                                    };
+                                },
+                            }"
+                            x-on:click.outside="
+                                const menu = document.getElementById('log-options-menu');
+                                if (menu && menu.contains($event.target)) {
+                                    return;
+                                }
+                                $wire.closeLogOptionsMenu();
+                            "
                         >
                             <button
                                 type="button"
+                                x-ref="logOptionsTrigger"
                                 wire:click="toggleLogOptionsMenu"
                                 class="box-border inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium leading-none text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
                                 aria-haspopup="true"
@@ -185,9 +235,14 @@
                                 </span>
                             </button>
                             @if ($logOptionsMenuOpen)
+                                <template x-teleport="body">
                                 <div
-                                    wire:transition
-                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] dply-flyout-panel p-4"
+                                    id="log-options-menu"
+                                    x-init="compute()"
+                                    x-on:scroll.window.passive="compute()"
+                                    x-on:resize.window.passive="compute()"
+                                    x-bind:style="`top: ${position.top}px; left: ${position.left}px; width: ${position.width}px;`"
+                                    class="fixed z-[80] dply-flyout-panel p-4"
                                     @click.stop
                                 >
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-3">
@@ -284,6 +339,7 @@
                                         </button>
                                     </div>
                                 </div>
+                                </template>
                             @endif
                         </div>
                     </div>

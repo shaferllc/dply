@@ -9,6 +9,7 @@ use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\ManagedDatabaseSizeCatalog;
 
 /**
@@ -24,11 +25,13 @@ final class ManagedDatabaseProvisionConsole
 
     public static function label(CloudDatabase $database): string
     {
-        $engine = $database->backendEngineSlug();
+        if ($database->engine === CloudDatabase::ENGINE_REDIS) {
+            return __('Provisioning managed Valkey …');
+        }
 
-        return $engine === 'valkey'
-            ? __('Provisioning managed Valkey …')
-            : __('Provisioning managed :engine …', ['engine' => $engine]);
+        $engine = (string) (DatabaseEngineInfo::for($database->engine)['label'] ?? ucfirst($database->engine));
+
+        return __('Provisioning managed :engine …', ['engine' => $engine]);
     }
 
     public static function ensure(Site $site, SiteBinding $binding, CloudDatabase $database, ?string $runId = null): ConsoleAction
@@ -60,8 +63,10 @@ final class ManagedDatabaseProvisionConsole
             $run->forceFill([
                 'status' => ConsoleAction::STATUS_RUNNING,
                 'started_at' => $run->started_at ?? now(),
-                'label' => $run->label ?: self::label($database),
+                'label' => self::label($database),
             ])->save();
+        } elseif ($run->label !== self::label($database)) {
+            $run->forceFill(['label' => self::label($database)])->save();
         }
 
         self::remember($binding, (string) $run->id);

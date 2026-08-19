@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Server;
+use App\Models\Site;
 use App\Support\Servers\ProviderResourceTags;
 
 function taggedServer(string $id = '01jabcdefghijklmnopqrstuvw'): Server
@@ -39,6 +40,22 @@ test('labels key the marker and the server id', function (): void {
         'managed-by' => 'dply',
         'dply-server-id' => '01jabcdefghijklmnopqrstuvw',
     ]);
+});
+
+test('managed database tags include the kind plus server and site', function (): void {
+    $server = taggedServer();
+    $site = new Site;
+    $site->forceFill(['id' => '01jsiteidabcdefghijklmnop']);
+    $site->setRelation('server', $server);
+
+    expect(ProviderResourceTags::forSite($site))->toBe('dply-site-01jsiteidabcdefghijklmnop')
+        ->and(ProviderResourceTags::forManagedDatabase($server, $site))->toBe([
+            'dply',
+            'dply-database',
+            'dply-01jabcdefghijklmnopqrstuvw',
+            'dply-site-01jsiteidabcdefghijklmnop',
+        ])
+        ->and(ProviderResourceTags::forManagedDatabase())->toBe(['dply', 'dply-database']);
 });
 
 test('ownership is recognised from either tag shape', function (): void {

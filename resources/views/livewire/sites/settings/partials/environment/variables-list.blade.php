@@ -12,13 +12,13 @@
         {{-- Identity and actions share one line. They were stacked as two rows
              split by a border, which cost ~40px of header before a single
              variable appeared. --}}
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2.5 sm:px-6">
-            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
                 <button type="button" class="flex min-w-0 flex-wrap items-center gap-2 text-left" x-on:click="open = ! open" :aria-expanded="open">
                     <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open && 'rotate-90'" />
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
                         {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                     </span>
@@ -147,7 +147,7 @@
         @if ($variableCount > 0 && $envAdvanced)
             {{-- Search and the prefix filters share a line: the search field was
                  full-width on its own row above the chips for no reason. --}}
-            <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-5 py-1.5 sm:px-6">
+            <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-5 py-2.5 sm:px-6">
                 <div class="relative w-full sm:w-56">
                     <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-mist" />
                     <input
@@ -216,11 +216,11 @@
              the individual variables, each overridable. User overrides for keys
              in that binding are shown as a sub-section within the same group. --}}
         @if ($bindingManagedGroups !== [] || $overrideGroups !== [])
-            <div class="border-b border-brand-ink/10 bg-sky-50/20">
-                <div class="flex items-center gap-2 px-5 py-1.5 sm:px-6">
-                    <x-heroicon-o-link class="h-3.5 w-3.5 text-sky-700" aria-hidden="true" />
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-800">{{ __('Managed by connected resources') }}</p>
-                    <span class="text-xs text-brand-moss">{{ __('injected at deploy · editable as an override') }}</span>
+            <div class="border-b border-brand-ink/10">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                    <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Managed by connected resources') }}</p>
+                    <span class="text-xs text-brand-moss">{{ __('Injected at deploy · editable as an override') }}</span>
                 </div>
 
                 @foreach ($bindingManagedGroups as $gBindingId => $group)
@@ -233,8 +233,8 @@
                             && (array_key_exists((string) $editing_env_key, $group['vars'])
                                 || ($gGroupOverrides && array_key_exists((string) $editing_env_key, $gGroupOverrides['keys'])));
                     @endphp
-                    <div class="border-t border-sky-200/40" wire:key="managed-group-{{ md5($gBindingId) }}" x-data="{ expanded: @js($gHasEditing) }">
-                        <div class="flex flex-wrap items-center justify-between gap-2 bg-sky-50/60 px-5 py-1.5 sm:px-6">
+                    <div class="border-t border-brand-ink/10" wire:key="managed-group-{{ md5($gBindingId) }}" x-data="{ expanded: @js($gHasEditing) }">
+                        <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/15 px-5 py-2.5 sm:px-6">
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
                                 <span class="text-sm font-semibold text-brand-ink">{{ $gTypeLabel }}</span>
@@ -326,7 +326,7 @@
                                     $mEditing = ($editing_env_key ?? null) === $mKey;
                                     $mSensitive = (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|URL|DSN)/i', (string) $mKey);
                                 @endphp
-                                <li class="px-5 py-1.5 sm:px-6" wire:key="managed-env-{{ md5($mKey) }}">
+                                <li class="px-5 py-2.5 sm:px-6" wire:key="managed-env-{{ md5($mKey) }}">
                                     @if ($mEditing)
                                         {{-- Override editor: writes a real .env key that beats the binding value. --}}
                                         <form wire:submit="saveEditedEnvVar" class="space-y-3">
@@ -357,20 +357,20 @@
                                             </div>
                                         </form>
                                     @else
-                                        <div class="flex flex-wrap items-center justify-between gap-3">
-                                            <div class="flex min-w-0 items-center gap-3 pl-9">
-                                                <div class="min-w-0">
-                                                    <p class="font-mono text-sm font-semibold text-brand-ink">{{ $mKey }}</p>
-                                                    <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
-                                                        @if ($mValue === '')
-                                                            <span class="text-brand-mist">(empty)</span>
-                                                        @elseif ($mSensitive)
-                                                            {{ str_repeat('•', min(24, max(4, strlen($mValue)))) }}
-                                                        @else
-                                                            {{ $mValue }}
-                                                        @endif
-                                                    </p>
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex min-w-0 flex-1 items-center gap-2.5">
+                                                <div class="flex min-w-0 shrink-0 items-center gap-1 sm:w-64">
+                                                    <span class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $mKey }}">{{ $mKey }}</span>
                                                 </div>
+                                                <p class="min-w-0 flex-1 truncate font-mono text-xs text-brand-moss">
+                                                    @if ($mValue === '')
+                                                        <span class="text-brand-mist">(empty)</span>
+                                                    @elseif ($mSensitive)
+                                                        {{ str_repeat('•', min(24, max(4, strlen($mValue)))) }}
+                                                    @else
+                                                        {{ $mValue }}
+                                                    @endif
+                                                </p>
                                             </div>
                                             <button type="button" wire:click="overrideManagedEnvVar(@js($mKey))" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Set a .env value that overrides the binding.') }}">{{ __('Override') }}</button>
                                         </div>
@@ -381,8 +381,8 @@
                             {{-- User overrides for keys provided by this binding, shown inline
                                  within the same group so "Database · tracely" is one unit. --}}
                             @if ($gGroupOverrides)
-                                <li class="border-t border-amber-200/40 bg-amber-50/30 px-5 py-1.5 sm:px-6" wire:key="override-divider-{{ md5((string) $gBindingId) }}">
-                                    <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-amber-800">{{ __('Your overrides · take precedence at deploy') }}</p>
+                                <li class="border-t border-brand-ink/10 bg-brand-sand/15 px-5 py-2.5 sm:px-6" wire:key="override-divider-{{ md5((string) $gBindingId) }}">
+                                    <p class="text-xs font-semibold text-brand-ink">{{ __('Your overrides') }} <span class="font-normal text-brand-moss">{{ __('· take precedence at deploy') }}</span></p>
                                 </li>
                                 @foreach ($gGroupOverrides['keys'] as $oKey => $oValue)
                                     @php
@@ -391,7 +391,7 @@
                                         $oValueLength = strlen($oValue);
                                         $oRowComment  = $envComments[$oKey] ?? null;
                                     @endphp
-                                    <li class="bg-amber-50/20 px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
+                                    <li class="px-5 py-2.5 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
                                         @if ($oIsEditing)
                                             <form wire:submit="saveEditedEnvVar" class="space-y-3">
                                                 <div class="flex flex-wrap items-end gap-3">
@@ -429,40 +429,42 @@
                                                 </div>
                                             </form>
                                         @else
-                                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                                <div class="flex min-w-0 items-center gap-3 pl-9">
-                                                    <div class="min-w-0">
-                                                        <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
-                                                        <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
-                                                            @if ($oIsRevealed)
-                                                                {{ $oValue === '' ? '(empty)' : $oValue }}
-                                                            @elseif ($oValueLength === 0)
-                                                                <span class="text-brand-mist">(empty)</span>
-                                                            @else
-                                                                {{ str_repeat('•', min(24, max(4, $oValueLength))) }}
-                                                            @endif
-                                                        </p>
-                                                        @if ($oRowComment !== null && $oRowComment !== '')
-                                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
-                                                        @endif
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex min-w-0 flex-1 items-center gap-2.5">
+                                                    <div class="flex min-w-0 shrink-0 items-center gap-1 sm:w-64">
+                                                        <span class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $oKey }}">{{ $oKey }}</span>
                                                     </div>
-                                                </div>
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
-                                                        @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
-                                                        @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
+                                                    <p class="min-w-0 flex-1 truncate font-mono text-xs text-brand-moss">
+                                                        @if ($oIsRevealed)
+                                                            {{ $oValue === '' ? '(empty)' : $oValue }}
+                                                        @elseif ($oValueLength === 0)
+                                                            <span class="text-brand-mist">(empty)</span>
+                                                        @else
+                                                            {{ str_repeat('•', min(24, max(4, $oValueLength))) }}
                                                         @endif
+                                                    </p>
+                                                </div>
+                                                <div class="flex shrink-0 items-center gap-1">
+                                                    <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
+                                                        @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" />
+                                                        @else <x-heroicon-o-eye class="h-4 w-4" />
+                                                        @endif
+                                                        <span class="sr-only">{{ $oIsRevealed ? __('Hide :key', ['key' => $oKey]) : __('Show :key', ['key' => $oKey]) }}</span>
                                                     </button>
-                                                    <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Edit value') }}">
-                                                        <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
+                                                    <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
+                                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                                        <span class="sr-only">{{ __('Edit :key', ['key' => $oKey]) }}</span>
                                                     </button>
-                                                    <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove override') }}">
+                                                    <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" title="{{ __('Remove override') }}">
                                                         <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
-                                                        {{ __('Remove') }}
+                                                        <span class="sr-only">{{ __('Remove :key', ['key' => $oKey]) }}</span>
                                                     </button>
                                                 </div>
                                             </div>
+                                            @if ($oRowComment !== null && $oRowComment !== '')
+                                                <p class="mt-0.5 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
+                                            @endif
                                         @endif
                                     </li>
                                 @endforeach
@@ -480,8 +482,8 @@
                         $ogTypeLabel = $bindingTypeLabelsInline[$ogGroup['type']] ?? (string) str($ogGroup['type'])->title();
                         $ogHasEditing = ($editing_env_key ?? null) !== null && array_key_exists((string) $editing_env_key, $ogGroup['keys']);
                     @endphp
-                    <div class="border-t border-sky-200/40" wire:key="override-group-{{ md5((string) $ogBindingId) }}" x-data="{ expanded: @js($ogHasEditing) }">
-                        <div class="flex flex-wrap items-center gap-2 bg-sky-50/60 px-5 py-1.5 sm:px-6">
+                    <div class="border-t border-brand-ink/10" wire:key="override-group-{{ md5((string) $ogBindingId) }}" x-data="{ expanded: @js($ogHasEditing) }">
+                        <div class="flex flex-wrap items-center gap-2 bg-brand-sand/15 px-5 py-2.5 sm:px-6">
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
                                 <span class="text-sm font-semibold text-brand-ink">{{ $ogTypeLabel }}</span>
@@ -499,7 +501,7 @@
                                     $oValueLength = strlen($oValue);
                                     $oRowComment  = $envComments[$oKey] ?? null;
                                 @endphp
-                                <li class="px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
+                                <li class="px-5 py-2.5 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
                                     @if ($oIsEditing)
                                         <form wire:submit="saveEditedEnvVar" class="space-y-3">
                                             <div class="flex flex-wrap items-end gap-3">
@@ -532,40 +534,42 @@
                                             </div>
                                         </form>
                                     @else
-                                        <div class="flex flex-wrap items-center justify-between gap-3">
-                                            <div class="flex min-w-0 items-center gap-3">
-                                                <div class="min-w-0">
-                                                    <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
-                                                    <p class="mt-0.5 break-all font-mono text-xs text-brand-moss">
-                                                        @if ($oIsRevealed)
-                                                            {{ $oValue === '' ? '(empty)' : $oValue }}
-                                                        @elseif ($oValueLength === 0)
-                                                            <span class="text-brand-mist">(empty)</span>
-                                                        @else
-                                                            {{ str_repeat('•', min(24, max(4, $oValueLength))) }}
-                                                        @endif
-                                                    </p>
-                                                    @if ($oRowComment !== null && $oRowComment !== '')
-                                                        <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
-                                                    @endif
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex min-w-0 flex-1 items-center gap-2.5">
+                                                <div class="flex min-w-0 shrink-0 items-center gap-1 sm:w-64">
+                                                    <span class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $oKey }}">{{ $oKey }}</span>
                                                 </div>
-                                            </div>
-                                            <div class="flex flex-wrap items-center gap-2">
-                                                <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
-                                                    @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
-                                                    @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
+                                                <p class="min-w-0 flex-1 truncate font-mono text-xs text-brand-moss">
+                                                    @if ($oIsRevealed)
+                                                        {{ $oValue === '' ? '(empty)' : $oValue }}
+                                                    @elseif ($oValueLength === 0)
+                                                        <span class="text-brand-mist">(empty)</span>
+                                                    @else
+                                                        {{ str_repeat('•', min(24, max(4, $oValueLength))) }}
                                                     @endif
+                                                </p>
+                                            </div>
+                                            <div class="flex shrink-0 items-center gap-1">
+                                                <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
+                                                    @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" />
+                                                    @else <x-heroicon-o-eye class="h-4 w-4" />
+                                                    @endif
+                                                    <span class="sr-only">{{ $oIsRevealed ? __('Hide :key', ['key' => $oKey]) : __('Show :key', ['key' => $oKey]) }}</span>
                                                 </button>
-                                                <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Edit value') }}">
-                                                    <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
+                                                <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
+                                                    <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                                    <span class="sr-only">{{ __('Edit :key', ['key' => $oKey]) }}</span>
                                                 </button>
-                                                <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove override') }}">
+                                                <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" title="{{ __('Remove override') }}">
                                                     <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                     <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
-                                                    {{ __('Remove') }}
+                                                    <span class="sr-only">{{ __('Remove :key', ['key' => $oKey]) }}</span>
                                                 </button>
                                             </div>
                                         </div>
+                                        @if ($oRowComment !== null && $oRowComment !== '')
+                                            <p class="mt-0.5 whitespace-pre-line text-xs italic text-brand-mist"># {{ $oRowComment }}</p>
+                                        @endif
                                     @endif
                                 </li>
                             @endforeach
@@ -635,7 +639,7 @@
                         $escrowRevealed = $residency && array_key_exists($key, $revealed_escrow_values ?? []);
                         $canManageResidency = method_exists($this, 'escalateEnvVar');
                     @endphp
-                    <li class="px-5 py-1 transition-colors hover:bg-brand-sand/15 sm:px-6" wire:key="env-row-{{ md5($key) }}">
+                    <li class="px-5 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-6" wire:key="env-row-{{ md5($key) }}">
                         @if ($isEditing)
                             {{-- Inline edit form. Cancel reverts; Save writes and closes. --}}
                             <form wire:submit="saveEditedEnvVar" class="space-y-3">
@@ -800,7 +804,7 @@
                                     <button
                                         type="button"
                                         wire:click="toggleRevealEnvVar('{{ $key }}')"
-                                        class="rounded p-1 text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40"
                                         title="{{ $isRevealed ? __('Hide value') : __('Reveal value') }}"
                                     >
                                         @if ($isRevealed)
@@ -814,7 +818,7 @@
                                     <button
                                         type="button"
                                         wire:click="editEnvVar('{{ $key }}')"
-                                        class="rounded p-1 text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-brand-ink/25 hover:bg-brand-sand/40"
                                         title="{{ __('Edit value') }}"
                                     >
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
@@ -857,7 +861,7 @@
                     $envFrom = ($envCurrentPage - 1) * $envPerPage + 1;
                     $envTo = min($envCurrentPage * $envPerPage, $envFilteredCount);
                 @endphp
-                <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-2 sm:px-6">
+                <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-2.5 sm:px-6">
                     <span class="text-xs text-brand-mist">{{ __(':from–:to of :total', ['from' => $envFrom, 'to' => $envTo, 'total' => $envFilteredCount]) }}</span>
                     <div class="flex items-center gap-1.5">
                         <button type="button" wire:click="$set('env_page', {{ max(1, $envCurrentPage - 1) }})" @disabled($envCurrentPage <= 1) class="dply-btn dply-btn-xs dply-btn-outline">

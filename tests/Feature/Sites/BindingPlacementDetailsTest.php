@@ -10,6 +10,7 @@ use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +73,56 @@ function fakeDoCatalog(): void
         ], 200),
     ]);
 }
+
+test('on this server is disabled until the chosen engine is installed', function () {
+    fakeDoCatalog();
+    [$user, $server, $site] = placementDetailsSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $server, 'site' => $site])
+        ->call('openBindingModal', 'database', 'provision')
+        ->set('bindingForm.engine', 'postgres')
+        ->assertSet('bindingForm.placement', '')
+        ->assertSee(__('Install :engine', ['engine' => 'PostgreSQL']));
+
+    $onBox = collect($component->instance()->databasePlacements())->firstWhere('key', 'on_box');
+    expect($onBox)->not->toBeNull()
+        ->and($onBox['available'])->toBeFalse()
+        ->and($onBox['install_action'])->toBeTrue()
+        ->and($onBox['note'])->toBe(__(':engine is not installed on this server yet.', ['engine' => 'PostgreSQL']));
+
+    $component
+        ->set('bindingForm.placement', 'on_box')
+        ->call('saveBinding')
+        ->assertDispatched('notify', type: 'error');
+});
+
+test('on this server unlocks when postgres is already running', function () {
+    fakeDoCatalog();
+    [$user, $server, $site] = placementDetailsSite();
+
+    ServerDatabaseEngine::query()->create([
+        'server_id' => $server->id,
+        'engine' => 'postgres',
+        'status' => ServerDatabaseEngine::STATUS_RUNNING,
+        'is_default' => true,
+        'port' => 5432,
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(ResourceMap::class, ['server' => $server, 'site' => $site])
+        ->call('openBindingModal', 'database', 'provision')
+        ->set('bindingForm.engine', 'postgres');
+
+    $onBox = collect($component->instance()->databasePlacements())->firstWhere('key', 'on_box');
+    expect($onBox)->not->toBeNull()
+        ->and($onBox['available'])->toBeTrue()
+        ->and($onBox['install_action'])->toBeFalse();
+
+    $component
+        ->assertSet('bindingForm.placement', 'on_box')
+        ->assertDontSee(__('Install :engine', ['engine' => 'PostgreSQL']));
+});
 
 test('database provision does not offer redis as an engine', function () {
     fakeDoCatalog();

@@ -1,18 +1,16 @@
     @if ($parserErrors !== [])
         <div class="{{ $card }}">
-            <div class="flex items-start gap-3 bg-rose-50 px-5 py-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
-                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Parse error') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-rose-900">{{ __('The cached .env has parse errors') }}</h3>
-                    <ul class="mt-1 list-inside list-disc text-sm text-rose-800">
-                        @foreach ($parserErrors as $err)
-                            <li class="font-mono text-xs">{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-exclamation-triangle"
+                :title="__('The cached .env has parse errors')"
+                :note="__('These lines failed to parse and will not deploy as written.')"
+                tone="danger"
+            />
+            <ul class="list-inside list-disc px-5 py-3.5 sm:px-6">
+                @foreach ($parserErrors as $err)
+                    <li class="font-mono text-xs text-rose-800">{{ $err }}</li>
+                @endforeach
+            </ul>
         </div>
     @endif

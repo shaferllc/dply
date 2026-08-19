@@ -32,7 +32,11 @@
                 data-subscribe="{{ $logBroadcastEchoSubscribable ? '1' : '0' }}"
             ></div>
 
-            <section class="dply-card min-w-0 overflow-hidden p-0">
+            <section @class([
+                'dply-card min-w-0 p-0',
+                'overflow-visible' => $logSourceMenuOpen || $logOptionsMenuOpen,
+                'overflow-hidden' => ! $logSourceMenuOpen && ! $logOptionsMenuOpen,
+            ])>
                 <x-workspace-panel-head
                     icon="heroicon-o-document-text"
                     :title="__('Logs')"

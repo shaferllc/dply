@@ -251,12 +251,26 @@ class ConsoleAction extends Model
             if ($line === '') {
                 continue;
             }
-            $normalized[] = [
-                't' => (int) ($entry['t'] ?? 0),
-                'level' => is_string($entry['level'] ?? null) ? (string) $entry['level'] : self::LEVEL_INFO,
-                'source' => isset($entry['source']) && $entry['source'] !== '' ? (string) $entry['source'] : null,
-                'line' => $line,
-            ];
+
+            $t = (int) ($entry['t'] ?? 0);
+            $level = is_string($entry['level'] ?? null) ? (string) $entry['level'] : self::LEVEL_INFO;
+            $source = isset($entry['source']) && $entry['source'] !== '' ? (string) $entry['source'] : null;
+
+            // Older writers stored an SSH dump as one row. Split so each
+            // visual line keeps the same [source] tag in the console.
+            foreach (preg_split('/\R/u', $line) ?: [$line] as $part) {
+                $part = trim($part);
+                if ($part === '') {
+                    continue;
+                }
+
+                $normalized[] = [
+                    't' => $t,
+                    'level' => $level,
+                    'source' => $source,
+                    'line' => $part,
+                ];
+            }
         }
 
         return $normalized;

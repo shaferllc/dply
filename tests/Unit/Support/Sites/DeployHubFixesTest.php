@@ -109,3 +109,25 @@ test('a redis-only failure does not also list the site fixer', function () {
         ->and($ids)->not->toContain('install_php_redis')
         ->and($ids)->not->toContain('composer_install');
 });
+
+test('a completed fixer card stays visible so its output can live in the fix', function () {
+    $site = deployHubFixSite([
+        'runtime_version' => '8.4',
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'version' => '8.4',
+                ],
+            ],
+        ],
+    ]);
+    $latest = failedDeploy($site, 'psql: command not found');
+
+    $without = DeployHubFixes::cards($site->fresh(), $latest, [], ['install_pg_client']);
+    $with = DeployHubFixes::cards($site->fresh(), $latest, [], ['install_pg_client'], 'install_pg_client');
+
+    expect(collect($without)->pluck('id')->all())->not->toContain('install_pg_client')
+        ->and(collect($with)->pluck('id')->all())->toContain('install_pg_client');
+});

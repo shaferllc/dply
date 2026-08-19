@@ -37,7 +37,46 @@ test('create database cluster posts and normalizes the response', function () {
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && $request['engine'] === 'pg'
         && $request['region'] === 'nyc1'
-        && $request['num_nodes'] === 1);
+        && $request['num_nodes'] === 1
+        && ! isset($request['tags']));
+});
+
+test('create database cluster sends provider tags', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases' => Http::response([
+            'database' => [
+                'id' => 'db-abc',
+                'status' => 'creating',
+                'engine' => 'pg',
+                'tags' => ['dply', 'dply-database'],
+                'connection' => [],
+            ],
+        ], 201),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('pg', 'nyc1', 'db-s-1vcpu-1gb', 'dply-fn-abc', null, ['dply', 'dply-database', 'dply-site-abc']);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request['tags'] === ['dply', 'dply-database', 'dply-site-abc']);
+});
+
+test('tag database cluster creates missing tags and attaches them', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/tags' => Http::response([], 201),
+        'https://api.digitalocean.com/v2/tags/*/resources' => Http::response([], 204),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->tagDatabaseCluster('db-abc', ['dply', 'dply-database']);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with(parse_url($request->url(), PHP_URL_PATH) ?: '', '/tags')
+        && $request['name'] === 'dply');
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/tags/dply/resources')
+        && $request['resources'][0]['resource_type'] === 'database'
+        && $request['resources'][0]['resource_id'] === 'db-abc');
 });
 
 test('create remaps portable size and rejected region from the live catalog', function () {

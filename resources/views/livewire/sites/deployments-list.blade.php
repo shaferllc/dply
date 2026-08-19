@@ -114,8 +114,12 @@
                 @include('livewire.sites.partials.deployments._history-panel')
             @endif
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
-                <x-cli-snippet :command="'dply sites:deployments '.$site->slug" />
+            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                <x-cli-snippet :commands="[
+                    ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                    ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                    ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                ]" />
             </div>
             </main>
             </section>

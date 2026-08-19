@@ -4,15 +4,16 @@
          it outside the docroot — e.g. /etc/dply/<slug>.env — for an extra
          layer of defense in case the deny rule ever fails or is removed. --}}
     @if ($supportsEnvPush)
-        <details class="{{ $card }}">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-cog-6-tooth class="h-4 w-4 text-brand-moss" />
+        <details class="group {{ $card }}">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <div class="flex min-w-0 items-center gap-2">
+                    <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform group-open:rotate-90" />
+                    <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0 text-brand-sage" />
                     <span class="text-sm font-semibold text-brand-ink">{{ __('Advanced — .env file location') }}</span>
                 </div>
-                <span class="font-mono text-xs text-brand-mist">{{ $site->effectiveEnvFilePath() }}</span>
+                <span class="truncate font-mono text-xs text-brand-mist">{{ $site->effectiveEnvFilePath() }}</span>
             </summary>
-            <div class="px-6 py-5 sm:px-8 space-y-3">
+            <div class="space-y-3 px-5 py-5 sm:px-6">
                 <p class="text-sm text-brand-moss">
                     {{ __('By default the .env file lives at :default.', ['default' => rtrim($site->effectiveEnvDirectory(), '/').'/.env']) }}
                     {{ __('Override the path to relocate it outside the docroot — useful as defense in depth even with the webserver-level deny rule.') }}

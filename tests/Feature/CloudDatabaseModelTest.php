@@ -7,6 +7,7 @@ namespace Tests\Feature\CloudDatabaseModelTest;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\Site;
+use App\Support\Sites\ManagedDatabaseProvisionConsole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -41,6 +42,17 @@ test('engine maps to do engine slug', function () {
     expect(CloudDatabase::factory()->make(['engine' => 'mysql'])->backendEngineSlug())->toBe('mysql');
     expect(CloudDatabase::factory()->make(['engine' => 'redis'])->backendEngineSlug())->toBe('valkey')
         ->and(CloudDatabase::factory()->redis()->make()->backendEngineVersion())->toBe('8');
+});
+test('provision console label uses the engine name not the provider slug', function () {
+    expect(ManagedDatabaseProvisionConsole::label(
+        CloudDatabase::factory()->make(['engine' => 'postgres']),
+    ))->toBe(__('Provisioning managed :engine …', ['engine' => 'PostgreSQL']))
+        ->and(ManagedDatabaseProvisionConsole::label(
+            CloudDatabase::factory()->make(['engine' => 'mysql']),
+        ))->toBe(__('Provisioning managed :engine …', ['engine' => 'MySQL']))
+        ->and(ManagedDatabaseProvisionConsole::label(
+            CloudDatabase::factory()->make(['engine' => 'redis']),
+        ))->toBe(__('Provisioning managed Valkey …'));
 });
 test('postgres connection env vars', function () {
     $db = CloudDatabase::factory()->active()->create();

@@ -135,7 +135,7 @@
                         {{ __('No phase results recorded for this deployment.') }}
                     </div>
                 @else
-                    <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4" wire:key="deploy-timeline-{{ $showOutput ? 'out' : 'hid' }}">
+                    <div class="border-b border-brand-ink/10 px-4 py-5 sm:px-5" wire:key="deploy-timeline-{{ $showOutput ? 'out' : 'hid' }}">
                         @include('livewire.sites.partials.deployments._phase-timeline', [
                             'timelinePhases' => $timelinePhases,
                             'deployment' => $deployment,

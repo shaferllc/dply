@@ -6,6 +6,7 @@ namespace App\Modules\Cloud\Jobs;
 
 use App\Models\CloudDatabase;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -70,10 +71,20 @@ class ProvisionCloudDatabaseJob implements ShouldQueue
                     $database->backendSizeSlug(),
                     $this->clusterName($database),
                     $database->backendEngineVersion(),
+                    ProviderResourceTags::forCloudDatabase($database),
                 );
                 $database->forceFill(['backend_id' => $cluster['id']])->save();
             } else {
                 $cluster = $service->getDatabaseCluster($database->backend_id);
+                try {
+                    $service->ensureDatabaseClusterTags(
+                        $database->backend_id,
+                        ProviderResourceTags::forCloudDatabase($database),
+                        $cluster['tags'] ?? [],
+                    );
+                } catch (Throwable) {
+                    // Tagging must not stall an otherwise-healthy provision.
+                }
             }
         } catch (Throwable $e) {
             Log::error('cloud.database.provision_failed', [

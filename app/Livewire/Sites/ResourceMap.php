@@ -80,6 +80,10 @@ class ResourceMap extends Component
             $this->syncDockerInstallProgress();
         }
 
+        if ($this->onBoxEngineInstallRunId !== null) {
+            $this->syncOnBoxDatabaseInstallProgress();
+        }
+
         $this->site->load('bindings');
 
         if (

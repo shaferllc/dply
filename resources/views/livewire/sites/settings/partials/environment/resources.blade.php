@@ -873,8 +873,13 @@
                         <div class="mt-2 space-y-2">
                             @foreach ($dbPlacements as $p)
                                 @continue(! in_array($chosenEngine, $p['engines'] ?? [], true))
+                                @php
+                                    $installPoll = ! empty($p['installing'])
+                                        ? (($p['key'] ?? '') === 'on_box' ? 'syncOnBoxDatabaseInstallProgress' : 'syncDockerInstallProgress')
+                                        : null;
+                                @endphp
                                 <label
-                                    @if (! empty($p['installing'])) wire:poll.3s="syncDockerInstallProgress" @endif
+                                    @if ($installPoll) wire:poll.3s="{{ $installPoll }}" @endif
                                     @class([
                                         'flex items-start gap-3 rounded-lg border p-3 transition-colors',
                                         'cursor-pointer border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
@@ -892,7 +897,9 @@
                                             @endif
                                         </span>
                                         <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
-                                        @if (($p['key'] ?? '') === 'docker' && ! $p['available'])
+                                        @if (($p['key'] ?? '') === 'on_box' && ! $p['available'])
+                                            @include('livewire.sites.settings.partials.environment._placement-on-box-install', ['p' => $p])
+                                        @elseif (($p['key'] ?? '') === 'docker' && ! $p['available'])
                                             @include('livewire.sites.settings.partials.environment._placement-docker-install', ['p' => $p])
                                         @elseif ($p['note'])
                                             <span class="mt-0.5 block text-xs font-medium text-amber-700">{{ $p['note'] }}</span>

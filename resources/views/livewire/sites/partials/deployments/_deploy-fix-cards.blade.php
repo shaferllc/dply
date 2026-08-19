@@ -7,7 +7,7 @@
         && ! ($this->deploymentRemediationRun?->isStale() ?? true);
     $fixerRun = method_exists($this, 'fixerRun') ? $this->fixerRun : null;
     $fixerInFlight = $fixerRun && $fixerRun->isInFlight();
-    $activeFixerKey = method_exists($this, 'fixerRunKey') ? $this->fixerRunKey : null;
+    $activeFixerKey = $this->fixerRunKey ?? null;
 @endphp
 
 @if ($deployFixCards !== [])
@@ -20,7 +20,7 @@
                     default => false,
                 };
             @endphp
-            <article wire:key="deploy-fix-{{ $card['id'] }}" class="rounded-xl border border-amber-200 bg-amber-50/80 p-3">
+            <article wire:key="deploy-fix-{{ $card['id'] }}" data-deploy-fix="{{ $card['id'] }}" class="rounded-xl border border-amber-200 bg-amber-50/80 p-3">
                 <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Fix') }}</p>
                 <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $card['title'] }}</h3>
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $card['reason'] }}</p>
@@ -94,7 +94,7 @@
                             wire:click="dismissPipelineSuggestion(@js($card['dismiss_key']))"
                             wire:loading.attr="disabled"
                             wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
-                            class="inline-flex items-center justify-center rounded-lg border border-transparent p-1.5 text-brand-mist hover:border-brand-ink/10 hover:bg-white/70 hover:text-brand-moss disabled:opacity-60"
+                            class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-2 text-brand-ink shadow-sm hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60"
                             title="{{ __('Dismiss this suggestion') }}"
                             aria-label="{{ __('Dismiss :label', ['label' => $card['title']]) }}"
                         >
@@ -102,6 +102,16 @@
                         </button>
                     @endif
                 </div>
+                @if (! empty($embedFixerOutput)
+                    && ($card['source'] ?? '') === 'fixer'
+                    && $fixerRun
+                    && $activeFixerKey === ($card['id'] ?? null))
+                    @include('livewire.sites.partials._deploy-fixer-output', [
+                        'fixerRun' => $fixerRun,
+                        'deployAction' => $deployAction ?? 'deployNow',
+                        'embedded' => true,
+                    ])
+                @endif
             </article>
         @endforeach
     </div>
