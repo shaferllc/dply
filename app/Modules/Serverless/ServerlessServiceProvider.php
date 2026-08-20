@@ -38,6 +38,8 @@ class ServerlessServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->aliasServerlessAssetsDisk();
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Console\CollectServerlessUsageCommand::class,
@@ -64,5 +66,29 @@ class ServerlessServiceProvider extends ServiceProvider
         Livewire::component('serverless.logs-panel', LogsPanel::class);
         Livewire::component('serverless.platform-panel', PlatformPanel::class);
         Livewire::component('serverless.rollback-panel', RollbackPanel::class);
+    }
+
+    /**
+     * Leftover `Storage::disk('serverless_assets')` calls alias the durable
+     * dply.io disk (`site_assets`) so they do not throw after that invented
+     * disk was removed from filesystems.php.
+     */
+    private function aliasServerlessAssetsDisk(): void
+    {
+        $existing = config('filesystems.disks.serverless_assets');
+        if (is_array($existing) && filled($existing['driver'] ?? null)) {
+            return;
+        }
+
+        $source = config('filesystems.disks.site_assets');
+        if (! is_array($source) || ! filled($source['driver'] ?? null)) {
+            return;
+        }
+
+        // Same root as site_assets, but do not register a second /site-assets
+        // serve route — Laravel requires unique URLs for served disks.
+        $source['serve'] = false;
+
+        config(['filesystems.disks.serverless_assets' => $source]);
     }
 }

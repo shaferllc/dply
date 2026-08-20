@@ -24,7 +24,7 @@ test('it serves a published build asset', function () {
     ]);
 
     Storage::disk(ServerlessAssetPublisher::DISK)->put(
-        $site->id.'/build/assets/app-aaaaaaaa.css',
+        app(ServerlessAssetPublisher::class)->prefix($site).'/build/assets/app-aaaaaaaa.css',
         'body{color:red}',
     );
 

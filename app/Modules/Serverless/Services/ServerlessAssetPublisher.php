@@ -12,13 +12,21 @@ use Illuminate\Support\Facades\Storage;
  * Publish a Functions Laravel app's `public/build` off the function so Vite
  * CSS/fonts are not served through the 1 MB HTTP response cap.
  *
- * Files land on the `serverless_assets` disk and are served at
- * `/serverless-assets/{site}/build/…`. The deploy then sets ASSET_URL to that
- * origin so `asset()` / `@vite` point here instead of the function hostname.
+ * Files land on the control-plane disk that already serves dply.io
+ * (`site_assets` — logos, favicons, org icons) under `serverless-assets/{site}/`.
+ * The public URL stays `/serverless-assets/{site}/build/…`. The deploy then
+ * sets ASSET_URL to that origin so `asset()` / `@vite` point here instead of
+ * the function hostname.
  */
 class ServerlessAssetPublisher
 {
-    public const DISK = 'serverless_assets';
+    /**
+     * Durable control-plane disk that already serves dply.io. Looked up by
+     * matching the public origin host against configured disk URLs.
+     */
+    public const DISK = 'site_assets';
+
+    public const STORAGE_PREFIX = 'serverless-assets';
 
     /**
      * Upload `public/build` and return the ASSET_URL origin, or null when
@@ -71,6 +79,61 @@ class ServerlessAssetPublisher
         return rtrim($public, '/');
     }
 
+    /**
+     * The filesystem disk that already serves the control-plane origin
+     * (dply.io in production). Prefers `site_assets` when its URL host
+     * matches; never invents a `serverless_assets` disk.
+     */
+    public function diskName(): string
+    {
+        $host = strtolower((string) parse_url($this->origin(), PHP_URL_HOST));
+        $disks = config('filesystems.disks', []);
+        if (! is_array($disks)) {
+            return self::DISK;
+        }
+
+        $ranked = [];
+        foreach ($disks as $name => $disk) {
+            if (! is_string($name) || ! is_array($disk) || $name === 'serverless_assets') {
+                continue;
+            }
+            $driver = $disk['driver'] ?? null;
+            if (! is_string($driver) || $driver === '') {
+                continue;
+            }
+
+            $url = $disk['url'] ?? '';
+            $diskHost = is_string($url) && $url !== ''
+                ? strtolower((string) parse_url($url, PHP_URL_HOST))
+                : '';
+            $hostMatches = $host !== '' && $diskHost !== '' && $diskHost === $host;
+            $preferred = $name === self::DISK;
+
+            if (! $hostMatches && ! $preferred) {
+                continue;
+            }
+
+            $rank = match ($name) {
+                'site_assets' => 0,
+                'public' => 1,
+                default => 2,
+            };
+            if (! $hostMatches) {
+                $rank += 10;
+            }
+
+            $ranked[] = [$rank, $name];
+        }
+
+        if ($ranked === []) {
+            return self::DISK;
+        }
+
+        usort($ranked, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        return $ranked[0][1];
+    }
+
     public function read(Site $site, string $relative): ?string
     {
         $key = $this->prefix($site).'/'.ltrim(str_replace('\\', '/', $relative), '/');
@@ -86,12 +149,12 @@ class ServerlessAssetPublisher
 
     public function prefix(Site $site): string
     {
-        return (string) $site->id;
+        return self::STORAGE_PREFIX.'/'.$site->id;
     }
 
     private function disk(): Filesystem
     {
-        return Storage::disk(self::DISK);
+        return Storage::disk($this->diskName());
     }
 
     private function uploadDirectory(string $localDir, string $storagePrefix): int
