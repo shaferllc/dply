@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Site;
 use App\Modules\Serverless\Services\ServerlessFunctionConfigurator;
+use App\Modules\Serverless\Services\ServerlessMaintenance;
 use App\Modules\Serverless\Support\FunctionConfiguration;
 use App\Modules\Serverless\Support\FunctionCorsPolicy;
 use App\Modules\Serverless\Support\FunctionLogForwarding;
@@ -79,6 +80,9 @@ trait ManagesServerlessRuntime
     /** Seal bound parameters so a caller cannot override them per request. */
     public bool $serverless_parameters_final = false;
 
+    /** Durable maintenance for Laravel functions (bound `__dply_maintenance`). */
+    public bool $serverless_maintenance = false;
+
     /** '' | papertrail | datadog | logtail — where console logs are forwarded. */
     public string $serverless_log_provider = '';
 
@@ -93,7 +97,7 @@ trait ManagesServerlessRuntime
      */
     public function syncServerlessRuntimeFromSite(): void
     {
-        $limits = $this->site->serverlessLimits();
+        $limits = Site::normalizeServerlessLimits($this->site->serverlessLimits());
         $this->serverless_memory = $limits['memory'];
         $this->serverless_timeout_ms = $limits['timeout'];
         $this->serverless_concurrency = $limits['concurrency'];
@@ -119,6 +123,7 @@ trait ManagesServerlessRuntime
         $this->serverless_log_endpoint = $forwarding->endpoint;
 
         $this->serverless_parameters_final = $configuration->finalParameters;
+        $this->serverless_maintenance = $configuration->maintenance;
         $this->serverless_parameters = [];
         foreach ($configuration->parameters as $key => $value) {
             $this->serverless_parameters[] = [
@@ -325,5 +330,34 @@ trait ManagesServerlessRuntime
         $this->site->setAttribute('meta', $meta);
 
         $this->toastSuccess(__('Resource limits saved — they apply on the next deploy.'));
+    }
+
+    public function saveServerlessMaintenance(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->usesFunctionsRuntime() || ! $this->site->isLaravelFrameworkDetected()) {
+            $this->toastError(__('Maintenance applies to Laravel functions only.'));
+
+            return;
+        }
+
+        $result = app(ServerlessMaintenance::class)
+            ->setEnabled($this->site, $this->serverless_maintenance);
+
+        $this->site->refresh();
+        $this->syncServerlessRuntimeFromSite();
+
+        if (! $result['ok']) {
+            $this->toastError((string) ($result['error'] ?? __('The host rejected the maintenance update.')));
+
+            return;
+        }
+
+        $this->toastSuccess($result['applied']
+            ? ($this->serverless_maintenance
+                ? __('Maintenance is on — visitors see a 503 until you turn it off.')
+                : __('Maintenance is off — the function is serving traffic again.'))
+            : __('Maintenance saved — it applies on the next deploy.'));
     }
 }

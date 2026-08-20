@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Serverless\ServerlessLaravelHandlerCommandTest;
 
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 beforeEach(function () {
     // The handler file only declares functions (function_exists-guarded);
@@ -151,10 +152,108 @@ test('file downloads read the on-disk bytes instead of an empty getContent', fun
     $bytes = '%PDF-1.4 '.random_bytes(16);
     file_put_contents($path, $bytes);
 
-    $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($path);
+    $response = new BinaryFileResponse($path);
     $response->headers->set('Content-Type', 'application/pdf');
 
     expect(dply_do_functions_response_body($response))->toBe($bytes);
 
     @unlink($path);
+});
+
+test('packaged bootstrap cache is preferred over empty tmp redirects', function () {
+    $root = sys_get_temp_dir().'/dply-fn-cache-'.uniqid();
+    mkdir($root.'/bootstrap/cache', 0777, true);
+    file_put_contents($root.'/bootstrap/cache/config.php', '<?php return [];');
+    $tmp = $root.'/tmp-bootstrap';
+
+    $paths = dply_do_functions_bootstrap_cache_env($root, $tmp);
+
+    expect($paths['APP_CONFIG_CACHE'])->toBe($root.'/bootstrap/cache/config.php');
+    expect($paths['APP_ROUTES_CACHE'])->toBe($tmp.'/routes.php');
+});
+
+test('warm max requests defaults to 250 and is capped', function () {
+    expect(dply_do_functions_warm_max_requests([]))->toBe(250);
+    expect(dply_do_functions_warm_max_requests(['DPLY_WARM_MAX_REQUESTS' => '10']))->toBe(10);
+    expect(dply_do_functions_warm_max_requests(['DPLY_WARM_MAX_REQUESTS' => '99999']))->toBe(10000);
+});
+
+test('durable maintenance is on for the bound parameter or env flag', function () {
+    expect(dply_do_functions_maintenance_enabled(['__dply_maintenance' => true], []))->toBeTrue();
+    expect(dply_do_functions_maintenance_enabled([], ['DPLY_MAINTENANCE' => '1']))->toBeTrue();
+    expect(dply_do_functions_maintenance_enabled([], ['DPLY_MAINTENANCE' => '0']))->toBeFalse();
+    expect(dply_do_functions_maintenance_enabled([], []))->toBeFalse();
+});
+
+test('build assets are skipped on the function when asset url is off-function', function () {
+    $env = [
+        'APP_URL' => 'https://app.example.test',
+        'ASSET_URL' => 'https://dply.example/serverless-assets/1',
+    ];
+
+    expect(dply_do_functions_off_function_assets($env, '/build/assets/app.css'))->toBeTrue();
+    expect(dply_do_functions_off_function_assets($env, '/favicon.ico'))->toBeFalse();
+    expect(dply_do_functions_off_function_assets([
+        'APP_URL' => 'https://app.example.test',
+        'ASSET_URL' => 'https://app.example.test',
+    ], '/build/assets/app.css'))->toBeFalse();
+});
+
+test('a signed allowlisted artisan command is accepted', function () {
+    $command = 'migrate --force';
+    $secret = 's3cret';
+    $task = dply_do_functions_command(
+        ['__ow_headers' => [
+            'x-dply-run' => 'artisan',
+            'x-dply-secret' => $secret,
+            'x-dply-artisan' => $command,
+            'x-dply-signature' => dply_do_functions_artisan_signature($secret, $command),
+        ]],
+        ['DPLY_COMMAND_SECRET' => $secret],
+    );
+
+    expect($task[0])->toBe('migrate');
+    expect($task[1]['--force'])->toBeTrue();
+});
+
+test('artisan migrate implies force when omitted', function () {
+    expect(dply_do_functions_parse_artisan('migrate'))->toBe(['migrate', ['--force' => true]]);
+});
+
+test('an unsigned artisan command is rejected', function () {
+    $this->expectException(RuntimeException::class);
+    $this->expectExceptionMessage('invalid artisan signature');
+
+    dply_do_functions_command(
+        ['__ow_headers' => [
+            'x-dply-run' => 'artisan',
+            'x-dply-secret' => 's3cret',
+            'x-dply-artisan' => 'migrate',
+        ]],
+        ['DPLY_COMMAND_SECRET' => 's3cret'],
+    );
+});
+
+test('a non-allowlisted artisan command is rejected', function () {
+    $secret = 's3cret';
+    $command = 'tinker';
+
+    $this->expectException(RuntimeException::class);
+    $this->expectExceptionMessage('not allowlisted');
+
+    dply_do_functions_command(
+        ['__ow_headers' => [
+            'x-dply-run' => 'artisan',
+            'x-dply-secret' => $secret,
+            'x-dply-artisan' => $command,
+            'x-dply-signature' => dply_do_functions_artisan_signature($secret, $command),
+        ]],
+        ['DPLY_COMMAND_SECRET' => $secret],
+    );
+});
+
+test('artisan rejects shell metacharacters', function () {
+    $this->expectException(RuntimeException::class);
+
+    dply_do_functions_parse_artisan('migrate; whoami');
 });

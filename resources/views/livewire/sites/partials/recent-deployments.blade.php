@@ -108,7 +108,9 @@
                                 </div>
                             @endif
                         @endforeach
-                        <x-cli-snippet class="text-2xs" :command="'dply sites:deployment '.$deployment->id.' --output'" />
+                        <x-cli-snippet class="text-2xs" :commands="[
+                            ['command' => 'dply sites:deployment '.$deployment->id.' --output'],
+                        ]" />
                     </div>
                 </details>
             </li>

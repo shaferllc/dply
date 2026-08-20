@@ -6,6 +6,7 @@ namespace App\Modules\Deploy\Services;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Modules\Serverless\Services\ServerlessAssetPublisher;
 use App\Support\DeployLogSanitizer;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -30,6 +31,7 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessEnvironmentPreparer $environmentPreparer,
         private readonly ServerlessDeployHookRunner $hookRunner,
         private readonly ServerlessBuildHostTools $buildHostTools,
+        private readonly ServerlessAssetPublisher $assetPublisher,
     ) {}
 
     /**
@@ -269,6 +271,22 @@ class DigitalOceanFunctionsArtifactBuilder
             $this->progress->done($site, 'commands', 'Ran deploy commands');
         }
 
+        $isLaravelFunctions = $detected['framework'] === 'laravel' && $site->server?->isDigitalOceanFunctionsHost();
+        if ($isLaravelFunctions) {
+            $optimizeLog = $this->optimizeLaravel($site, $checkout['working_directory']);
+            if ($optimizeLog !== '') {
+                $log[] = $optimizeLog;
+            }
+
+            $assetUrl = $this->assetPublisher->publishBuild($site, $checkout['working_directory']);
+            if (is_string($assetUrl) && $assetUrl !== '') {
+                $this->progress->active($site, 'assets', 'Publishing front-end assets');
+                $this->environmentPreparer->applyAssetUrl($site, $checkout['working_directory'], $assetUrl);
+                $this->progress->done($site, 'assets', 'Published front-end assets');
+                $log[] = 'Published front-end assets at '.$assetUrl;
+            }
+        }
+
         $sourcePath = $checkout['working_directory'].'/'.ltrim($artifactOutputPath, '/');
         if (! file_exists($sourcePath)) {
             throw new \RuntimeException('Serverless build output was not found at: '.$artifactOutputPath);
@@ -475,6 +493,31 @@ class DigitalOceanFunctionsArtifactBuilder
         $this->progress->done($site, $stepKey, $label);
 
         return $output;
+    }
+
+    /**
+     * Bake `php artisan optimize` into the zip so cold starts load packaged
+     * bootstrap/cache instead of compiling config/routes in /tmp.
+     */
+    private function optimizeLaravel(Site $site, string $workingDirectory): string
+    {
+        $dir = rtrim($workingDirectory, '/');
+        if (! is_file($dir.'/artisan') || ! is_file($dir.'/vendor/autoload.php')) {
+            return '';
+        }
+
+        $this->progress->active($site, 'optimize', 'Optimizing Laravel', 'php artisan optimize');
+
+        try {
+            $output = $this->runShell('php artisan optimize --no-interaction', $workingDirectory, $site);
+            $this->progress->done($site, 'optimize', 'Optimized Laravel');
+
+            return $output !== '' ? $output : 'Ran php artisan optimize.';
+        } catch (\RuntimeException $e) {
+            $this->progress->done($site, 'optimize', 'Skipped Laravel optimize');
+
+            return 'Laravel optimize skipped: '.$e->getMessage();
+        }
     }
 
     private function artifactFilename(Site $site): string

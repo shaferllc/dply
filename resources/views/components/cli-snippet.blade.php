@@ -1,11 +1,11 @@
 @props([
     /** @var array<int, array{label: string, command: string}>|null */
     'commands' => null,
-    /** @var string|null Single command for footer mode. */
+    /** @var string|null Single command — rendered as one row of the shared disclosure. */
     'command' => null,
     /** @var string|null Override the default summary/heading. */
     'summary' => null,
-    /** @var 'details'|'footer'|'stub'|null Render mode; auto-detected from props if null. */
+    /** @var 'details'|'footer'|'stub'|null `footer` is an alias for `details`. */
     'tone' => null,
     /** @var 'xs'|'10' Font-size class for snippet rows. */
     'size' => 'xs',
@@ -14,43 +14,22 @@
 ])
 
 @php
-    $resolvedTone = $tone
-        ?? ($commands !== null && $commands !== [] ? 'details' : ($command !== null ? 'footer' : 'stub'));
-    $rowSizeClass = $size === '10' ? 'text-2xs' : 'text-xs';
-    $detailsSummary = $summary ?? __('CLI commands');
-    $footerLabel = $summary ?? __('CLI commands:');
-    $stubMessage = __('CLI commands for this section are coming soon.');
-
     $rows = collect($commands ?? [])
         ->filter(fn ($entry): bool => is_array($entry) && isset($entry['command']) && trim((string) $entry['command']) !== '')
         ->values()
         ->all();
+
+    if ($rows === [] && is_string($command) && trim($command) !== '') {
+        $rows = [['command' => $command]];
+    }
+
+    $resolvedTone = $tone === 'stub' || $rows === [] ? 'stub' : 'details';
+    $rowSizeClass = $size === '10' ? 'text-2xs' : 'text-xs';
+    $detailsSummary = $summary ?? __('CLI commands');
+    $stubMessage = __('CLI commands for this section are coming soon.');
 @endphp
 
-@if ($resolvedTone === 'footer' && $command !== null && trim((string) $command) !== '')
-    <footer
-        {{ $attributes->class(['text-xs text-brand-moss']) }}
-        data-cli-snippet="footer"
-        x-data="{ copied: false }"
-    >
-        <span class="font-medium text-brand-ink/70">{{ $footerLabel }}</span>
-        {{-- A long command wraps inside the code block; the copy control stays
-             pinned to its top-right rather than being pushed onto its own line. --}}
-        <div class="mt-1 flex min-w-0 items-start gap-1.5">
-            <code class="min-w-0 flex-1 select-all break-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 font-mono text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $command }}</code>
-            <button
-                type="button"
-                class="mt-0.5 inline-flex shrink-0 items-center justify-center rounded p-1 text-brand-mist hover:bg-brand-sand hover:text-brand-ink"
-                title="{{ __('Copy command') }}"
-                aria-label="{{ __('Copy command') }}"
-                @click="navigator.clipboard.writeText(@js($command)); copied = true; setTimeout(() => copied = false, 1500)"
-            >
-                <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="!copied" />
-                <x-heroicon-o-check class="h-3.5 w-3.5 text-emerald-700" x-show="copied" x-cloak />
-            </button>
-        </div>
-    </footer>
-@elseif ($resolvedTone === 'details' && $rows !== [])
+@if ($resolvedTone === 'details')
     {{-- Flush disclosure — no nested rounded card (merged chrome footers).
          wire:ignore.self keeps the browser `open` attribute across Livewire
          polls (log viewer, etc.); without it the disclosure snaps shut. --}}

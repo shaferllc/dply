@@ -46,7 +46,7 @@ final class ServerlessMultiActionDeployer
      */
     public function deploy(Site $site, string $workingDirectory, array $context): array
     {
-        $limits = $site->serverlessLimits();
+        $limits = Site::normalizeServerlessLimits($site->serverlessLimits());
 
         $this->recordAction($site, [
             'name' => $context['primary_action'],
@@ -258,7 +258,7 @@ final class ServerlessMultiActionDeployer
             'timeout' => (int) ($manifest['timeout'] ?? $siteLimits['timeout']),
             'memory' => (int) ($manifest['memory'] ?? $siteLimits['memory']),
             'concurrency' => (int) ($manifest['concurrency'] ?? $siteLimits['concurrency']),
-            'logs' => (int) ($manifest['logs'] ?? $siteLimits['logs']),
+            'logs' => (int) ($manifest['logs'] ?? $siteLimits['logs'] ?? Site::SERVERLESS_DEFAULT_LOGS_KB),
         ];
     }
 

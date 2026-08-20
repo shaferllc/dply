@@ -9,8 +9,8 @@ use App\Models\Site;
 use App\Models\SiteUptimeCheckResult;
 use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
-use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Status\MonitorOperationalState;
@@ -128,7 +128,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
 
         $emit = $this->beginConsoleAction();
         $regionLabel = (string) (config('site_uptime.probe_regions.'.$monitor->probe_region) ?? $monitor->probe_region);
-        $kindLabel = $monitor->isSslCheck() ? __('SSL') : __('HTTP');
+        $kindLabel = $monitor->checkTypeLabel();
         $emit->step('uptime', sprintf('%s · %s · %s', $monitor->label, $kindLabel, $regionLabel));
 
         $base = $resolver->resolveBaseUrl($site);
@@ -201,17 +201,15 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * HTTP GET with optional expected-status, keyword and response-time
-     * assertions. Tries HTTPS then HTTP. A failing status/keyword reads OUTAGE;
-     * a pass that is slower than the threshold reads DEGRADED.
+     * assertions. The URL scheme is pinned to the monitor's check type
+     * (http vs https) — no cross-scheme fallback. A failing status/keyword
+     * reads OUTAGE; a pass that is slower than the threshold reads DEGRADED.
      *
      * @return array{state: string, ok: bool, http_status: ?int, latency_ms: int, error: ?string, checked_url: ?string, meta: array<string, mixed>, ssl_should_warn: bool}
      */
     private function runHttpCheck(SiteUptimeMonitor $monitor, string $url, ConsoleEmitter $emit): array
     {
-        $attempts = [$url];
-        if (str_starts_with(strtolower($url), 'https://')) {
-            $attempts[] = 'http://'.substr($url, strlen('https://'));
-        }
+        $attempts = [$this->constrainUrlToCheckType($monitor, $url)];
 
         $expected = $monitor->expectedStatus();
         $keyword = $monitor->keywordAssertion();
@@ -417,6 +415,28 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
             'meta' => $meta,
             'ssl_should_warn' => $shouldWarn,
         ];
+    }
+
+    /**
+     * Pin the request to the monitor's scheme so an HTTPS check never
+     * silently succeeds over HTTP, and vice versa.
+     */
+    private function constrainUrlToCheckType(SiteUptimeMonitor $monitor, string $url): string
+    {
+        $scheme = match ($monitor->check_type) {
+            SiteUptimeMonitor::CHECK_HTTP => 'http',
+            SiteUptimeMonitor::CHECK_HTTPS => 'https',
+            default => null,
+        };
+        if ($scheme === null) {
+            return $url;
+        }
+
+        if (preg_match('#^https?://#i', $url) === 1) {
+            return (string) preg_replace('#^https?://#i', $scheme.'://', $url, 1);
+        }
+
+        return $scheme.'://'.$url;
     }
 
     private function elapsedMs(float $started): int

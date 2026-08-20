@@ -535,27 +535,29 @@
         </dl>
     </details>
     </div>
+
+    <div class="space-y-2.5 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
+        <x-cli-snippet
+            :summary="__('dply CLI (from your laptop)')"
+            :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"
+            :commands="[
+                ['label' => __('Link this repo'), 'command' => 'dply link --byo '.$site->id],
+                ['label' => __('Deploy (linked repo)'), 'command' => 'dply deploy --follow'],
+                ['label' => __('Deploy this site'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
+                ['label' => __('Tail deploy logs'), 'command' => 'dply site logs --site '.$site->id.' --follow'],
+                ['label' => __('Site status'), 'command' => 'dply site status --site '.$site->id],
+            ]"
+        />
+
+        <x-cli-snippet
+            :summary="__('Artisan (on the server)')"
+            :commands="[
+                ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
+                ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
+                ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
+                ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
+            ]"
+        />
+    </div>
 </section>
-
-<x-cli-snippet
-    class="mt-6"
-    :summary="__('dply CLI (from your laptop)')"
-    :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"
-    :commands="[
-        ['label' => __('Link this repo'), 'command' => 'dply link --byo '.$site->id],
-        ['label' => __('Deploy (linked repo)'), 'command' => 'dply deploy --follow'],
-        ['label' => __('Deploy this site'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
-        ['label' => __('Tail deploy logs'), 'command' => 'dply site logs --site '.$site->id.' --follow'],
-        ['label' => __('Site status'), 'command' => 'dply site status --site '.$site->id],
-    ]"
-/>
-
-<x-cli-snippet
-    :summary="__('Artisan (on the server)')"
-    :commands="[
-    ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-    ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
-    ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
-    ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
-    ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
-]" />

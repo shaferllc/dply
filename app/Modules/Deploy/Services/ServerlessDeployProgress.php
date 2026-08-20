@@ -70,6 +70,8 @@ class ServerlessDeployProgress
         'dependencies' => 60,
         'hooks_after' => 70,
         'commands' => 80,
+        'optimize' => 85,
+        'assets' => 88,
         'package' => 90,
         'upload' => 100,
         'actions' => 110,

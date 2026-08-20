@@ -34,6 +34,7 @@ final class MachineCallbackPaths
         'webhook/*',                   // TaskRunner lifecycle callbacks (provisioning, runs)
         'hooks/*',                     // deploy / GitHub App / log / vitals webhooks
         'fn/*',                        // public serverless function invocation URLs
+        'serverless-assets/*',         // published Functions Laravel Vite/build assets
         'api/edge/preview-comments/*', // cross-origin preview-comment widget (per-site token)
         'api/queue/*',                 // dply Queue data plane (SigV4, per-namespace credential)
         'up',                          // uptime/health probe

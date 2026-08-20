@@ -64,8 +64,21 @@ class ServerlessEnvironmentPreparer
             $publicUrl = $site->serverlessFriendlyUrl() ?: $site->serverlessPublicUrl();
             if (is_string($publicUrl) && $publicUrl !== '') {
                 $managed = $this->setEnvKey($managed, 'APP_URL', $publicUrl);
+                // ASSET_URL follows APP_URL unless deploy later publishes
+                // `public/build` off-function and overwrites it.
                 $managed = $this->setEnvKey($managed, 'ASSET_URL', $publicUrl);
             }
+
+            if (! $this->envHasKey($managed, 'SESSION_DRIVER')) {
+                $managed = $this->setEnvKey($managed, 'SESSION_DRIVER', 'cookie');
+                $notes[] = 'defaulted SESSION_DRIVER to cookie';
+            }
+
+            $managed = $this->setEnvKey(
+                $managed,
+                'DPLY_MAINTENANCE',
+                $this->maintenanceEnabled($site) ? '1' : '0',
+            );
         }
 
         // Log shipping — the function's handler POSTs each request it serves
@@ -138,6 +151,22 @@ class ServerlessEnvironmentPreparer
         }
 
         $site->forceFill(['env_file_content' => implode("\n", $lines)])->save();
+    }
+
+    /**
+     * Point ASSET_URL at the off-function published origin after `public/build`
+     * has been uploaded. APP_URL stays the function hostname.
+     */
+    public function applyAssetUrl(Site $site, string $workingDirectory, string $assetUrl): void
+    {
+        $managed = $this->setEnvKey((string) $site->env_file_content, 'ASSET_URL', $assetUrl);
+        if ($managed !== (string) $site->env_file_content) {
+            $site->forceFill(['env_file_content' => $managed])->save();
+        }
+
+        $repoEnvPath = rtrim($workingDirectory, '/').'/.env';
+        $current = is_file($repoEnvPath) ? (string) file_get_contents($repoEnvPath) : $managed;
+        file_put_contents($repoEnvPath, $this->setEnvKey($current, 'ASSET_URL', $assetUrl));
     }
 
     /**
@@ -251,5 +280,16 @@ class ServerlessEnvironmentPreparer
         }
 
         return false;
+    }
+
+    private function maintenanceEnabled(Site $site): bool
+    {
+        $maintenance = $site->serverlessConfig()['maintenance'] ?? false;
+
+        if (is_array($maintenance)) {
+            return (bool) ($maintenance['enabled'] ?? false);
+        }
+
+        return (bool) $maintenance;
     }
 }

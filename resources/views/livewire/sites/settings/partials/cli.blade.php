@@ -23,7 +23,7 @@
         @livewire('sites.cli-console', ['site' => $site, 'server' => $server], key('cli-console-'.$site->id))
     </div>
 
-    <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
         <x-cli-snippet
             :summary="__('Local terminal')"
             :intro="__('Install once, then run these from your machine. Sessions: Profile → CLI.')"
@@ -59,7 +59,7 @@
             @livewire('sites.cli-console', ['site' => $site, 'server' => $server], key('cli-console-'.$site->id))
         </div>
 
-        <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
             <x-cli-snippet
                 :summary="__('Local terminal')"
                 :intro="__('Install once, then run these from your machine. Sessions: Profile → CLI.')"

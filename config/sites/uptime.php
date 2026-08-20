@@ -96,8 +96,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Cosmetic labels shown on the monitor row and any public status page. A
-    | monitor's `probe_region` is derived from the worker it runs on (see
-    | `probe_workers` below), so this map only governs how a region reads.
+    | monitor's `probe_region` is the host-nearest key (where the site lives),
+    | not the probe worker that egresses the check. `probe_workers` still
+    | routes the queue. This map only governs how a region reads.
     |
     | @var array<string, string>
     */
@@ -117,8 +118,10 @@ return [
     |
     | Each worker is a Horizon node that consumes its own `queue`; a check
     | dispatched onto that queue runs the HTTP GET from the worker's location.
-    | `region` points at a `probe_regions` key and supplies the monitor's
-    | cosmetic label. Add an entry only once the box is deployed and listening
+    | `region` points at a `probe_regions` key used to pick the nearest
+    | worker for queue routing. The monitor row's location label comes from
+    | the host, not this worker region. Add an entry only once the box is
+    | deployed and listening
     | on its queue — there is no liveness detection in v1, so a configured
     | worker is assumed live. The order here is the fallback order when the
     | host's nearest region has no deployed worker (the first entry wins).

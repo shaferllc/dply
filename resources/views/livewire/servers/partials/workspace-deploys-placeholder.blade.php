@@ -55,5 +55,9 @@
                 @endforeach
             </ul>
         </div>
+
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6" aria-hidden="true">
+            <div class="h-3 w-28 animate-pulse rounded bg-brand-ink/10"></div>
+        </div>
     </section>
 </x-server-workspace-layout>

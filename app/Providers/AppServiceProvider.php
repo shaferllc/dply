@@ -28,7 +28,6 @@ use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteProcess;
-use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
@@ -113,6 +112,7 @@ use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerWebserverSitesProvider;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
+use App\Services\Sites\EnsuresDefaultUptimeMonitors;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteApacheProvisioner;
@@ -125,8 +125,6 @@ use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use App\Services\Sites\TestingHostnameProvisioner;
-use App\Services\Sites\UptimeProbeRegionResolver;
-use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\CaddyWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
@@ -522,29 +520,7 @@ class AppServiceProvider extends ServiceProvider
 
         Site::created(function (Site $site): void {
             rescue(
-                function () use ($site): void {
-                    $regions = array_keys((array) config('site_uptime.probe_regions', []));
-                    if ($regions === []) {
-                        return;
-                    }
-
-                    // Probe from the worker nearest the host; the cosmetic
-                    // region label is derived from that worker (falling back to
-                    // the host's nearest region when no worker is configured).
-                    $worker = app(UptimeProbeWorkerResolver::class)->forSite($site);
-                    $region = app(UptimeProbeWorkerResolver::class)->regionFor($worker)
-                        ?? app(UptimeProbeRegionResolver::class)->forSite($site);
-
-                    SiteUptimeMonitor::query()->firstOrCreate(
-                        ['site_id' => $site->id, 'sort_order' => 0],
-                        [
-                            'label' => __('Homepage check'),
-                            'path' => null,
-                            'probe_region' => $region,
-                            'probe_worker' => $worker,
-                        ],
-                    );
-                },
+                fn () => app(EnsuresDefaultUptimeMonitors::class)->ensure($site),
                 report: false,
             );
 

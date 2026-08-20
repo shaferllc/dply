@@ -29,12 +29,14 @@ test('site creation auto creates default uptime monitor', function () {
         'organization_id' => $organization->id,
     ]);
 
-    $monitors = SiteUptimeMonitor::query()->where('site_id', $site->id)->get();
+    $monitors = SiteUptimeMonitor::query()->where('site_id', $site->id)->orderBy('sort_order')->get();
 
-    expect($monitors)->toHaveCount(1);
-    $monitor = $monitors->first();
-    expect($monitor->path)->toBeNull();
-    expect((int) $monitor->sort_order)->toBe(0);
-    expect($monitor->probe_region)->not->toBeEmpty();
-    expect($monitor->label)->not->toBeEmpty();
+    expect($monitors)->toHaveCount(2);
+    expect($monitors->pluck('label')->all())->toBe(['Homepage (HTTPS)', 'Homepage (HTTP)']);
+    expect($monitors->pluck('check_type')->all())->toBe([
+        SiteUptimeMonitor::CHECK_HTTPS,
+        SiteUptimeMonitor::CHECK_HTTP,
+    ]);
+    expect($monitors->every(fn (SiteUptimeMonitor $monitor): bool => $monitor->path === null))->toBeTrue();
+    expect($monitors->every(fn (SiteUptimeMonitor $monitor): bool => $monitor->probe_region !== ''))->toBeTrue();
 });

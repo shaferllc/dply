@@ -53,7 +53,9 @@
         @endif
 
         <x-slot:footer>
-            <x-cli-snippet :command="'dply ops:env-find '.($query !== '' ? $query : 'KEY').($mode === 'prefix' ? ' --prefix' : '')" />
+            <x-cli-snippet :commands="[
+                ['command' => 'dply ops:env-find '.($query !== '' ? $query : 'KEY').($mode === 'prefix' ? ' --prefix' : '')],
+            ]" />
         </x-slot:footer>
     </x-infrastructure-shell>
 </div>

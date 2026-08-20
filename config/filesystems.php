@@ -124,6 +124,19 @@ return [
             'report' => false,
         ],
 
+        /*
+         | Published Vite/build assets for Functions Laravel apps. Served at
+         | /serverless-assets/{site}/… so fonts/CSS skip the function's 1 MB
+         | HTTP cap. Local disk in dev; the controller streams files.
+         */
+        'serverless_assets' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/serverless-assets'),
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

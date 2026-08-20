@@ -34,6 +34,9 @@ final class FunctionConfiguration
 
     public const MODES = [self::MODE_OFF, self::MODE_WEB, self::MODE_RAW];
 
+    /** Bound parameter the Laravel adapter reads for durable maintenance. */
+    public const MAINTENANCE_PARAMETER_KEY = '__dply_maintenance';
+
     /**
      * @param  array<string, mixed>  $parameters  Default parameters bound to the function.
      */
@@ -45,6 +48,7 @@ final class FunctionConfiguration
         public readonly bool $finalParameters = false,
         public readonly array $parameters = [],
         public readonly FunctionLogForwarding $logForwarding = new FunctionLogForwarding,
+        public readonly bool $maintenance = false,
     ) {}
 
     /**
@@ -76,6 +80,11 @@ final class FunctionConfiguration
         $parameters = $serverlessConfig['parameters'] ?? [];
         $parameters = is_array($parameters) ? $parameters : [];
 
+        $maintenance = $serverlessConfig['maintenance'] ?? false;
+        $maintenanceEnabled = is_array($maintenance)
+            ? (bool) ($maintenance['enabled'] ?? false)
+            : (bool) $maintenance;
+
         return new self(
             webMode: $mode,
             cors: $cors,
@@ -89,6 +98,7 @@ final class FunctionConfiguration
             logForwarding: FunctionLogForwarding::fromArray(
                 is_array($serverlessConfig['log_forwarding'] ?? null) ? $serverlessConfig['log_forwarding'] : []
             ),
+            maintenance: $maintenanceEnabled,
         );
     }
 
@@ -157,6 +167,10 @@ final class FunctionConfiguration
         if ($this->isWebEnabled() && $this->cors->enabled) {
             $pairs[] = ['key' => FunctionCorsPolicy::PARAMETER_KEY, 'value' => $this->cors->toParameter()];
         }
+
+        // Always bound so toggling maintenance off clears a previously-true
+        // parameter on a live metadata update (the list is replaced wholesale).
+        $pairs[] = ['key' => self::MAINTENANCE_PARAMETER_KEY, 'value' => $this->maintenance];
 
         // Log forwarding is configured the same way — the platform reads it
         // from an environment variable on the function, not from an API.

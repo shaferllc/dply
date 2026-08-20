@@ -189,6 +189,9 @@
             {{ __('Dply uses this configuration for preview-hostname DNS, DNS-01 challenge defaults, and any DNS records created during provisioning.') }}
         </p>
     </div>
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['command' => 'dply sites:dns '.$site->slug],
+        ]" />
+    </div>
 </div>
-
-<x-cli-snippet class="mt-6" :command="'dply sites:dns '.$site->slug" />

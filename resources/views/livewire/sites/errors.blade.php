@@ -128,7 +128,9 @@
                             @include('livewire.partials.error-stream', ['errorStreamNested' => true])
 
                             <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
-                                <x-cli-snippet :command="'dply sites:errors '.$site->slug" />
+                                <x-cli-snippet :commands="[
+                                    ['command' => 'dply sites:errors '.$site->slug],
+                                ]" />
                             </div>
                         @endif
 

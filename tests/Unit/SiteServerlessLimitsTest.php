@@ -24,6 +24,18 @@ test('it returns platform defaults when no limits are stored', function () {
         'logs' => Site::SERVERLESS_DEFAULT_LOGS_KB,
     ]);
 });
+test('it fills log capture when a stored snapshot omits the key', function () {
+    expect(Site::normalizeServerlessLimits([
+        'memory' => 1024,
+        'timeout' => 120000,
+        'concurrency' => 4,
+    ]))->toBe([
+        'memory' => 1024,
+        'timeout' => 120000,
+        'concurrency' => 4,
+        'logs' => Site::SERVERLESS_DEFAULT_LOGS_KB,
+    ]);
+});
 test('it passes through valid stored limits', function () {
     $limits = siteWithLimits(['memory' => 1024, 'timeout' => 120000, 'concurrency' => 8, 'logs' => 64])
         ->serverlessLimits();

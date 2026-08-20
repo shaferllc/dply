@@ -219,7 +219,7 @@
                                                         {{ $style['label'] }}
                                                     </span>
                                                     <p class="text-sm font-medium text-brand-ink">{{ $m->label }}</p>
-                                                    <span class="inline-flex items-center rounded bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $m->isSslCheck() ? __('SSL') : __('HTTP') }}</span>
+                                                    <span class="inline-flex items-center rounded bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $m->checkTypeLabel() }}</span>
                                                     <span class="truncate font-mono text-xs text-brand-moss" title="{{ $hostnameDisplay }}{{ $m->normalizedPath() }}">{{ $hostnameDisplay }}{{ $m->isSslCheck() ? '' : ($m->normalizedPath() ?: '/') }}</span>
                                                 </div>
                                                 {{-- Region folded into the result line: it was its own line for one
@@ -341,7 +341,7 @@
                 <form wire:submit="saveMonitor" id="uptime-monitor-form" class="space-y-4">
                     <div>
                         <x-input-label for="uptime-label" :value="__('Label')" />
-                        <x-text-input id="uptime-label" wire:model="newLabel" class="mt-1 block w-full" placeholder="{{ __('e.g. Homepage check') }}" :disabled="! $canEdit" />
+                        <x-text-input id="uptime-label" wire:model="newLabel" class="mt-1 block w-full" placeholder="{{ __('e.g. Homepage (HTTPS)') }}" :disabled="! $canEdit" />
                         <x-input-error :messages="$errors->get('newLabel')" class="mt-1" />
                     </div>
 
@@ -354,13 +354,14 @@
                             class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
                             @disabled(! $canEdit)
                         >
+                            <option value="https">{{ __('HTTPS — reachability & content') }}</option>
                             <option value="http">{{ __('HTTP — reachability & content') }}</option>
                             <option value="ssl">{{ __('SSL — certificate expiry') }}</option>
                         </select>
                         <x-input-error :messages="$errors->get('newCheckType')" class="mt-1" />
                     </div>
 
-                    <div x-show="ctype === 'http'" class="space-y-4">
+                    <div x-show="ctype === 'http' || ctype === 'https'" class="space-y-4" x-cloak>
                         <div>
                             <x-input-label for="uptime-path" :value="__('Path (optional)')" />
                             <div class="mt-1 flex rounded-lg border border-brand-ink/15 bg-slate-50 shadow-sm focus-within:border-brand-sage focus-within:ring-2 focus-within:ring-brand-sage/30">

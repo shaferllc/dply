@@ -170,7 +170,9 @@
     @endif
 
     @php($runningDeploysSnippet = "dply fleet:deploys:running --json | jq '.deployments[] | select(.server_id==\"{$server->id}\")'")
-    <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
-        <x-cli-snippet :command="$runningDeploysSnippet" />
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['command' => $runningDeploysSnippet],
+        ]" />
     </div>
 </div>

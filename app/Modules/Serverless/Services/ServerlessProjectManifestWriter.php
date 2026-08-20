@@ -73,7 +73,7 @@ class ServerlessProjectManifestWriter
     private function functionFromAction(Site $site, FunctionAction $action, FunctionConfiguration $configuration): array
     {
         $subdir = trim((string) ($action->meta['source_subdir'] ?? ''));
-        $siteLimits = $site->serverlessLimits();
+        $siteLimits = Site::normalizeServerlessLimits($site->serverlessLimits());
         $limits = [
             'timeout' => (int) round(((int) ($action->timeout_ms ?: $siteLimits['timeout'])) / 1000),
             'memory' => (int) ($action->memory_mb ?: $siteLimits['memory']),
@@ -102,7 +102,7 @@ class ServerlessProjectManifestWriter
     private function functionFromSite(Site $site, FunctionConfiguration $configuration): array
     {
         $config = $site->serverlessConfig();
-        $limits = $site->serverlessLimits();
+        $limits = Site::normalizeServerlessLimits($site->serverlessLimits());
 
         return array_filter([
             'name' => $site->serverlessActionName() ?: (string) $site->slug,

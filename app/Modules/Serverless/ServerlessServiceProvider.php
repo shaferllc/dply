@@ -43,6 +43,7 @@ class ServerlessServiceProvider extends ServiceProvider
                 Console\CollectServerlessUsageCommand::class,
                 Console\ServerlessTickCommand::class,
                 Console\ServerlessQueueDoctorCommand::class,
+                Console\ServerlessFilesystemDoctorCommand::class,
                 Console\BackfillFunctionActionsCommand::class,
                 Console\PruneFunctionInvocationsCommand::class,
                 Console\ServerlessManifestCommand::class,

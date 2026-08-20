@@ -194,10 +194,13 @@ final class DigitalOceanFunctionsActionDeployer
         }
 
         // Resource limits are operator-controlled on the Runtime tab and
-        // stored in meta.serverless.limits. serverlessLimits() fills in the
-        // platform defaults (512MB / 60s / concurrency 1) when unset — a
-        // framework cold start needs far more than OpenWhisk's stock 3s/256MB.
-        $limits = $site->serverlessLimits();
+        // stored in meta.serverless.limits. Normalize so a snapshot that
+        // predates log capture still has every OpenWhisk `limits` key —
+        // `$limits['logs']` on a 3-key array aborts the PUT with
+        // "Undefined array key logs". Defaults: 512MB / 60s / concurrency 1 /
+        // 256 KB logs. A framework cold start needs far more than
+        // OpenWhisk's stock 3s/256MB.
+        $limits = Site::normalizeServerlessLimits($site->serverlessLimits());
 
         // How the function is exposed over HTTP (web/raw/off, CORS, endpoint
         // secret) and what parameters are bound to it. Operator-owned on the

@@ -78,7 +78,9 @@
             };
         @endphp
         <x-slot:footer>
-            <x-cli-snippet :command="$deploysCommand" />
+            <x-cli-snippet :commands="[
+                ['command' => $deploysCommand],
+            ]" />
         </x-slot:footer>
     </x-infrastructure-shell>
 </div>

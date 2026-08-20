@@ -34,8 +34,8 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, StatusPageMonitor> $statusPageMonitors
  * @property-read Collection<int, SiteUptimeCheckResult> $checkResults
  * @property-read Collection<int, SiteUptimeIncident> $incidents
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class SiteUptimeMonitor extends Model
 {
@@ -45,8 +45,18 @@ class SiteUptimeMonitor extends Model
     /** A plain HTTP GET (with optional keyword / status / latency assertions). */
     public const CHECK_HTTP = 'http';
 
+    /** An HTTPS GET — same assertions as HTTP, but never falls back to http://. */
+    public const CHECK_HTTPS = 'https';
+
     /** A TLS handshake that flags certs expiring within the warn window. */
     public const CHECK_SSL = 'ssl';
+
+    /** @var list<string> */
+    public const CHECK_TYPES = [
+        self::CHECK_HTTP,
+        self::CHECK_HTTPS,
+        self::CHECK_SSL,
+    ];
 
     public const MATCH_CONTAIN = 'must_contain';
 
@@ -127,6 +137,21 @@ class SiteUptimeMonitor extends Model
     public function isSslCheck(): bool
     {
         return ($this->check_type ?? self::CHECK_HTTP) === self::CHECK_SSL;
+    }
+
+    public function isHttpsCheck(): bool
+    {
+        return ($this->check_type ?? self::CHECK_HTTP) === self::CHECK_HTTPS;
+    }
+
+    /** Badge / console label: HTTP, HTTPS, or SSL. */
+    public function checkTypeLabel(): string
+    {
+        return match ($this->check_type ?? self::CHECK_HTTP) {
+            self::CHECK_SSL => __('SSL'),
+            self::CHECK_HTTPS => __('HTTPS'),
+            default => __('HTTP'),
+        };
     }
 
     /** Keyword body assertion, or null when none is configured. */

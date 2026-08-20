@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire\Sites\MonitorServerlessTest;
 
 use App\Livewire\Sites\Monitor;
-use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Models\User;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -84,7 +84,7 @@ test('set stats range rejects unknown ranges', function () {
         ->call('setStatsRange', 'bogus')
         ->assertSet('statsRange', '24h');
 });
-test('a function without a monitor gets a homepage check', function () {
+test('a function without a monitor gets an http and https homepage pair', function () {
     Queue::fake();
     [$user, $server, $site] = makeFunctionsSite();
 
@@ -93,14 +93,42 @@ test('a function without a monitor gets a homepage check', function () {
 
     Livewire::actingAs($user)->test(Monitor::class, ['server' => $server, 'site' => $site]);
 
-    $monitor = SiteUptimeMonitor::query()->where('site_id', $site->id)->first();
-    expect($monitor)->not->toBeNull();
-    expect($monitor->label)->toBe('Homepage check');
-    expect(array_keys(config('site_uptime.probe_regions')))->toContain($monitor->probe_region);
+    $monitors = SiteUptimeMonitor::query()->where('site_id', $site->id)->orderBy('sort_order')->get();
+    expect($monitors)->toHaveCount(2);
+    expect($monitors->pluck('label')->all())->toBe(['Homepage (HTTPS)', 'Homepage (HTTP)']);
+    expect($monitors->pluck('check_type')->all())->toBe([
+        SiteUptimeMonitor::CHECK_HTTPS,
+        SiteUptimeMonitor::CHECK_HTTP,
+    ]);
+    expect($monitors->every(fn (SiteUptimeMonitor $monitor): bool => $monitor->probe_region === 'us-east'))->toBeTrue();
 
     // Idempotent — a second visit must not add a duplicate.
     Livewire::actingAs($user)->test(Monitor::class, ['server' => $server, 'site' => $site]);
-    expect(SiteUptimeMonitor::query()->where('site_id', $site->id)->count())->toBe(1);
+    expect(SiteUptimeMonitor::query()->where('site_id', $site->id)->count())->toBe(2);
+});
+test('a legacy homepage check is retargeted to https and gains an http sibling', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeFunctionsSite();
+
+    SiteUptimeMonitor::query()->where('site_id', $site->id)->delete();
+    SiteUptimeMonitor::query()->create([
+        'site_id' => $site->id,
+        'label' => 'Homepage check',
+        'check_type' => SiteUptimeMonitor::CHECK_HTTP,
+        'path' => null,
+        'probe_region' => 'eu-falkenstein',
+        'probe_worker' => 'worker-1',
+        'sort_order' => 0,
+    ]);
+
+    Livewire::actingAs($user)->test(Monitor::class, ['server' => $server, 'site' => $site]);
+
+    $monitors = SiteUptimeMonitor::query()->where('site_id', $site->id)->orderBy('sort_order')->get();
+    expect($monitors)->toHaveCount(2);
+    expect($monitors->firstWhere('check_type', SiteUptimeMonitor::CHECK_HTTPS)?->label)->toBe('Homepage (HTTPS)');
+    expect($monitors->firstWhere('check_type', SiteUptimeMonitor::CHECK_HTTP)?->label)->toBe('Homepage (HTTP)');
+    expect($monitors->every(fn (SiteUptimeMonitor $monitor): bool => $monitor->probe_region === 'us-east'))->toBeTrue();
+    expect(SiteUptimeMonitor::query()->where('site_id', $site->id)->where('label', 'Homepage check')->exists())->toBeFalse();
 });
 test('the uptime resolver finds a function url', function () {
     [, , $site] = makeFunctionsSite();

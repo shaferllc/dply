@@ -64,13 +64,15 @@ trait ManagesServerless
      * defaults filled in. The DigitalOcean Functions deployer reads these
      * straight onto the OpenWhisk action's `limits` block at deploy time.
      *
+     * Always returns every key. A stored `limits` snapshot from before log
+     * capture existed (memory/timeout/concurrency only) must not fail a
+     * deploy with an undefined `logs` index.
+     *
+     * @param  array<string, mixed>  $limits
      * @return array{memory: int, timeout: int, concurrency: int, logs: int}
      */
-    public function serverlessLimits(): array
+    public static function normalizeServerlessLimits(array $limits = []): array
     {
-        $limits = $this->serverlessConfig()['limits'] ?? [];
-        $limits = is_array($limits) ? $limits : [];
-
         $memory = (int) ($limits['memory'] ?? self::SERVERLESS_DEFAULT_MEMORY_MB);
         if (! in_array($memory, self::SERVERLESS_MEMORY_OPTIONS_MB, true)) {
             $memory = self::SERVERLESS_DEFAULT_MEMORY_MB;
@@ -91,6 +93,16 @@ trait ManagesServerless
             'concurrency' => $concurrency,
             'logs' => $logs,
         ];
+    }
+
+    /**
+     * @return array{memory: int, timeout: int, concurrency: int, logs: int}
+     */
+    public function serverlessLimits(): array
+    {
+        $limits = $this->serverlessConfig()['limits'] ?? [];
+
+        return self::normalizeServerlessLimits(is_array($limits) ? $limits : []);
     }
 
     /**

@@ -81,7 +81,9 @@
                             </ul>
                         </div>
                     @endif
-                    <x-cli-snippet command="dply ops:doctor" />
+                    <x-cli-snippet :commands="[
+                        ['command' => 'dply ops:doctor'],
+                    ]" />
                 </div>
             </section>
         @endif
@@ -109,7 +111,9 @@
                         @endforeach
                     </ul>
                     <div class="mt-4">
-                        <x-cli-snippet command="dply ops:failed-deploys" />
+                        <x-cli-snippet :commands="[
+                            ['command' => 'dply ops:failed-deploys'],
+                        ]" />
                     </div>
                 </div>
             </section>
@@ -253,7 +257,9 @@
         @endif
 
         <x-slot:footer>
-            <x-cli-snippet command="dply ops:doctor" />
+            <x-cli-snippet :commands="[
+                ['command' => 'dply ops:doctor'],
+            ]" />
         </x-slot:footer>
     </x-infrastructure-shell>
 </div>

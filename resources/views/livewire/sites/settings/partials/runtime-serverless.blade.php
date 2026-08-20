@@ -162,6 +162,33 @@
         </div>
     </form>
 
+    @if ($site->isLaravelFrameworkDetected())
+        <form wire:submit="saveServerlessMaintenance" class="border-b border-brand-ink/10">
+            <x-workspace-panel-head
+                dense
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-pause-circle"
+                :title="__('Maintenance')"
+                :note="__('Takes the app offline with a 503. This survives a cold start — it is not a temporary file on the function.')"
+            />
+            <div class="space-y-3 px-3 py-3 sm:px-4">
+                <label class="flex items-start gap-2">
+                    <input type="checkbox" wire:model="serverless_maintenance" class="mt-0.5 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage" />
+                    <span class="min-w-0">
+                        <span class="block text-xs font-medium text-brand-ink">{{ __('Show the maintenance page') }}</span>
+                        <span class="mt-0.5 block text-2xs text-brand-moss">{{ __('Visitors get a 503 until you turn this off. Scheduler and queue ticks still run.') }}</span>
+                    </span>
+                </label>
+                <div class="flex justify-end">
+                    <x-primary-button type="submit">
+                        <span wire:loading.remove wire:target="saveServerlessMaintenance">{{ __('Save maintenance') }}</span>
+                        <span wire:loading wire:target="saveServerlessMaintenance">{{ __('Saving…') }}</span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </form>
+    @endif
+
     {{-- 3. HTTP access — how the function is reachable, who may call it, and
          what is bound to it. Action metadata, so saving applies live. --}}
     @php

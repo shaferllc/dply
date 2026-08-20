@@ -190,3 +190,36 @@ test('the wake url matches the route the wake controller is registered on', func
 
     $this->assertStringContainsString('DPLY_QUEUE_WAKE_URL=https://dply.tunnel.example'.$path, (string) $site->fresh()->env_file_content);
 });
+
+test('it defaults session driver to cookie when unset', function () {
+    $site = Site::factory()->create(['env_file_content' => "APP_ENV=production\n"]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $this->assertStringContainsString('SESSION_DRIVER=cookie', (string) $site->fresh()->env_file_content);
+});
+
+test('it keeps an explicit session driver', function () {
+    $site = Site::factory()->create(['env_file_content' => "SESSION_DRIVER=redis\n"]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $managed = (string) $site->fresh()->env_file_content;
+    $this->assertStringContainsString('SESSION_DRIVER=redis', $managed);
+    $this->assertStringNotContainsString('SESSION_DRIVER=cookie', $managed);
+});
+
+test('it overwrites asset url after off-function publish', function () {
+    $site = Site::factory()->create([
+        'env_file_content' => "APP_URL=https://fn.example\nASSET_URL=https://fn.example\n",
+    ]);
+    File::put($this->dir.'/.env', (string) $site->env_file_content);
+
+    $published = 'https://dply.example/serverless-assets/'.$site->id;
+    (new ServerlessEnvironmentPreparer)->applyAssetUrl($site, $this->dir, $published);
+
+    $managed = (string) $site->fresh()->env_file_content;
+    $this->assertStringContainsString('ASSET_URL='.$published, $managed);
+    $this->assertStringContainsString('APP_URL=https://fn.example', $managed);
+    $this->assertStringContainsString('ASSET_URL='.$published, (string) file_get_contents($this->dir.'/.env'));
+});

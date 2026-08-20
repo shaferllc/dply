@@ -243,6 +243,7 @@ use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
 use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
+use App\Modules\Serverless\Http\Controllers\ServerlessAssetController;
 use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
 use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
@@ -312,6 +313,11 @@ Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
 Route::post('/hooks/functions/{site}/queue/wake', ServerlessQueueWakeController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.functions.queue.wake');
+
+Route::get('/serverless-assets/{site}/{path}', ServerlessAssetController::class)
+    ->where('path', '.*')
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('serverless.assets');
 
 Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
     ->middleware(['throttle:function-log-ingest'])

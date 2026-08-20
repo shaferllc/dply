@@ -7,6 +7,7 @@ namespace App\Modules\Serverless\Services;
 use App\Models\Site;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\Serverless\Models\FunctionInvocation;
+use App\Modules\Serverless\Support\ServerlessArtisan;
 
 /**
  * Fire a single dply tick against a serverless function.
@@ -43,7 +44,7 @@ final class InvokeFunctionTick
     {
         $headers = [];
 
-        if (in_array($task, ['schedule', 'queue', 'queue-retry'], true)) {
+        if (in_array($task, ['schedule', 'queue', 'queue-retry', 'artisan'], true)) {
             $headers = [
                 'x-dply-run' => $task,
                 'x-dply-secret' => $site->ensureServerlessCommandSecret(),
@@ -113,6 +114,30 @@ final class InvokeFunctionTick
             'ok' => $invocation !== null && (bool) $invocation->success,
             'output' => trim((string) ($invocation->result_excerpt ?? '')),
         ];
+    }
+
+    /**
+     * Run one allowlisted artisan command, HMAC-signed so a captured tick
+     * cannot be turned into arbitrary remote execution.
+     *
+     * `down` / `up` also persist durable maintenance (bound parameter + env)
+     * because `/tmp` `artisan down` is lost on the next cold start.
+     */
+    public function runArtisan(Site $site, string $command): ?FunctionInvocation
+    {
+        $command = trim($command);
+        [$name] = ServerlessArtisan::parse($command);
+
+        if (in_array($name, ['down', 'up'], true)) {
+            app(ServerlessMaintenance::class)->setEnabled($site, $name === 'down');
+        }
+
+        $secret = $site->ensureServerlessCommandSecret();
+
+        return $this->tickSite($site, 'artisan', [
+            'x-dply-artisan' => $command,
+            'x-dply-signature' => ServerlessArtisan::signature($secret, $command),
+        ]);
     }
 
     /**

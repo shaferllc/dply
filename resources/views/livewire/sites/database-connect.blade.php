@@ -111,7 +111,9 @@
                         </p>
                         @if ($tunnelInstallCommand)
                             <div class="mt-2 min-w-0">
-                                <x-cli-snippet :command="$tunnelInstallCommand" :summary="__('Run once:')" />
+                                <x-cli-snippet :commands="[
+                                    ['command' => $tunnelInstallCommand],
+                                ]" :summary="__('Run once:')" />
                             </div>
                             <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">
                                 {{ __('The link works once and expires in 10 minutes. The key is applied to the server in the background — give it a few seconds before opening the tunnel.') }}
@@ -135,10 +137,14 @@
                         </div>
                         <div class="mt-2 min-w-0 space-y-2">
                             @if ($launchCommand)
-                                <x-cli-snippet :command="$launchCommand" :summary="__('…in TablePlus:')" />
+                                <x-cli-snippet :commands="[
+                                    ['command' => $launchCommand],
+                                ]" :summary="__('…in TablePlus:')" />
                             @endif
                             @if ($terminalCommand)
-                                <x-cli-snippet :command="$terminalCommand" :summary="__('…at a terminal prompt:')" />
+                                <x-cli-snippet :commands="[
+                                    ['command' => $terminalCommand],
+                                ]" :summary="__('…at a terminal prompt:')" />
                             @endif
                         </div>
                     @endif

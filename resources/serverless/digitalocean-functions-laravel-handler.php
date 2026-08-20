@@ -12,9 +12,14 @@
  * expects.
  *
  * The OpenWhisk action filesystem is read-only except for /tmp, so before
- * the framework boots this redirects Laravel's storage path AND every
- * bootstrap/cache file (config/events/packages/routes/services) into /tmp —
- * otherwise a cold boot that needs to (re)write any of them crashes.
+ * the framework boots this redirects Laravel's storage path AND compiled
+ * views into /tmp. Packaged `bootstrap/cache/*` from `artisan optimize` is
+ * preferred over empty /tmp redirects — those files are read-only and that
+ * is fine. Only missing cache files are pointed at /tmp so a cold boot that
+ * needs to write them does not crash.
+ *
+ * The bootstrapped Application is reused across invocations in the same
+ * container (Bref-style), capped by DPLY_WARM_MAX_REQUESTS (default 250).
  *
  * Do not edit in the user's repo — dply overwrites this file on every deploy.
  */
@@ -31,8 +36,11 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
+use Illuminate\Support\Facades\Facade;
 use Monolog\Handler\StreamHandler;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 if (! function_exists('dply_do_functions_cors_headers')) {
     /**
@@ -95,6 +103,9 @@ if (! function_exists('main')) {
      */
     function main(array $args): array
     {
+        static $warmApp = null;
+        static $warmHits = 0;
+
         $corsPolicy = is_array($args['__dply_cors'] ?? null) ? $args['__dply_cors'] : null;
 
         // With web-custom-options in force the platform stops answering
@@ -142,28 +153,26 @@ if (! function_exists('main')) {
             putenv("{$key}={$value}");
         };
 
-        // Read-only-filesystem redirects — bootstrap/cache and the compiled
-        // view path MUST point at /tmp here, so these always win.
-        foreach ([
-            'VIEW_COMPILED_PATH' => $storage.'/framework/views',
-            'APP_CONFIG_CACHE' => $bootstrapCache.'/config.php',
-            'APP_EVENTS_CACHE' => $bootstrapCache.'/events.php',
-            'APP_PACKAGES_CACHE' => $bootstrapCache.'/packages.php',
-            'APP_ROUTES_CACHE' => $bootstrapCache.'/routes.php',
-            'APP_SERVICES_CACHE' => $bootstrapCache.'/services.php',
-        ] as $key => $value) {
+        // Compiled views always live in /tmp — they are written at runtime.
+        $setEnv('VIEW_COMPILED_PATH', $storage.'/framework/views');
+
+        // Prefer packaged bootstrap/cache from `artisan optimize`. Fall back
+        // to /tmp only when a file was not baked into the zip.
+        foreach (dply_do_functions_bootstrap_cache_env($root, $bootstrapCache) as $key => $value) {
             $setEnv($key, $value);
         }
 
         // Serverless-safe driver defaults — applied ONLY when the app's .env
         // does not set them, so provisioning Redis (CACHE_STORE=redis) or a
-        // database queue stays in the operator's control.
+        // database queue stays in the operator's control. Cookie sessions
+        // survive across containers; `array` would lose the session on every
+        // cold start.
         foreach ([
             'APP_ENV' => 'production',
             'LOG_CHANNEL' => 'stderr',
             'CACHE_STORE' => 'array',
             'CACHE_DRIVER' => 'array',
-            'SESSION_DRIVER' => 'array',
+            'SESSION_DRIVER' => 'cookie',
             'QUEUE_CONNECTION' => 'sync',
         ] as $key => $value) {
             if (($envFile[$key] ?? '') === '') {
@@ -180,18 +189,55 @@ if (! function_exists('main')) {
             $setEnv('APP_KEY', 'base64:'.base64_encode(random_bytes(32)));
         }
 
+        $headers = is_array($args['__ow_headers'] ?? null) ? $args['__ow_headers'] : [];
+        $isCommand = trim((string) ($headers['x-dply-run'] ?? '')) !== '';
+
+        // Durable maintenance — bound `__dply_maintenance` or DPLY_MAINTENANCE
+        // in the packaged .env. `/tmp` `down` is lost on cold start, so we
+        // never rely on it as the source of truth. Command ticks (scheduler /
+        // queue / artisan) still run so operators can drain work and bring
+        // the app back.
+        $maintenance = dply_do_functions_maintenance_enabled($args, $envFile);
+        if ($maintenance && ! $isCommand) {
+            return dply_do_functions_maintenance_response($corsPolicy, $args);
+        }
+
         try {
             require $root.'/vendor/autoload.php';
 
-            /** @var Application $app */
-            $app = require $root.'/bootstrap/app.php';
-            $app->useStoragePath($storage);
+            $maxWarm = dply_do_functions_warm_max_requests($envFile);
+            if ($warmApp !== null && $warmHits >= $maxWarm) {
+                if (class_exists(Facade::class)) {
+                    Facade::clearResolvedInstances();
+                }
+                $warmApp = null;
+                $warmHits = 0;
+                gc_collect_cycles();
+            }
 
-            // Register the dply Queue connection, the shared lock store, and
-            // the failed-job provider, if this function has a namespace.
-            dply_do_functions_register_queue($app, $envFile);
-            dply_do_functions_register_queue_locks($app, $envFile);
-            dply_do_functions_register_failed_jobs($app, $envFile);
+            if ($warmApp instanceof Application) {
+                $app = $warmApp;
+                $warmHits++;
+            } else {
+                /** @var Application $app */
+                $app = require $root.'/bootstrap/app.php';
+                $app->useStoragePath($storage);
+
+                // Register the dply Queue connection, the shared lock store, and
+                // the failed-job provider, if this function has a namespace.
+                dply_do_functions_register_queue($app, $envFile);
+                dply_do_functions_register_queue_locks($app, $envFile);
+                dply_do_functions_register_failed_jobs($app, $envFile);
+
+                $warmApp = $app;
+                $warmHits = 1;
+            }
+
+            if ($maintenance) {
+                dply_do_functions_write_down_file($storage);
+            } else {
+                @unlink($storage.'/framework/down');
+            }
 
             // dply background tick — run the Laravel scheduler or a queue
             // worker instead of handling an HTTP request. The scheduler runs
@@ -219,7 +265,9 @@ if (! function_exists('main')) {
             }
 
             $path = '/'.ltrim((string) ($args['__ow_path'] ?? '/'), '/');
-            $public = dply_do_functions_public_response($root, $path);
+            $public = dply_do_functions_off_function_assets($envFile, $path)
+                ? null
+                : dply_do_functions_public_response($root, $path);
             if ($public !== null) {
                 if ($corsPolicy !== null) {
                     $public['headers'] += dply_do_functions_cors_headers($corsPolicy, $args);
@@ -293,6 +341,223 @@ if (! function_exists('main')) {
                 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
             ];
         }
+    }
+}
+
+if (! function_exists('dply_do_functions_bootstrap_cache_env')) {
+    /**
+     * Map Laravel cache-path env keys to packaged bootstrap/cache files when
+     * they exist in the zip, otherwise to writable /tmp copies.
+     *
+     * @return array<string, string>
+     */
+    function dply_do_functions_bootstrap_cache_env(string $root, string $tmpBootstrap): array
+    {
+        $packaged = rtrim($root, '/').'/bootstrap/cache';
+        $files = [
+            'APP_CONFIG_CACHE' => 'config.php',
+            'APP_EVENTS_CACHE' => 'events.php',
+            'APP_PACKAGES_CACHE' => 'packages.php',
+            'APP_ROUTES_CACHE' => 'routes.php',
+            'APP_SERVICES_CACHE' => 'services.php',
+        ];
+
+        $out = [];
+        foreach ($files as $key => $file) {
+            $packagedFile = $packaged.'/'.$file;
+            $out[$key] = is_file($packagedFile) ? $packagedFile : $tmpBootstrap.'/'.$file;
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('dply_do_functions_warm_max_requests')) {
+    /**
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_warm_max_requests(array $envFile): int
+    {
+        $raw = trim((string) ($envFile['DPLY_WARM_MAX_REQUESTS'] ?? (getenv('DPLY_WARM_MAX_REQUESTS') ?: '250')));
+        $n = (int) $raw;
+
+        return max(1, min(10000, $n > 0 ? $n : 250));
+    }
+}
+
+if (! function_exists('dply_do_functions_maintenance_enabled')) {
+    /**
+     * @param  array<string, mixed>  $args
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_maintenance_enabled(array $args, array $envFile): bool
+    {
+        $bound = $args['__dply_maintenance'] ?? null;
+        if ($bound === true || $bound === 1 || $bound === '1' || $bound === 'true' || $bound === 'on' || $bound === 'yes') {
+            return true;
+        }
+
+        $env = strtolower(trim((string) ($envFile['DPLY_MAINTENANCE'] ?? (getenv('DPLY_MAINTENANCE') ?: ''))));
+
+        return in_array($env, ['1', 'true', 'yes', 'on'], true);
+    }
+}
+
+if (! function_exists('dply_do_functions_write_down_file')) {
+    /**
+     * Mirror durable maintenance into Laravel's down file so the framework
+     * middleware agrees with the handler. The file itself is not durable
+     * (/tmp); the env / bound parameter is.
+     */
+    function dply_do_functions_write_down_file(string $storage): void
+    {
+        $dir = $storage.'/framework';
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+
+        @file_put_contents($dir.'/down', json_encode([
+            'except' => [],
+            'redirect' => null,
+            'retry' => 60,
+            'refresh' => 15,
+            'secret' => null,
+            'status' => 503,
+            'template' => null,
+        ], JSON_THROW_ON_ERROR));
+    }
+}
+
+if (! function_exists('dply_do_functions_maintenance_response')) {
+    /**
+     * @param  array<string, mixed>|null  $corsPolicy
+     * @param  array<string, mixed>  $args
+     * @return array{statusCode: int, headers: array<string, string>, body: string}
+     */
+    function dply_do_functions_maintenance_response(?array $corsPolicy, array $args): array
+    {
+        $headers = [
+            'content-type' => 'text/html; charset=utf-8',
+            'retry-after' => '60',
+        ];
+        if ($corsPolicy !== null) {
+            $headers += dply_do_functions_cors_headers($corsPolicy, $args);
+        }
+
+        return [
+            'statusCode' => 503,
+            'headers' => $headers,
+            'body' => '<!DOCTYPE html><html><head><title>Maintenance</title></head><body><h1>Be right back.</h1><p>This application is down for maintenance.</p></body></html>',
+        ];
+    }
+}
+
+if (! function_exists('dply_do_functions_off_function_assets')) {
+    /**
+     * True when Vite/build assets are published off-function (ASSET_URL is a
+     * different origin than APP_URL) so this function must not serve /build
+     * and trip the 1 MB HTTP response cap on fonts/CSS.
+     *
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_off_function_assets(array $envFile, string $path): bool
+    {
+        $assetUrl = rtrim((string) ($envFile['ASSET_URL'] ?? ''), '/');
+        $appUrl = rtrim((string) ($envFile['APP_URL'] ?? ''), '/');
+        if ($assetUrl === '' || $appUrl === '' || strcasecmp($assetUrl, $appUrl) === 0) {
+            return false;
+        }
+
+        $relative = '/'.ltrim($path, '/');
+
+        return $relative === '/build' || str_starts_with($relative, '/build/');
+    }
+}
+
+if (! function_exists('dply_do_functions_artisan_allowlist')) {
+    /**
+     * Keep in sync with App\Modules\Serverless\Support\ServerlessArtisan::ALLOWLIST.
+     *
+     * @return list<string>
+     */
+    function dply_do_functions_artisan_allowlist(): array
+    {
+        return [
+            'about',
+            'optimize', 'optimize:clear',
+            'config:cache', 'config:clear',
+            'route:cache', 'route:clear', 'route:list',
+            'view:cache', 'view:clear',
+            'event:cache', 'event:clear',
+            'cache:clear',
+            'queue:restart',
+            'migrate', 'migrate:status',
+            'down', 'up',
+            'storage:link',
+        ];
+    }
+}
+
+if (! function_exists('dply_do_functions_artisan_signature')) {
+    function dply_do_functions_artisan_signature(string $secret, string $command): string
+    {
+        return hash_hmac('sha256', "artisan\n".$command, $secret);
+    }
+}
+
+if (! function_exists('dply_do_functions_parse_artisan')) {
+    /**
+     * Parse an allowlisted artisan invocation into Kernel::call() arguments.
+     *
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    function dply_do_functions_parse_artisan(string $command): array
+    {
+        $command = trim($command);
+        if ($command === '' || preg_match('/[;|&`$()\\\\]|\\n|\\r/', $command) === 1) {
+            throw new RuntimeException('dply command rejected: malformed artisan command.');
+        }
+
+        $parts = preg_split('/\s+/', $command) ?: [];
+        $name = (string) array_shift($parts);
+        if ($name === 'php') {
+            $next = (string) array_shift($parts);
+            if ($next !== 'artisan') {
+                throw new RuntimeException('dply command rejected: unknown artisan command.');
+            }
+            $name = (string) array_shift($parts);
+        } elseif ($name === 'artisan') {
+            $name = (string) array_shift($parts);
+        }
+
+        if ($name === '' || ! in_array($name, dply_do_functions_artisan_allowlist(), true)) {
+            throw new RuntimeException('dply command rejected: artisan command is not allowlisted.');
+        }
+
+        $params = [];
+        foreach ($parts as $part) {
+            if (! str_starts_with($part, '--')) {
+                throw new RuntimeException('dply command rejected: positional artisan arguments are not allowed.');
+            }
+
+            $opt = substr($part, 2);
+            if ($opt === '' || ! preg_match('/^[A-Za-z0-9][A-Za-z0-9:_-]*(=.*)?$/', $opt)) {
+                throw new RuntimeException('dply command rejected: malformed artisan option.');
+            }
+
+            if (str_contains($opt, '=')) {
+                [$key, $value] = explode('=', $opt, 2);
+                $params['--'.$key] = $value;
+            } else {
+                $params['--'.$opt] = true;
+            }
+        }
+
+        if ($name === 'migrate' && ! array_key_exists('--force', $params)) {
+            $params['--force'] = true;
+        }
+
+        return [$name, $params];
     }
 }
 
@@ -373,6 +638,17 @@ if (! function_exists('dply_do_functions_command')) {
             }
 
             return ['queue:retry', ['id' => [$id]]];
+        }
+
+        if ($task === 'artisan') {
+            $command = trim((string) ($headers['x-dply-artisan'] ?? ''));
+            $signature = trim((string) ($headers['x-dply-signature'] ?? ''));
+            $expected = dply_do_functions_artisan_signature($secret, $command);
+            if ($command === '' || $signature === '' || ! hash_equals($expected, $signature)) {
+                throw new RuntimeException('dply command rejected: invalid artisan signature.');
+            }
+
+            return dply_do_functions_parse_artisan($command);
         }
 
         throw new RuntimeException('dply command rejected: unknown task "'.$task.'".');
@@ -729,23 +1005,30 @@ if (! function_exists('dply_do_functions_attach_queue_wake')) {
      */
     function dply_do_functions_attach_queue_wake(mixed $app, array $envFile): callable
     {
-        $queued = false;
+        static $installedOn = null;
+
+        $GLOBALS['dply_do_functions_job_queued'] = false;
 
         try {
-            $app->make(Dispatcher::class)->listen(
-                JobQueued::class,
-                function () use (&$queued): void {
-                    $queued = true;
-                },
-            );
+            $dispatcher = $app->make(Dispatcher::class);
         } catch (Throwable) {
             // No event dispatcher — nothing to watch. The safety-net tick
             // still drains this app, just at the old latency.
             return static function (): void {};
         }
 
-        return static function () use (&$queued, $envFile): void {
-            if (! $queued) {
+        if ($installedOn !== $dispatcher) {
+            $dispatcher->listen(
+                JobQueued::class,
+                static function (): void {
+                    $GLOBALS['dply_do_functions_job_queued'] = true;
+                },
+            );
+            $installedOn = $dispatcher;
+        }
+
+        return static function () use ($envFile): void {
+            if (empty($GLOBALS['dply_do_functions_job_queued'])) {
                 return;
             }
 
@@ -1056,14 +1339,14 @@ if (! function_exists('dply_do_functions_response_body')) {
             return $content;
         }
 
-        if ($response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+        if ($response instanceof BinaryFileResponse) {
             $file = $response->getFile();
             if ($file->isFile()) {
                 return (string) file_get_contents($file->getPathname());
             }
         }
 
-        if ($response instanceof \Symfony\Component\HttpFoundation\StreamedResponse) {
+        if ($response instanceof StreamedResponse) {
             ob_start();
             $response->sendContent();
 
@@ -1207,14 +1490,16 @@ if (! function_exists('dply_do_functions_attach_log_capture')) {
 
             // Level 100 = DEBUG — an int so this works under Monolog 2 and 3.
             $handler = new StreamHandler($stream, 100);
-            $app->make('log')->channel()->getLogger()->pushHandler($handler);
+            $logger = $app->make('log')->channel()->getLogger();
+            $logger->pushHandler($handler);
 
-            return static function () use ($handler, $stream): array {
+            return static function () use ($logger, $handler, $stream): array {
                 try {
                     $handler->close();
                     rewind($stream);
                     $raw = rtrim((string) stream_get_contents($stream), "\n");
                     fclose($stream);
+                    $logger->popHandler();
 
                     return $raw === '' ? [] : explode("\n", $raw);
                 } catch (Throwable $e) {
