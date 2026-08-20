@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Serverless;
 
+use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Http\Request;
 
@@ -75,6 +76,48 @@ final class ServerlessWorkspaceUrl
     }
 
     /**
+     * Workspace or journey URL for a live/never-live function.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public static function destinationForFunction(Site $site, array $query = []): string
+    {
+        if (
+            in_array($site->status, [
+                Site::STATUS_FUNCTIONS_CONFIGURED,
+                Site::STATUS_FUNCTIONS_FAILED,
+            ], true)
+            && $site->last_deploy_at === null
+        ) {
+            return self::journey($site);
+        }
+
+        return self::show($site, 'general', $query);
+    }
+
+    /**
+     * Product-line URL when a FaaS namespace host is opened on a /servers/{id} path.
+     *
+     * A DigitalOcean Functions / AWS Lambda host is not a BYO server. Send the
+     * operator to the function workspace (or deploy journey when it never went
+     * live). After the function is deleted the leftover host has no site — land
+     * on the Serverless index rather than rendering Servers chrome.
+     */
+    public static function forHost(Server $server): ?string
+    {
+        if (! $server->isServerlessHost()) {
+            return null;
+        }
+
+        $function = $server->sites()->orderBy('created_at')->first();
+        if ($function === null) {
+            return route('serverless.index');
+        }
+
+        return self::destinationForFunction($function);
+    }
+
+    /**
      * Resolve a sidebar / deep-link `sites.*` route to the serverless product URL
      * when the site is a function; otherwise return null (caller keeps sites.*).
      *
@@ -134,19 +177,7 @@ final class ServerlessWorkspaceUrl
         $query = $request->query();
 
         if ($suffix === '' || $suffix === 'general') {
-            // Mirror SiteWorkspaceController: never-live / failed first deploy
-            // stays on the journey rather than an empty workspace.
-            if (
-                in_array($site->status, [
-                    Site::STATUS_FUNCTIONS_CONFIGURED,
-                    Site::STATUS_FUNCTIONS_FAILED,
-                ], true)
-                && $site->last_deploy_at === null
-            ) {
-                return self::journey($site);
-            }
-
-            return self::show($site, 'general', $query);
+            return self::destinationForFunction($site, $query);
         }
 
         // Legacy serverless bookmark used `/edge-routing` before `/proxy-routing`.

@@ -94,15 +94,16 @@ return Application::configure(basePath: dirname(__DIR__))
             EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
+            // Function / leftover FaaS hosts must leave /servers/{id}/… before
+            // the tag/role workspace gate 404s a deep link (or Lazy overview
+            // paints Servers chrome). Address bar stays on /serverless/….
+            RedirectServerlessByoWorkspace::class,
             // Workspace deep-link guard: 404s requests for workspace routes the
             // bound server can't reach (tag-gated rows that lack the required
             // installed-service tag; role-gated rows hidden by role_nav_keys).
             // Short-circuits for non-server routes via an `instanceof` check,
             // so the cost is one route-binding lookup per web request.
             EnsureServerServiceInstalled::class,
-            // Function Sites still resolve under /servers/…/sites/… for
-            // Livewire mounts, but the address bar must stay on /serverless/{site}.
-            RedirectServerlessByoWorkspace::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

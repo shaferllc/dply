@@ -25,8 +25,8 @@ use App\Http\Controllers\ServerlessWorkspaceController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\Sites\DatabaseConnectionUriController;
-use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseConnectLinkController;
+use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteScheduleController;
@@ -755,22 +755,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
         // A serverless function is not a server — the DO Functions namespace
         // is an implementation detail. Send the operator straight to the
-        // function workspace (or deploy journey when it never went live).
-        if ($server->isDigitalOceanFunctionsHost()) {
-            $function = $server->sites()->orderBy('created_at')->first();
-            if ($function !== null) {
-                if (
-                    in_array($function->status, [
-                        Site::STATUS_FUNCTIONS_CONFIGURED,
-                        Site::STATUS_FUNCTIONS_FAILED,
-                    ], true)
-                    && $function->last_deploy_at === null
-                ) {
-                    return redirect()->to(ServerlessWorkspaceUrl::journey($function));
-                }
-
-                return redirect()->to(ServerlessWorkspaceUrl::show($function));
-            }
+        // function workspace (or /serverless when the leftover host has no
+        // function). Never fall through to servers.overview.
+        $serverlessUrl = ServerlessWorkspaceUrl::forHost($server);
+        if ($serverlessUrl !== null) {
+            return redirect()->to($serverlessUrl);
         }
 
         // Journey page is SSH/VM-shaped — only VM hosts have a provision task

@@ -21,7 +21,6 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
-use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SupervisorProgram;
 use App\Modules\Backups\Models\SiteFileBackup;
@@ -73,28 +72,13 @@ class WorkspaceOverview extends Component
 
         // A serverless function is not a server — the DO Functions namespace
         // host is an implementation detail. Redirect to the function
-        // workspace (or deploy journey when it never went live) so the
-        // operator never sees server-shaped chrome (SSH, setup, metrics)
-        // that does not apply to a function.
-        if ($server->isDigitalOceanFunctionsHost()) {
-            $function = $server->sites()->orderBy('created_at')->first();
-            if ($function !== null) {
-                if (
-                    in_array($function->status, [
-                        Site::STATUS_FUNCTIONS_CONFIGURED,
-                        Site::STATUS_FUNCTIONS_FAILED,
-                    ], true)
-                    && $function->last_deploy_at === null
-                ) {
-                    return $this->redirect(
-                        ServerlessWorkspaceUrl::journey($function),
-                    );
-                }
-
-                return $this->redirect(
-                    ServerlessWorkspaceUrl::show($function),
-                );
-            }
+        // workspace (or deploy journey when it never went live). After the
+        // function is deleted the leftover host has no site: land on the
+        // Serverless index, never BYO Servers chrome (that used to bounce
+        // show ↔ overview on Lazy hydrate).
+        $serverlessUrl = ServerlessWorkspaceUrl::forHost($server);
+        if ($serverlessUrl !== null) {
+            return $this->redirect($serverlessUrl);
         }
 
         // Same story for dply Edge + dply Cloud synthetic hosts — neither

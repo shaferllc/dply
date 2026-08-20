@@ -7,6 +7,7 @@ use App\Jobs\PollEksClusterStatusJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Workspace;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
@@ -28,6 +29,16 @@ trait InteractsWithServerWorkspace
     {
         $this->authorize('view', $server);
         $this->server = $server;
+
+        // FaaS hosts are not BYO servers. A Lazy workspace island hydrates on
+        // `livewire.update`, which is not in the non-VM allow-list below — that
+        // used to bounce leftover functions hosts overview → show → overview.
+        $serverlessUrl = ServerlessWorkspaceUrl::forHost($server);
+        if ($serverlessUrl !== null) {
+            $this->redirect($serverlessUrl, navigate: true);
+
+            return;
+        }
 
         if (! $server->isVmHost()) {
             $allowedRoutes = ['servers.show', 'servers.overview', 'servers.sites'];
