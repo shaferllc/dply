@@ -111,6 +111,28 @@ test('cancel deploy requests cancellation of the running deploy', function () {
     app(ServerlessDeployProgress::class)->checkpoint($site->fresh());
 });
 
+test('namespace provision failure shows the stored reason not the canned sentence', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_ERROR,
+        serverMeta: [
+            'provision_error' => [
+                'stage' => 'namespace',
+                'message' => 'DigitalOcean API failed to create functions namespace: Unable to authenticate you',
+            ],
+        ],
+    );
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Provisioning namespace')
+        ->assertSee('Unable to authenticate you')
+        ->assertSee('DigitalOcean API failed to create functions namespace')
+        ->assertDontSee('Could not create the DigitalOcean Functions namespace.')
+        ->assertDontSee('Review the log, fix the issue, then retry.');
+});
+
 test('retry provision redispatches the host job when errored', function () {
     Bus::fake();
     [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_ERROR);

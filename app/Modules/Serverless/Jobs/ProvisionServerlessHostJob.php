@@ -10,10 +10,12 @@ use App\Models\SiteDeployment;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
+use App\Support\DeployLogRedactor;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -65,17 +67,16 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             $platform = ServerlessPlatformContext::fromConfig();
             if (! $platform->configured()) {
                 Log::warning('serverless.namespace.managed_not_configured', ['server_id' => $server->id]);
-                $server->update(['status' => Server::STATUS_ERROR]);
+                $this->markFailed(
+                    $server,
+                    'dply-managed serverless is not configured — the platform DigitalOcean Functions namespace is missing.',
+                );
 
                 return;
             }
 
             $meta['digitalocean_functions'] = $platform->openWhiskCredentials();
-            $server->update([
-                'meta' => $meta,
-                'status' => Server::STATUS_READY,
-                'setup_status' => Server::SETUP_STATUS_DONE,
-            ]);
+            $this->markReady($server, $meta);
 
             $this->deployConfiguredFunctions($server);
 
@@ -88,11 +89,12 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
         if (! empty($meta['digitalocean_functions']['api_host'] ?? null)) {
             // A functions namespace has no SSH setup phase — make sure the
             // host reads as fully ready so the workspace navigation shows.
-            if ($server->status !== Server::STATUS_READY || $server->setup_status !== Server::SETUP_STATUS_DONE) {
-                $server->update([
-                    'status' => Server::STATUS_READY,
-                    'setup_status' => Server::SETUP_STATUS_DONE,
-                ]);
+            if (
+                $server->status !== Server::STATUS_READY
+                || $server->setup_status !== Server::SETUP_STATUS_DONE
+                || isset($meta['provision_error'])
+            ) {
+                $this->markReady($server, $meta);
             }
             $this->deployConfiguredFunctions($server);
 
@@ -102,7 +104,10 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
         $credential = $server->providerCredential;
         if ($credential === null) {
             Log::warning('serverless.namespace.no_credential', ['server_id' => $server->id]);
-            $server->update(['status' => Server::STATUS_ERROR]);
+            $this->markFailed(
+                $server,
+                'This function has no DigitalOcean API credential, so the namespace could not be created. Connect a DigitalOcean account and retry.',
+            );
 
             return;
         }
@@ -117,7 +122,7 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
                 'server_id' => $server->id,
                 'error' => $e->getMessage(),
             ]);
-            $server->update(['status' => Server::STATUS_ERROR]);
+            $this->markFailed($server, $e->getMessage());
 
             return;
         }
@@ -131,7 +136,10 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
                 'server_id' => $server->id,
                 'returned_keys' => array_keys($namespace),
             ]);
-            $server->update(['status' => Server::STATUS_ERROR]);
+            $this->markFailed(
+                $server,
+                'DigitalOcean created a namespace but returned credentials that cannot be used. Retry provisioning, or check the DigitalOcean Functions response.',
+            );
 
             return;
         }
@@ -141,14 +149,47 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             'namespace' => $namespace['namespace'],
             'access_key' => $namespace['access_key'],
         ];
+        $this->markReady($server, $meta);
+
+        $this->deployConfiguredFunctions($server);
+    }
+
+    /**
+     * Persist a secret-safe namespace failure onto the host so Journey can
+     * show the real reason instead of a canned sentence.
+     */
+    private function markFailed(Server $server, string $message): void
+    {
+        $safe = Str::limit(DeployLogRedactor::redact(trim($message)), 500, '…');
+        if ($safe === '') {
+            $safe = 'Could not create the DigitalOcean Functions namespace.';
+        }
+
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta['provision_error'] = [
+            'stage' => 'namespace',
+            'message' => $safe,
+            'at' => now()->toIso8601String(),
+        ];
+
+        $server->update([
+            'status' => Server::STATUS_ERROR,
+            'meta' => $meta,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function markReady(Server $server, array $meta): void
+    {
+        unset($meta['provision_error']);
+
         $server->update([
             'meta' => $meta,
             'status' => Server::STATUS_READY,
-            // No SSH setup phase for a functions namespace — it is done.
             'setup_status' => Server::SETUP_STATUS_DONE,
         ]);
-
-        $this->deployConfiguredFunctions($server);
     }
 
     /**

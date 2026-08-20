@@ -147,6 +147,7 @@ test('managed host errors when the platform namespace is not configured', functi
     Http::assertNothingSent();
     $server->refresh();
     expect($server->status)->toBe(Server::STATUS_ERROR);
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('platform DigitalOcean Functions namespace is missing');
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
 });
 
@@ -162,7 +163,27 @@ test('marks host errored when the api call fails', function () {
     $server->refresh();
     expect($server->status)->toBe(Server::STATUS_ERROR);
     $this->assertArrayNotHasKey('digitalocean_functions', $server->meta);
+    expect($server->meta['provision_error']['stage'] ?? null)->toBe('namespace');
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('DigitalOcean API failed to create functions namespace: nope');
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
+});
+
+test('redacts secrets from a persisted namespace provision error', function () {
+    Bus::fake();
+    Http::fake([
+        'api.digitalocean.com/v2/functions/namespaces' => Http::response([
+            'message' => 'Unable to authenticate you token=dop_v1_supersecret',
+        ], 401),
+    ]);
+    $server = makeHost();
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    $server->refresh();
+    $message = (string) ($server->meta['provision_error']['message'] ?? '');
+    expect($message)->toContain('Unable to authenticate you')
+        ->and($message)->toContain('token=[redacted]')
+        ->and($message)->not->toContain('dop_v1_supersecret');
 });
 
 test('managed host re-stamps a rotated platform key over the old one', function () {

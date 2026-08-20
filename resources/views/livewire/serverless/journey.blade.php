@@ -418,7 +418,11 @@
                                                 <span class="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">{{ __('Paused') }}</span>
                                             @endif
                                         </div>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $stage['detail'] }}</p>
+                                        <p @class([
+                                            'mt-1 text-sm leading-relaxed break-words',
+                                            'font-mono text-[13px] text-rose-900' => $stage['state'] === 'failed',
+                                            'text-brand-moss' => $stage['state'] !== 'failed',
+                                        ])>{{ $stage['detail'] }}</p>
 
                                         @if ($stage['key'] === 'deploy' && count($deploySteps) > 0)
                                             <ul class="mt-3 space-y-0 overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-cream/30">

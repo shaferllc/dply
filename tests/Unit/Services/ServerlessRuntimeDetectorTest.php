@@ -53,6 +53,7 @@ test('detects symfony via framework bundle', function () {
 
         expect($result['framework'])->toBe('symfony');
         expect($result['language'])->toBe('php');
+        expect($result['runtime'])->toBe('php:8.3');
         expect($result['confidence'])->toBe('medium');
     } finally {
         File::deleteDirectory($dir);
@@ -137,6 +138,8 @@ test('detects laravel octane flag from composer', function () {
         ]);
 
         expect($result['framework'])->toBe('laravel');
+        expect($result['language'])->toBe('php');
+        expect($result['runtime'])->toBe('php:8.3');
         expect($result['laravel_octane'])->toBeTrue();
     } finally {
         File::deleteDirectory($dir);
@@ -246,6 +249,9 @@ test('framework markers win over a raw main file', function () {
 
     expect($result['framework'])->toBe('laravel');
     expect($result['deploy_kind'])->toBe('framework');
+    expect($result['language'])->toBe('php');
+    expect($result['runtime'])->toBe('php:8.3');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader');
 });
 
 test('detects an express app as a framework', function () {
@@ -277,4 +283,136 @@ test('a raw action is unsupported when the target lacks that runtime', function 
     expect($result['framework'])->toBe('raw');
     expect($result['unsupported_for_target'])->toBeTrue();
     expect($result['runtime'])->toBe('');
+});
+
+test('laravel detect uses php runtime when target default is nodejs', function () {
+    // DigitalOcean Functions advertises default_runtime=nodejs:18. A Laravel
+    // app must still report a PHP kind — the create UI reads this string.
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['language'])->toBe('php');
+    expect($result['runtime'])->toBe('php:8.3');
+    expect($result['runtime'])->not->toStartWith('nodejs');
+});
+
+test('laravel 13 detect uses php 8.4', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['php' => '^8.4', 'laravel/framework' => '^13.0']]),
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['runtime'])->toBe('php:8.4');
+});
+
+test('laravel 13 bumps an advertised php 8.3 default', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^13.0']]),
+    ], ['default_runtime' => 'php:8.3']);
+
+    expect($result['runtime'])->toBe('php:8.4');
+});
+
+test('symfony detect uses php runtime when target default is nodejs', function () {
+    $result = detectRepo([
+        'composer.json' => json_encode(['require' => ['symfony/framework-bundle' => '^7.0']]),
+    ]);
+
+    expect($result['framework'])->toBe('symfony');
+    expect($result['language'])->toBe('php');
+    expect($result['runtime'])->toBe('php:8.3');
+});
+
+test('php generic detect uses php runtime when target default is nodejs', function () {
+    $result = detectRepo([
+        'composer.json' => json_encode(['require' => ['php' => '^8.3']]),
+    ]);
+
+    expect($result['framework'])->toBe('php_generic');
+    expect($result['language'])->toBe('php');
+    expect($result['runtime'])->toBe('php:8.3');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader');
+});
+
+test('php detect keeps aws lambda provided runtime', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+    ], ['default_runtime' => 'provided.al2023']);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['runtime'])->toBe('provided.al2023');
+});
+
+test('laravel with vite appends npm ci and build', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'package.json' => json_encode([
+            'devDependencies' => ['vite' => '^6.0', 'laravel-vite-plugin' => '^1.0'],
+            'scripts' => ['build' => 'vite build'],
+        ]),
+        'package-lock.json' => json_encode(['lockfileVersion' => 3]),
+        'vite.config.js' => "export default {}\n",
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['runtime'])->toBe('php:8.3');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader && npm ci && npm run build');
+});
+
+test('laravel with vite and pnpm lockfile uses pnpm', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'package.json' => json_encode([
+            'devDependencies' => ['vite' => '^6.0'],
+            'scripts' => ['build' => 'vite build'],
+        ]),
+        'pnpm-lock.yaml' => "lockfileVersion: '9.0'\n",
+    ]);
+
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader && pnpm install --frozen-lockfile && pnpm run build');
+});
+
+test('laravel packageManager field wins over lockfile', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'package.json' => json_encode([
+            'packageManager' => 'bun@1.1.0',
+            'devDependencies' => ['vite' => '^6.0'],
+            'scripts' => ['build' => 'vite build'],
+        ]),
+        'package-lock.json' => json_encode(['lockfileVersion' => 3]),
+    ]);
+
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader && bun install && bun run build');
+});
+
+test('laravel api only package json stays composer only', function () {
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'package.json' => json_encode([
+            'devDependencies' => ['eslint' => '^9.0'],
+            'scripts' => ['lint' => 'eslint .'],
+        ]),
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader');
 });

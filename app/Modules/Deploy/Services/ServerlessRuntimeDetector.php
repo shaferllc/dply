@@ -366,24 +366,40 @@ final class ServerlessRuntimeDetector
      *
      * @param  array<int, string> $reasons
      * @param  array<string, mixed> $capabilities
+     * @param  array<string, mixed>|null  $composerJson
+     * @param  array<string, mixed>|null  $packageJson
      * @return array<string, mixed>
      */
-    private function phpResult(string $framework, string $confidence, string $artifactOutputPath, array $reasons, array $capabilities, string $deployKind): array
-    {
+    private function phpResult(
+        string $framework,
+        string $confidence,
+        string $artifactOutputPath,
+        array $reasons,
+        array $capabilities,
+        string $deployKind,
+        string $workingDirectory,
+        ?array $composerJson,
+        ?array $packageJson,
+    ): array {
         $unsupportedForTarget = ! (bool) ($capabilities['supports_php_runtime'] ?? false);
         $warnings = [];
         if ($unsupportedForTarget) {
             $warnings[] = 'This repository looks like a PHP project, but the selected serverless target does not advertise a PHP runtime.';
         }
 
+        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+        if ($frontend !== '') {
+            $reasons[] = 'Detected a frontend compile step — will install JS deps and run the build after Composer.';
+        }
+
         return [
             'framework' => $framework,
             'deploy_kind' => $deployKind,
             'language' => 'php',
-            'runtime' => $unsupportedForTarget ? '' : (string) ($capabilities['default_runtime'] ?? ''),
+            'runtime' => $unsupportedForTarget ? '' : $this->phpRuntime($composerJson, $capabilities),
             'entrypoint' => $unsupportedForTarget ? '' : (string) ($capabilities['default_entrypoint'] ?? 'public/index.php'),
             'entry_file' => '',
-            'build_command' => 'composer install --no-dev --optimize-autoloader',
+            'build_command' => $this->phpBuildCommand($workingDirectory, $packageJson),
             'artifact_output_path' => $artifactOutputPath,
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => $confidence,
@@ -391,6 +407,179 @@ final class ServerlessRuntimeDetector
             'warnings' => $warnings,
             'unsupported_for_target' => $unsupportedForTarget,
         ];
+    }
+
+    /**
+     * PHP runtime for a detected PHP app.
+     *
+     * DigitalOcean Functions advertises `default_runtime` as nodejs:18 (the
+     * OpenWhisk default). That must not leak into Laravel / Symfony / generic
+     * PHP detection — those apps run on a PHP kind. AWS Lambda keeps
+     * `provided.al2023` (Bref). Laravel 13 requires PHP >= 8.4.
+     *
+     * @param  array<string, mixed>|null  $composerJson
+     * @param  array<string, mixed> $capabilities
+     */
+    private function phpRuntime(?array $composerJson, array $capabilities): string
+    {
+        $fromCapabilities = (string) ($capabilities['default_php_runtime'] ?? '');
+        if ($fromCapabilities !== '' && $this->isPhpCompatibleRuntime($fromCapabilities)) {
+            return $this->maybeBumpLaravelPhpRuntime($fromCapabilities, $composerJson);
+        }
+
+        $default = (string) ($capabilities['default_runtime'] ?? '');
+        if ($this->isPhpCompatibleRuntime($default)) {
+            return $this->maybeBumpLaravelPhpRuntime($default, $composerJson);
+        }
+
+        if ($default !== '' && ! str_starts_with($default, 'nodejs') && ! str_starts_with($default, 'node:')) {
+            // AWS Lambda Bref (`provided.al2023`) and other non-Node defaults.
+            return $default;
+        }
+
+        return $this->composerNeedsPhp84($composerJson)
+            ? 'php:8.4'
+            : self::RAW_RUNTIME_DEFAULTS['php'];
+    }
+
+    private function isPhpCompatibleRuntime(string $runtime): bool
+    {
+        return str_starts_with($runtime, 'php');
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $composerJson
+     */
+    private function maybeBumpLaravelPhpRuntime(string $runtime, ?array $composerJson): string
+    {
+        if (! $this->composerNeedsPhp84($composerJson)) {
+            return $runtime;
+        }
+
+        $version = $this->phpRuntimeVersion($runtime);
+        if ($version !== null && version_compare($version, '8.4', '<')) {
+            return 'php:8.4';
+        }
+
+        return $runtime;
+    }
+
+    private function phpRuntimeVersion(string $runtime): ?string
+    {
+        if (preg_match('/^php:(\d+\.\d+)/', $runtime, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * Laravel 13 (and composer `php` constraints of ^8.4+) need php:8.4.
+     *
+     * @param  array<string, mixed>|null  $composerJson
+     */
+    private function composerNeedsPhp84(?array $composerJson): bool
+    {
+        $require = is_array($composerJson['require'] ?? null) ? $composerJson['require'] : [];
+
+        $phpConstraint = (string) ($require['php'] ?? '');
+        if (preg_match('/8\.(?:[4-9]|\d{2,})/', $phpConstraint) === 1) {
+            return true;
+        }
+
+        $laravel = (string) ($require['laravel/framework'] ?? '');
+        if ($laravel !== '' && preg_match('/(?:\^|~|>=|>|=)?\s*(\d+)/', $laravel, $matches) === 1) {
+            return (int) $matches[1] >= 13;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $packageJson
+     */
+    private function phpBuildCommand(string $workingDirectory, ?array $packageJson): string
+    {
+        $composer = 'composer install --no-dev --optimize-autoloader';
+        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+
+        return $frontend === '' ? $composer : $composer.' && '.$frontend;
+    }
+
+    /**
+     * Append a lockfile-aware JS install+build when the PHP app actually
+     * compiles a frontend (Vite / Mix / webpack / `scripts.build`). API-only
+     * Laravel apps with no compile step stay composer-only. `node_modules` is
+     * still excluded from the Functions zip.
+     *
+     * @param  array<string, mixed>|null  $packageJson
+     */
+    private function frontendCompileCommand(string $workingDirectory, ?array $packageJson): string
+    {
+        if ($packageJson === null) {
+            return '';
+        }
+
+        $dependencies = array_merge(
+            $this->stringKeys($packageJson['dependencies'] ?? null),
+            $this->stringKeys($packageJson['devDependencies'] ?? null),
+        );
+        $scripts = is_array($packageJson['scripts'] ?? null) ? $packageJson['scripts'] : [];
+
+        $hasVite = in_array('vite', $dependencies, true)
+            || is_file($workingDirectory.'/vite.config.js')
+            || is_file($workingDirectory.'/vite.config.ts')
+            || is_file($workingDirectory.'/vite.config.mjs');
+        $hasMix = in_array('laravel-mix', $dependencies, true)
+            || is_file($workingDirectory.'/webpack.mix.js');
+        $hasWebpack = in_array('webpack', $dependencies, true)
+            || is_file($workingDirectory.'/webpack.config.js');
+        $hasBuildScript = isset($scripts['build']) && is_string($scripts['build']) && trim($scripts['build']) !== '';
+
+        if (! $hasVite && ! $hasMix && ! $hasWebpack && ! $hasBuildScript) {
+            return '';
+        }
+
+        $manager = $this->jsPackageManager($workingDirectory, $packageJson);
+
+        return match ($manager) {
+            'pnpm' => is_file($workingDirectory.'/pnpm-lock.yaml')
+                ? 'pnpm install --frozen-lockfile && pnpm run build'
+                : 'pnpm install && pnpm run build',
+            'yarn' => is_file($workingDirectory.'/yarn.lock')
+                ? 'yarn install --frozen-lockfile && yarn build'
+                : 'yarn install && yarn build',
+            'bun' => 'bun install && bun run build',
+            default => is_file($workingDirectory.'/package-lock.json')
+                ? 'npm ci && npm run build'
+                : 'npm install && npm run build',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed> $packageJson
+     */
+    private function jsPackageManager(string $workingDirectory, array $packageJson): string
+    {
+        $pinned = (string) ($packageJson['packageManager'] ?? '');
+        if ($pinned !== '') {
+            $name = strtolower((string) preg_replace('/@.*$/', '', $pinned));
+            if (in_array($name, ['npm', 'pnpm', 'yarn', 'bun'], true)) {
+                return $name;
+            }
+        }
+
+        if (is_file($workingDirectory.'/pnpm-lock.yaml')) {
+            return 'pnpm';
+        }
+        if (is_file($workingDirectory.'/yarn.lock')) {
+            return 'yarn';
+        }
+        if (is_file($workingDirectory.'/bun.lockb') || is_file($workingDirectory.'/bun.lock')) {
+            return 'bun';
+        }
+
+        return 'npm';
     }
 
     /**

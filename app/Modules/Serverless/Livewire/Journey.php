@@ -13,8 +13,10 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
+use App\Support\DeployLogRedactor;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -325,6 +327,7 @@ class Journey extends Component
         $hostConfig = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
         $namespaceReady = ! empty($hostConfig['api_host'] ?? null);
         $serverErrored = $server->status === Server::STATUS_ERROR;
+        $provisionError = $this->namespaceProvisionError($meta);
 
         $siteActive = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
         $siteFailed = $site->status === Site::STATUS_FUNCTIONS_FAILED;
@@ -400,9 +403,12 @@ class Journey extends Component
             [
                 'key' => 'namespace',
                 'label' => __('Provisioning namespace'),
-                'detail' => $namespaceState === 'failed'
-                    ? __('Could not create the DigitalOcean Functions namespace.')
-                    : __('Creating the DigitalOcean Functions namespace.'),
+                'detail' => match ($namespaceState) {
+                    'failed' => $provisionError !== ''
+                        ? $provisionError
+                        : __('Could not create the DigitalOcean Functions namespace.'),
+                    default => __('Creating the DigitalOcean Functions namespace.'),
+                },
                 'state' => $namespaceState,
             ],
             [
@@ -500,10 +506,16 @@ class Journey extends Component
             : null;
 
         $failedStep = collect($deploySteps)->first(fn (array $step): bool => $step['state'] === 'failed');
-        $errorSummary = $this->errorSummary(
-            (string) ($deployment->log_output ?? ''),
-            is_array($failedStep) ? $failedStep : null,
-        );
+        $errorSummary = $namespaceState === 'failed'
+            ? ($provisionError !== '' ? $provisionError : __('Could not create the DigitalOcean Functions namespace.'))
+            : $this->errorSummary(
+                (string) ($deployment->log_output ?? ''),
+                is_array($failedStep) ? $failedStep : null,
+            );
+        $failedStepLabel = is_array($failedStep) ? (string) $failedStep['label'] : '';
+        if ($failedStepLabel === '' && $namespaceState === 'failed') {
+            $failedStepLabel = __('Provisioning namespace');
+        }
 
         $repoLabel = $this->repositoryLabel((string) ($site->git_repository_url ?? ''));
 
@@ -538,7 +550,7 @@ class Journey extends Component
             'deployStartedAt' => $deployment?->started_at,
             'errorSummary' => $errorSummary,
             'repoLabel' => $repoLabel,
-            'failedStepLabel' => is_array($failedStep) ? (string) $failedStep['label'] : '',
+            'failedStepLabel' => $failedStepLabel,
         ]);
     }
 
@@ -599,6 +611,26 @@ class Journey extends Component
         }
 
         return $url;
+    }
+
+    /**
+     * Secret-safe namespace create failure stored on the host by
+     * {@see ProvisionServerlessHostJob}. Empty when the job never persisted one.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function namespaceProvisionError(array $meta): string
+    {
+        $raw = $meta['provision_error'] ?? null;
+        $message = is_array($raw)
+            ? trim((string) ($raw['message'] ?? ''))
+            : (is_string($raw) ? trim($raw) : '');
+
+        if ($message === '') {
+            return '';
+        }
+
+        return Str::limit(DeployLogRedactor::redact($message), 400, '…');
     }
 
     /**
