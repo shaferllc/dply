@@ -105,6 +105,9 @@ class CreateServerlessFunction
             if ($credential === null) {
                 throw new InvalidArgumentException('The selected DigitalOcean credential is missing, belongs to another organization, or is not a DigitalOcean credential. Pick one from /credentials.');
             }
+            if ($credential->isUnhealthy()) {
+                throw new InvalidArgumentException('The selected DigitalOcean credential can no longer authenticate. Replace it at /credentials, then try again.');
+            }
         }
 
         // The serverless "host" — a DO Functions namespace. It starts PENDING;

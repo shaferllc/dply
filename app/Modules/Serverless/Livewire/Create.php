@@ -75,13 +75,14 @@ class Create extends Component
             return;
         }
 
-        $first = ProviderCredential::query()
-            ->where('organization_id', $org->id)
-            ->where('provider', 'digitalocean')
-            ->value('id');
+        // Prefer a credential DigitalOcean still accepts. `value('id')` with
+        // no order used to preselect the oldest row — often a revoked token
+        // sitting next to a working one — and namespace provision 401'd
+        // while the operator pointed at DIGITALOCEAN_TOKEN on the core app.
+        $preferred = ProviderCredential::preferredHealthyForOrganization($org->id, 'digitalocean');
 
-        if (is_string($first)) {
-            $this->provider_credential_id = $first;
+        if ($preferred !== null) {
+            $this->provider_credential_id = $preferred->id;
         } elseif ($this->managedAvailable()) {
             $this->delivery_mode = 'managed';
         }
@@ -139,6 +140,22 @@ class Create extends Component
     {
         return Feature::active('surface.serverless_managed')
             && ServerlessPlatformContext::fromConfig()->configured();
+    }
+
+    private function selectedCredentialIsUnhealthy(string $organizationId): bool
+    {
+        $credentialId = trim($this->provider_credential_id);
+        if ($credentialId === '') {
+            return false;
+        }
+
+        $credential = ProviderCredential::query()
+            ->where('id', $credentialId)
+            ->where('organization_id', $organizationId)
+            ->where('provider', 'digitalocean')
+            ->first();
+
+        return $credential?->isUnhealthy() ?? false;
     }
 
     public string $region = 'nyc1';
@@ -376,6 +393,15 @@ class Create extends Component
             'provider_credential_id.exists' => __('That DigitalOcean credential isn\'t available to this organization. Pick one from the list or add a new one under /credentials.'),
         ]);
 
+        if (! $managed && $this->selectedCredentialIsUnhealthy($org->id)) {
+            $this->addError(
+                'provider_credential_id',
+                __('That DigitalOcean credential can’t connect. Replace it at /credentials, or pick a working token.'),
+            );
+
+            return null;
+        }
+
         try {
             $site = $action->handle(auth()->user(), $org, [
                 'name' => $this->name,
@@ -430,7 +456,8 @@ class Create extends Component
         $credentials = $org === null ? collect() : ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->where('provider', 'digitalocean')
-            ->get(['id', 'name']);
+            ->orderByDesc('created_at')
+            ->get(['id', 'name', 'validation_error']);
 
         return view('livewire.serverless.create', [
             'credentials' => $credentials,

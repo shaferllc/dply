@@ -112,6 +112,19 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        if ($credential->isUnhealthy()) {
+            Log::warning('serverless.namespace.unhealthy_credential', [
+                'server_id' => $server->id,
+                'credential_id' => $credential->id,
+            ]);
+            $this->markFailed(
+                $server,
+                'The DigitalOcean credential on this function can no longer authenticate. Replace it at /credentials (the token needs Functions write), then create again.',
+            );
+
+            return;
+        }
+
         try {
             $namespace = (new DigitalOceanService($credential))->createFunctionsNamespace(
                 $server->region !== '' ? (string) $server->region : 'nyc1',

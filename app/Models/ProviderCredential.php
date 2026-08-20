@@ -103,6 +103,25 @@ class ProviderCredential extends Model
             ->first();
     }
 
+    /**
+     * Newest credential that still authenticates. Falls back to the newest
+     * row (even if rejected) so a picker has something to show.
+     */
+    public static function preferredHealthyForOrganization(?string $organizationId, string $provider): ?self
+    {
+        if (! filled($organizationId) || trim($provider) === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('organization_id', $organizationId)
+            ->where('provider', $provider)
+            ->whereNull('validation_error')
+            ->orderByDesc('created_at')
+            ->first()
+            ?? static::newestForOrganization($organizationId, $provider);
+    }
+
     public static function preferredForServer(Server $server): ?self
     {
         return static::newestForOrganization((string) $server->organization_id, $server->provider->value)

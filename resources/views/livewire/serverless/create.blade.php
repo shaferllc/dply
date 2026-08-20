@@ -248,7 +248,9 @@
                                                 <select id="provider_credential_id" wire:model.live="provider_credential_id" class="dply-input mt-1 block w-full" required>
                                                     <option value="" disabled>{{ __('Select a credential') }}</option>
                                                     @foreach ($credentials as $credential)
-                                                        <option value="{{ $credential->id }}">{{ $credential->name }}</option>
+                                                        <option value="{{ $credential->id }}">
+                                                            {{ $credential->name }}{{ filled($credential->validation_error) ? ' — '.__('Can’t connect') : '' }}
+                                                        </option>
                                                     @endforeach
                                                 </select>
                                             @endif
