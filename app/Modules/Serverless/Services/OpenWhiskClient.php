@@ -225,7 +225,7 @@ class OpenWhiskClient
 
             return [
                 'ok' => false,
-                'error' => trim('OpenWhisk returned HTTP '.$response->status().'. '.$detail),
+                'error' => trim('DigitalOcean Functions returned HTTP '.$response->status().'. '.$detail),
                 'data' => $response->json(),
             ];
         }

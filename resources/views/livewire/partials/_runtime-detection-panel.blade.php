@@ -22,7 +22,7 @@
     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p class="font-medium">{{ __('No runtime detected.') }}</p>
         @if ($detectionIsServerless)
-            <p class="mt-1">{{ __('No framework markers, no OpenWhisk project.yml, and no recognized main() entry file at the repo root. Pick a runtime manually before deploying.') }}</p>
+            <p class="mt-1">{{ __('No framework markers, no project.yml, and no recognized main() entry file at the repo root. Pick a runtime manually before deploying.') }}</p>
         @else
             <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
         @endif

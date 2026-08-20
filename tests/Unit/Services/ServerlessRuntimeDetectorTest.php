@@ -226,6 +226,8 @@ test('a file without a main symbol is not a raw action', function () {
 
     expect($result['framework'])->toBe('unknown');
     expect($result['deploy_kind'])->toBe('unknown');
+    expect($result['warnings'][0] ?? '')->toContain('no project.yml');
+    expect($result['warnings'][0] ?? '')->not->toContain('OpenWhisk');
 });
 
 test('detects an openwhisk project yml as a raw multi action package', function () {
@@ -415,4 +417,39 @@ test('laravel api only package json stays composer only', function () {
 
     expect($result['framework'])->toBe('laravel');
     expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader');
+});
+
+test('frontendCompileCommand exists so laravel detect cannot throw undefined method', function () {
+    expect(method_exists(ServerlessRuntimeDetector::class, 'frontendCompileCommand'))->toBeTrue();
+
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'package.json' => json_encode([
+            'devDependencies' => ['laravel-mix' => '^6.0'],
+            'scripts' => ['build' => 'mix --production'],
+        ]),
+        'webpack.mix.js' => "const mix = require('laravel-mix');\n",
+        'yarn.lock' => "# yarn lockfile v1\n",
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader && yarn install --frozen-lockfile && yarn build');
+});
+
+test('symfony with webpack config appends npm install and build', function () {
+    // A `scripts.build` key would match detectNodeStack first (node_generic).
+    // webpack.config.js alone still trips the PHP frontend compile suffix.
+    $result = detectRepo([
+        'composer.json' => json_encode(['require' => ['symfony/framework-bundle' => '^7.0']]),
+        'package.json' => json_encode([
+            'devDependencies' => ['webpack' => '^5.0'],
+        ]),
+        'webpack.config.js' => "module.exports = {};\n",
+    ]);
+
+    expect($result['framework'])->toBe('symfony');
+    expect($result['runtime'])->toBe('php:8.3');
+    expect($result['build_command'])->toBe('composer install --no-dev --optimize-autoloader && npm install && npm run build');
 });

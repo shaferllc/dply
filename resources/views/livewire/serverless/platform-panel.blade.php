@@ -12,7 +12,7 @@
         'credentials' => 'heroicon-o-key',
     ];
     $tabNotes = [
-        'inspector' => __('Deployed action and namespace inventory — live from OpenWhisk.'),
+        'inspector' => __('Deployed action and namespace inventory — live from DigitalOcean Functions.'),
         'triggers' => __('Schedules, triggers, and rules for this function.'),
         'console' => __('Send a test request. Results also appear on Logs.'),
         'credentials' => __('The namespace access key dply uses to reach this function.'),
@@ -82,7 +82,7 @@
 
         @if (! $action['ok'])
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-900 sm:px-4">
-                {{ $action['error'] ?? __('Could not read the action from OpenWhisk.') }}
+                {{ $action['error'] ?? __('Could not read the action from DigitalOcean Functions.') }}
             </div>
         @elseif ($actionDoc)
             <div class="border-b border-brand-ink/10">
@@ -139,7 +139,7 @@
                 <button
                     type="button"
                     wire:click="deleteAction"
-                    wire:confirm="{{ __('Delete the action :name from OpenWhisk?', ['name' => $actionName]) }}"
+                    wire:confirm="{{ __('Delete the action :name from DigitalOcean Functions?', ['name' => $actionName]) }}"
                     class="inline-flex shrink-0 items-center rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
                 >
                     {{ __('Delete action') }}

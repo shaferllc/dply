@@ -38,7 +38,7 @@ class RoadmapItemSeeder extends Seeder
             [
                 'title' => 'Serverless functions',
                 'summary' => 'Deploy functions to DO Functions, Cloudflare Workers, and more.',
-                'description' => 'Org-scoped serverless sites with provider adapters, Laravel on OpenWhisk, and optional dply-managed backend billing.',
+                'description' => 'Org-scoped serverless sites with provider adapters, Laravel on DigitalOcean Functions, and optional dply-managed backend billing.',
                 'status' => RoadmapItem::STATUS_IN_PROGRESS,
                 'area' => 'serverless',
                 'sort_order' => 2,

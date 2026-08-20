@@ -8,7 +8,7 @@
     <x-profile-shell
         class="mt-4"
         :title="__('Serverless glue')"
-        :description="__('OpenWhisk sequences that connect Edge deploy hooks, Cloud redeploy endpoints, and BYO cron callbacks — orchestration across engines without leaving dply.')"
+        :description="__('Function sequences that connect Edge deploy hooks, Cloud redeploy endpoints, and BYO cron callbacks — orchestration across engines without leaving dply.')"
         icon="heroicon-o-link"
     >
         <x-slot:actions>
@@ -163,7 +163,7 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('Build the sequence') }}</p>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('When your inventory is ready, define and deploy an OpenWhisk sequence on your functions host.') }}</p>
+                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('When your inventory is ready, define and deploy a function sequence on your functions host.') }}</p>
                             </div>
                             <button
                                 type="button"
@@ -181,7 +181,7 @@
             <section aria-labelledby="glue-sequences-heading">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <h2 id="glue-sequences-heading" class="text-sm font-semibold text-brand-ink">{{ __('Define a sequence') }}</h2>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Chain code actions in one OpenWhisk namespace. Components may come from any package-site on the same functions host.') }}</p>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Chain code actions in one DigitalOcean Functions namespace. Components may come from any package-site on the same functions host.') }}</p>
                 </div>
 
                 @if (count($snapshot['functions_hosts']) === 0)

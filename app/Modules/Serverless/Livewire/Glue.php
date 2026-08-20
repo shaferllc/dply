@@ -126,7 +126,7 @@ class Glue extends Component
         $result = $deployer->deploy($action);
 
         if ($result['ok']) {
-            $this->toastSuccess(__('Sequence deployed to OpenWhisk.'));
+            $this->toastSuccess(__('Sequence deployed to DigitalOcean Functions.'));
         } else {
             $this->toastError($result['error'] ?? __('Deploy failed.'));
         }

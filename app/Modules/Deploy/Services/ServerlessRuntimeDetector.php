@@ -132,7 +132,7 @@ final class ServerlessRuntimeDetector
                 'artifact_output_path' => '.',
                 'package' => (string) ($capabilities['default_package'] ?? 'default'),
                 'confidence' => 'high',
-                'reasons' => ['Detected an OpenWhisk project.yml manifest — a raw multi-action package.'],
+                'reasons' => ['Detected a project.yml functions manifest — a multi-function package.'],
                 'warnings' => ['Individual actions are enumerated from the manifest at deploy time.'],
                 'unsupported_for_target' => false,
             ];
@@ -176,7 +176,7 @@ final class ServerlessRuntimeDetector
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => 'low',
             'reasons' => ['No clear framework markers were detected in the repository root.'],
-            'warnings' => ['Set the runtime and entrypoint manually before deploying — this repo has no framework, no OpenWhisk project.yml, and no recognised main() entry file.'],
+            'warnings' => ['Set the runtime and entrypoint manually before deploying — this repo has no framework, no project.yml, and no recognised main() entry file.'],
             'unsupported_for_target' => false,
         ];
     }
@@ -283,7 +283,7 @@ final class ServerlessRuntimeDetector
             'artifact_output_path' => '.',
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => 'high',
-            'reasons' => ['Detected a raw OpenWhisk '.$language.' action — '.$entryFile.' defines a main() handler.'],
+            'reasons' => ['Detected a raw '.$language.' function — '.$entryFile.' defines a main() handler.'],
             'warnings' => $warnings,
             'unsupported_for_target' => ! $supported,
         ];

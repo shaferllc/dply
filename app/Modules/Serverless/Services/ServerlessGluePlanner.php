@@ -135,7 +135,7 @@ final class ServerlessGluePlanner
         $seqCount = count($snapshot['sequences'] ?? []);
 
         if ($codeCount > 0 && $seqCount === 0) {
-            $gaps[] = __('No OpenWhisk sequences defined yet — use the Sequences tab to create one.');
+            $gaps[] = __('No function sequences defined yet — use the Sequences tab to create one.');
         }
 
         if ($key === 'edge_webhook_pipeline' && count($snapshot['edge_sites'] ?? []) > 0 && count($snapshot['edge_hooks'] ?? []) === 0) {

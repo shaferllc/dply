@@ -60,7 +60,7 @@ class ServerlessGinAdapter
         }
 
         if (! $plan['has_router']) {
-            throw new RuntimeException('dply Gin adapter: the repository must export `func Router() http.Handler` (a *gin.Engine satisfies it) so dply can drive it as an OpenWhisk action.');
+            throw new RuntimeException('dply Gin adapter: the repository must export `func Router() http.Handler` (a *gin.Engine satisfies it) so dply can drive it as a function.');
         }
 
         $stub = $this->stubPath();

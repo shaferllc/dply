@@ -74,7 +74,7 @@
         [
             'n' => '02',
             'title' => __('Point at a repo'),
-            'body' => __('dply detects the runtime, builds the package, and injects the OpenWhisk adapter at deploy time.'),
+            'body' => __('dply detects the runtime, builds the package, and injects the Functions adapter at deploy time.'),
         ],
         [
             'n' => '03',

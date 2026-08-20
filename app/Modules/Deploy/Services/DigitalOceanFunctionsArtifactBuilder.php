@@ -183,7 +183,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // wraps the repo's own action, and reports each call to dply.
         $shimLog = [];
         if ($isRawAction && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting logging shim', 'dply ↔ OpenWhisk raw-action bridge');
+            $this->progress->active($site, 'adapter', 'Injecting logging shim', 'dply ↔ Functions raw-action bridge');
             $injection = $this->shimInjector->inject(
                 $checkout['working_directory'],
                 (string) $detected['language'],

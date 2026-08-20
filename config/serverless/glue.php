@@ -15,13 +15,13 @@ return [
 
     'edge_webhook_pipeline' => [
         'title' => 'Edge deploy hook → serverless sequence',
-        'summary' => 'Mint an Edge deploy hook, chain serverless code actions in an OpenWhisk sequence, and point the hook at the sequence web action URL.',
+        'summary' => 'Mint an Edge deploy hook, chain serverless code actions in a function sequence, and point the hook at the sequence web action URL.',
         'doc_slug' => 'edge-deploy-triggers',
         'requires' => 'edge_hooks_and_actions',
         'steps' => [
             'Inventory Edge sites with deploy hooks and your DO Functions namespace code actions.',
             'Create a serverless sequence on the functions host that chains at least two code actions (validate → notify → redeploy, etc.).',
-            'Deploy the sequence to OpenWhisk and copy its web-export invocation URL from the function Platform tab.',
+            'Deploy the sequence to DigitalOcean Functions and copy its web-export invocation URL from the function Platform tab.',
             'On the Edge site, open Deploy triggers and mint a deploy hook — or call the hook URL from your sequence’s last action.',
             'Smoke-test: POST the Edge hook and confirm the sequence runs end-to-end in serverless invocation logs.',
             'Document the hook prefix and sequence name in your runbook for on-call.',
@@ -44,14 +44,14 @@ return [
 
     'byo_cron_callback' => [
         'title' => 'Sequence → BYO cron callback',
-        'summary' => 'Finish an OpenWhisk sequence with a BYO server cron or HTTP callback — useful for VPS tasks a managed PaaS cannot reach.',
+        'summary' => 'Finish a function sequence with a BYO server cron or HTTP callback — useful for VPS tasks a managed PaaS cannot reach.',
         'doc_slug' => 'server-cron-jobs',
         'requires' => 'byo_cron_and_actions',
         'steps' => [
             'Identify the BYO server cron or site endpoint the sequence should hit last.',
             'Author a code action that signs and POSTs to your BYO callback URL or internal API.',
             'Chain it after validation/normalization actions in a sequence on the functions host.',
-            'Optionally mirror timing with an OpenWhisk cron trigger on the first action.',
+            'Optionally mirror timing with a Functions cron trigger on the first action.',
             'Confirm the BYO cron log or site deploy hook receives the callback on test invoke.',
         ],
     ],

@@ -54,7 +54,7 @@ test('serverless detection maps a recognized action', function () {
         'entrypoint' => 'main',
         'build_command' => 'composer install',
         'confidence' => 'high',
-        'reasons' => ['Detected a raw OpenWhisk php action.'],
+        'reasons' => ['Detected a raw php function.'],
         'warnings' => [],
     ], 'https://github.com/acme/api.git', 'main');
 

@@ -138,7 +138,7 @@ final class DigitalOceanFunctionsActionDeployer
             ? 'This is a dply-managed host, so the key comes from DPLY_SERVERLESS_DO_ACCESS_KEY — rotate/refresh it in the environment and redeploy.'
             : 'The key is stored on the host as meta.digitalocean_functions.access_key — re-save the namespace credentials on the host and redeploy.';
 
-        return 'OpenWhisk rejected the credentials for namespace '.$namespace.' at '.$apiHost.'. '.$source;
+        return 'DigitalOcean Functions rejected the credentials for namespace '.$namespace.' at '.$apiHost.'. '.$source;
     }
 
     /**

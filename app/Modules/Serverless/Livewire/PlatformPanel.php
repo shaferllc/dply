@@ -420,7 +420,7 @@ class PlatformPanel extends Component
             return true;
         }
 
-        $this->toastError($result['error'] ?? __('OpenWhisk request failed.'));
+        $this->toastError($result['error'] ?? __('Functions request failed.'));
 
         return false;
     }
