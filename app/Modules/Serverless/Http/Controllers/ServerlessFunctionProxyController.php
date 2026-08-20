@@ -7,6 +7,7 @@ namespace App\Modules\Serverless\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Modules\Serverless\Services\ServerlessAssetPublisher;
 use App\Modules\Serverless\Services\ServerlessRoutingResolver;
 use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\RedirectResponse;
@@ -58,6 +59,11 @@ class ServerlessFunctionProxyController extends Controller
             return $redirect;
         }
 
+        $published = $this->servePublishedAsset($request, $site, $path);
+        if ($published !== null) {
+            return $published;
+        }
+
         if ($routing['cors']['enabled'] && $request->isMethod('OPTIONS')) {
             $preflight = $this->corsPreflight($request, $routing['cors']);
             if ($preflight !== null) {
@@ -73,6 +79,25 @@ class ServerlessFunctionProxyController extends Controller
         $upstream = $this->forward($request, $actionUrl, $path);
 
         return $this->decorate($request, $upstream, $routing);
+    }
+
+    /**
+     * Serve Vite/build files from the attached disk on the function host
+     * so browsers never fetch them from the control-plane origin.
+     */
+    private function servePublishedAsset(Request $request, Site $site, string $path): ?Response
+    {
+        if (! in_array($request->method(), ['GET', 'HEAD'], true)) {
+            return null;
+        }
+
+        $publisher = app(ServerlessAssetPublisher::class);
+        $relative = $publisher->relativeFromRequestPath($site, $path);
+        if ($relative === null) {
+            return null;
+        }
+
+        return $publisher->responseFor($site, $relative);
     }
 
     /**

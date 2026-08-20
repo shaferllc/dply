@@ -70,7 +70,7 @@ class ServerlessServiceProvider extends ServiceProvider
 
     /**
      * Leftover `Storage::disk('serverless_assets')` calls alias the durable
-     * dply.io disk (`site_assets`) so they do not throw after that invented
+     * attached store (`site_assets`) so they do not throw after that invented
      * disk was removed from filesystems.php.
      */
     private function aliasServerlessAssetsDisk(): void

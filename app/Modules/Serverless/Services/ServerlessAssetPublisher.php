@@ -5,24 +5,26 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use Illuminate\Contracts\Filesystem\Filesystem;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
 /**
  * Publish a Functions Laravel app's `public/build` off the function so Vite
  * CSS/fonts are not served through the 1 MB HTTP response cap.
  *
- * Files land on the control-plane disk that already serves dply.io
- * (`site_assets` — logos, favicons, org icons) under `serverless-assets/{site}/`.
- * The public URL stays `/serverless-assets/{site}/build/…`. The deploy then
- * sets ASSET_URL to that origin so `asset()` / `@vite` point here instead of
- * the function hostname.
+ * Files land on the durable attached store (`site_assets`) under
+ * `serverless-assets/{site}/`. ASSET_URL is that disk's own public URL
+ * ({@see Filesystem::url()} / the disk `url` config). When the disk is
+ * local and that URL is still the control-plane host, ASSET_URL stays on
+ * the function hostname so the proxy can serve `/build` same-origin.
  */
 class ServerlessAssetPublisher
 {
     /**
-     * Durable control-plane disk that already serves dply.io. Looked up by
-     * matching the public origin host against configured disk URLs.
+     * Durable attached store (logos, favicons, org icons). Not looked up
+     * by matching APP_URL / dply.io.
      */
     public const DISK = 'site_assets';
 
@@ -60,83 +62,35 @@ class ServerlessAssetPublisher
         return $url;
     }
 
+    /**
+     * Public ASSET_URL prefix for this site's published build.
+     *
+     * Prefers the attached disk's own URL. Falls back to the function
+     * hostname when that URL is the control-plane origin (local disk
+     * whose `url` is still APP_URL).
+     */
     public function assetUrl(Site $site): string
     {
-        return $this->origin().'/serverless-assets/'.$site->id;
-    }
-
-    public function origin(): string
-    {
-        $public = trim((string) config('dply.public_app_url', ''));
-        if ($public === '') {
-            $public = rtrim((string) config('app.url'), '/');
+        $fromDisk = $this->diskPublicUrl($site);
+        if ($fromDisk !== null) {
+            return $fromDisk;
         }
 
-        if (preg_match('~^https?://~i', $public) !== 1) {
-            $public = 'https://'.$public;
-        }
-
-        return rtrim($public, '/');
+        return $this->sameOriginUrl($site);
     }
 
-    /**
-     * The filesystem disk that already serves the control-plane origin
-     * (dply.io in production). Prefers `site_assets` when its URL host
-     * matches; never invents a `serverless_assets` disk.
-     */
     public function diskName(): string
     {
-        $host = strtolower((string) parse_url($this->origin(), PHP_URL_HOST));
-        $disks = config('filesystems.disks', []);
-        if (! is_array($disks)) {
-            return self::DISK;
-        }
-
-        $ranked = [];
-        foreach ($disks as $name => $disk) {
-            if (! is_string($name) || ! is_array($disk) || $name === 'serverless_assets') {
-                continue;
-            }
-            $driver = $disk['driver'] ?? null;
-            if (! is_string($driver) || $driver === '') {
-                continue;
-            }
-
-            $url = $disk['url'] ?? '';
-            $diskHost = is_string($url) && $url !== ''
-                ? strtolower((string) parse_url($url, PHP_URL_HOST))
-                : '';
-            $hostMatches = $host !== '' && $diskHost !== '' && $diskHost === $host;
-            $preferred = $name === self::DISK;
-
-            if (! $hostMatches && ! $preferred) {
-                continue;
-            }
-
-            $rank = match ($name) {
-                'site_assets' => 0,
-                'public' => 1,
-                default => 2,
-            };
-            if (! $hostMatches) {
-                $rank += 10;
-            }
-
-            $ranked[] = [$rank, $name];
-        }
-
-        if ($ranked === []) {
-            return self::DISK;
-        }
-
-        usort($ranked, fn (array $a, array $b): int => $a[0] <=> $b[0]);
-
-        return $ranked[0][1];
+        return self::DISK;
     }
 
     public function read(Site $site, string $relative): ?string
     {
-        $key = $this->prefix($site).'/'.ltrim(str_replace('\\', '/', $relative), '/');
+        $key = $this->storageKey($site, $relative);
+        if ($key === null) {
+            return null;
+        }
+
         $disk = $this->disk();
         if (! $disk->exists($key)) {
             return null;
@@ -147,14 +101,185 @@ class ServerlessAssetPublisher
         return is_string($contents) ? $contents : null;
     }
 
+    /**
+     * Stream a published file. Null when the path is unsafe or missing.
+     */
+    public function responseFor(Site $site, string $relative): ?Response
+    {
+        $contents = $this->read($site, $relative);
+        if ($contents === null) {
+            return null;
+        }
+
+        $safe = $this->safeRelative($relative) ?? $relative;
+        $cache = preg_match('/\.[a-f0-9]{8,}\./', $safe) === 1
+            ? 'public, max-age=31536000, immutable'
+            : 'public, max-age=3600';
+
+        return response($contents, 200, [
+            'Content-Type' => $this->mimeFor($safe),
+            'Cache-Control' => $cache,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
+     * Map a request path on the function host to a storage-relative key.
+     * Accepts `/build/…` and `/serverless-assets/{site}/…`.
+     */
+    public function relativeFromRequestPath(Site $site, string $path): ?string
+    {
+        $relative = $this->safeRelative($path);
+        if ($relative === null) {
+            return null;
+        }
+
+        if ($relative === 'build' || str_starts_with($relative, 'build/')) {
+            return $relative;
+        }
+
+        $prefixed = self::STORAGE_PREFIX.'/'.$site->id.'/';
+        if (str_starts_with($relative, $prefixed)) {
+            $stripped = substr($relative, strlen($prefixed));
+
+            return $stripped !== '' ? $stripped : null;
+        }
+
+        return null;
+    }
+
     public function prefix(Site $site): string
     {
         return self::STORAGE_PREFIX.'/'.$site->id;
     }
 
-    private function disk(): Filesystem
+    public function mimeFor(string $path): string
     {
-        return Storage::disk($this->diskName());
+        return match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
+            'css' => 'text/css; charset=utf-8',
+            'js', 'mjs' => 'application/javascript; charset=utf-8',
+            'json', 'map' => 'application/json; charset=utf-8',
+            'svg' => 'image/svg+xml',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'avif' => 'image/avif',
+            'ico' => 'image/x-icon',
+            'woff2' => 'font/woff2',
+            'woff' => 'font/woff',
+            'ttf' => 'font/ttf',
+            'otf' => 'font/otf',
+            'wasm' => 'application/wasm',
+            default => 'application/octet-stream',
+        };
+    }
+
+    /**
+     * The disk's own public prefix for this site, or null when that URL
+     * is missing or still the control-plane host.
+     */
+    private function diskPublicUrl(Site $site): ?string
+    {
+        try {
+            $url = rtrim((string) $this->disk()->url($this->prefix($site)), '/');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($url === '' || preg_match('~^https?://~i', $url) !== 1) {
+            return null;
+        }
+
+        if ($this->urlIsControlPlane($url)) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    private function sameOriginUrl(Site $site): string
+    {
+        $url = $site->serverlessFriendlyUrl() ?: $site->serverlessPublicUrl();
+        if (! is_string($url) || $url === '') {
+            $url = 'https://'.$site->ensureServerlessProxySlug().'.'
+                .ServerlessTestingDomains::apexFor($site->getKey());
+        }
+
+        return rtrim($url, '/');
+    }
+
+    private function urlIsControlPlane(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host === '') {
+            return true;
+        }
+
+        foreach ($this->controlPlaneHosts() as $plane) {
+            if ($host === $plane) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function controlPlaneHosts(): array
+    {
+        $hosts = [];
+        foreach ([
+            (string) config('app.url', ''),
+            (string) config('dply.public_app_url', ''),
+        ] as $origin) {
+            $origin = trim($origin);
+            if ($origin === '') {
+                continue;
+            }
+            if (preg_match('~^https?://~i', $origin) !== 1) {
+                $origin = 'https://'.$origin;
+            }
+            $host = strtolower((string) parse_url($origin, PHP_URL_HOST));
+            if ($host !== '') {
+                $hosts[] = $host;
+            }
+        }
+
+        return array_values(array_unique($hosts));
+    }
+
+    private function storageKey(Site $site, string $relative): ?string
+    {
+        $safe = $this->safeRelative($relative);
+        if ($safe === null) {
+            return null;
+        }
+
+        return $this->prefix($site).'/'.$safe;
+    }
+
+    private function safeRelative(string $relative): ?string
+    {
+        $relative = ltrim(str_replace('\\', '/', $relative), '/');
+        if ($relative === '' || str_contains($relative, '..') || str_contains($relative, "\0")) {
+            return null;
+        }
+
+        return $relative;
+    }
+
+    private function disk(): FilesystemAdapter
+    {
+        $disk = Storage::disk($this->diskName());
+
+        if (! $disk instanceof FilesystemAdapter) {
+            throw new \RuntimeException('Attached asset disk is not a filesystem adapter.');
+        }
+
+        return $disk;
     }
 
     private function uploadDirectory(string $localDir, string $storagePrefix): int
@@ -190,27 +315,5 @@ class ServerlessAssetPublisher
         }
 
         return 'public, max-age=3600';
-    }
-
-    public function mimeFor(string $path): string
-    {
-        return match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
-            'css' => 'text/css; charset=utf-8',
-            'js', 'mjs' => 'application/javascript; charset=utf-8',
-            'json', 'map' => 'application/json; charset=utf-8',
-            'svg' => 'image/svg+xml',
-            'png' => 'image/png',
-            'jpg', 'jpeg' => 'image/jpeg',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'avif' => 'image/avif',
-            'ico' => 'image/x-icon',
-            'woff2' => 'font/woff2',
-            'woff' => 'font/woff',
-            'ttf' => 'font/ttf',
-            'otf' => 'font/otf',
-            'wasm' => 'application/wasm',
-            default => 'application/octet-stream',
-        };
     }
 }

@@ -162,8 +162,9 @@ class ServerlessEnvironmentPreparer
     }
 
     /**
-     * Point ASSET_URL at the off-function published origin after `public/build`
-     * has been uploaded. APP_URL stays the function hostname.
+     * Point ASSET_URL at the published origin after `public/build` has been
+     * uploaded (the attached disk's public URL, or the function hostname when
+     * that disk is still the control plane). APP_URL stays the function hostname.
      */
     public function applyAssetUrl(Site $site, string $workingDirectory, string $assetUrl): void
     {

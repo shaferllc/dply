@@ -23,25 +23,9 @@ class ServerlessAssetController
             abort(404);
         }
 
-        $relative = ltrim(str_replace('\\', '/', $path), '/');
-        if ($relative === '' || str_contains($relative, '..') || str_contains($relative, "\0")) {
-            abort(404);
-        }
+        $response = $publisher->responseFor($site, $path);
+        abort_if($response === null, 404);
 
-        $contents = $publisher->read($site, $relative);
-        if ($contents === null) {
-            abort(404);
-        }
-
-        $mime = $publisher->mimeFor($relative);
-        $cache = preg_match('/\.[a-f0-9]{8,}\./', $relative) === 1
-            ? 'public, max-age=31536000, immutable'
-            : 'public, max-age=3600';
-
-        return response($contents, 200, [
-            'Content-Type' => $mime,
-            'Cache-Control' => $cache,
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $response;
     }
 }

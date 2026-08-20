@@ -3,9 +3,11 @@
 namespace Tests\Feature\ServerlessFunctionProxyTest;
 
 use App\Models\Site;
+use App\Modules\Serverless\Services\ServerlessAssetPublisher;
 use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -115,4 +117,30 @@ test('it proxies a minted unique testing hostname', function () {
     $this->get('http://'.$slug.'.'.$domain.'/')
         ->assertOk()
         ->assertSee('reached via unique host');
+});
+
+test('it serves published build assets on the function host without forwarding', function () {
+    Http::fake([
+        'https://faas.example/*' => Http::response('should not reach the function', 200),
+    ]);
+    Storage::fake(ServerlessAssetPublisher::DISK);
+
+    $site = Site::factory()->create([
+        'meta' => ['serverless' => [
+            'proxy_slug' => 'placehold',
+            'action_url' => 'https://faas.example/api/v1/web/ns/default/app',
+        ]],
+    ]);
+
+    Storage::disk(ServerlessAssetPublisher::DISK)->put(
+        app(ServerlessAssetPublisher::class)->prefix($site).'/build/assets/app-aaaaaaaa.js',
+        'console.log(1)',
+    );
+
+    $this->get('/fn/placehold/build/assets/app-aaaaaaaa.js')
+        ->assertOk()
+        ->assertHeader('content-type', 'application/javascript; charset=utf-8')
+        ->assertSee('console.log(1)', false);
+
+    Http::assertNothingSent();
 });
