@@ -44,7 +44,7 @@
         class="border-b border-brand-ink/10"
         icon="heroicon-o-bolt"
         :title="__('Function')"
-        :note="__('HTTP-triggered function on DigitalOcean Functions.')"
+        :note="__('HTTP-triggered function.')"
     >
         <x-slot:actions>
             <span class="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-semibold {{ $statusBadgeClass }}">{{ $statusLabel }}</span>

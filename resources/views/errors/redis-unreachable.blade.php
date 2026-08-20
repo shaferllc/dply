@@ -108,6 +108,10 @@
                     {{ __('SSH or run `redis-cli -h :host -p :port ping` from this machine — if that hangs, the box is down, the firewall is blocking, or the host moved.', ['host' => $host, 'port' => $port]) }}
                 </li>
                 <li>
+                    <strong>{{ __('TLS for DigitalOcean managed Redis.') }}</strong>
+                    {{ __('A host on :25061 or *.db.ondigitalocean.com is TLS-only. Plain tcp:// fails at AUTH. Set REDIS_SCHEME=tls (or REDIS_URL=rediss://…) in the live .env and in the site env cache, then `php artisan config:clear`.') }}
+                </li>
+                <li>
                     <strong>{{ __('Use local cache during the outage.') }}</strong><br>
                     <code>CACHE_STORE=file</code>
                     <code>QUEUE_CONNECTION=sync</code><br>

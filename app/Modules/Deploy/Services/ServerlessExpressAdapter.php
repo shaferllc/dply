@@ -67,7 +67,7 @@ class ServerlessExpressAdapter
 
         $stub = $this->stubPath();
         if (! is_file($stub)) {
-            throw new RuntimeException('DigitalOcean Functions Express adapter stub is missing: '.$stub);
+            throw new RuntimeException('Functions Express adapter stub is missing: '.$stub);
         }
 
         $dir = rtrim($workingDirectory, '/');
@@ -97,7 +97,7 @@ class ServerlessExpressAdapter
 
         return $plan + [
             'ran' => true,
-            'output' => 'Injected DigitalOcean Functions Express adapter as '.self::HANDLER_FILENAME.', wrapping '.$requireTarget.'.',
+            'output' => 'Injected Functions Express adapter as '.self::HANDLER_FILENAME.', wrapping '.$requireTarget.'.',
         ];
     }
 

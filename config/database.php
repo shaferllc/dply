@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Redis\RedisConnectionTls;
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
@@ -193,10 +194,14 @@ return [
         | Redis that's healthy never retries, so this is free there. A sustained
         | outage still fails fast (retries exhaust within a few seconds) and hits
         | the friendly redis-unreachable handler in bootstrap/app.php.
+        |
+        | TLS: DigitalOcean managed Redis/Valkey on :25061 / *.db.ondigitalocean.com
+        | is TLS-only. RedisConnectionTls infers scheme=tls (and redis:// → rediss://)
+        | so a stale .env missing REDIS_SCHEME still handshakes. Local 127.0.0.1 stays tcp.
         */
         'default' => [
-            'url' => env('REDIS_URL'),
-            'scheme' => env('REDIS_SCHEME', 'tcp'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -211,8 +216,8 @@ return [
         ],
 
         'cache' => [
-            'url' => env('REDIS_URL'),
-            'scheme' => env('REDIS_SCHEME', 'tcp'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -244,8 +249,8 @@ return [
         | the queue `block_for` (config/queue.php); -1 satisfies any block_for.
         */
         'queue' => [
-            'url' => env('REDIS_URL'),
-            'scheme' => env('REDIS_SCHEME', 'tcp'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),

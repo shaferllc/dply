@@ -178,7 +178,7 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeProfile()) {
             'docker_web' => __('Docker'),
             'kubernetes_web' => __('Kubernetes'),
-            'digitalocean_functions_web' => __('DigitalOcean Functions'),
+            'digitalocean_functions_web' => __('Functions'),
             'aws_lambda_bref_web' => __('AWS Lambda'),
             'vm_web' => __('BYO VM'),
             default => (string) str($this->runtimeProfile())->replace('_', ' ')->title(),
@@ -972,7 +972,7 @@ trait ResolvesSiteRuntime
             'digitalocean_kubernetes' => 'DigitalOcean Kubernetes',
             'aws_docker' => 'AWS Docker',
             'aws_kubernetes' => 'AWS Kubernetes',
-            'digitalocean_functions' => 'DigitalOcean Functions',
+            'digitalocean_functions' => 'Functions',
             'aws_lambda' => 'AWS Lambda',
             default => 'BYO runtime',
         };

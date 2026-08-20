@@ -87,7 +87,7 @@ class ServerlessFlaskAdapter
 
         $stub = $this->stubPath();
         if (! is_file($stub)) {
-            throw new RuntimeException('DigitalOcean Functions Flask adapter stub is missing: '.$stub);
+            throw new RuntimeException('Functions Flask adapter stub is missing: '.$stub);
         }
 
         $dir = rtrim($workingDirectory, '/');
@@ -112,7 +112,7 @@ class ServerlessFlaskAdapter
 
         return $plan + [
             'ran' => true,
-            'output' => 'Injected DigitalOcean Functions Flask adapter as '.self::HANDLER_FILENAME
+            'output' => 'Injected Functions Flask adapter as '.self::HANDLER_FILENAME
                 .', wrapping '.$importTarget.':'.$plan['app_var'].'.',
         ];
     }

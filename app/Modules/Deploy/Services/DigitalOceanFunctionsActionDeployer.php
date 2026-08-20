@@ -85,7 +85,7 @@ final class DigitalOceanFunctionsActionDeployer
     private function assertFunctionsHost(?Server $server): void
     {
         if (! $server instanceof Server || ! $server->isDigitalOceanFunctionsHost()) {
-            throw new \RuntimeException('DigitalOcean Functions deploy requires a Functions-backed host.');
+            throw new \RuntimeException('Functions deploy requires a Functions-backed host.');
         }
     }
 
@@ -138,7 +138,7 @@ final class DigitalOceanFunctionsActionDeployer
             ? 'This is a dply-managed host, so the key comes from DPLY_SERVERLESS_DO_ACCESS_KEY — rotate/refresh it in the environment and redeploy.'
             : 'The key is stored on the host as meta.digitalocean_functions.access_key — re-save the namespace credentials on the host and redeploy.';
 
-        return 'DigitalOcean Functions rejected the credentials for namespace '.$namespace.' at '.$apiHost.'. '.$source;
+        return 'Functions rejected the credentials for namespace '.$namespace.' at '.$apiHost.'. '.$source;
     }
 
     /**
@@ -163,7 +163,7 @@ final class DigitalOceanFunctionsActionDeployer
         $accessKey = trim((string) ($hostConfig['access_key'] ?? ''));
 
         if ($apiHost === '' || $namespace === '' || $accessKey === '') {
-            throw new \RuntimeException('DigitalOcean Functions host metadata is incomplete. Save API host, namespace, and access key first.');
+            throw new \RuntimeException('Functions host metadata is incomplete. Save API host, namespace, and access key first.');
         }
 
         // Resolve runtime config AFTER the build — the artifact builder
@@ -176,7 +176,7 @@ final class DigitalOceanFunctionsActionDeployer
         $entrypoint = trim((string) $resolvedConfig['entrypoint']) ?: 'main';
 
         if (! str_ends_with(strtolower($artifactPath), '.zip')) {
-            throw new \RuntimeException('DigitalOcean Functions deploy expects a .zip artifact.');
+            throw new \RuntimeException('Functions deploy expects a .zip artifact.');
         }
 
         $realArtifactPath = realpath($artifactPath);
@@ -204,7 +204,7 @@ final class DigitalOceanFunctionsActionDeployer
         // is what every function deployed before this existed already is.
         $functionConfiguration = FunctionConfiguration::fromSiteConfig($site->serverlessConfig());
 
-        $this->progress->active($site, 'upload', 'Uploading to DigitalOcean Functions', 'Namespace '.$namespace);
+        $this->progress->active($site, 'upload', 'Uploading to the functions host', 'Namespace '.$namespace);
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(300)
             ->acceptJson()
@@ -228,16 +228,16 @@ final class DigitalOceanFunctionsActionDeployer
 
         if ($response->status() === 401 || $response->status() === 403) {
             throw new \RuntimeException(
-                'DigitalOcean Functions deploy failed: HTTP '.$response->status().' — '
+                'Functions deploy failed: HTTP '.$response->status().' — '
                 .$this->authFailureMessage($apiHost, $namespace, $server)
             );
         }
 
         if (! $response->successful()) {
-            throw new \RuntimeException('DigitalOcean Functions deploy failed: HTTP '.$response->status().' '.$response->body());
+            throw new \RuntimeException('Functions deploy failed: HTTP '.$response->status().' '.$response->body());
         }
 
-        $this->progress->done($site, 'upload', 'Uploaded to DigitalOcean Functions');
+        $this->progress->done($site, 'upload', 'Uploaded to the functions host');
 
         $json = $response->json();
         $revisionId = is_array($json) && isset($json['version']) ? (string) $json['version'] : null;
@@ -322,7 +322,7 @@ final class DigitalOceanFunctionsActionDeployer
         return [
             'output' => implode("\n", array_filter([
                 $buildOutput !== '' ? $buildOutput : null,
-                'DigitalOcean Functions deploy completed.',
+                'Functions deploy completed.',
                 'Namespace: '.$namespace,
                 'Package: '.$package,
                 'Action: '.$actionName,
@@ -366,7 +366,7 @@ final class DigitalOceanFunctionsActionDeployer
             ->delete($this->actionPutUrl($apiHost, $package, $actionName));
 
         if (! $response->successful() && $response->status() !== 404) {
-            throw new \RuntimeException('DigitalOcean Functions delete failed: HTTP '.$response->status().' '.$response->body());
+            throw new \RuntimeException('Functions delete failed: HTTP '.$response->status().' '.$response->body());
         }
     }
 
@@ -464,7 +464,7 @@ final class DigitalOceanFunctionsActionDeployer
     private function splitAccessKey(string $accessKey): array
     {
         if (! str_contains($accessKey, ':')) {
-            throw new \RuntimeException('DigitalOcean Functions access key must use `id:secret` format.');
+            throw new \RuntimeException('Functions access key must use `id:secret` format.');
         }
 
         [$id, $secret] = explode(':', $accessKey, 2);
@@ -472,7 +472,7 @@ final class DigitalOceanFunctionsActionDeployer
         $secret = trim($secret);
 
         if ($id === '' || $secret === '') {
-            throw new \RuntimeException('DigitalOcean Functions access key id and secret must both be present.');
+            throw new \RuntimeException('Functions access key id and secret must both be present.');
         }
 
         return [$id, $secret];

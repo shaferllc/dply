@@ -126,7 +126,7 @@ class Glue extends Component
         $result = $deployer->deploy($action);
 
         if ($result['ok']) {
-            $this->toastSuccess(__('Sequence deployed to DigitalOcean Functions.'));
+            $this->toastSuccess(__('Sequence deployed to the functions host.'));
         } else {
             $this->toastError($result['error'] ?? __('Deploy failed.'));
         }
@@ -187,7 +187,7 @@ class Glue extends Component
 
         $server = $site->server;
         if ($server === null || ! $server->isDigitalOceanFunctionsHost()) {
-            throw ValidationException::withMessages(['sequenceSiteId' => __('Sequences must live on a DigitalOcean Functions host.')]);
+            throw ValidationException::withMessages(['sequenceSiteId' => __('Sequences must live on a functions host.')]);
         }
 
         return $site;

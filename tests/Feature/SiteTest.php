@@ -7,9 +7,7 @@ use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\ConvertSiteToAtomicLayoutJob;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
@@ -29,7 +27,9 @@ use App\Models\SitePreviewDomain;
 use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\Workspace;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DockerDeployEngine;
 use App\Modules\Deploy\Services\KubernetesKubectlExecutor;
@@ -124,7 +124,7 @@ test('site settings deploy section shows docker runtime artifacts', function () 
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('docker compose up -d --build')
         ->assertSee('FROM php:8.3-apache');
@@ -158,7 +158,7 @@ test('site settings deploy section shows kubernetes runtime artifacts', function
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('kind: Deployment');
@@ -874,7 +874,7 @@ test('functions host deploy uses digitalocean functions engine', function () {
     expect($site->status)->toBe(Site::STATUS_FUNCTIONS_ACTIVE);
     expect(data_get($site->meta, 'serverless.last_revision_id'))->toBe('7');
     expect(data_get($site->meta, 'serverless.artifact_path'))->not->toBeNull();
-    $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+    $this->assertStringContainsString('Functions deploy completed.', (string) $deployment->log_output);
 
     // The post-deploy health check ran and the function answered.
     $this->assertStringContainsString('Health check: HTTP 200', (string) $deployment->log_output);
@@ -1475,7 +1475,7 @@ test('vm site pipeline workspace shows rollout hooks and reference', function ()
     // The pipeline lives on the WorkspacePipeline component (the sites.pipeline
     // route now redirects into the Deployments hub's pipeline tab); drive the
     // component's sub-tabs directly.
-    $component = Livewire::actingAs($user)->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
+    $component = Livewire::actingAs($user)->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
 
     // Default sub-tab is Overview; the tab strip is Overview/Steps/Rollout/
     // Reference (config/site_deploy_pipeline.php). The old "Pipeline steps"
@@ -1861,7 +1861,7 @@ test('site show displays docker runtime target summary', function () {
 
     // Compose / Dockerfile artifacts live on Pipeline; live discovery on Runtime.
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('Compose file')
         ->assertSee('Managed Dockerfile')
@@ -1907,7 +1907,7 @@ test('site show displays kubernetes runtime target summary', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('Manifest')
@@ -2357,7 +2357,7 @@ test('site show displays preview and certificate summary', function () {
     // The preview routing tab renders a "coming soon" teaser unless the real
     // workspace.site_preview flag is active; enable it so the live panel shows.
     config(['features.workspace.site_preview' => true]);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::flushCache();
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
@@ -3185,7 +3185,7 @@ test('site settings aliases section shows quick ssl action only for uncovered al
 
     // The aliases routing tab is coming-soon-gated; enable the live surface.
     config(['features.workspace.site_aliases' => true]);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::flushCache();
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])

@@ -61,17 +61,17 @@ class DigitalOceanFunctionsLaravelAdapter
 
         $stub = $this->stubPath();
         if (! is_file($stub)) {
-            throw new RuntimeException('DigitalOcean Functions Laravel handler stub is missing: '.$stub);
+            throw new RuntimeException('Functions Laravel handler stub is missing: '.$stub);
         }
 
         $target = rtrim($workingDirectory, '/').'/'.self::HANDLER_FILENAME;
         if (file_put_contents($target, (string) file_get_contents($stub)) === false) {
-            throw new RuntimeException('Could not write the DigitalOcean Functions Laravel adapter to '.$target);
+            throw new RuntimeException('Could not write the Functions Laravel adapter to '.$target);
         }
 
         return $plan + [
             'ran' => true,
-            'output' => 'Injected DigitalOcean Functions Laravel adapter at '.self::HANDLER_FILENAME.'.',
+            'output' => 'Injected Functions Laravel adapter at '.self::HANDLER_FILENAME.'.',
         ];
     }
 

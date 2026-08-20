@@ -83,7 +83,7 @@ class ServerlessDjangoAdapter
 
         $stub = $this->stubPath();
         if (! is_file($stub)) {
-            throw new RuntimeException('DigitalOcean Functions WSGI adapter stub is missing: '.$stub);
+            throw new RuntimeException('Functions WSGI adapter stub is missing: '.$stub);
         }
 
         $dir = rtrim($workingDirectory, '/');
@@ -99,7 +99,7 @@ class ServerlessDjangoAdapter
 
         return $plan + [
             'ran' => true,
-            'output' => 'Injected DigitalOcean Functions Django adapter as '.self::HANDLER_FILENAME
+            'output' => 'Injected Functions Django adapter as '.self::HANDLER_FILENAME
                 .', wrapping '.$plan['module_file'].':'.$plan['app_var'].'.',
         ];
     }

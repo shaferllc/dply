@@ -2,6 +2,7 @@
 
 namespace App\Modules\Serverless\Jobs;
 
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -10,8 +11,11 @@ use App\Models\SiteDeployment;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Serverless\Support\ServerlessCustomerCopy;
+use App\Modules\Serverless\Support\ServerlessHostCredential;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
+use App\Services\Providers\ProviderCredentialHealth;
 use App\Support\DeployLogRedactor;
+use App\Support\Providers\ProviderAuthFailure;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -102,42 +106,8 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $credential = $server->providerCredential;
-        if ($credential === null) {
-            Log::warning('serverless.namespace.no_credential', ['server_id' => $server->id]);
-            $this->markFailed(
-                $server,
-                'This function has no provider credential, so the namespace could not be created. Connect an account and retry.',
-            );
-
-            return;
-        }
-
-        if ($credential->isUnhealthy()) {
-            Log::warning('serverless.namespace.unhealthy_credential', [
-                'server_id' => $server->id,
-                'credential_id' => $credential->id,
-            ]);
-            $this->markFailed(
-                $server,
-                'The DigitalOcean credential on this function can no longer authenticate. Replace it at /credentials (the token needs Functions write), then create again.',
-            );
-
-            return;
-        }
-
-        try {
-            $namespace = (new DigitalOceanService($credential))->createFunctionsNamespace(
-                $server->region !== '' ? (string) $server->region : 'nyc1',
-                'dply-'.$server->id,
-            );
-        } catch (Throwable $e) {
-            Log::error('serverless.namespace.provision_failed', [
-                'server_id' => $server->id,
-                'error' => $e->getMessage(),
-            ]);
-            $this->markFailed($server, $e->getMessage());
-
+        $namespace = $this->provisionNamespace($server);
+        if ($namespace === null) {
             return;
         }
 
@@ -166,6 +136,96 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
         $this->markReady($server, $meta);
 
         $this->deployConfiguredFunctions($server);
+    }
+
+    /**
+     * Create the functions namespace, remapping off a rejected token first.
+     * A live 401 stamps that credential and retries once with a healthy sibling.
+     *
+     * @return array{api_host: string, namespace: string, access_key: string, region: string}|null
+     */
+    private function provisionNamespace(Server $server): ?array
+    {
+        $credential = ServerlessHostCredential::resolveForProvision($server);
+        if ($credential === null) {
+            $hadAttached = filled($server->provider_credential_id);
+            Log::warning($hadAttached ? 'serverless.namespace.unhealthy_credential' : 'serverless.namespace.no_credential', [
+                'server_id' => $server->id,
+                'credential_id' => $server->provider_credential_id,
+            ]);
+            $this->markFailed(
+                $server,
+                $hadAttached
+                    ? ServerlessHostCredential::UNUSABLE_MESSAGE
+                    : 'This function has no provider credential, so the namespace could not be created. Connect an account and retry.',
+            );
+
+            return null;
+        }
+
+        try {
+            return $this->createNamespace($server, $credential);
+        } catch (Throwable $e) {
+            return $this->retryNamespaceAfterAuthFailure($server, $credential, $e);
+        }
+    }
+
+    /**
+     * @return array{api_host: string, namespace: string, access_key: string, region: string}
+     */
+    private function createNamespace(Server $server, ProviderCredential $credential): array
+    {
+        return (new DigitalOceanService($credential))->createFunctionsNamespace(
+            $server->region !== '' ? (string) $server->region : 'nyc1',
+            'dply-'.$server->id,
+        );
+    }
+
+    /**
+     * @return array{api_host: string, namespace: string, access_key: string, region: string}|null
+     */
+    private function retryNamespaceAfterAuthFailure(Server $server, ProviderCredential $credential, Throwable $e): ?array
+    {
+        if (! ProviderAuthFailure::detected($e->getMessage())) {
+            Log::error('serverless.namespace.provision_failed', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->markFailed($server, $e->getMessage());
+
+            return null;
+        }
+
+        app(ProviderCredentialHealth::class)->markUnhealthy($credential, $e->getMessage());
+        $server->unsetRelation('providerCredential');
+
+        $replacement = ServerlessHostCredential::resolveForProvision($server);
+        if ($replacement === null || $replacement->is($credential)) {
+            Log::warning('serverless.namespace.unhealthy_credential', [
+                'server_id' => $server->id,
+                'credential_id' => $credential->id,
+            ]);
+            $this->markFailed($server, ServerlessHostCredential::UNUSABLE_MESSAGE);
+
+            return null;
+        }
+
+        try {
+            return $this->createNamespace($server, $replacement);
+        } catch (Throwable $retryError) {
+            Log::error('serverless.namespace.provision_failed', [
+                'server_id' => $server->id,
+                'error' => $retryError->getMessage(),
+            ]);
+            $this->markFailed(
+                $server,
+                ProviderAuthFailure::detected($retryError->getMessage())
+                    ? ServerlessHostCredential::UNUSABLE_MESSAGE
+                    : $retryError->getMessage(),
+            );
+
+            return null;
+        }
     }
 
     /**

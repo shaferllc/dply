@@ -110,7 +110,7 @@ class OpenWhiskClient
      * Create or update a trigger. `$params` is a flat key→value map; it is
      * converted to OpenWhisk's `{key, value}` parameter list.
      *
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     public function putTrigger(string $name, array $params = []): array
@@ -130,7 +130,7 @@ class OpenWhiskClient
     /**
      * Fire a trigger once with an optional JSON payload.
      *
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     public function fireTrigger(string $name, array $payload = []): array
@@ -192,8 +192,8 @@ class OpenWhiskClient
     /**
      * Issue one OpenWhisk REST call and normalize the outcome. Never throws.
      *
-     * @param  array<string, mixed> $query
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $query
+     * @param  array<string, mixed>  $body
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     private function request(string $method, string $path, array $query = [], array $body = []): array
@@ -225,7 +225,7 @@ class OpenWhiskClient
 
             return [
                 'ok' => false,
-                'error' => trim('DigitalOcean Functions returned HTTP '.$response->status().'. '.$detail),
+                'error' => trim('The functions host returned HTTP '.$response->status().'. '.$detail),
                 'data' => $response->json(),
             ];
         }
@@ -236,7 +236,7 @@ class OpenWhiskClient
     /**
      * Convert a flat map to OpenWhisk's `[{key, value}, …]` parameter shape.
      *
-     * @param  array<string, mixed> $assoc
+     * @param  array<string, mixed>  $assoc
      * @return list<array{key: string, value: mixed}>
      */
     private function keyValuePairs(array $assoc): array

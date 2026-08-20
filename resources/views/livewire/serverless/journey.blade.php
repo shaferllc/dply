@@ -625,12 +625,26 @@
                 <div class="border-b border-brand-ink/10 bg-rose-50/70 px-5 py-4">
                     <h3 id="serverless-delete-fn-title" class="text-base font-semibold text-brand-ink">{{ __('Delete this function?') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Removes the function, its deploy history, and its DigitalOcean Functions namespace. This cannot be undone.') }}
+                        {{ __('Removes the function, its deploy history, and its functions namespace. This cannot be undone.') }}
                     </p>
                 </div>
                 <div class="px-5 py-4">
+                    @php
+                        [$typeToConfirmBefore, $typeToConfirmAfter] = array_pad(
+                            explode(':name', __('Type :name to confirm'), 2),
+                            2,
+                            '',
+                        );
+                    @endphp
                     <label for="serverless-delete-fn-name" class="block text-sm font-medium text-brand-ink">
-                        {{ __('Type :name to confirm', ['name' => $site->name]) }}
+                        {{ $typeToConfirmBefore }}<button
+                            type="button"
+                            x-data="{ copied: false }"
+                            x-on:click.stop="navigator.clipboard.writeText(@js($site->name)); copied = true; setTimeout(() => copied = false, 1500)"
+                            class="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-md bg-white px-1.5 py-0.5 align-baseline font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/15 hover:bg-brand-sand/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage"
+                            :title="copied ? @js(__('Copied')) : @js(__('Copy name'))"
+                            :aria-label="copied ? @js(__('Copied')) : @js(__('Copy :name', ['name' => $site->name]))"
+                        ><span aria-hidden="true">“</span><span class="select-all break-all">{{ $site->name }}</span><span aria-hidden="true">”</span><x-heroicon-o-clipboard-document class="h-3.5 w-3.5 shrink-0 text-brand-moss" x-show="!copied" aria-hidden="true" /><span x-show="copied" x-cloak class="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-700"><x-heroicon-s-check class="h-3.5 w-3.5" aria-hidden="true" />{{ __('Copied') }}</span></button>{{ $typeToConfirmAfter }}
                     </label>
                     <input id="serverless-delete-fn-name" type="text" wire:model="deleteFunctionConfirmName"
                            autocomplete="off" autofocus

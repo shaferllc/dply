@@ -181,7 +181,7 @@
             <section aria-labelledby="glue-sequences-heading">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <h2 id="glue-sequences-heading" class="text-sm font-semibold text-brand-ink">{{ __('Define a sequence') }}</h2>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Chain code actions in one DigitalOcean Functions namespace. Components may come from any package-site on the same functions host.') }}</p>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Chain code actions in one functions namespace. Components may come from any package-site on the same functions host.') }}</p>
                 </div>
 
                 @if (count($snapshot['functions_hosts']) === 0)
@@ -193,7 +193,7 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('No serverless host yet') }}</p>
                                 <p class="mt-1 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Add a DigitalOcean Functions host first — create a serverless app from the Serverless index.') }}
+                                    {{ __('Add a functions host first — create a serverless app from the Serverless index.') }}
                                 </p>
                             </div>
                         </div>

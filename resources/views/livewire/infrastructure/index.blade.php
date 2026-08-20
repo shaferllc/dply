@@ -116,7 +116,7 @@
                     </span>
                     <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('Serverless') }}</h3>
                     <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
-                        {{ __('HTTP-triggered functions on DigitalOcean Functions and AWS Lambda.') }}
+                        {{ __('HTTP-triggered functions on dply Serverless and AWS Lambda.') }}
                     </p>
                     <p class="mt-4 text-sm font-semibold text-brand-ink">
                         <span class="font-mono">{{ $counts['serverless']['total'] }}</span>

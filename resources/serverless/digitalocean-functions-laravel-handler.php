@@ -275,7 +275,7 @@ if (! function_exists('main')) {
                 'statusCode' => 500,
                 'headers' => ['content-type' => 'application/json'],
                 'body' => (string) json_encode([
-                    'error' => 'The Laravel app failed to handle this request on DigitalOcean Functions.',
+                    'error' => 'The Laravel app failed to handle this request.',
                     'exception' => $e::class,
                     'message' => $e->getMessage(),
                     'at' => $e->getFile().':'.$e->getLine(),

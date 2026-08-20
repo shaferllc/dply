@@ -12,7 +12,7 @@
         'credentials' => 'heroicon-o-key',
     ];
     $tabNotes = [
-        'inspector' => __('Deployed action and namespace inventory — live from DigitalOcean Functions.'),
+        'inspector' => __('Deployed action and namespace inventory — live from the functions host.'),
         'triggers' => __('Schedules, triggers, and rules for this function.'),
         'console' => __('Send a test request. Results also appear on Logs.'),
         'credentials' => __('The namespace access key dply uses to reach this function.'),
@@ -82,7 +82,7 @@
 
         @if (! $action['ok'])
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-900 sm:px-4">
-                {{ $action['error'] ?? __('Could not read the action from DigitalOcean Functions.') }}
+                {{ $action['error'] ?? __('Could not read the action from the functions host.') }}
             </div>
         @elseif ($actionDoc)
             <div class="border-b border-brand-ink/10">
@@ -139,7 +139,7 @@
                 <button
                     type="button"
                     wire:click="deleteAction"
-                    wire:confirm="{{ __('Delete the action :name from DigitalOcean Functions?', ['name' => $actionName]) }}"
+                    wire:confirm="{{ __('Delete the action :name from the functions host?', ['name' => $actionName]) }}"
                     class="inline-flex shrink-0 items-center rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
                 >
                     {{ __('Delete action') }}
@@ -163,7 +163,7 @@
         <div class="border-b border-brand-ink/10">
             <div class="{{ $stripHead }}">
                 <h3 class="text-xs font-semibold text-brand-ink">{{ __('Schedules') }}</h3>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('DigitalOcean cron (UTC). One click adds a trigger.') }}</p>
+                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Functions cron (UTC). One click adds a trigger.') }}</p>
             </div>
 
             @if (! $scheduled['ok'])
@@ -458,7 +458,7 @@
                      do it on the operator's behalf and shouldn't pretend to. --}}
                 <div class="border-t border-brand-ink/10 pt-3">
                     <p class="mb-2 text-2xs text-brand-moss">
-                        {{ __('Keys are created and revoked with doctl or in the DigitalOcean control panel. After rotating, update the host credentials in dply.') }}
+                        {{ __('Keys are created and revoked on the functions host. After rotating, update the host credentials in dply.') }}
                     </p>
                     <x-cli-snippet :commands="[
                         ['label' => __('List keys'), 'command' => 'doctl serverless key list'.($namespace ? ' --namespace '.$namespace : '')],

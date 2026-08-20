@@ -62,7 +62,7 @@
 
             $edgeCards = [
                 ['icon' => 'cloud', 'color' => 'forest', 'title' => 'Cloud apps', 'body' => 'App-first PaaS backed by DigitalOcean App Platform or AWS App Runner. Deploy from git—no server, no OS, no Nginx config to manage.'],
-                ['icon' => 'bolt', 'color' => 'rust', 'title' => 'Serverless functions', 'body' => 'HTTP web functions via DigitalOcean Functions. Create, deploy, and invoke from the dashboard—billed flat per function, no cold-start infrastructure to provision.'],
+                ['icon' => 'bolt', 'color' => 'rust', 'title' => 'Serverless functions', 'body' => 'HTTP web functions via dply Serverless. Create, deploy, and invoke from the dashboard—billed flat per function, no cold-start infrastructure to provision.'],
                 ['icon' => 'signal', 'color' => 'sage', 'title' => 'Managed Realtime', 'body' => 'A dply-hosted Pusher-compatible WebSocket relay built on Cloudflare Workers and DigitalOcean. Drop-in replacement for Pusher or Laravel Reverb—billed through dply, zero infra to run.'],
                 ['icon' => 'queue-list', 'color' => 'sage', 'title' => 'Managed Queues', 'body' => 'A hosted job queue Laravel reaches with its built-in SQS driver—no package, no Redis to provision. Priced by capacity rather than per job, and included free on Serverless sites, where a shared job store is the difference between queues working and jobs vanishing.'],
                 ['icon' => 'globe-alt', 'color' => 'forest', 'title' => 'CDN & edge storage', 'body' => 'Global Cloudflare CDN with R2 object storage and KV backing Edge sites. Assets, purge, and edge config are managed alongside the app—not in a separate provider console.'],
@@ -93,7 +93,7 @@
                 ['Git deploys &amp; rollbacks', 'ok', 'Git remotes, signed webhooks, deploy hooks, atomic deploys with a <code class="text-xs bg-brand-sand/60 px-1 rounded">releases/</code> directory, and rollback to a prior release.'],
                 ['PHP / Laravel / Node / static', 'ok', 'Site types for PHP-FPM, Node reverse proxy, and static; Laravel options like scheduler, Octane, and env in the deploy flow.'],
                 ['Edge &amp; Cloud hosting', 'ok', 'Container apps on DigitalOcean App Platform or AWS App Runner via a unified EdgeBackend. Deploy from git without a server, Nginx config, or OS to maintain. Cloudflare CDN, R2 object storage, and KV included.'],
-                ['Serverless functions (FaaS)', 'partial', 'HTTP web functions via DigitalOcean Functions—create, deploy, and invoke from the dashboard. Multi-language adapters and package-level features are in progress.'],
+                ['Serverless functions (FaaS)', 'partial', 'HTTP web functions via dply Serverless—create, deploy, and invoke from the dashboard. Multi-language adapters and package-level features are in progress.'],
                 ['Managed Realtime', 'ok', 'Pusher-compatible WebSocket relay built on Cloudflare Workers and DigitalOcean. Drop-in for Laravel Echo / Reverb, billed through dply, no relay infra to operate.'],
                 ['Managed Queues', 'partial', 'SQS-compatible hosted job queue with depth, throughput, and failed-job retry in the dashboard. In beta: free for all queues while the data plane proves out, then priced per queue by capacity tier (always free on Serverless).'],
                 ['Databases (MySQL, MariaDB, PostgreSQL)', 'ok', 'Create databases and users on the server over SSH through the provisioning paths.'],

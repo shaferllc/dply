@@ -15,7 +15,7 @@
         <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4">
             <p class="text-sm font-semibold text-brand-ink">{{ __('You can\'t create a serverless app right now') }}</p>
             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('Creating one provisions a DigitalOcean Functions namespace and starts a deploy — both are billed work, which is paused for this organization. Add a payment method and this form unlocks.') }}
+                {{ __('Creating one provisions a functions namespace and starts a deploy — both are billed work, which is paused for this organization. Add a payment method and this form unlocks.') }}
             </p>
         </div>
     @endif

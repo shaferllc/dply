@@ -106,7 +106,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // takes the Bref path above instead.)
         $laravelAdapterLog = [];
         if ($detected['framework'] === 'laravel' && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting Laravel adapter', 'DigitalOcean Functions ↔ Laravel bridge');
+            $this->progress->active($site, 'adapter', 'Injecting Laravel adapter', 'Functions ↔ Laravel bridge');
             $injection = $this->laravelAdapter->inject($checkout['working_directory']);
             if ($injection['ran']) {
                 $laravelAdapterLog[] = $injection['output'];
@@ -125,7 +125,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // zipped repo exposes the main() web action the runtime invokes.
         $expressAdapterLog = [];
         if ($detected['framework'] === 'express' && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting Express adapter', 'DigitalOcean Functions ↔ Express bridge');
+            $this->progress->active($site, 'adapter', 'Injecting Express adapter', 'Functions ↔ Express bridge');
             $injection = $this->expressAdapter->inject($checkout['working_directory']);
             if ($injection['ran']) {
                 $expressAdapterLog[] = $injection['output'];
@@ -142,7 +142,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // zipped repo exposes the main() web action the runtime invokes.
         $flaskAdapterLog = [];
         if ($detected['framework'] === 'flask' && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting Flask adapter', 'DigitalOcean Functions ↔ Flask bridge');
+            $this->progress->active($site, 'adapter', 'Injecting Flask adapter', 'Functions ↔ Flask bridge');
             $injection = $this->flaskAdapter->inject($checkout['working_directory']);
             if ($injection['ran']) {
                 $flaskAdapterLog[] = $injection['output'];
@@ -155,7 +155,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // adapter pointed at the project's wsgi.py.
         $djangoAdapterLog = [];
         if ($detected['framework'] === 'django' && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting Django adapter', 'DigitalOcean Functions ↔ Django bridge');
+            $this->progress->active($site, 'adapter', 'Injecting Django adapter', 'Functions ↔ Django bridge');
             $injection = $this->djangoAdapter->inject($checkout['working_directory']);
             if ($injection['ran']) {
                 $djangoAdapterLog[] = $injection['output'];
@@ -168,7 +168,7 @@ class DigitalOceanFunctionsArtifactBuilder
         // adapter, which drives the repo's exported Router().
         $ginAdapterLog = [];
         if ($detected['framework'] === 'gin' && $site->server?->isDigitalOceanFunctionsHost()) {
-            $this->progress->active($site, 'adapter', 'Injecting Gin adapter', 'DigitalOcean Functions ↔ Gin bridge');
+            $this->progress->active($site, 'adapter', 'Injecting Gin adapter', 'Functions ↔ Gin bridge');
             $injection = $this->ginAdapter->inject($checkout['working_directory']);
             if ($injection['ran']) {
                 $ginAdapterLog[] = $injection['output'];

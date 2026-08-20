@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -37,8 +37,8 @@ class RoadmapItemSeeder extends Seeder
             ],
             [
                 'title' => 'Serverless functions',
-                'summary' => 'Deploy functions to DO Functions, Cloudflare Workers, and more.',
-                'description' => 'Org-scoped serverless sites with provider adapters, Laravel on DigitalOcean Functions, and optional dply-managed backend billing.',
+                'summary' => 'Deploy functions to dply Serverless, Cloudflare Workers, and more.',
+                'description' => 'Org-scoped serverless sites with provider adapters, Laravel on Functions, and optional dply-managed backend billing.',
                 'status' => RoadmapItem::STATUS_IN_PROGRESS,
                 'area' => 'serverless',
                 'sort_order' => 2,

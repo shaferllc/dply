@@ -65,7 +65,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      */
     private function availability(string $key, array $snapshot): array
     {
@@ -82,7 +82,7 @@ final class ServerlessGluePlanner
                 $hasHosts && $codeCount >= 2 && $hookCount > 0,
                 $this->missingReason(
                     [
-                        ! $hasHosts => __('Add a DigitalOcean Functions host (serverless function).'),
+                        ! $hasHosts => __('Add a functions host (serverless function).'),
                         $codeCount < 2 => __('Define at least two code actions on the functions namespace.'),
                         $hookCount === 0 => __('Mint an Edge deploy hook on at least one Edge site.'),
                     ],
@@ -92,7 +92,7 @@ final class ServerlessGluePlanner
                 $hasHosts && $codeCount >= 2 && $cloudCount > 0,
                 $this->missingReason(
                     [
-                        ! $hasHosts => __('Add a DigitalOcean Functions host.'),
+                        ! $hasHosts => __('Add a functions host.'),
                         $codeCount < 2 => __('Define at least two code actions for a sequence.'),
                         $cloudCount === 0 => __('Provision a Cloud app to target for redeploy.'),
                     ],
@@ -102,7 +102,7 @@ final class ServerlessGluePlanner
                 $hasHosts && $codeCount >= 2 && $cronCount > 0,
                 $this->missingReason(
                     [
-                        ! $hasHosts => __('Add a DigitalOcean Functions host.'),
+                        ! $hasHosts => __('Add a functions host.'),
                         $codeCount < 2 => __('Define at least two code actions for a sequence.'),
                         $cronCount === 0 => __('Add a BYO server cron job as the callback target.'),
                     ],
@@ -112,7 +112,7 @@ final class ServerlessGluePlanner
                 $hasHosts && $codeCount >= 3 && $hookCount > 0 && $cloudCount > 0 && $cronCount > 0,
                 $this->missingReason(
                     [
-                        ! $hasHosts => __('Add a DigitalOcean Functions host.'),
+                        ! $hasHosts => __('Add a functions host.'),
                         $codeCount < 3 => __('Define at least three code actions for a multi-step pipeline.'),
                         $hookCount === 0 => __('Mint an Edge deploy hook.'),
                         $cloudCount === 0 => __('Provision a Cloud app.'),
@@ -125,7 +125,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      * @return list<string>
      */
     private function gaps(string $key, array $snapshot): array
@@ -150,8 +150,8 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $definition
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, mixed>  $snapshot
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
     private function buildSteps(string $key, array $definition, array $snapshot): array
@@ -177,7 +177,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      * @return list<array{kind: string, label: string, href: string|null, meta: string|null}>
      */
     private function resources(string $key, array $snapshot): array
@@ -238,7 +238,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      * @return array{0: string|null, 1: string|null}
      */
     private function stepLink(string $key, int $index, array $snapshot): array
@@ -287,7 +287,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<int, (array|string)> $reasons
+     * @param  array<int, (array|string)>  $reasons
      */
     private function missingReason(array $reasons): string
     {

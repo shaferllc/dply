@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Redis\RedisConnectionTls;
 use Database\Factories\CloudDatabaseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -339,7 +340,6 @@ class CloudDatabase extends Model
             return true;
         }
 
-        return str_contains($host, 'ondigitalocean.com')
-            || str_contains($host, 'upstash.io');
+        return RedisConnectionTls::requiresTls($host, $connection['port'] ?? null);
     }
 }

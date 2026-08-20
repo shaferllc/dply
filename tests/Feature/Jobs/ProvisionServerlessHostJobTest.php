@@ -147,7 +147,7 @@ test('managed host errors when the platform namespace is not configured', functi
     Http::assertNothingSent();
     $server->refresh();
     expect($server->status)->toBe(Server::STATUS_ERROR);
-    expect($server->meta['provision_error']['message'] ?? '')->toContain('platform DigitalOcean Functions namespace is missing');
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('platform functions namespace is missing');
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
 });
 
@@ -155,6 +155,7 @@ test('marks host errored when the attached credential is already rejected', func
     Bus::fake();
     Http::fake();
     $server = makeHost();
+    $rejectedId = $server->provider_credential_id;
     $server->providerCredential?->forceFill([
         'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
     ])->save();
@@ -164,8 +165,45 @@ test('marks host errored when the attached credential is already rejected', func
     Http::assertNothingSent();
     $server->refresh();
     expect($server->status)->toBe(Server::STATUS_ERROR);
-    expect($server->meta['provision_error']['message'] ?? '')->toContain('can no longer authenticate');
+    expect($server->provider_credential_id)->toBe($rejectedId);
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('This credential can’t connect')
+        ->and($server->meta['provision_error']['message'] ?? '')->toContain('/credentials')
+        ->and($server->meta['provision_error']['message'] ?? '')->not->toContain('DigitalOcean');
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
+});
+
+test('remaps a rejected attached credential onto a healthy org sibling', function () {
+    Bus::fake();
+    fakeNamespaceApi();
+    $server = makeHost();
+    $rejected = $server->providerCredential;
+    $rejected?->forceFill([
+        'name' => 'dsds',
+        'credentials' => ['token' => 'dop_v1_stale'],
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ])->save();
+
+    $healthy = ProviderCredential::query()->create([
+        'organization_id' => $server->organization_id,
+        'user_id' => $server->user_id,
+        'provider' => 'digitalocean',
+        'name' => 'aug_19',
+        'credentials' => ['token' => 'dop_v1_ok'],
+        'created_at' => now()->addSecond(),
+    ]);
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    Http::assertSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer dop_v1_ok')
+        && str_contains($request->url(), '/functions/namespaces'));
+    Http::assertNotSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer dop_v1_stale'));
+
+    $server->refresh();
+    expect($server->status)->toBe(Server::STATUS_READY);
+    expect($server->provider_credential_id)->toBe($healthy->id)
+        ->and($server->provider_credential_id)->not->toBe($rejected?->id);
+    expect($server->sites()->first()?->serverless_provider_credential_id)->toBe($healthy->id);
+    expect($server->meta['digitalocean_functions']['namespace'] ?? null)->toBe('fn-abc123');
 });
 
 test('marks host errored when the api call fails', function () {
@@ -181,7 +219,7 @@ test('marks host errored when the api call fails', function () {
     expect($server->status)->toBe(Server::STATUS_ERROR);
     $this->assertArrayNotHasKey('digitalocean_functions', $server->meta);
     expect($server->meta['provision_error']['stage'] ?? null)->toBe('namespace');
-    expect($server->meta['provision_error']['message'] ?? '')->toContain('DigitalOcean API failed to create functions namespace: nope');
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('Could not create the functions namespace: nope');
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
 });
 
@@ -189,8 +227,8 @@ test('redacts secrets from a persisted namespace provision error', function () {
     Bus::fake();
     Http::fake([
         'api.digitalocean.com/v2/functions/namespaces' => Http::response([
-            'message' => 'Unable to authenticate you token=dop_v1_supersecret',
-        ], 401),
+            'message' => 'rate limited token=dop_v1_supersecret',
+        ], 500),
     ]);
     $server = makeHost();
 
@@ -198,7 +236,7 @@ test('redacts secrets from a persisted namespace provision error', function () {
 
     $server->refresh();
     $message = (string) ($server->meta['provision_error']['message'] ?? '');
-    expect($message)->toContain('Unable to authenticate you')
+    expect($message)->toContain('rate limited')
         ->and($message)->toContain('token=[redacted]')
         ->and($message)->not->toContain('dop_v1_supersecret');
 });

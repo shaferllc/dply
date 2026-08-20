@@ -3,6 +3,7 @@
 namespace Tests\Feature\Livewire\Serverless\JourneyTest;
 
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -128,8 +129,9 @@ test('namespace provision failure shows the stored reason not the canned sentenc
         ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
         ->assertSee('Provisioning namespace')
         ->assertSee('Unable to authenticate you')
-        ->assertSee('DigitalOcean API failed to create functions namespace')
-        ->assertDontSee('Could not create the DigitalOcean Functions namespace.')
+        ->assertSee('Could not create the functions namespace')
+        ->assertDontSee('DigitalOcean Functions')
+        ->assertDontSee('DigitalOcean API failed')
         ->assertDontSee('Review the log, fix the issue, then retry.');
 });
 
@@ -143,6 +145,44 @@ test('retry provision redispatches the host job when errored', function () {
 
     Bus::assertDispatched(ProvisionServerlessHostJob::class);
     expect($server->fresh()->status)->toBe(Server::STATUS_PENDING);
+});
+
+test('retry provision remaps a rejected credential onto a healthy sibling', function () {
+    Bus::fake();
+    $rejected = ProviderCredential::query()->create([
+        'organization_id' => $this->org->id,
+        'user_id' => $this->user->id,
+        'provider' => 'digitalocean',
+        'name' => 'dsds',
+        'credentials' => ['token' => 'dop_v1_stale'],
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+        'created_at' => now()->subMinute(),
+    ]);
+    $healthy = ProviderCredential::query()->create([
+        'organization_id' => $this->org->id,
+        'user_id' => $this->user->id,
+        'provider' => 'digitalocean',
+        'name' => 'aug_19',
+        'credentials' => ['token' => 'dop_v1_ok'],
+        'created_at' => now(),
+    ]);
+    [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_ERROR);
+    $server->update(['provider_credential_id' => $rejected->id]);
+    $site->update(['serverless_provider_credential_id' => $rejected->id]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server->fresh(), 'site' => $site->fresh()])
+        ->assertSee('dsds')
+        ->call('retryProvision')
+        ->assertSee('aug_19');
+
+    Bus::assertDispatched(ProvisionServerlessHostJob::class);
+    $server->refresh();
+    $site->refresh();
+    expect($server->status)->toBe(Server::STATUS_PENDING);
+    expect($server->provider_credential_id)->toBe($healthy->id)
+        ->and($server->provider_credential_id)->not->toBe($rejected->id);
+    expect($site->serverless_provider_credential_id)->toBe($healthy->id);
 });
 
 test('retry deploy dispatches a deployment', function () {

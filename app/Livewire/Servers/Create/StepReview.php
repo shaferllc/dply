@@ -479,7 +479,7 @@ class StepReview extends Component
     protected function flashSuccessForServerType(string $type): void
     {
         Session::flash('success', match ($type) {
-            'digitalocean_functions' => __('DigitalOcean Functions host added. Create a site to wire its runtime and deploy settings.'),
+            'digitalocean_functions' => __('Functions host added. Create a site to wire its runtime and deploy settings.'),
             'aws_lambda' => __('AWS Lambda target added. Create a site to wire its runtime and Bref deploy settings.'),
             'digitalocean_kubernetes' => __('DigitalOcean Kubernetes target added. Create a site to prepare manifests and cluster runtime settings.'),
             'aws' => __('AWS EC2 instance is being created. This usually takes 1–2 minutes.'),

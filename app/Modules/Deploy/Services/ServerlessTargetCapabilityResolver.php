@@ -128,7 +128,7 @@ final class ServerlessTargetCapabilityResolver
             // file. dply's PHP/Node function templates export `main`.
             'default_entrypoint' => 'main',
             'default_package' => 'default',
-            'host_label' => 'DigitalOcean Functions',
+            'host_label' => 'Functions',
             'features' => self::featureValues(ServerlessFeatureMatrix::digitalOceanFunctions()),
         ];
     }

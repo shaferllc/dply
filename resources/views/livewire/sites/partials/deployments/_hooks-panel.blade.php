@@ -6,7 +6,7 @@
         />
     @else
         <div class="px-3 py-4 text-center text-xs text-brand-moss sm:px-4">
-            {{ __('Deploy hooks are only available on DigitalOcean Functions hosts.') }}
+            {{ __('Deploy hooks are only available on functions hosts.') }}
         </div>
     @endif
 </section>

@@ -5,6 +5,7 @@ namespace App\Services\Sites;
 use App\Models\Site;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
+use App\Support\Redis\RedisConnectionTls;
 use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Support\Str;
 
@@ -74,7 +75,8 @@ class SiteEnvPusher
         $secretEnv = $includeSharedSecrets
             ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
             : [];
-        $mergedVars = array_merge($secretEnv, $parsed['variables'], $bindingEnv);
+        $mergedVars = RedisConnectionTls::ensureEnv(array_merge($secretEnv, $parsed['variables'], $bindingEnv));
+        $this->persistInferredRedisTls($site, $parsed['variables'], $mergedVars);
 
         // Resolve any non-resident secrets (escrowed / external references) to
         // their real values just-in-time. The loose blob only carries
@@ -149,7 +151,45 @@ class SiteEnvPusher
             ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
             : [];
 
-        return array_merge($secretEnv, $parsed['variables'], $this->bindingEnv($site));
+        return RedisConnectionTls::ensureEnv(array_merge($secretEnv, $parsed['variables'], $this->bindingEnv($site)));
+    }
+
+    /**
+     * A BYO/atomic deploy writes the release `.env` from `env_file_content`.
+     * If that cache still has REDIS_HOST on DigitalOcean :25061 but no
+     * REDIS_SCHEME, the next deploy would ship plaintext tcp:// and 500.
+     * Persist the inferred tls/rediss keys so the cache matches the box.
+     *
+     * @param  array<string, string>  $original
+     * @param  array<string, string>  $merged
+     */
+    private function persistInferredRedisTls(Site $site, array $original, array $merged): void
+    {
+        $patch = [];
+
+        $originalScheme = strtolower(trim((string) ($original['REDIS_SCHEME'] ?? '')));
+        if (($merged['REDIS_SCHEME'] ?? '') === 'tls' && ! in_array($originalScheme, ['tls', 'rediss', 'ssl'], true)) {
+            $patch['REDIS_SCHEME'] = 'tls';
+        }
+
+        $originalUrl = (string) ($original['REDIS_URL'] ?? '');
+        $mergedUrl = (string) ($merged['REDIS_URL'] ?? '');
+        if ($originalUrl !== '' && $mergedUrl !== '' && $mergedUrl !== $originalUrl) {
+            $patch['REDIS_URL'] = $mergedUrl;
+        }
+
+        if ($patch === []) {
+            return;
+        }
+
+        $parsed = $this->parser->parse((string) ($site->env_file_content ?? ''));
+        if ($parsed['errors'] !== []) {
+            return;
+        }
+
+        $site->forceFill([
+            'env_file_content' => $this->writer->render(array_merge($parsed['variables'], $patch), $parsed['comments']),
+        ])->save();
     }
 
     /**

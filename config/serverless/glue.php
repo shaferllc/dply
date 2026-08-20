@@ -19,9 +19,9 @@ return [
         'doc_slug' => 'edge-deploy-triggers',
         'requires' => 'edge_hooks_and_actions',
         'steps' => [
-            'Inventory Edge sites with deploy hooks and your DO Functions namespace code actions.',
+            'Inventory Edge sites with deploy hooks and your functions namespace code actions.',
             'Create a serverless sequence on the functions host that chains at least two code actions (validate → notify → redeploy, etc.).',
-            'Deploy the sequence to DigitalOcean Functions and copy its web-export invocation URL from the function Platform tab.',
+            'Deploy the sequence to the functions host and copy its web-export invocation URL from the function Platform tab.',
             'On the Edge site, open Deploy triggers and mint a deploy hook — or call the hook URL from your sequence’s last action.',
             'Smoke-test: POST the Edge hook and confirm the sequence runs end-to-end in serverless invocation logs.',
             'Document the hook prefix and sequence name in your runbook for on-call.',

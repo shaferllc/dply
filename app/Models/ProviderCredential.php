@@ -104,10 +104,10 @@ class ProviderCredential extends Model
     }
 
     /**
-     * Newest credential that still authenticates. Falls back to the newest
-     * row (even if rejected) so a picker has something to show.
+     * Newest credential that still authenticates. Does not fall back to a
+     * rejected row — callers that must not POST a known-bad token use this.
      */
-    public static function preferredHealthyForOrganization(?string $organizationId, string $provider): ?self
+    public static function newestHealthyForOrganization(?string $organizationId, string $provider): ?self
     {
         if (! filled($organizationId) || trim($provider) === '') {
             return null;
@@ -118,7 +118,16 @@ class ProviderCredential extends Model
             ->where('provider', $provider)
             ->whereNull('validation_error')
             ->orderByDesc('created_at')
-            ->first()
+            ->first();
+    }
+
+    /**
+     * Newest credential that still authenticates. Falls back to the newest
+     * row (even if rejected) so a picker has something to show.
+     */
+    public static function preferredHealthyForOrganization(?string $organizationId, string $provider): ?self
+    {
+        return static::newestHealthyForOrganization($organizationId, $provider)
             ?? static::newestForOrganization($organizationId, $provider);
     }
 

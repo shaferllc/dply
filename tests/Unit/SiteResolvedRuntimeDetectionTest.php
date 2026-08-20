@@ -127,7 +127,7 @@ test('runtime profile label maps known profiles', function () {
     expect($site->runtimeProfileLabel())->toBe('Kubernetes');
 
     $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
-    expect($site->runtimeProfileLabel())->toBe('DigitalOcean Functions');
+    expect($site->runtimeProfileLabel())->toBe('Functions');
 
     $site->meta = ['runtime_profile' => 'aws_lambda_bref_web'];
     expect($site->runtimeProfileLabel())->toBe('AWS Lambda');

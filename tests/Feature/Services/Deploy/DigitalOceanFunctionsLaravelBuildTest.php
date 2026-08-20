@@ -63,7 +63,7 @@ test('it injects the laravel adapter into a digitalocean functions build', funct
     $result = app(DigitalOceanFunctionsArtifactBuilder::class)->build($site);
 
     expect($result['artifact_path'])->toBeFile();
-    $this->assertStringContainsString('Injected DigitalOcean Functions Laravel adapter', $result['output']);
+    $this->assertStringContainsString('Injected Functions Laravel adapter', $result['output']);
 
     $zip = new ZipArchive;
     expect($zip->open($result['artifact_path']) === true)->toBeTrue();

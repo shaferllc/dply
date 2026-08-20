@@ -14,6 +14,7 @@ use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Modules\Serverless\Support\ServerlessCustomerCopy;
+use App\Modules\Serverless\Support\ServerlessHostCredential;
 use App\Support\DeployLogRedactor;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
@@ -128,9 +129,16 @@ class Journey extends Component
             return;
         }
 
+        $resolved = ServerlessHostCredential::resolveForProvision($server);
+        $name = trim((string) ($resolved?->name ?? ''));
+
         $server->update(['status' => Server::STATUS_PENDING]);
         ProvisionServerlessHostJob::dispatch($server->id);
-        $this->toastSuccess(__('Retrying namespace provisioning…'));
+        $this->toastSuccess(
+            $name !== ''
+                ? __('Retrying namespace provisioning with :name…', ['name' => $name])
+                : __('Retrying namespace provisioning…')
+        );
     }
 
     /**
@@ -324,11 +332,13 @@ class Journey extends Component
         $deployment = $this->latestDeployment();
         $config = $site->serverlessConfig();
 
+        $server->loadMissing('providerCredential');
         $meta = is_array($server->meta) ? $server->meta : [];
         $hostConfig = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
         $namespaceReady = ! empty($hostConfig['api_host'] ?? null);
         $serverErrored = $server->status === Server::STATUS_ERROR;
         $provisionError = $this->namespaceProvisionError($meta);
+        $credentialName = trim((string) ($server->providerCredential?->name ?? ''));
 
         $siteActive = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
         $siteFailed = $site->status === Site::STATUS_FUNCTIONS_FAILED;
@@ -408,7 +418,9 @@ class Journey extends Component
                     'failed' => $provisionError !== ''
                         ? $provisionError
                         : __('Could not create the functions namespace.'),
-                    default => __('Creating the functions namespace.'),
+                    default => $credentialName !== ''
+                        ? __('Creating the functions namespace using :name.', ['name' => $credentialName])
+                        : __('Creating the functions namespace.'),
                 },
                 'state' => $namespaceState,
             ],
@@ -494,6 +506,7 @@ class Journey extends Component
         // Function facts — populated progressively as the deploy resolves them.
         $facts = [
             ['label' => __('Region'), 'value' => $server->region ?: null],
+            ['label' => __('Credential'), 'value' => $this->stringOrNull($credentialName !== '' ? $credentialName : null)],
             ['label' => __('Runtime'), 'value' => $this->stringOrNull($config['runtime'] ?? null)],
             ['label' => __('Namespace'), 'value' => $this->stringOrNull($hostConfig['namespace'] ?? null), 'mono' => true],
             ['label' => __('Package'), 'value' => $this->stringOrNull($config['package'] ?? null), 'mono' => true],
@@ -669,7 +682,7 @@ class Journey extends Component
 
         $parts = array_values(array_unique(array_filter($parts)));
 
-        return implode(' — ', array_slice($parts, 0, 2));
+        return ServerlessCustomerCopy::neutralize(implode(' — ', array_slice($parts, 0, 2)));
     }
 
     private function stringOrNull(mixed $value): ?string

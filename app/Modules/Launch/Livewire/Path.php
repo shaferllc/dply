@@ -54,8 +54,8 @@ class Path extends Component
                         'cta' => __('Plan Lambda path'),
                     ],
                     [
-                        'title' => __('DigitalOcean Functions'),
-                        'description' => __('Target a DigitalOcean Functions namespace with a function-native deployment flow.'),
+                        'title' => __('Functions'),
+                        'description' => __('Target a functions namespace with a function-native deployment flow.'),
                         'href' => route('launches.serverless'),
                         'cta' => __('Plan Functions path'),
                     ],

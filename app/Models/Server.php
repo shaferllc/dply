@@ -1032,7 +1032,7 @@ class Server extends Model
     public function providerDisplayLabel(): string
     {
         if ($this->isDigitalOceanFunctionsHost()) {
-            return 'DigitalOcean Functions';
+            return 'Functions';
         }
 
         if ($this->isAwsLambdaHost()) {

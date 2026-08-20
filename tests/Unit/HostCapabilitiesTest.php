@@ -31,7 +31,7 @@ test('digitalocean functions hosts disable machine features', function () {
     expect($capabilities->supportsWebserverProvisioning())->toBeFalse();
     expect($capabilities->supportsEnvPushToHost())->toBeFalse();
     expect($capabilities->supportsFunctionDeploy())->toBeTrue();
-    expect($server->providerDisplayLabel())->toBe('DigitalOcean Functions');
+    expect($server->providerDisplayLabel())->toBe('Functions');
 });
 
 test('docker hosts expose container capabilities without vm features', function () {

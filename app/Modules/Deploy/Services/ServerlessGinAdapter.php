@@ -65,7 +65,7 @@ class ServerlessGinAdapter
 
         $stub = $this->stubPath();
         if (! is_file($stub)) {
-            throw new RuntimeException('DigitalOcean Functions Gin adapter stub is missing: '.$stub);
+            throw new RuntimeException('Functions Gin adapter stub is missing: '.$stub);
         }
 
         $target = rtrim($workingDirectory, '/').'/'.self::HANDLER_FILENAME;
@@ -75,7 +75,7 @@ class ServerlessGinAdapter
 
         return $plan + [
             'ran' => true,
-            'output' => 'Injected DigitalOcean Functions Gin adapter as '.self::HANDLER_FILENAME.'.',
+            'output' => 'Injected Functions Gin adapter as '.self::HANDLER_FILENAME.'.',
         ];
     }
 

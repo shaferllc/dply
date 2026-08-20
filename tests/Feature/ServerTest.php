@@ -281,7 +281,7 @@ test('serverless launch path is displayed with organization', function () {
     $response->assertOk();
     $response->assertSee('Serverless');
     $response->assertSee('AWS Lambda');
-    $response->assertSee('DigitalOcean Functions');
+    $response->assertSee('Functions');
 });
 
 test('kubernetes launch path is displayed with organization', function () {
