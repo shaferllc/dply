@@ -151,6 +151,23 @@ test('managed host errors when the platform namespace is not configured', functi
     Bus::assertNotDispatched(RunSiteDeploymentJob::class);
 });
 
+test('marks host errored when the attached credential is already rejected', function () {
+    Bus::fake();
+    Http::fake();
+    $server = makeHost();
+    $server->providerCredential?->forceFill([
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ])->save();
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    Http::assertNothingSent();
+    $server->refresh();
+    expect($server->status)->toBe(Server::STATUS_ERROR);
+    expect($server->meta['provision_error']['message'] ?? '')->toContain('can no longer authenticate');
+    Bus::assertNotDispatched(RunSiteDeploymentJob::class);
+});
+
 test('marks host errored when the api call fails', function () {
     Bus::fake();
     Http::fake([

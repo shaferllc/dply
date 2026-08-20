@@ -9,6 +9,7 @@ use App\Models\SiteDeployment;
 // which does not exist — a fatal on dispatch. No test covers this path.
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Serverless\Support\ServerlessCustomerCopy;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use App\Support\DeployLogRedactor;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -69,7 +70,7 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
                 Log::warning('serverless.namespace.managed_not_configured', ['server_id' => $server->id]);
                 $this->markFailed(
                     $server,
-                    'dply-managed serverless is not configured — the platform DigitalOcean Functions namespace is missing.',
+                    'dply-managed serverless is not configured — the platform functions namespace is missing.',
                 );
 
                 return;
@@ -106,7 +107,7 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             Log::warning('serverless.namespace.no_credential', ['server_id' => $server->id]);
             $this->markFailed(
                 $server,
-                'This function has no DigitalOcean API credential, so the namespace could not be created. Connect a DigitalOcean account and retry.',
+                'This function has no provider credential, so the namespace could not be created. Connect an account and retry.',
             );
 
             return;
@@ -151,7 +152,7 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             ]);
             $this->markFailed(
                 $server,
-                'DigitalOcean created a namespace but returned credentials that cannot be used. Retry provisioning, or check the DigitalOcean Functions response.',
+                'The functions host created a namespace but returned credentials that cannot be used. Retry provisioning.',
             );
 
             return;
@@ -173,9 +174,9 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
      */
     private function markFailed(Server $server, string $message): void
     {
-        $safe = Str::limit(DeployLogRedactor::redact(trim($message)), 500, '…');
+        $safe = Str::limit(DeployLogRedactor::redact(trim(ServerlessCustomerCopy::neutralize($message))), 500, '…');
         if ($safe === '') {
-            $safe = 'Could not create the DigitalOcean Functions namespace.';
+            $safe = 'Could not create the functions namespace.';
         }
 
         $meta = is_array($server->meta) ? $server->meta : [];

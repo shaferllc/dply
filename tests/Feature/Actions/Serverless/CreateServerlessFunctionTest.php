@@ -171,6 +171,35 @@ test('managed mode runs on dplys account without a customer credential', functio
     expect($server->meta['serverless_managed'])->toBeTrue();
 });
 
+test('byo mode is rejected when the digitalocean credential is unhealthy', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $credential = ProviderCredential::query()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'provider' => 'digitalocean',
+        'name' => 'stale',
+        'credentials' => ['token' => 'dop_v1_stale'],
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ]);
+
+    $this->expectException(InvalidArgumentException::class);
+    $this->expectExceptionMessage('can no longer authenticate');
+
+    app(CreateServerlessFunction::class)->handle($user, $org, [
+        'name' => 'Laravel demo',
+        'repo' => 'shaferllc/dply-demo-laravel-function',
+        'branch' => 'master',
+        'runtime' => 'php:8.4',
+        'region' => 'nyc1',
+        'provider_credential_id' => $credential->id,
+    ]);
+});
+
 test('managed mode is rejected when the platform namespace is not configured', function () {
     Bus::fake();
     Config::set('serverless.managed.api_host', '');

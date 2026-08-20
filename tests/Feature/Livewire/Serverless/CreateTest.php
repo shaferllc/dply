@@ -114,6 +114,55 @@ test('validation rejects empty name and repo', function () {
         ->assertHasErrors(['name', 'git_repository_url']);
 });
 
+test('preselects the newest healthy digitalocean credential', function () {
+    ProviderCredential::query()->create([
+        'organization_id' => $this->org->id,
+        'user_id' => $this->user->id,
+        'provider' => 'digitalocean',
+        'name' => 'stale',
+        'credentials' => ['token' => 'dop_v1_stale'],
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ]);
+
+    $healthy = ProviderCredential::query()->create([
+        'organization_id' => $this->org->id,
+        'user_id' => $this->user->id,
+        'provider' => 'digitalocean',
+        'name' => 'aug_19',
+        'credentials' => ['token' => 'dop_v1_ok'],
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->assertSet('provider_credential_id', $healthy->id)
+        ->assertSee('Can’t connect');
+});
+
+test('create rejects an unhealthy digitalocean credential', function () {
+    $stale = ProviderCredential::query()->create([
+        'organization_id' => $this->org->id,
+        'user_id' => $this->user->id,
+        'provider' => 'digitalocean',
+        'name' => 'stale',
+        'credentials' => ['token' => 'dop_v1_stale'],
+        'validation_error' => 'DigitalOcean API failed to validate token: Unable to authenticate you',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', 'Laravel demo')
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'shaferllc/dply-demo-laravel-function')
+        ->set('git_branch', 'master')
+        ->set('runtime', 'php:8.4')
+        ->set('region', 'nyc1')
+        ->set('provider_credential_id', $stale->id)
+        ->call('create')
+        ->assertHasErrors(['provider_credential_id']);
+
+    expect(Site::query()->where('organization_id', $this->org->id)->exists())->toBeFalse();
+});
+
 test('happy path creates function and redirects', function () {
     Bus::fake();
     withCredential($this->user, $this->org);

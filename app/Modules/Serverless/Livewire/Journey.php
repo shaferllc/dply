@@ -13,6 +13,7 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
+use App\Modules\Serverless\Support\ServerlessCustomerCopy;
 use App\Support\DeployLogRedactor;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
@@ -305,7 +306,7 @@ class Journey extends Component
         // A namespace dply couldn't reach is the operator's problem to finish,
         // so name it rather than reporting a clean success.
         if ($result['remote_error'] !== null) {
-            $this->toastError(__('Deleted :name from dply, but its DigitalOcean namespace could not be removed — delete it in the DigitalOcean console. (:error)', [
+            $this->toastError(__('Deleted :name from dply, but its functions namespace could not be removed. (:error)', [
                 'name' => $name,
                 'error' => $result['remote_error'],
             ]));
@@ -406,8 +407,8 @@ class Journey extends Component
                 'detail' => match ($namespaceState) {
                     'failed' => $provisionError !== ''
                         ? $provisionError
-                        : __('Could not create the DigitalOcean Functions namespace.'),
-                    default => __('Creating the DigitalOcean Functions namespace.'),
+                        : __('Could not create the functions namespace.'),
+                    default => __('Creating the functions namespace.'),
                 },
                 'state' => $namespaceState,
             ],
@@ -507,7 +508,7 @@ class Journey extends Component
 
         $failedStep = collect($deploySteps)->first(fn (array $step): bool => $step['state'] === 'failed');
         $errorSummary = $namespaceState === 'failed'
-            ? ($provisionError !== '' ? $provisionError : __('Could not create the DigitalOcean Functions namespace.'))
+            ? ($provisionError !== '' ? $provisionError : __('Could not create the functions namespace.'))
             : $this->errorSummary(
                 (string) ($deployment->log_output ?? ''),
                 is_array($failedStep) ? $failedStep : null,
@@ -630,7 +631,7 @@ class Journey extends Component
             return '';
         }
 
-        return Str::limit(DeployLogRedactor::redact($message), 400, '…');
+        return Str::limit(DeployLogRedactor::redact(ServerlessCustomerCopy::neutralize($message)), 400, '…');
     }
 
     /**
