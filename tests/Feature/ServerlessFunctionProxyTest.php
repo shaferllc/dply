@@ -25,7 +25,9 @@ test('it proxies a friendly url to the function', function () {
         ->assertOk()
         ->assertSee('hello from the function');
 
-    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://faas.example/api/v1/web/ns/default/orders'));
+    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://faas.example/api/v1/web/ns/default/orders')
+        && $request->hasHeader('X-Forwarded-Host')
+        && $request->hasHeader('X-Forwarded-Proto'));
 });
 
 test('it proxies a testing domain subdomain', function () {

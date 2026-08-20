@@ -218,7 +218,17 @@ if (! function_exists('main')) {
                 ];
             }
 
-            $request = dply_do_functions_request($args);
+            $path = '/'.ltrim((string) ($args['__ow_path'] ?? '/'), '/');
+            $public = dply_do_functions_public_response($root, $path);
+            if ($public !== null) {
+                if ($corsPolicy !== null) {
+                    $public['headers'] += dply_do_functions_cors_headers($corsPolicy, $args);
+                }
+
+                return $public;
+            }
+
+            $request = dply_do_functions_request($args, $envFile);
 
             // Capture this request's Laravel log records — DigitalOcean
             // Functions never persists them, so the visit report below is
@@ -883,13 +893,119 @@ if (! function_exists('dply_do_functions_queue_size')) {
     }
 }
 
+if (! function_exists('dply_do_functions_is_internal_host')) {
+    /**
+     * Hosts that must never become APP_URL / asset() roots. DigitalOcean
+     * Functions (OpenWhisk) invokes the action with Host: ccontroller — if
+     * that leaks into Laravel's URL generator, Vite emits
+     * https://ccontroller/build/assets/… and the browser cannot resolve it.
+     */
+    function dply_do_functions_is_internal_host(string $host): bool
+    {
+        $host = strtolower(trim($host));
+
+        return $host === ''
+            || in_array($host, ['ccontroller', 'controller', 'localhost', '127.0.0.1'], true)
+            || str_ends_with($host, '.local')
+            || str_ends_with($host, '.internal');
+    }
+}
+
+if (! function_exists('dply_do_functions_public_host')) {
+    /**
+     * The hostname the function should present as — the dply-proxied
+     * friendly host (X-Forwarded-Host) or APP_URL, never the OpenWhisk
+     * controller.
+     *
+     * @param  array<string, mixed>  $headers
+     * @param  array<string, string>  $envFile
+     */
+    function dply_do_functions_public_host(array $headers, array $envFile): string
+    {
+        $candidates = [
+            $headers['x-forwarded-host'] ?? $headers['X-Forwarded-Host'] ?? '',
+            (string) parse_url((string) ($envFile['APP_URL'] ?? ''), PHP_URL_HOST),
+            (string) parse_url((string) ($envFile['ASSET_URL'] ?? ''), PHP_URL_HOST),
+            $headers['host'] ?? $headers['Host'] ?? '',
+        ];
+
+        foreach ($candidates as $candidate) {
+            $host = strtolower(trim(explode(',', (string) $candidate)[0]));
+            $host = explode(':', $host)[0];
+            if ($host !== '' && ! dply_do_functions_is_internal_host($host)) {
+                return $host;
+            }
+        }
+
+        return '';
+    }
+}
+
+if (! function_exists('dply_do_functions_public_response')) {
+    /**
+     * Serve a file from public/ the way nginx would in front of Laravel.
+     * DigitalOcean Functions has no webserver, so /build/assets/*.css would
+     * otherwise fall through to a Laravel 404 (or the app's catch-all).
+     *
+     * @return array{statusCode: int, headers: array<string, string>, body: string}|null
+     */
+    function dply_do_functions_public_response(string $root, string $path): ?array
+    {
+        $relative = ltrim($path, '/');
+        if ($relative === '' || str_contains($relative, "\0") || str_contains($relative, '..')) {
+            return null;
+        }
+
+        $publicRoot = realpath(rtrim($root, '/').'/public');
+        if ($publicRoot === false || ! is_dir($publicRoot)) {
+            return null;
+        }
+
+        $realFile = realpath($publicRoot.'/'.$relative);
+        if ($realFile === false || ! is_file($realFile)) {
+            return null;
+        }
+        if (! str_starts_with($realFile, $publicRoot.DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        $mime = match (strtolower((string) pathinfo($realFile, PATHINFO_EXTENSION))) {
+            'css' => 'text/css',
+            'js', 'mjs' => 'application/javascript',
+            'svg' => 'image/svg+xml',
+            'woff2' => 'font/woff2',
+            'woff' => 'font/woff',
+            'ttf' => 'font/ttf',
+            'json', 'map' => 'application/json',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'ico' => 'image/x-icon',
+            'txt' => 'text/plain; charset=utf-8',
+            'xml' => 'application/xml',
+            default => (mime_content_type($realFile) ?: 'application/octet-stream'),
+        };
+
+        return [
+            'statusCode' => 200,
+            'headers' => [
+                'content-type' => $mime,
+                'cache-control' => 'public, max-age=31536000, immutable',
+            ],
+            'body' => (string) file_get_contents($realFile),
+        ];
+    }
+}
+
 if (! function_exists('dply_do_functions_request')) {
     /**
      * Rebuild an Illuminate request from an OpenWhisk raw web-action event.
      *
      * @param  array<string, mixed>  $args
+     * @param  array<string, string>  $envFile
      */
-    function dply_do_functions_request(array $args): Request
+    function dply_do_functions_request(array $args, array $envFile = []): Request
     {
         $method = strtoupper((string) ($args['__ow_method'] ?? 'GET'));
         $path = '/'.ltrim((string) ($args['__ow_path'] ?? '/'), '/');
@@ -908,6 +1024,15 @@ if (! function_exists('dply_do_functions_request')) {
         $contentType = (string) ($headers['content-type'] ?? $headers['Content-Type'] ?? '');
         if ($contentType !== '') {
             $server['CONTENT_TYPE'] = $contentType;
+        }
+
+        $publicHost = dply_do_functions_public_host($headers, $envFile);
+        if ($publicHost !== '') {
+            $server['HTTP_HOST'] = $publicHost;
+            $server['SERVER_NAME'] = $publicHost;
+            $server['HTTPS'] = 'on';
+            $server['SERVER_PORT'] = '443';
+            $server['REQUEST_SCHEME'] = 'https';
         }
 
         $parameters = [];

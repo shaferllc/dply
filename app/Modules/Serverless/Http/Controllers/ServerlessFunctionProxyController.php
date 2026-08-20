@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-
-use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Models\Site;
+use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Modules\Serverless\Services\ServerlessRoutingResolver;
+use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -160,6 +159,14 @@ class ServerlessFunctionProxyController extends Controller
             }
             $headers[$name] = implode(', ', $values);
         }
+
+        // The function must generate absolute URLs for the hostname the
+        // visitor used — not OpenWhisk's internal controller host. Overwrite
+        // any inbound forwarded pair so a client cannot spoof a different
+        // public origin through the proxy.
+        $headers['X-Forwarded-Host'] = $request->getHost();
+        $headers['X-Forwarded-Proto'] = $request->secure() ? 'https' : $request->getScheme();
+        $headers['X-Forwarded-Port'] = $request->secure() ? '443' : (string) $request->getPort();
 
         $client = Http::withHeaders($headers)->timeout(70)->withoutRedirecting();
 

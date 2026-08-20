@@ -6,6 +6,7 @@ namespace Tests\Feature\Services\Deploy\ServerlessEnvironmentPreparerTest;
 
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 
@@ -158,6 +159,22 @@ test('it skips the queue wake url when no public url is configured', function ()
     (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
 
     $this->assertStringNotContainsString('DPLY_QUEUE_WAKE_URL=', (string) $site->fresh()->env_file_content);
+});
+
+test('it force-sets app url and asset url to the function hostname', function () {
+    $site = Site::factory()->create([
+        'name' => 'Placehold',
+        'slug' => 'placehold',
+        'env_file_content' => "APP_URL=http://localhost\nASSET_URL=http://localhost\n",
+    ]);
+    $host = $site->ensureServerlessProxySlug().'.'.ServerlessTestingDomains::apexFor($site->id);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $managed = (string) $site->fresh()->env_file_content;
+    $this->assertStringContainsString('APP_URL=https://'.$host, $managed);
+    $this->assertStringContainsString('ASSET_URL=https://'.$host, $managed);
+    $this->assertStringNotContainsString('APP_URL=http://localhost', $managed);
 });
 
 test('the wake url matches the route the wake controller is registered on', function () {

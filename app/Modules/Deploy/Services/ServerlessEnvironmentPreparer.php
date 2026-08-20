@@ -57,6 +57,15 @@ class ServerlessEnvironmentPreparer
         // overriding any stale DPLY_COMMAND_SECRET committed in the repo .env.
         if ($isLaravel) {
             $managed = $this->setEnvKey($managed, 'DPLY_COMMAND_SECRET', $site->ensureServerlessCommandSecret());
+
+            // DigitalOcean Functions invokes the action as Host: ccontroller.
+            // Force APP_URL / ASSET_URL to the function's public hostname so
+            // Vite and asset() never emit https://ccontroller/build/assets/….
+            $publicUrl = $site->serverlessFriendlyUrl() ?: $site->serverlessPublicUrl();
+            if (is_string($publicUrl) && $publicUrl !== '') {
+                $managed = $this->setEnvKey($managed, 'APP_URL', $publicUrl);
+                $managed = $this->setEnvKey($managed, 'ASSET_URL', $publicUrl);
+            }
         }
 
         // Log shipping — the function's handler POSTs each request it serves
