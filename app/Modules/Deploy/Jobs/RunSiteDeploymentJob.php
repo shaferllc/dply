@@ -18,6 +18,7 @@ use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Jobs\RunSiteInsightsJob;
@@ -25,6 +26,7 @@ use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
+use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
@@ -242,6 +244,10 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'deployment_id' => $deployment->id,
             ], $this->timeout + 120);
 
+            if ($this->site->usesFunctionsRuntime()) {
+                app(ServerlessDeployProgress::class)->seed($this->site);
+            }
+
             // Retrying a failed first serverless deploy: leave the "failed"
             // badge and return to configured-while-deploying so the journey /
             // index read as in-flight, not still broken.
@@ -352,6 +358,14 @@ class RunSiteDeploymentJob implements ShouldQueue
                     }
                 }
 
+                if ($this->site->usesFunctionsRuntime()) {
+                    $progress = app(ServerlessDeployProgress::class);
+                    $progress->checkpoint($this->site);
+                    if ($deployment->fresh()?->status === SiteDeployment::STATUS_FAILED) {
+                        throw new ServerlessDeployCancelledException('Deploy cancelled by operator.');
+                    }
+                }
+
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
                     'git_sha' => $result['sha'],
@@ -430,11 +444,17 @@ class RunSiteDeploymentJob implements ShouldQueue
                     }
                 }
             } catch (\Throwable $e) {
+                if ($this->site->usesFunctionsRuntime()) {
+                    app(ServerlessDeployProgress::class)->flushLog($this->site);
+                }
                 $msg = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($e->getMessage()));
+                $existingLog = trim((string) ($deployment->fresh()?->log_output ?? ''));
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_FAILED,
                     'exit_code' => 1,
-                    'log_output' => $msg,
+                    'log_output' => $existingLog !== '' && ! str_contains($existingLog, $msg)
+                        ? $existingLog."\n\n".$msg
+                        : $msg,
                     'finished_at' => now(),
                 ]);
                 $this->markServerlessFirstDeployFailed();

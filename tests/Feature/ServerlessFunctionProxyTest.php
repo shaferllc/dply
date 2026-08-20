@@ -3,6 +3,7 @@
 namespace Tests\Feature\ServerlessFunctionProxyTest;
 
 use App\Models\Site;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -66,14 +67,50 @@ test('an undeployed function returns 503', function () {
     $this->get('/fn/pending-fn')->assertStatus(503);
 });
 
-test('proxy slugs are unique', function () {
-    $a = Site::factory()->create(['name' => 'Laravel demo']);
-    $b = Site::factory()->create(['name' => 'Laravel demo']);
+test('new proxy slugs include a stable site-id suffix so same-name sites do not collide', function () {
+    $a = Site::factory()->create(['name' => 'Laravel demo', 'slug' => 'laravel-demo']);
+    $b = Site::factory()->create(['name' => 'Laravel demo', 'slug' => 'laravel-demo']);
 
     $slugA = $a->ensureServerlessProxySlug();
     $slugB = $b->ensureServerlessProxySlug();
 
-    expect($slugA)->toBe('laravel-demo');
+    expect($slugA)->toBe('laravel-demo-'.substr(sha1((string) $a->id), 0, 8));
+    expect($slugB)->toBe('laravel-demo-'.substr(sha1((string) $b->id), 0, 8));
     $this->assertNotSame($slugA, $slugB);
-    expect($slugB)->toStartWith('laravel-demo-');
+    $this->assertNotSame($a->serverlessFunctionHost(), $b->serverlessFunctionHost());
+});
+
+test('an already allocated proxy slug is not reminted', function () {
+    $site = Site::factory()->create([
+        'name' => 'Placehold',
+        'slug' => 'placehold',
+        'meta' => ['serverless' => ['proxy_slug' => 'placehold']],
+    ]);
+
+    expect($site->ensureServerlessProxySlug())->toBe('placehold');
+    expect($site->fresh()->ensureServerlessProxySlug())->toBe('placehold');
+    expect($site->serverlessFriendlyUrl())->toBe(
+        'https://placehold.'.ServerlessTestingDomains::apexFor($site->id)
+    );
+});
+
+test('it proxies a minted unique testing hostname', function () {
+    Http::fake([
+        'https://faas.example/*' => Http::response('reached via unique host', 200, ['Content-Type' => 'text/plain']),
+    ]);
+
+    $site = Site::factory()->create([
+        'name' => 'Orders API',
+        'slug' => 'orders-api',
+        'meta' => ['serverless' => [
+            'action_url' => 'https://faas.example/api/v1/web/ns/default/orders',
+        ]],
+    ]);
+    $slug = $site->ensureServerlessProxySlug();
+
+    $domain = (string) (config('services.digitalocean.testing_domains')[0] ?? 'dply.test');
+
+    $this->get('http://'.$slug.'.'.$domain.'/')
+        ->assertOk()
+        ->assertSee('reached via unique host');
 });

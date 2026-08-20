@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Support;
 
+use App\Modules\Edge\Support\EdgeTestingDomains;
+
 /**
  * Serverless function hostnames live on their own apex — dply-serverless.cloud
- * — so every deployed function answers at {slug}.dply-serverless.cloud. This is
- * deliberately separate from the shared DPLY_TESTING_DOMAINS pool that BYO/VM
- * site previews draw from, and from the Edge on-dply.* delivery pool
- * ({@see \App\Modules\Edge\Support\EdgeTestingDomains}).
+ * — so every deployed function answers at {slug}-{idHash8}.dply-serverless.cloud.
+ * This is deliberately separate from the shared DPLY_TESTING_DOMAINS pool that
+ * BYO/VM site previews draw from, and from the Edge on-dply.* delivery pool
+ * ({@see EdgeTestingDomains}).
  *
  * Override with DPLY_SERVERLESS_TESTING_DOMAINS (comma-separated) when running
  * locally or on a staging apex.

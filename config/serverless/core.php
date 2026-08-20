@@ -88,8 +88,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Every deployed function gets a friendly hostname on a dedicated apex —
-    | {slug}.dply-serverless.cloud — rather than borrowing an entry from the
-    | shared DPLY_TESTING_DOMAINS pool that BYO/VM previews use. Needs
+    | {slug}-{idHash8}.dply-serverless.cloud — rather than borrowing an entry
+    | from the shared DPLY_TESTING_DOMAINS pool that BYO/VM previews use. Needs
     | *.dply-serverless.cloud DNS + wildcard TLS pointed at the dply app.
     |
     | Override with DPLY_SERVERLESS_TESTING_DOMAINS (comma-separated) for local

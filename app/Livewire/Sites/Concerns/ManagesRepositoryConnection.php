@@ -129,7 +129,7 @@ trait ManagesRepositoryConnection
 
         if ($this->git_repository_url === '') {
             // Never connected — default to the provider picker; the repo list
-            // (and first-repo auto-select) loads lazily on the Connection tab.
+            // loads lazily on the Connection tab.
             $this->repo_source = 'provider';
             if ($this->source_control_account_id === '') {
                 $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];

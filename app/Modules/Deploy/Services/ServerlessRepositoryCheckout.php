@@ -19,6 +19,7 @@ final class ServerlessRepositoryCheckout
     ) {}
 
     /**
+     * @param  (callable(string): void)|null  $onOutput
      * @return array{
      *     workspace_path: string,
      *     repository_path: string,
@@ -35,6 +36,7 @@ final class ServerlessRepositoryCheckout
         int|string|null $userId = null,
         ?string $sourceControlAccountId = null,
         ?string $refKind = null,
+        ?callable $onOutput = null,
     ): array {
         $repositoryUrl = trim($repositoryUrl);
         $branch = trim($branch) !== '' ? trim($branch) : 'main';
@@ -55,26 +57,26 @@ final class ServerlessRepositoryCheckout
         $resolvedBranch = $branch;
 
         if (is_dir($repositoryPath.'/.git')) {
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'remote', 'set-url', 'origin', $cloneUrl], $workspacePath);
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'remote', 'set-url', 'origin', $cloneUrl], $workspacePath, $onOutput);
             if ($isCommit) {
                 // Commit SHAs: fetch full history then detached checkout.
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--all', '--prune'], $workspacePath);
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath);
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--all', '--prune'], $workspacePath, $onOutput);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath, $onOutput);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath, $onOutput);
             } else {
-                $resolvedBranch = $this->fetchBranch($repositoryPath, $workspacePath, $cloneUrl, $branch, $log);
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $resolvedBranch, 'FETCH_HEAD'], $workspacePath);
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
+                $resolvedBranch = $this->fetchBranch($repositoryPath, $workspacePath, $cloneUrl, $branch, $log, $onOutput);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $resolvedBranch, 'FETCH_HEAD'], $workspacePath, $onOutput);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath, $onOutput);
             }
         } else {
             File::deleteDirectory($repositoryPath);
             if ($isCommit) {
                 // Full clone (no --depth, no --branch) so any commit is reachable.
-                $log[] = $this->run(['git', 'clone', $cloneUrl, $repositoryPath], $workspacePath);
-                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath);
+                $log[] = $this->run(['git', 'clone', $cloneUrl, $repositoryPath], $workspacePath, $onOutput);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath, $onOutput);
             } else {
                 try {
-                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
+                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath, $onOutput);
                 } catch (\RuntimeException $e) {
                     $fallbackBranch = $this->defaultBranchForCloneUrl($cloneUrl, $workspacePath);
                     if ($fallbackBranch === null || $fallbackBranch === $branch) {
@@ -84,7 +86,7 @@ final class ServerlessRepositoryCheckout
                     $resolvedBranch = $fallbackBranch;
                     $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
                     File::deleteDirectory($repositoryPath);
-                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $fallbackBranch, $cloneUrl, $repositoryPath], $workspacePath);
+                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $fallbackBranch, $cloneUrl, $repositoryPath], $workspacePath, $onOutput);
                 }
             }
         }
@@ -140,23 +142,31 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  array<int, string> $command
+     * @param  array<int, string>  $command
+     * @param  (callable(string): void)|null  $onOutput
      */
-    private function run(array $command, string $workingDirectory): string
+    private function run(array $command, string $workingDirectory, ?callable $onOutput = null): string
     {
         $process = new Process($command, $workingDirectory);
         $process->setTimeout(300);
-        $process->run();
+        $captured = '';
+        $process->run(function (string $type, string $buffer) use ($onOutput, &$captured): void {
+            $captured .= $buffer;
+            if ($onOutput !== null && $buffer !== '') {
+                $onOutput($buffer);
+            }
+        });
 
         if (! $process->isSuccessful()) {
             throw new \RuntimeException(trim($process->getErrorOutput()."\n".$process->getOutput()));
         }
 
-        return trim($process->getOutput());
+        return trim($captured !== '' ? $captured : $process->getOutput());
     }
 
     /**
      * @param  list<string>  $log
+     * @param  (callable(string): void)|null  $onOutput
      */
     private function fetchBranch(
         string $repositoryPath,
@@ -164,9 +174,10 @@ final class ServerlessRepositoryCheckout
         string $cloneUrl,
         string $branch,
         array &$log,
+        ?callable $onOutput = null,
     ): string {
         try {
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $branch], $workspacePath);
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $branch], $workspacePath, $onOutput);
 
             return $branch;
         } catch (\RuntimeException $e) {
@@ -176,7 +187,7 @@ final class ServerlessRepositoryCheckout
             }
 
             $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $fallbackBranch], $workspacePath);
+            $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--depth', '1', 'origin', $fallbackBranch], $workspacePath, $onOutput);
 
             return $fallbackBranch;
         }

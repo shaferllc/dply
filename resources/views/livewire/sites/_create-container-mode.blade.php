@@ -74,6 +74,7 @@
                         wire:change="inspectContainerRepository"
                         class="mt-2 block w-full rounded-xl border-slate-300 text-sm"
                     >
+                        <option value="">{{ __('Select a repository') }}</option>
                         @foreach ($containerAvailableRepositories as $repository)
                             <option value="{{ $repository['url'] }}">{{ $repository['label'] }}</option>
                         @endforeach

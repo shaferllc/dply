@@ -7,7 +7,7 @@
         default => 'active',
     };
 @endphp
-<div @if ($shouldPoll) wire:poll.3s @endif>
+<div @if ($shouldPoll && ! $confirmingCancel && ! $confirmingDeleteDeployment && ! $confirmingDeleteFunction) wire:poll.3s @endif>
     <div @class([
         'dply-page-shell py-8 sm:py-10' => ! $embedded,
         'min-w-0' => $embedded,
@@ -122,11 +122,21 @@
                 @if ($namespaceState === 'failed' || $deployState === 'failed' || $live || $cancellable || $deployPaused)
                     <div class="mt-4 flex flex-wrap items-center gap-2">
                         @if ($cancellable)
-                            <button type="button" wire:click="openCancelModal"
-                                    class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-sm font-semibold text-rose-800 transition hover:border-rose-300 hover:bg-rose-100">
-                                <x-heroicon-o-x-circle class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Cancel deploy') }}
-                            </button>
+                            @if ($teardownOnCancel)
+                                @can('delete', $site)
+                                    <button type="button" wire:click="openCancelModal"
+                                            class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-sm font-semibold text-rose-800 transition hover:border-rose-300 hover:bg-rose-100">
+                                        <x-heroicon-o-x-circle class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Cancel provision') }}
+                                    </button>
+                                @endcan
+                            @else
+                                <button type="button" wire:click="openCancelModal"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-sm font-semibold text-rose-800 transition hover:border-rose-300 hover:bg-rose-100">
+                                    <x-heroicon-o-x-circle class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Cancel deploy') }}
+                                </button>
+                            @endif
                         @endif
 
                         @if ($namespaceState === 'failed')
@@ -269,8 +279,8 @@
                                     <x-heroicon-m-arrow-right class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                                 </a>
                             @endunless
-                            @if ($actionUrl)
-                                <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
+                            @if ($openUrl)
+                                <a href="{{ $openUrl }}" target="_blank" rel="noopener"
                                    class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/50">
                                     <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Open app') }}
@@ -365,7 +375,7 @@
                 <div class="lg:col-span-7">
                     <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
                         <h2 class="text-sm font-semibold text-brand-ink">{{ __('Deploy stages') }}</h2>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Namespace, build, and go-live — updates every few seconds.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Checkout, build, push, and go-live — updates every few seconds.') }}</p>
                     </div>
 
                     <ol class="divide-y divide-brand-ink/8">
@@ -423,6 +433,9 @@
                                             'font-mono text-[13px] text-rose-900' => $stage['state'] === 'failed',
                                             'text-brand-moss' => $stage['state'] !== 'failed',
                                         ])>{{ $stage['detail'] }}</p>
+                                        @if ($stage['key'] === 'deploy' && $stage['state'] === 'active' && $currentActivityDetail !== '')
+                                            <p class="mt-0.5 truncate font-mono text-xs text-brand-moss/70">{{ $currentActivityDetail }}</p>
+                                        @endif
 
                                         @if ($stage['key'] === 'deploy' && count($deploySteps) > 0)
                                             <ul class="mt-3 space-y-0 overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-cream/30">
@@ -466,6 +479,22 @@
                                                 @endforeach
                                             </ul>
                                         @endif
+
+                                        @if ($stage['key'] === 'deploy' && $activityLines !== [])
+                                            <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-ink">
+                                                <div class="flex items-center justify-between gap-2 px-3 py-2">
+                                                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-cream/70">{{ __('Recent activity') }}</p>
+                                                    @if ($stage['state'] === 'active')
+                                                        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden="true"></span>
+                                                    @endif
+                                                </div>
+                                                <ul class="space-y-0.5 px-3 pb-2.5 font-mono text-xs leading-relaxed text-brand-cream/90">
+                                                    @foreach ($activityLines as $line)
+                                                        <li class="break-all">{{ $line }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </li>
@@ -502,13 +531,10 @@
                         @endforeach
                     </dl>
 
-                    @if ($actionUrl)
-                        <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
-                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Invocation URL') }}</p>
-                            <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
-                               class="mt-1 block break-all font-mono text-sm text-brand-forest hover:underline">{{ $actionUrl }}</a>
-                        </div>
-                    @endif
+                    @include('livewire.serverless.partials.function-url-rows', [
+                        'invocationUrl' => $actionUrl,
+                        'friendlyUrl' => $friendlyUrl,
+                    ])
 
                     @if (trim($log) !== '')
                         <div class="border-t border-brand-ink/10">
@@ -566,29 +592,39 @@
         </section>
     </div>
 
-    {{-- Cancel confirmation — in-app modal (no browser confirm) --}}
     @if ($confirmingCancel)
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="serverless-cancel-title">
-            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCancelModal"></div>
-            <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-xl">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
-                    <h3 id="serverless-cancel-title" class="text-base font-semibold text-brand-ink">{{ __('Cancel this deploy?') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Stops at the next step boundary — in-flight steps finish first. Completed work is not rolled back.') }}
-                    </p>
-                </div>
-                <div class="flex justify-end gap-2 px-5 py-4">
-                    <button type="button" wire:click="closeCancelModal"
-                            class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/40">
-                        {{ __('Keep deploying') }}
-                    </button>
-                    <button type="button" wire:click="cancelDeploy" wire:loading.attr="disabled"
-                            class="inline-flex items-center rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-70">
-                        {{ __('Cancel deploy') }}
-                    </button>
-                </div>
-            </div>
+    <x-modal
+        name="serverless-cancel-provision"
+        :show="true"
+        maxWidth="md"
+        overlayClass="bg-brand-ink/40"
+        panelClass="dply-modal-panel"
+        focusable
+    >
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
+            <h2 class="text-xl font-semibold text-brand-ink">
+                {{ $teardownOnCancel ? __('Cancel this provision?') : __('Cancel this deploy?') }}
+            </h2>
+            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                @if ($teardownOnCancel)
+                    {{ __('This stops the in-progress work, removes the function and its namespace, and it will not stay looking live. This cannot be undone.') }}
+                @else
+                    {{ __('Stops at the next step boundary — in-flight steps finish first. The live function stays up. Completed work is not rolled back.') }}
+                @endif
+            </p>
         </div>
+        <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+            <x-secondary-button type="button" wire:click="closeCancelModal">
+                {{ $teardownOnCancel ? __('Keep provisioning') : __('Keep deploying') }}
+            </x-secondary-button>
+            <x-danger-button type="button" wire:click="cancelDeploy" wire:loading.attr="disabled" wire:target="cancelDeploy">
+                <span wire:loading.remove wire:target="cancelDeploy">
+                    {{ $teardownOnCancel ? __('Cancel and remove') : __('Cancel deploy') }}
+                </span>
+                <span wire:loading wire:target="cancelDeploy">{{ __('Cancelling…') }}</span>
+            </x-danger-button>
+        </div>
+    </x-modal>
     @endif
 
     {{-- Delete-failed-run confirmation — same in-app modal shape as cancel --}}

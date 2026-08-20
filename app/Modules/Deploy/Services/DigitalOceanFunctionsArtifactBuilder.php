@@ -46,7 +46,7 @@ class DigitalOceanFunctionsArtifactBuilder
 
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
 
-        $this->progress->active($site, 'checkout', 'Cloning repository', $repositoryUrl);
+        $this->progress->active($site, 'checkout', 'Checking out the repository', $repositoryUrl);
         $checkout = $this->repositoryCheckout->checkout(
             'build-'.$site->id,
             $repositoryUrl,
@@ -57,8 +57,12 @@ class DigitalOceanFunctionsArtifactBuilder
                 ? $resolvedConfig['source_control_account_id']
                 : null,
             $site->gitRefKind(),
+            function (string $chunk) use ($site): void {
+                $this->progress->appendLog($site, $chunk);
+            },
         );
-        $this->progress->done($site, 'checkout', 'Cloned repository');
+        $this->progress->flushLog($site);
+        $this->progress->done($site, 'checkout', 'Checked out the repository');
 
         // before_clone hooks — operator shell that runs after checkout but
         // before the build (e.g. `npm ci && npm run build`).
@@ -77,9 +81,20 @@ class DigitalOceanFunctionsArtifactBuilder
             }
         }
 
+        $this->progress->active($site, 'detect', 'Detecting runtime');
         $detected = $this->runtimeDetector->detect(
             $checkout['working_directory'],
             $this->capabilityResolver->forSite($site),
+        );
+        $detectedLabel = trim((string) ($detected['framework'] ?? '')) !== ''
+            && (string) $detected['framework'] !== 'unknown'
+            ? (string) $detected['framework']
+            : (string) ($detected['language'] ?? '');
+        $this->progress->done(
+            $site,
+            'detect',
+            'Detected runtime',
+            $detectedLabel !== '' ? $detectedLabel : '',
         );
 
         if ($detected['unsupported_for_target']) {
@@ -199,11 +214,13 @@ class DigitalOceanFunctionsArtifactBuilder
         // Bundle dply's managed environment into the artifact (and mint a
         // stable APP_KEY for Laravel) — the function has no other way to
         // receive configuration.
+        $this->progress->active($site, 'environment', 'Preparing environment');
         $envLog = $this->environmentPreparer->prepare(
             $site,
             $checkout['working_directory'],
             $detected['framework'] === 'laravel',
         );
+        $this->progress->done($site, 'environment', 'Prepared environment');
 
         // A raw action with no dependency manifest needs no build step; for
         // anything else an empty build command is a misconfiguration.
@@ -226,9 +243,10 @@ class DigitalOceanFunctionsArtifactBuilder
         $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, ...$expressAdapterLog, ...$flaskAdapterLog, ...$djangoAdapterLog, ...$ginAdapterLog, ...$shimLog, $envLog]);
 
         if ($buildCommand !== '') {
-            $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
-            $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
-            $this->progress->done($site, 'dependencies', 'Installed dependencies');
+            $depLabel = ServerlessDeployProgress::dependenciesLabel($buildCommand);
+            $this->progress->active($site, 'dependencies', $depLabel, $buildCommand);
+            $log[] = $this->runShell($buildCommand, $checkout['working_directory'], $site);
+            $this->progress->done($site, 'dependencies', str_replace('Installing', 'Installed', $depLabel));
         }
 
         // after_clone hooks — operator shell that runs once dependencies are
@@ -247,7 +265,7 @@ class DigitalOceanFunctionsArtifactBuilder
         $deployCommand = trim((string) $site->post_deploy_command);
         if ($deployCommand !== '') {
             $this->progress->active($site, 'commands', 'Running deploy commands', $deployCommand);
-            $log[] = $this->runShell($deployCommand, $checkout['working_directory']);
+            $log[] = $this->runShell($deployCommand, $checkout['working_directory'], $site);
             $this->progress->done($site, 'commands', 'Ran deploy commands');
         }
 
@@ -260,13 +278,13 @@ class DigitalOceanFunctionsArtifactBuilder
         File::ensureDirectoryExists($artifactDirectory);
         $artifactPath = $artifactDirectory.'/'.$this->artifactFilename($site);
 
-        $this->progress->active($site, 'package', 'Packaging artifact');
+        $this->progress->active($site, 'package', 'Packaging the artifact');
         if (is_file($sourcePath) && str_ends_with(strtolower($sourcePath), '.zip')) {
             File::copy($sourcePath, $artifactPath);
         } else {
             $this->zipPath($sourcePath, $artifactPath, $this->zipExclusions($checkout['working_directory']));
         }
-        $this->progress->done($site, 'package', 'Packaged artifact');
+        $this->progress->done($site, 'package', 'Packaged the artifact');
 
         return [
             'artifact_path' => $artifactPath,
@@ -467,7 +485,7 @@ class DigitalOceanFunctionsArtifactBuilder
         return $base.'-'.now()->format('YmdHis').'.zip';
     }
 
-    private function runShell(string $command, string $workingDirectory): string
+    private function runShell(string $command, string $workingDirectory, Site $site): string
     {
         // Control-plane workers often lack Composer and Node on PATH. Wrap
         // the command so the same shell installs them into storage/app/bin
@@ -478,13 +496,23 @@ class DigitalOceanFunctionsArtifactBuilder
 
         $process = Process::fromShellCommandline($prepared, $workingDirectory, $this->buildHostTools->processEnv());
         $process->setTimeout(1800);
-        $process->run();
+
+        $captured = '';
+        $process->run(function (string $type, string $buffer) use ($site, &$captured): void {
+            $plain = $this->plain($buffer);
+            if ($plain === '') {
+                return;
+            }
+            $captured .= ($captured !== '' && ! str_ends_with($captured, "\n") ? "\n" : '').$plain;
+            $this->progress->appendLog($site, $plain);
+        });
+        $this->progress->flushLog($site);
 
         if (! $process->isSuccessful()) {
             throw new \RuntimeException($this->plain($process->getErrorOutput()."\n".$process->getOutput()));
         }
 
-        return $this->plain($process->getOutput());
+        return $captured !== '' ? $captured : $this->plain($process->getOutput());
     }
 
     /**

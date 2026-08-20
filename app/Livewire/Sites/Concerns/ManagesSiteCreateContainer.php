@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Deploy\Services\LocalRepositoryInspector;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 
@@ -119,12 +119,6 @@ trait ManagesSiteCreateContainer
         $this->containerAvailableRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
-
-        if ($this->containerAvailableRepositories !== [] && $this->container_repository_selection === '') {
-            $first = $this->containerAvailableRepositories[0];
-            $this->container_repository_selection = (string) $first['url'];
-            $this->container_repository_branch = (string) $first['branch'];
-        }
     }
 
     /**

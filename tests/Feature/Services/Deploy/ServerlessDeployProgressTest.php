@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\Deploy\ServerlessDeployProgressTest;
 
-use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
+use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -86,4 +86,42 @@ test('checkpoint ignores a stale request for a different deployment', function (
     (new ServerlessDeployProgress)->checkpoint($site);
 
     expect($current->fresh()->status)->toBe(SiteDeployment::STATUS_RUNNING);
+});
+
+test('seed writes the pending catalog once', function () {
+    $site = Site::factory()->create();
+    $deployment = runningDeployment($site);
+
+    $progress = new ServerlessDeployProgress;
+    $progress->seed($site);
+    $progress->seed($site);
+
+    $steps = $deployment->fresh()->phaseSteps(ServerlessDeployProgress::PHASE);
+
+    expect($steps)->toHaveCount(count(ServerlessDeployProgress::CATALOG));
+    expect(collect($steps)->pluck('key')->all())->toBe(array_column(ServerlessDeployProgress::CATALOG, 'key'));
+    expect(collect($steps)->every(fn (array $step): bool => $step['state'] === 'pending'))->toBeTrue();
+});
+
+test('append log streams a tail onto the running deployment', function () {
+    $site = Site::factory()->create();
+    $deployment = runningDeployment($site);
+
+    $progress = new ServerlessDeployProgress;
+    $progress->appendLog($site, "Installing dependencies\n");
+    $progress->appendLog($site, '- Installing laravel/framework');
+    $progress->flushLog($site);
+
+    expect($deployment->fresh()->log_output)
+        ->toContain('Installing dependencies')
+        ->toContain('Installing laravel/framework');
+});
+
+test('dependencies label names composer and npm', function () {
+    expect(ServerlessDeployProgress::dependenciesLabel('composer install --no-dev --optimize-autoloader'))
+        ->toBe('Installing Composer dependencies');
+    expect(ServerlessDeployProgress::dependenciesLabel('npm ci && npm run build'))
+        ->toBe('Installing Node dependencies');
+    expect(ServerlessDeployProgress::dependenciesLabel('composer install && npm run build'))
+        ->toBe('Installing Composer and Node dependencies');
 });

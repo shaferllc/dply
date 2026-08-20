@@ -9,6 +9,7 @@
     $actionName = trim((string) ($cfg['action_name'] ?? ''));
     $revision = trim((string) ($cfg['last_revision_id'] ?? ''));
     $invocationUrl = trim((string) ($cfg['action_url'] ?? ''));
+    $friendlyUrl = $site->serverlessFriendlyUrl();
     $lastDeployedAt = $cfg['last_deployed_at'] ?? null;
     $keepWarm = (bool) ($cfg['keep_warm'] ?? false);
     $neverDeployed = $revision === '';
@@ -70,23 +71,13 @@
                 @endforeach
             </dl>
 
-            @if ($invocationUrl !== '')
-                <div x-data="{ copied: false }" class="mt-2 flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
-                    <span class="shrink-0 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Invocation URL') }}</span>
-                    <span class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink" title="{{ $invocationUrl }}">{{ $invocationUrl }}</span>
-                    <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
-                    <button type="button"
-                        class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink"
-                        title="{{ __('Copy URL') }}"
-                        @click="navigator.clipboard.writeText(@js($invocationUrl)); copied = true; setTimeout(() => copied = false, 2000)"
-                    >
-                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
-                    </button>
-                    <a href="{{ $invocationUrl }}" target="_blank" rel="noreferrer" title="{{ __('Open') }}" class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink">
-                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
-                    </a>
-                </div>
-            @endif
+            @include('livewire.serverless.partials.function-url-rows', [
+                'invocationUrl' => $invocationUrl,
+                'friendlyUrl' => $friendlyUrl,
+                'wrapperClass' => 'mt-2 overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-sand/20',
+                'pad' => 'px-3 py-2',
+                'urlClass' => 'mt-1 block truncate font-mono text-xs text-brand-ink underline-offset-2 hover:text-brand-sage hover:underline',
+            ])
         </div>
     </section>
 

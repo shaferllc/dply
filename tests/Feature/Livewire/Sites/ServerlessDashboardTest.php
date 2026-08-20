@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Livewire\Sites\ServerlessDashboardTest;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
+use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -46,15 +48,17 @@ test('general section shows the invocation url for a deployed function', functio
     [$user, $server, $site] = functionSite([
         'runtime' => 'nodejs:20',
         'action_url' => 'https://faas-nyc1.doserverless.co/api/v1/web/fn-abc/default/api',
+        'proxy_slug' => 'acme-api',
         'last_revision_id' => '7',
     ]);
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertOk()
-        ->assertSee('Function URL')
-        ->assertSee('Direct:')
+        ->assertSee('Friendly URL')
+        ->assertSee('Invocation URL')
         ->assertSee('faas-nyc1.doserverless.co')
+        ->assertSee('acme-api.'.ServerlessTestingDomains::apexFor($site->id))
         ->assertSee('nodejs:20')
         ->assertSee('Manage deploys');
 });
@@ -80,7 +84,7 @@ test('deploy redeploy button dispatches a deployment and redirects to the journe
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->call('redeployServerlessFunction')
-        ->assertRedirect(\App\Support\Serverless\ServerlessWorkspaceUrl::journey($site));
+        ->assertRedirect(ServerlessWorkspaceUrl::journey($site));
 
     Bus::assertDispatched(RunSiteDeploymentJob::class);
 });

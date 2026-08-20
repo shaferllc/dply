@@ -14,11 +14,11 @@ use App\Livewire\Sites\Concerns\ManagesRepositoryBrowsing;
 use App\Livewire\Sites\Concerns\ManagesRepositoryConnection;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -113,7 +113,6 @@ class Repository extends Component
     #[Url(as: 'commits_page', except: 1)]
     public int $commitsPage = 1;
 
-
     // Connection-tab repository picker state (repo_source, source_control_account_id,
     // repository_selection, git_repository_url, git_branch, git_ref_kind,
     // linkedSourceControlAccounts, availableRepositories) lives in the
@@ -180,7 +179,6 @@ class Repository extends Component
         $this->primeRepositoryPicker(app(SourceControlRepositoryBrowser::class));
     }
 
-
     /** Trait hook: linked accounts refreshed after connecting a provider mid-flow. */
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
@@ -192,7 +190,6 @@ class Repository extends Component
         }
         $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
     }
-
 
     /**
      * Trait hook (before the account list/selection clears): authorize the edit.
@@ -234,20 +231,11 @@ class Repository extends Component
         $this->clearRepoRefSelection();
     }
 
-    protected function onRepositoryAutoselected(): void
-    {
-        $this->clearRepoRefSelection();
-    }
-
-
     /* ──────────── Files navigation ──────────── */
-
 
     /* ──────────── Branches ──────────── */
 
-
     /* ──────────── Connection tab actions ──────────── */
-
 
     /* ──────────── Render ──────────── */
 
@@ -344,6 +332,4 @@ class Repository extends Component
      * remote reads); 'webhook' is included for the locked webhook embed.
      */
     private const LAZY_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'webhook'];
-
-
 }

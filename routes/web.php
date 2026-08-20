@@ -359,11 +359,12 @@ Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
     ->name('serverless.proxy');
 
 // Live function hostnames: a deployed function answers at
-// {slug}.dply-serverless.cloud. Each routable apex gets a wildcard-subdomain
-// route that proxies to the function — the serverless apex plus the legacy
-// DPLY_TESTING_DOMAINS pool, so functions minted before the dedicated apex
-// existed keep answering on their old hostnames. (Production needs *.{domain}
-// DNS + TLS pointed at the dply app for these to resolve.)
+// {slug}-{idHash8}.dply-serverless.cloud (or a previously allocated name-only
+// slug). Each routable apex gets a wildcard-subdomain route that proxies to
+// the function — the serverless apex plus the legacy DPLY_TESTING_DOMAINS
+// pool, so functions minted before the dedicated apex existed keep answering
+// on their old hostnames. (Production needs *.{domain} DNS + TLS pointed at
+// the dply app for these to resolve.)
 foreach (ServerlessTestingDomains::routable() as $functionDomain) {
     Route::domain('{slug}.'.$functionDomain)
         ->any('/{path?}', ServerlessFunctionProxyController::class)

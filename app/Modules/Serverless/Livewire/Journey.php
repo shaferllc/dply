@@ -13,11 +13,13 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
+use App\Modules\Serverless\Services\ServerlessSiteCanceller;
 use App\Modules\Serverless\Support\ServerlessCustomerCopy;
 use App\Modules\Serverless\Support\ServerlessHostCredential;
 use App\Support\DeployLogRedactor;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -190,25 +192,89 @@ class Journey extends Component
     }
 
     /**
-     * Request cancellation of the in-flight deploy. The deploy pipeline
-     * checks for this at each step boundary and aborts cleanly.
+     * Cancel an in-progress provision or deploy.
+     *
+     * A function that never went live is torn down (namespace + site) so it
+     * cannot keep looking successful. A live function only aborts the
+     * current redeploy and stays up.
      */
-    public function cancelDeploy(ServerlessDeployProgress $progress): void
+    public function cancelDeploy(ServerlessSiteCanceller $canceller): mixed
     {
         $this->confirmingCancel = false;
 
         $site = $this->site();
-        $this->authorize('update', $site);
+        $site->refresh();
 
+        $isLive = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
         $deployment = $this->latestDeployment();
-        if ($deployment === null || $deployment->status !== SiteDeployment::STATUS_RUNNING) {
-            $this->toastError(__('There is no deploy running to cancel.'));
+        $deployRunning = $deployment?->status === SiteDeployment::STATUS_RUNNING;
 
-            return;
+        if ($isLive) {
+            $this->authorize('update', $site);
+
+            if (! $deployRunning) {
+                $this->toastError(__('There is no deploy running to cancel.'));
+
+                return null;
+            }
+
+            $canceller->cancel($site);
+            $this->toastSuccess(__('Cancelling the deploy — it will stop at the next step.'));
+
+            return null;
         }
 
-        $progress->requestCancel($site, $deployment->id);
+        $this->authorize('delete', $site);
+
+        if (! $this->canCancelUnfinishedProvision($site, $deployment)) {
+            $this->toastError(__('There is no provision in progress to cancel.'));
+
+            return null;
+        }
+
+        $organization = $site->organization;
+        $name = $site->name;
+
+        if ($organization !== null) {
+            audit_log($organization, auth()->user(), 'serverless.provision_cancelled', $site, null, [
+                'name' => $name,
+                'server_id' => $site->server_id,
+            ]);
+        }
+
+        $result = $canceller->cancel($site);
+
+        if ($result === 'removed') {
+            $this->toastSuccess(__('Cancelled the provision. :name was removed.', ['name' => $name]));
+            $this->skipRender();
+
+            return $this->redirect(route('serverless.index'), navigate: true);
+        }
+
         $this->toastSuccess(__('Cancelling the deploy — it will stop at the next step.'));
+
+        return null;
+    }
+
+    /**
+     * First-provision cancel is for in-flight work or the stuck "still
+     * deploying" spinner (namespace ready, no live site, no finished failure).
+     */
+    private function canCancelUnfinishedProvision(Site $site, ?SiteDeployment $deployment): bool
+    {
+        if ($deployment?->status === SiteDeployment::STATUS_RUNNING) {
+            return true;
+        }
+
+        if ($site->status === Site::STATUS_FUNCTIONS_FAILED) {
+            return false;
+        }
+
+        if ($this->server()->status === Server::STATUS_ERROR) {
+            return false;
+        }
+
+        return $site->status !== Site::STATUS_FUNCTIONS_ACTIVE;
     }
 
     public function openDeleteDeploymentModal(): void
@@ -371,11 +437,15 @@ class Journey extends Component
             if (($deployStatus === SiteDeployment::STATUS_FAILED || $siteFailed) && $state === 'active') {
                 $state = 'failed';
             }
+            $durationMs = is_int($step['duration_ms'] ?? null) ? $step['duration_ms'] : null;
+            if ($durationMs === null && $state === 'active' && is_string($step['started_at'] ?? null)) {
+                $durationMs = max(0, (int) round(Carbon::parse((string) $step['started_at'])->diffInMilliseconds(now())));
+            }
             $deploySteps[] = [
-                'label' => (string) ($step['label'] ?? ''),
-                'detail' => (string) ($step['detail'] ?? ''),
+                'label' => ServerlessCustomerCopy::neutralize((string) ($step['label'] ?? '')),
+                'detail' => ServerlessCustomerCopy::neutralize((string) ($step['detail'] ?? '')),
                 'state' => $state,
-                'duration' => $this->formatDuration(is_int($step['duration_ms'] ?? null) ? $step['duration_ms'] : null),
+                'duration' => $this->formatDuration($durationMs),
             ];
         }
 
@@ -404,6 +474,24 @@ class Journey extends Component
             default => 'pending',
         };
 
+        // Seeded catalog is written as soon as the deploy row exists. If the
+        // worker hasn't gotten that far (or this is an older in-flight row),
+        // still show the expected pipeline instead of a lone generic sentence.
+        if ($deploySteps === [] && in_array($deployState, ['active', 'pending'], true)) {
+            foreach (ServerlessDeployProgress::CATALOG as $item) {
+                $deploySteps[] = [
+                    'label' => __($item['label']),
+                    'detail' => '',
+                    'state' => 'pending',
+                    'duration' => '',
+                ];
+            }
+        }
+
+        $activeStep = collect($deploySteps)->first(fn (array $step): bool => $step['state'] === 'active');
+        $currentActivity = is_array($activeStep) ? (string) $activeStep['label'] : '';
+        $currentActivityDetail = is_array($activeStep) ? (string) $activeStep['detail'] : '';
+
         $stages = [
             [
                 'key' => 'created',
@@ -430,7 +518,9 @@ class Journey extends Component
                 'detail' => match ($deployState) {
                     'failed' => __('The deploy failed — see the log below.'),
                     'blocked' => __('Deploys are paused for this organization — nothing was built.'),
-                    default => __('Checking out the repo, building the artifact, pushing the action.'),
+                    default => $currentActivity !== ''
+                        ? $currentActivity
+                        : __('Checking out the repo, building the artifact, pushing the action.'),
                 },
                 'state' => $deployState,
             ],
@@ -455,12 +545,25 @@ class Journey extends Component
         // would just re-render the same banner every 3s until the tab is closed.
         $shouldPoll = $bridging || (! $live && ! $failed && $deployState !== 'blocked');
 
-        // A deploy can be cancelled while its step pipeline is running.
-        $cancellable = $deployState === 'active' && $deployStatus === SiteDeployment::STATUS_RUNNING;
+        // Cancel while a job is running, while the namespace is still being
+        // created, or when Journey is stuck "still deploying" with no live
+        // site (namespace ready, no deployment row). Do not offer Cancel on
+        // a live resting function — that is Delete, not Cancel.
+        $stuckDeploying = $namespaceState === 'done'
+            && $deployment === null
+            && ! $siteActive
+            && ! $siteFailed
+            && ! $deployPaused;
+        $cancellable = $deployRunning
+            || ($namespaceState === 'active' && ! $siteActive)
+            || $stuckDeploying;
+        $teardownOnCancel = $cancellable && ! $siteActive;
         $cancelled = $deployStatus === SiteDeployment::STATUS_FAILED
             && str_contains(strtolower((string) ($deployment->log_output ?? '')), 'cancelled by operator');
 
         $actionUrl = is_string($config['action_url'] ?? null) ? $config['action_url'] : null;
+        $friendlyUrl = $site->serverlessFriendlyUrl();
+        $openUrl = $friendlyUrl ?: $actionUrl;
 
         // Elapsed — anchored on the current deploy's start (falling back to
         // the site's creation before any deploy exists), frozen at finish.
@@ -490,6 +593,7 @@ class Journey extends Component
             $cancelled => __('Deploy cancelled'),
             $failed => __('Deploy failed'),
             $deployState === 'blocked' => __('Deploys are paused'),
+            $deployState === 'active' && $currentActivity !== '' => $currentActivity,
             $deployState === 'active' => __('Building & deploying…'),
             $namespaceState === 'active' => __('Provisioning namespace…'),
             default => __('Starting deploy…'),
@@ -532,6 +636,7 @@ class Journey extends Component
         }
 
         $repoLabel = $this->repositoryLabel((string) ($site->git_repository_url ?? ''));
+        $activityLines = $this->activityLines((string) ($deployment?->log_output ?? ''));
 
         return view('livewire.serverless.journey', [
             'workspaceUrl' => ServerlessWorkspaceUrl::show($site),
@@ -543,16 +648,22 @@ class Journey extends Component
             'deployment' => $deployment,
             'stages' => $stages,
             'deploySteps' => $deploySteps,
+            'currentActivity' => $currentActivity,
+            'currentActivityDetail' => $currentActivityDetail,
+            'activityLines' => $activityLines,
             'live' => $live,
             'failed' => $failed,
             'cancelled' => $cancelled,
             'deployPaused' => $deployState === 'blocked',
             'billingUrl' => $billingUrl,
             'cancellable' => $cancellable,
+            'teardownOnCancel' => $teardownOnCancel,
             'shouldPoll' => $shouldPoll,
             'namespaceState' => $namespaceState,
             'deployState' => $deployState,
             'actionUrl' => $actionUrl,
+            'friendlyUrl' => $friendlyUrl,
+            'openUrl' => $openUrl,
             'log' => $deployment->log_output ?? '',
             'headline' => $headline,
             'title' => $title,
@@ -645,6 +756,33 @@ class Journey extends Component
         }
 
         return Str::limit(DeployLogRedactor::redact(ServerlessCustomerCopy::neutralize($message)), 400, '…');
+    }
+
+    /**
+     * Recent runner lines for the in-progress feed — not the full transcript.
+     *
+     * @return list<string>
+     */
+    private function activityLines(string $log): array
+    {
+        if (trim($log) === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\R/', $log) ?: [];
+        $picked = [];
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = trim((string) $lines[$i]);
+            if ($line === '' || str_starts_with($line, '---')) {
+                continue;
+            }
+            $picked[] = ServerlessCustomerCopy::neutralize(Str::limit($line, 220, '…'));
+            if (count($picked) >= 8) {
+                break;
+            }
+        }
+
+        return array_reverse($picked);
     }
 
     /**

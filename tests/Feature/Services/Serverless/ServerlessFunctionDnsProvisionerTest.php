@@ -88,10 +88,27 @@ test('wildcard mode never applies to a zone outside the serverless apex pool', f
 });
 
 test('every function gets a hostname on the dedicated serverless apex', function () {
-    $site = Site::factory()->create(['name' => 'Orders API']);
+    $site = Site::factory()->create(['name' => 'Orders API', 'slug' => 'orders-api']);
 
     expect($site->serverlessFunctionHost())
         ->toBe($site->ensureServerlessProxySlug().'.dply-serverless.cloud');
+});
+
+test('same-name functions get distinct dns hostnames', function () {
+    Http::fake();
+
+    $a = Site::factory()->create(['name' => 'Cachet', 'slug' => 'cachet']);
+    $b = Site::factory()->create(['name' => 'Cachet', 'slug' => 'cachet']);
+
+    app(ServerlessFunctionDnsProvisioner::class)->provision($a);
+    app(ServerlessFunctionDnsProvisioner::class)->provision($b);
+
+    $hostA = $a->fresh()->serverlessConfig()['dns']['hostname'] ?? null;
+    $hostB = $b->fresh()->serverlessConfig()['dns']['hostname'] ?? null;
+
+    expect($hostA)->toBe('cachet-'.substr(sha1((string) $a->id), 0, 8).'.dply-serverless.cloud');
+    expect($hostB)->toBe('cachet-'.substr(sha1((string) $b->id), 0, 8).'.dply-serverless.cloud');
+    $this->assertNotSame($hostA, $hostB);
 });
 
 test('the serverless apex defaults to dply-serverless.cloud with no env configured', function () {

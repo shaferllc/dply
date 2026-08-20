@@ -13,6 +13,8 @@ final class DigitalOceanFunctionsDeployEngine implements DeployEngine
     /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
+        app(ServerlessDeployProgress::class)->seed($context->site());
+
         $result = $this->actionDeployer->deploy($context->site());
 
         return [

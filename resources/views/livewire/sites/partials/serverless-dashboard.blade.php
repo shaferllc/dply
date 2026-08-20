@@ -1,10 +1,7 @@
 @php
     $serverless = is_array($site->meta['serverless'] ?? null) ? $site->meta['serverless'] : [];
     $invocationUrl = trim((string) ($serverless['action_url'] ?? ''));
-    $functionHost = $site->serverlessFunctionHost();
-    $friendlyUrl = $functionHost !== null
-        ? 'https://'.$functionHost
-        : url('fn/'.$site->ensureServerlessProxySlug());
+    $friendlyUrl = $site->serverlessFriendlyUrl();
     $runtime = trim((string) ($serverless['runtime'] ?? ''));
     $lastDeployedAt = $serverless['last_deployed_at'] ?? null;
     $revision = trim((string) ($serverless['last_revision_id'] ?? ''));
@@ -51,32 +48,18 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    {{-- URL + the actions that belong to it, on one line. --}}
-    <div class="px-4 py-3 sm:px-5" x-data="{ copied: false }">
-        <div class="flex items-center gap-2">
-            <span class="shrink-0 rounded-md bg-brand-sand/70 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('URL') }}</span>
-            <a href="{{ $friendlyUrl }}" target="_blank" rel="noopener noreferrer"
-               class="min-w-0 flex-1 truncate font-mono text-xs text-brand-ink underline-offset-2 hover:text-brand-sage hover:underline"
-               title="{{ $friendlyUrl }}">{{ preg_replace('#^https?://#', '', $friendlyUrl) }}</a>
-            <button type="button"
-                    x-on:click="navigator.clipboard.writeText(@js($friendlyUrl)); copied = true; setTimeout(() => copied = false, 1500)"
-                    class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink"
-                    :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'">
-                <x-heroicon-o-clipboard class="h-4 w-4" aria-hidden="true" />
-            </button>
-            <a href="{{ $friendlyUrl }}" target="_blank" rel="noopener noreferrer"
-               title="{{ __('Open function') }}"
-               class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
-                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-            </a>
-            <span x-show="copied" x-cloak class="shrink-0 text-2xs font-medium text-brand-forest">{{ __('Copied') }}</span>
+    @include('livewire.serverless.partials.function-url-rows', [
+        'invocationUrl' => $invocationUrl,
+        'friendlyUrl' => $friendlyUrl,
+        'wrapperClass' => '',
+        'pad' => 'px-4 py-3 sm:px-5',
+        'urlClass' => 'mt-1 block truncate font-mono text-xs text-brand-ink underline-offset-2 hover:text-brand-sage hover:underline',
+    ])
+    @if ($invocationUrl === '')
+        <div class="px-4 py-3 sm:px-5">
+            <p class="text-2xs text-brand-moss/60">{{ __('Live once the first deploy completes.') }}</p>
         </div>
-        @if ($invocationUrl !== '')
-            <p class="mt-1 truncate text-2xs text-brand-moss/60" title="{{ $invocationUrl }}">{{ __('Direct:') }} <span class="font-mono">{{ $invocationUrl }}</span></p>
-        @else
-            <p class="mt-1 text-2xs text-brand-moss/60">{{ __('Live once the first deploy completes.') }}</p>
-        @endif
-    </div>
+    @endif
 
     {{-- Combined stat strip rather than a card of its own. --}}
     <dl class="{{ $strip }} grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-4">

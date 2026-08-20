@@ -30,6 +30,7 @@ final class DigitalOceanFunctionsActionDeployer
     {
         $site->loadMissing('server', 'domains');
         $this->assertFunctionsHost($site->server);
+        $this->progress->seed($site);
 
         $buildResult = $this->artifactBuilder->build($site);
         $result = $this->pushArtifact(
@@ -204,7 +205,7 @@ final class DigitalOceanFunctionsActionDeployer
         // is what every function deployed before this existed already is.
         $functionConfiguration = FunctionConfiguration::fromSiteConfig($site->serverlessConfig());
 
-        $this->progress->active($site, 'upload', 'Uploading to the functions host', 'Namespace '.$namespace);
+        $this->progress->active($site, 'upload', 'Pushing the action', 'Namespace '.$namespace);
         $response = Http::withBasicAuth($keyId, $keySecret)
             ->timeout(300)
             ->acceptJson()
@@ -237,7 +238,7 @@ final class DigitalOceanFunctionsActionDeployer
             throw new \RuntimeException('Functions deploy failed: HTTP '.$response->status().' '.$response->body());
         }
 
-        $this->progress->done($site, 'upload', 'Uploaded to the functions host');
+        $this->progress->done($site, 'upload', 'Pushed the action');
 
         $json = $response->json();
         $revisionId = is_array($json) && isset($json['version']) ? (string) $json['version'] : null;
@@ -308,7 +309,7 @@ final class DigitalOceanFunctionsActionDeployer
 
         $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
-        // Point the function's friendly hostname ({slug}.{testing-domain}) at
+        // Point the function's friendly hostname ({slug}-{idHash8}.{apex}) at
         // the dply app so it resolves. The app proxies through to the raw DO
         // Functions URL — DO Functions itself has no custom-domain support.
         $dnsStatus = $this->dnsProvisioner->provision($site);
@@ -392,7 +393,7 @@ final class DigitalOceanFunctionsActionDeployer
             return 'skipped (function is not exposed over HTTP).';
         }
 
-        $this->progress->active($site, 'verify', 'Verifying the function');
+        $this->progress->active($site, 'verify', 'Checking that the function is live');
 
         try {
             $request = Http::timeout(30);

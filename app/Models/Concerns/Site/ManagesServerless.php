@@ -7,6 +7,7 @@ namespace App\Models\Concerns\Site;
 use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessDeploymentConfigResolver;
 use App\Modules\Serverless\Support\ServerlessTestingDomains;
+use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -108,9 +109,12 @@ trait ManagesServerless
     }
 
     /**
-     * The function's globally-unique friendly slug — the one that gives it a
-     * clean dply-hosted URL ({app}/fn/{slug}) instead of the raw DigitalOcean
-     * Functions invocation URL. Generated and persisted on first access.
+     * The function's globally-unique friendly slug — the left-hand label of
+     * `{slug}-{idHash8}.{serverless apex}` and `/fn/{slug}`. New mints follow
+     * the same `{slug}-{8-char sha1}` house style as Edge/VM testing hostnames
+     * ({@see UnifiedPreviewHostname::siteLabel()}).
+     * Already-allocated slugs are never reminted, so live functions keep
+     * answering at the hostname they were given.
      */
     public function ensureServerlessProxySlug(): string
     {
@@ -119,13 +123,13 @@ trait ManagesServerless
             return $existing;
         }
 
-        $base = Str::slug((string) $this->name) ?: 'fn';
-        $slug = $base;
+        $slug = $this->mintServerlessProxySlug();
+        $candidate = $slug;
         while (static::query()
-            ->where('meta->serverless->proxy_slug', $slug)
+            ->where('meta->serverless->proxy_slug', $candidate)
             ->whereKeyNot($this->getKey())
             ->exists()) {
-            $slug = $base.'-'.Str::lower(Str::random(4));
+            $candidate = rtrim(Str::limit($slug.'-'.Str::lower(Str::random(4)), 63, ''), '-');
         }
 
         $meta = $this->meta ?? [];
@@ -133,11 +137,27 @@ trait ManagesServerless
         if (! is_array($serverless)) {
             $serverless = [];
         }
-        $serverless['proxy_slug'] = $slug;
+        $serverless['proxy_slug'] = $candidate;
         $meta['serverless'] = $serverless;
         $this->forceFill(['meta' => $meta])->save();
 
-        return $slug;
+        return $candidate;
+    }
+
+    /**
+     * Stable new-mint label: `{name-slug}-{8-char sha1 of site id}`.
+     * Two sites named "placehold" therefore never share a hostname.
+     */
+    protected function mintServerlessProxySlug(): string
+    {
+        $source = trim((string) ($this->slug ?: $this->name));
+        $base = trim(Str::slug($source) ?: 'fn', '-');
+        $base = $base !== '' ? $base : 'fn';
+
+        $suffixSource = $this->getKey() ?: ($this->server_id ?: $source);
+        $suffix = Str::lower(substr(sha1((string) $suffixSource), 0, 8));
+
+        return rtrim(Str::limit($base.'-'.$suffix, 63, ''), '-');
     }
 
     /**
@@ -172,10 +192,10 @@ trait ManagesServerless
 
     /**
      * The function's live hostname — its proxy slug under the dedicated
-     * serverless apex (e.g. orders-api.dply-serverless.cloud), matching how VM
-     * sites get a testing hostname. Every function gets one: the apex defaults
-     * to dply-serverless.cloud even with no env configuration, so this never
-     * falls back to the /fn/{slug} path URL.
+     * serverless apex (e.g. orders-api-a1b2c3d4.dply-serverless.cloud), matching
+     * how VM/Edge sites get a `{slug}-{idHash8}` testing hostname. Every
+     * function gets one: the apex defaults to dply-serverless.cloud even with
+     * no env configuration, so this never falls back to the /fn/{slug} path URL.
      *
      * {@see ServerlessTestingDomains} owns the apex pool — deliberately
      * separate from the shared DPLY_TESTING_DOMAINS preview pool.
@@ -187,18 +207,58 @@ trait ManagesServerless
     }
 
     /**
+     * The public hostname URL operators should share — a ready custom domain,
+     * the DNS-provisioned testing host, or `{slug}.{serverless apex}`.
+     * Never the raw functions invocation URL. Null until a slug or host exists
+     * (does not mint one on read).
+     */
+    public function serverlessFriendlyUrl(): ?string
+    {
+        $routing = $this->serverlessConfig()['routing'] ?? [];
+        $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+        foreach ($domains as $domain) {
+            if (! is_array($domain) || ($domain['dns_status'] ?? null) !== 'ready') {
+                continue;
+            }
+
+            $host = strtolower(trim((string) ($domain['hostname'] ?? '')));
+            if ($host !== '') {
+                return 'https://'.$host;
+            }
+        }
+
+        $dns = $this->serverlessConfig()['dns'] ?? [];
+        $dnsHost = is_array($dns) ? strtolower(trim((string) ($dns['hostname'] ?? ''))) : '';
+        if ($dnsHost !== '') {
+            return 'https://'.$dnsHost;
+        }
+
+        $slug = trim((string) ($this->serverlessConfig()['proxy_slug'] ?? ''));
+        if ($slug === '') {
+            return null;
+        }
+
+        return 'https://'.$slug.'.'.ServerlessTestingDomains::apexFor($this->getKey());
+    }
+
+    /**
      * The function's canonical public address, in the same priority order the
      * routing screen lists its invocation URLs: live hostname first, then the
      * /fn/{slug} path, then the raw provider invocation URL as a last resort.
      * Null before the first deploy has produced any of them.
      *
-     * {@see \App\Models\Concerns\Site\ResolvesSiteUrls::visitUrl()} can't answer
+     * {@see ResolvesSiteUrls::visitUrl()} can't answer
      * this — a function has no site_domains row and no testing hostname, so it
      * returns null and callers fall back to the site *name*, which reads as a
      * broken URL in the workspace header.
      */
     public function serverlessPublicUrl(): ?string
     {
+        $friendly = $this->serverlessFriendlyUrl();
+        if ($friendly !== null) {
+            return $friendly;
+        }
+
         $host = trim((string) ($this->serverlessFunctionHost() ?? ''));
         if ($host !== '') {
             return 'https://'.$host;

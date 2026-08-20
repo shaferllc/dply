@@ -6,18 +6,18 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\PreflightSiteSetupJob;
-use App\Modules\Scaffold\Jobs\RunComposerScaffoldJob;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Scaffold\Jobs\RunComposerScaffoldJob;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
-use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -138,13 +138,6 @@ class ChooseApp extends Component
     protected function onManualRepoUrlChanged(): void
     {
         $this->git_ref_kind = null;
-        $this->clearRepoRefSelection();
-        $this->syncRepoUrlToSite();
-    }
-
-    /** Trait hook: after the first repo is auto-selected on account load. */
-    protected function onRepositoryAutoselected(): void
-    {
         $this->clearRepoRefSelection();
         $this->syncRepoUrlToSite();
     }

@@ -41,7 +41,6 @@ class Create extends Component
         // Shared picker ships empty on* hooks; serverless create owns them
         // (auto-detect + app-name seeding).
         ManagesServerlessCreateGit::onRepositorySelected insteadof ConfiguresGitRepository;
-        ManagesServerlessCreateGit::onRepositoryAutoselected insteadof ConfiguresGitRepository;
         ManagesServerlessCreateGit::onManualRepoUrlChanged insteadof ConfiguresGitRepository;
     }
     use RefreshesLinkedSourceControlAccounts;

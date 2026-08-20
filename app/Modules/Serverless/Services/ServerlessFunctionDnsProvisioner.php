@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 /**
  * Ensures a deployed serverless function's friendly hostname
- * ({slug}.dply-serverless.cloud) has a DNS record pointing at the dply app,
+ * ({slug}-{idHash8}.dply-serverless.cloud) has a DNS record pointing at the dply app,
  * which proxies the request through to the raw DigitalOcean Functions
  * invocation URL (DO Functions has no custom domains).
  *
@@ -510,7 +510,7 @@ final class ServerlessFunctionDnsProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function store(Site $site, array $payload): void
     {

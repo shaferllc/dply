@@ -9,10 +9,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
-use App\Modules\Deploy\Services\ServerlessDeployProgress;
-use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -72,6 +71,39 @@ test('shows live state with the invocation url', function () {
         ->assertSee('https://faas.example/web/fn');
 });
 
+test('shows invocation and friendly urls for a live function', function () {
+    $actionUrl = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-abc/default/laravel-demo';
+
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas-nyc1-2ef2e6cc.doserverless.co']],
+        siteStatus: Site::STATUS_FUNCTIONS_ACTIVE,
+        siteOverrides: ['meta' => [
+            'host_kind' => null,
+            'serverless' => [
+                'action_url' => $actionUrl,
+                'proxy_slug' => 'laravel-demo',
+                'entrypoint' => 'main',
+                'last_revision_id' => '0.0.1',
+            ],
+        ]],
+    );
+
+    $friendlyUrl = 'https://laravel-demo.'.ServerlessTestingDomains::apexFor($site->id);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Invocation URL')
+        ->assertSee('Friendly URL')
+        ->assertSee($actionUrl)
+        ->assertSee($friendlyUrl)
+        ->assertDontSee('Friendly URL when DNS is ready')
+        ->assertDontSee('DigitalOcean')
+        ->assertDontSee('OpenWhisk');
+});
+
 test('it shows live deploy substeps', function () {
     [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_READY, serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']]);
     SiteDeployment::query()->create([
@@ -81,19 +113,152 @@ test('it shows live deploy substeps', function () {
         'status' => SiteDeployment::STATUS_RUNNING,
         'started_at' => now(),
         'phase_results' => ['serverless' => [
-            ['key' => 'checkout', 'label' => 'Cloned repository', 'state' => 'done', 'detail' => '', 'ok' => true],
-            ['key' => 'dependencies', 'label' => 'Installing dependencies', 'state' => 'active', 'detail' => '', 'ok' => false],
+            ['key' => 'checkout', 'label' => 'Checked out the repository', 'state' => 'done', 'detail' => '', 'ok' => true],
+            ['key' => 'dependencies', 'label' => 'Installing Composer dependencies', 'state' => 'active', 'detail' => 'composer install --no-dev', 'ok' => false],
         ]],
+        'log_output' => "[dply] Installing Composer dependencies\ncomposer install --no-dev\n- Installing laravel/framework (v13.0.0)",
     ]);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
-        ->assertSee('Cloned repository')
-        ->assertSee('Installing dependencies');
+        ->assertSee('Checked out the repository')
+        ->assertSee('Installing Composer dependencies')
+        ->assertSee('composer install --no-dev')
+        ->assertSee('Installing laravel/framework')
+        ->assertSee('Recent activity')
+        ->assertDontSee('Checking out the repo, building the artifact, pushing the action.');
 });
 
-test('cancel deploy requests cancellation of the running deploy', function () {
+test('in-progress deploy without recorded steps still shows the pipeline catalog', function () {
     [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_READY, serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']]);
+    SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_RUNNING,
+        'started_at' => now(),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Checking out the repository')
+        ->assertSee('Installing dependencies')
+        ->assertSee('Pushing the action');
+});
+
+test('cancel provision is available while deploying and tears down the unfinished function', function () {
+    [$server, $site] = makeFunction($this->user, $this->org, serverStatus: Server::STATUS_READY, serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']]);
+    $deployment = SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_RUNNING,
+        'started_at' => now(),
+    ]);
+    $siteId = $site->id;
+    $serverId = $server->id;
+    $deploymentId = $deployment->id;
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Cancel provision')
+        ->assertDontSee('Cancel deploy')
+        ->call('openCancelModal')
+        ->assertSet('confirmingCancel', true)
+        ->assertSee('Cancel this provision?')
+        ->assertSee('will not stay looking live')
+        ->assertSee('Cancel and remove')
+        ->call('cancelDeploy')
+        ->assertRedirect(route('serverless.index'));
+
+    expect(Site::query()->find($siteId))->toBeNull();
+    expect(Server::query()->find($serverId))->toBeNull();
+    expect(SiteDeployment::query()->find($deploymentId))->toBeNull();
+});
+
+test('cancel provision is available on the stuck deploying spinner with no deployment row', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+        siteStatus: Site::STATUS_FUNCTIONS_CONFIGURED,
+    );
+    $siteId = $site->id;
+    $serverId = $server->id;
+
+    expect(SiteDeployment::query()->where('site_id', $site->id)->exists())->toBeFalse();
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Building & deploying')
+        ->assertSee('Cancel provision')
+        ->assertDontSee('Function is live')
+        ->call('openCancelModal')
+        ->assertSet('confirmingCancel', true)
+        ->assertSee('Cancel this provision?')
+        ->call('cancelDeploy')
+        ->assertRedirect(route('serverless.index'));
+
+    expect(Site::query()->find($siteId))->toBeNull();
+    expect(Server::query()->find($serverId))->toBeNull();
+});
+
+test('cancel provision is available while the namespace is still provisioning', function () {
+    [$server, $site] = makeFunction($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Provisioning namespace')
+        ->assertSee('Cancel provision')
+        ->call('openCancelModal')
+        ->assertSet('confirmingCancel', true)
+        ->assertSee('removes the function and its namespace')
+        ->call('cancelDeploy')
+        ->assertRedirect(route('serverless.index'));
+
+    expect(Site::query()->find($site->id))->toBeNull();
+    expect(Server::query()->find($server->id))->toBeNull();
+});
+
+test('cancel is not shown when the function is already live', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+        siteStatus: Site::STATUS_FUNCTIONS_ACTIVE,
+        siteOverrides: ['meta' => [
+            'host_kind' => null,
+            'serverless' => ['action_url' => 'https://faas.example/web/fn'],
+        ]],
+    );
+    SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'status' => SiteDeployment::STATUS_SUCCESS,
+        'started_at' => now()->subMinute(),
+        'finished_at' => now()->subMinute(),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Function is live')
+        ->assertSee('Redeploy')
+        ->assertDontSee('Cancel provision')
+        ->assertDontSee('Cancel deploy')
+        ->assertDontSee('Cancel this provision?');
+});
+
+test('cancel in-flight redeploy aborts without deleting the live function', function () {
+    [$server, $site] = makeFunction(
+        $this->user,
+        $this->org,
+        serverStatus: Server::STATUS_READY,
+        serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+        siteStatus: Site::STATUS_FUNCTIONS_ACTIVE,
+    );
     $deployment = SiteDeployment::query()->create([
         'site_id' => $site->id,
         'project_id' => $site->project_id,
@@ -105,11 +270,19 @@ test('cancel deploy requests cancellation of the running deploy', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
         ->assertSee('Cancel deploy')
-        ->call('cancelDeploy');
+        ->assertDontSee('Cancel provision')
+        ->call('openCancelModal')
+        ->assertSet('confirmingCancel', true)
+        ->assertSee('Cancel this deploy?')
+        ->assertSee('The live function stays up')
+        ->call('cancelDeploy')
+        ->assertHasNoErrors()
+        ->assertSet('confirmingCancel', false);
 
-    // The deploy pipeline's next checkpoint should now abort.
-    $this->expectException(ServerlessDeployCancelledException::class);
-    app(ServerlessDeployProgress::class)->checkpoint($site->fresh());
+    expect(Site::query()->find($site->id))->not->toBeNull()
+        ->and($site->fresh()->status)->toBe(Site::STATUS_FUNCTIONS_ACTIVE)
+        ->and($deployment->fresh()->status)->toBe(SiteDeployment::STATUS_FAILED)
+        ->and($deployment->fresh()->log_output)->toContain('Cancelled by operator.');
 });
 
 test('namespace provision failure shows the stored reason not the canned sentence', function () {

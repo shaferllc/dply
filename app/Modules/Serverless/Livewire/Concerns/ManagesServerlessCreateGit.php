@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Livewire\Concerns;
 
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 /**
  * Git UX for serverless create: auto runtime detection hooks for
- * {@see \App\Livewire\Concerns\Sites\ConfiguresGitRepository}, app-name
+ * {@see ConfiguresGitRepository}, app-name
  * seeding from the repo, and an Edge-style branch/tag/commit picker that
  * works before a Site row exists.
  *
@@ -35,23 +36,6 @@ trait ManagesServerlessCreateGit
     protected function onRepositorySelected(): void
     {
         $this->maybeSeedAppNameFromRepo();
-        $this->detectFromRepository();
-    }
-
-    protected function onRepositoryAutoselected(): void
-    {
-        $this->maybeSeedAppNameFromRepo();
-
-        // Auto-select fires inside mount(), where a synchronous repo clone would
-        // hold up first paint — hand it to wire:init instead. It also fires when
-        // an account is linked mid-form, and there the click is already waiting
-        // on a round trip, so detect inline.
-        if ($this->mounting) {
-            $this->autoDetectPending = true;
-
-            return;
-        }
-
         $this->detectFromRepository();
     }
 
