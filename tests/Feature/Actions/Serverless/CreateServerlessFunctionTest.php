@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Actions\Serverless\CreateServerlessFunctionTest;
 
-use App\Modules\Serverless\Actions\CreateServerlessFunction;
-use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Serverless\Actions\CreateServerlessFunction;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
@@ -66,6 +66,7 @@ test('creates a serverless host and function site', function () {
     expect($site->git_branch)->toBe('main');
     expect($site->meta['serverless']['runtime'])->toBe('nodejs:20');
     expect($site->meta['runtime_profile'])->toBe('digitalocean_functions_web');
+    expect($site->serverlessKeepWarmEnabled())->toBeTrue();
 });
 
 test('dispatches the namespace provision job', function () {

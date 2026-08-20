@@ -360,4 +360,33 @@ trait ManagesServerlessRuntime
                 : __('Maintenance is off — the function is serving traffic again.'))
             : __('Maintenance saved — it applies on the next deploy.'));
     }
+
+    /**
+     * Persist Warm start. Takes effect on the next control-plane tick —
+     * no redeploy. Background processing already holds the function warm,
+     * so enabling this then does not send a second ping.
+     */
+    public function toggleServerlessKeepWarm(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->usesFunctionsRuntime()) {
+            $this->toastError(__('Warm start applies to serverless functions only.'));
+
+            return;
+        }
+
+        $enabled = $this->site->setServerlessKeepWarm(! $this->site->serverlessKeepWarmEnabled());
+        $this->site->setAttribute('meta', $this->site->meta);
+
+        if ($enabled && $this->site->serverlessBackgroundProcessingEnabled()) {
+            $this->toastSuccess(__('Warm start saved. Background processing already holds the function warm, so dply will not send a second ping.'));
+
+            return;
+        }
+
+        $this->toastSuccess($enabled
+            ? __('Warm start on — dply pings the function every minute so visitors skip the cold start. No redeploy needed.')
+            : __('Warm start off — the first request after idle pays the full boot cost.'));
+    }
 }

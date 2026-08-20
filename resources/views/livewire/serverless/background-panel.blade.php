@@ -183,13 +183,20 @@
 
         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-3">
             <div class="min-w-0">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Keep warm') }}</p>
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Warm start') }}</p>
                 <p class="mt-0.5 text-xs text-brand-moss">
-                    {{ __('Ping the function every minute so requests rarely hit a cold start. Unnecessary while background processing is on — that already keeps it warm.') }}
+                    @if ($enabled)
+                        {{ __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.') }}
+                    @elseif ($keepWarm)
+                        {{ __('A minute ping holds the function warm so visitors do not pay a cold start. No redeploy needed.') }}
+                    @else
+                        {{ __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.') }}
+                    @endif
                 </p>
             </div>
-            <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" class="{{ $btnOutline }} shrink-0">
-                {{ $keepWarm ? __('Disable') : __('Enable') }}
+            <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" wire:target="toggleKeepWarm" class="{{ $btnOutline }} shrink-0">
+                <span wire:loading.remove wire:target="toggleKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
+                <span wire:loading wire:target="toggleKeepWarm">{{ __('Saving…') }}</span>
             </button>
         </div>
     </div>

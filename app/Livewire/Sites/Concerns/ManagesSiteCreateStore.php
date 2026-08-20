@@ -138,6 +138,7 @@ trait ManagesSiteCreateStore
                 'build_command' => trim($this->form->functions_build_command),
                 'artifact_output_path' => trim($this->form->functions_artifact_output_path),
                 'detected_runtime' => $detectedRuntime !== [] ? $detectedRuntime : null,
+                'keep_warm' => true,
             ];
         } elseif ($dockerHost) {
             $meta['runtime_profile'] = 'docker_web';

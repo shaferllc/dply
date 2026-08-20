@@ -140,6 +140,7 @@ test('it serves published build assets on the function host without forwarding',
     $this->get('/fn/placehold/build/assets/app-aaaaaaaa.js')
         ->assertOk()
         ->assertHeader('content-type', 'application/javascript; charset=utf-8')
+        ->assertHeaderMissing('set-cookie')
         ->assertSee('console.log(1)', false);
 
     Http::assertNothingSent();

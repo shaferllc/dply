@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console\ServerlessTickCommandTest;
 
+use App\Console\Scheduling\DplySchedule;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Serverless\Jobs\ServerlessQueueSlotJob;
 use App\Modules\Serverless\Models\FunctionInvocation;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -79,10 +81,21 @@ test('it ticks enabled active functions via the authenticated api', function () 
         && data_get($request->data(), '__ow_headers.x-dply-run') === 'schedule'
         && data_get($request->data(), '__ow_headers.x-dply-secret') === $site->fresh()->ensureServerlessCommandSecret());
 });
-test('it skips functions without background enabled', function () {
+test('it skips functions without background enabled or warm start', function () {
     Http::fake();
 
     functionSite(Site::STATUS_FUNCTIONS_ACTIVE, []);
+
+    $this->artisan('serverless:tick')->assertSuccessful();
+
+    Http::assertNothingSent();
+    expect(FunctionInvocation::query()->count())->toBe(0);
+});
+
+test('it skips keep-warm when the flag is off', function () {
+    Http::fake();
+
+    functionSite(Site::STATUS_FUNCTIONS_ACTIVE, ['keep_warm' => false]);
 
     $this->artisan('serverless:tick')->assertSuccessful();
 
@@ -110,4 +123,36 @@ test('keep warm ticks the function without a command header', function () {
 
     Http::assertSent(fn ($request): bool => str_contains($request->url(), '/actions/laravel-demo')
         && data_get($request->data(), '__ow_headers.x-dply-run') === null);
+});
+
+test('background processing skips the extra keep-warm ping', function () {
+    Bus::fake();
+    fakeActivation();
+
+    $site = functionSite(Site::STATUS_FUNCTIONS_ACTIVE, [
+        'background_enabled' => true,
+        'keep_warm' => true,
+    ]);
+
+    $this->artisan('serverless:tick')->assertSuccessful();
+
+    expect(FunctionInvocation::query()
+        ->where('site_id', $site->id)->where('task', 'schedule')->count())->toBe(1);
+    expect(FunctionInvocation::query()
+        ->where('site_id', $site->id)->where('task', 'keep-warm')->count())->toBe(0);
+
+    expect(Http::recorded())->toHaveCount(1);
+    Http::assertSent(fn ($request): bool => data_get($request->data(), '__ow_headers.x-dply-run') === 'schedule');
+});
+
+test('the control plane schedule includes a minute serverless tick', function () {
+    $schedule = new Schedule(app());
+    DplySchedule::register($schedule);
+
+    $events = collect($schedule->events())->filter(
+        fn ($event): bool => str_contains((string) $event->command, 'serverless:tick'),
+    );
+
+    expect($events)->toHaveCount(1);
+    expect($events->first()->expression)->toBe('* * * * *');
 });

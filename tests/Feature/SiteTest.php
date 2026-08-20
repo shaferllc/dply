@@ -559,6 +559,7 @@ test('functions host site creation uses runtime profile and artifact metadata', 
     expect(data_get($site->meta, 'serverless.build_command'))->toBe('npm install && npm run build');
     expect(data_get($site->meta, 'serverless.artifact_output_path'))->toBe('dist');
     expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('vite_static');
+    expect($site->serverlessKeepWarmEnabled())->toBeTrue();
     expect($site->status)->toBe(Site::STATUS_PENDING);
     expect($site->provisioningState())->toBe('queued');
 });

@@ -106,6 +106,49 @@ trait ManagesServerless
     }
 
     /**
+     * Operator asked for a minute ping so visitors skip the platform cold start.
+     *
+     * Missing key is off — existing functions stay quiet until someone
+     * enables Warm start. New functions persist `true` at create time.
+     */
+    public function serverlessKeepWarmEnabled(): bool
+    {
+        return ($this->serverlessConfig()['keep_warm'] ?? false) === true;
+    }
+
+    /**
+     * Scheduler / queue ticks are on. Those invocations already hold a
+     * warm container, so a dedicated keep-warm GET would be a duplicate ping.
+     */
+    public function serverlessBackgroundProcessingEnabled(): bool
+    {
+        return ($this->serverlessConfig()['background_enabled'] ?? false) === true;
+    }
+
+    /**
+     * The control-plane tick should send a plain keep-warm GET.
+     *
+     * False when Warm start is off, or when background processing is already
+     * invoking the function every minute.
+     */
+    public function serverlessWantsKeepWarmPing(): bool
+    {
+        return $this->serverlessKeepWarmEnabled()
+            && ! $this->serverlessBackgroundProcessingEnabled();
+    }
+
+    public function setServerlessKeepWarm(bool $enabled): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['keep_warm'] = $enabled;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $enabled;
+    }
+
+    /**
      * The deployed action's name on the host, or '' when it has never been
      * deployed. Falls back to the trailing segment of the invocation URL for
      * functions deployed before the name was persisted.

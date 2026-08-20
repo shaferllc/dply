@@ -6,12 +6,12 @@ namespace App\Modules\Serverless\Actions;
 
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
-use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -155,6 +155,9 @@ class CreateServerlessFunction
                     'function_name' => $slug,
                     'repo_source' => $repoSource,
                     'source_control_account_id' => $sourceControlAccountId !== '' ? $sourceControlAccountId : null,
+                    // Public sites pay 8–10s on a cold boot. A minute ping
+                    // is the same invoke meter (~43k/mo vs 1M included).
+                    'keep_warm' => true,
                 ],
             ],
         ]);

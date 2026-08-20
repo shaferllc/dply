@@ -11,7 +11,8 @@
     $invocationUrl = trim((string) ($cfg['action_url'] ?? ''));
     $friendlyUrl = $site->serverlessFriendlyUrl();
     $lastDeployedAt = $cfg['last_deployed_at'] ?? null;
-    $keepWarm = (bool) ($cfg['keep_warm'] ?? false);
+    $keepWarm = $site->serverlessKeepWarmEnabled();
+    $backgroundEnabled = $site->serverlessBackgroundProcessingEnabled();
     $neverDeployed = $revision === '';
 
     // Saved limits live in meta.serverless.limits; deployed_limits is what the
@@ -434,23 +435,32 @@
         </div>
     </form>
 
-    {{-- 4. Cold starts — keep-warm is owned by the Workers tab; surface its state
-         here. Header-only section: the state IS the note, so there's no body. --}}
+    {{-- 4. Warm start — a control-plane minute ping. Takes effect on the
+         next tick; no redeploy. Background processing already warms, so
+         that path skips the extra GET. --}}
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head
             dense
-            icon="heroicon-o-clock"
-            :title="__('Cold starts')"
-            :count="$keepWarm ? __('keep-warm on') : __('keep-warm off')"
-            :note="$keepWarm
-                ? __('A scheduled ping holds a container warm to cut cold-start latency.')
-                : __('The first request after idle pays the framework cold-start cost.')"
+            icon="heroicon-o-bolt"
+            :title="__('Warm start')"
+            :count="$keepWarm ? __('on') : __('off')"
+            :note="$backgroundEnabled
+                ? __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.')
+                : ($keepWarm
+                    ? __('A minute ping holds the function warm so visitors do not pay a cold start.')
+                    : __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.'))"
         >
             <x-slot:actions>
-                <a href="{{ route('sites.workers', ['server' => $server, 'site' => $site]) }}" wire:navigate class="dply-btn dply-btn-xs dply-btn-outline">
-                    {{ __('Workers') }}
-                    <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                </a>
+                <button
+                    type="button"
+                    wire:click="toggleServerlessKeepWarm"
+                    wire:loading.attr="disabled"
+                    wire:target="toggleServerlessKeepWarm"
+                    class="dply-btn dply-btn-xs dply-btn-outline"
+                >
+                    <span wire:loading.remove wire:target="toggleServerlessKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
+                    <span wire:loading wire:target="toggleServerlessKeepWarm">{{ __('Saving…') }}</span>
+                </button>
             </x-slot:actions>
         </x-workspace-panel-head>
     </section>

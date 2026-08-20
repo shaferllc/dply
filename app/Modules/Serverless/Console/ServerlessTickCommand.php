@@ -28,7 +28,7 @@ class ServerlessTickCommand extends Command
 {
     protected $signature = 'serverless:tick';
 
-    protected $description = 'Run the Laravel scheduler and queue worker on background-enabled serverless functions.';
+    protected $description = 'Run the scheduler, queue safety-net, and warm-start pings for live serverless functions.';
 
     public function handle(InvokeFunctionTick $tick, ServerlessQueuePump $pump): int
     {
@@ -39,10 +39,10 @@ class ServerlessTickCommand extends Command
         $ticked = 0;
 
         foreach ($sites as $site) {
-            $background = data_get($site->meta, 'serverless.background_enabled') === true;
-            $keepWarm = data_get($site->meta, 'serverless.keep_warm') === true;
+            $background = $site->serverlessBackgroundProcessingEnabled();
+            $keepWarmPing = $site->serverlessWantsKeepWarmPing();
 
-            if (! $background && ! $keepWarm) {
+            if (! $background && ! $keepWarmPing) {
                 continue;
             }
 

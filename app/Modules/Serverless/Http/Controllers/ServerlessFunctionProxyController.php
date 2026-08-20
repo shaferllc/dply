@@ -61,6 +61,8 @@ class ServerlessFunctionProxyController extends Controller
 
         $published = $this->servePublishedAsset($request, $site, $path);
         if ($published !== null) {
+            $request->attributes->set('dply.skip_session_cookies', true);
+
             return $published;
         }
 

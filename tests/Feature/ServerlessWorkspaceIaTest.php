@@ -132,7 +132,7 @@ test('serverless runtime page renders the compact execution profile', function (
         ->assertSee('laravel-demo')
         ->assertSee('Invocation URL')
         ->assertSee('Resource limits')
-        ->assertSee('Cold starts');
+        ->assertSee('Warm start');
 });
 
 test('serverless schedule page renders compact and drops the coming-next teaser', function () {

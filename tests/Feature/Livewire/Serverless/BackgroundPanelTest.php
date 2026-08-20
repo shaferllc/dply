@@ -42,6 +42,21 @@ beforeEach(function () {
     ]);
 });
 
+test('toggle keep warm persists the warm-start flag', function () {
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site])
+        ->call('toggleKeepWarm')
+        ->assertSee('Warm start');
+
+    expect($this->site->fresh()->serverlessKeepWarmEnabled())->toBeTrue();
+
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
+        ->call('toggleKeepWarm');
+
+    expect($this->site->fresh()->serverlessKeepWarmEnabled())->toBeFalse();
+});
+
 test('toggle enables then disables background processing', function () {
     Livewire::actingAs($this->user)
         ->test(BackgroundPanel::class, ['site' => $this->site])

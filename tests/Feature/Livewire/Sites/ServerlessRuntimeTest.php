@@ -62,7 +62,7 @@ test('runtime tab renders the serverless control surface', function () {
         ->assertSee('Resource limits')
         ->assertSee('Concurrency')
         ->assertSee('Log capture')
-        ->assertSee('Cold starts')
+        ->assertSee('Warm start')
         // The VM runtime partial must NOT render for a function site.
         ->assertDontSee('Site processes')
         ->assertDontSee('Working directory');
@@ -150,4 +150,24 @@ test('it flags a pending redeploy when saved limits differ from deployed', funct
     Livewire::actingAs($user)
         ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->assertSee('Redeploy now');
+});
+
+test('warm start toggle persists without a redeploy', function () {
+    [$user, $server, $site] = functionSite();
+    Http::fake();
+
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+        ->assertSee('Warm start')
+        ->assertSee('Enable')
+        ->call('toggleServerlessKeepWarm');
+
+    expect($site->fresh()->serverlessKeepWarmEnabled())->toBeTrue();
+
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $site->fresh(), 'section' => 'runtime'])
+        ->assertSee('Disable')
+        ->call('toggleServerlessKeepWarm');
+
+    expect($site->fresh()->serverlessKeepWarmEnabled())->toBeFalse();
 });

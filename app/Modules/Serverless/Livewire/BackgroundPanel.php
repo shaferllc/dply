@@ -6,12 +6,12 @@ namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
-use App\Support\Sites\SiteRegistry;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\Serverless\Models\ServerlessFailedJob;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
 use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
+use App\Support\Sites\SiteRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -68,11 +68,20 @@ class BackgroundPanel extends Component
 
     public function toggleKeepWarm(): void
     {
-        $enabled = $this->flip('keep_warm');
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        $enabled = $site->setServerlessKeepWarm(! $site->serverlessKeepWarmEnabled());
+
+        if ($enabled && $site->serverlessBackgroundProcessingEnabled()) {
+            $this->toastSuccess(__('Warm start saved. Background processing already holds the function warm, so dply will not send a second ping.'));
+
+            return;
+        }
 
         $this->toastSuccess($enabled
-            ? __('Keep-warm enabled — dply pings the function every minute to cut cold starts.')
-            : __('Keep-warm disabled.'));
+            ? __('Warm start on — dply pings the function every minute so visitors skip the cold start. No redeploy needed.')
+            : __('Warm start off — the first request after idle pays the full boot cost.'));
     }
 
     /**
@@ -296,8 +305,8 @@ class BackgroundPanel extends Component
         $managed = $backend->managedQueue($site);
 
         return view('livewire.serverless.background-panel', [
-            'enabled' => (bool) ($serverless['background_enabled'] ?? false),
-            'keepWarm' => (bool) ($serverless['keep_warm'] ?? false),
+            'enabled' => $site->serverlessBackgroundProcessingEnabled(),
+            'keepWarm' => $site->serverlessKeepWarmEnabled(),
             'deployed' => trim((string) ($serverless['action_url'] ?? '')) !== '',
             'queueEnabled' => $config['enabled'],
             'activeSlots' => $pump->activeSlots($site),

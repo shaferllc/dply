@@ -17,6 +17,7 @@ use App\Http\Middleware\ValidateMetricsIngestToken;
 use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Modules\Serverless\Http\Middleware\SkipSessionCookiesForServerlessAssets;
 use App\Support\Debug\DebugExceptionDetail;
 use App\Support\DplyRuntime;
 use App\Support\Http\ScannerProbePaths;
@@ -86,6 +87,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // so a request to `api.acme.com/` doesn't fall through to the
         // marketing welcome view (which has no host constraint on /).
         $middleware->prependToGroup('web', [
+            // Outermost: strip session cookies after StartSession so hashed
+            // /build files stay CDN-cacheable on function hostnames.
+            SkipSessionCookiesForServerlessAssets::class,
             ResolveServerlessCustomDomain::class,
             ResolveEdgeCustomDomain::class,
         ]);
