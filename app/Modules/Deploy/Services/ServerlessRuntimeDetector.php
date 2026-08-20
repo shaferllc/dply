@@ -81,7 +81,7 @@ final class ServerlessRuntimeDetector
         $composerJson = $this->readJson($workingDirectory.'/composer.json');
 
         // ---- 1. Framework markers ------------------------------------------
-        $laravel = $this->detectLaravel($workingDirectory, $composerJson, $capabilities);
+        $laravel = $this->detectLaravel($workingDirectory, $composerJson, $packageJson, $capabilities);
         if ($laravel !== null) {
             return $laravel;
         }
@@ -104,7 +104,7 @@ final class ServerlessRuntimeDetector
         if ($composerJson !== null && $this->looksLikeSymfony($composerJson)) {
             return $this->phpResult('symfony', 'medium', 'public/build', [
                 'Detected Symfony via symfony/framework-bundle or symfony/symfony in composer.json.',
-            ], $capabilities, 'framework');
+            ], $capabilities, 'framework', $workingDirectory, $composerJson, $packageJson);
         }
 
         // ---- 2. Generic language projects (no recognised framework) --------
@@ -116,7 +116,7 @@ final class ServerlessRuntimeDetector
         if ($composerJson !== null) {
             return $this->phpResult('php_generic', 'medium', '.', [
                 'Detected composer.json without strong framework matches.',
-            ], $capabilities, 'raw');
+            ], $capabilities, 'raw', $workingDirectory, $composerJson, $packageJson);
         }
 
         // ---- 3. OpenWhisk project.yml → raw multi-action package -----------
@@ -183,10 +183,11 @@ final class ServerlessRuntimeDetector
 
     /**
      * @param  array<string, mixed>|null  $composerJson
+     * @param  array<string, mixed>|null  $packageJson
      * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectLaravel(string $workingDirectory, ?array $composerJson, array $capabilities): ?array
+    private function detectLaravel(string $workingDirectory, ?array $composerJson, ?array $packageJson, array $capabilities): ?array
     {
         if (! $this->looksLikeLaravel($workingDirectory, $composerJson)) {
             return null;
@@ -206,14 +207,19 @@ final class ServerlessRuntimeDetector
             }
         }
 
+        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+        if ($frontend !== '') {
+            $reasons[] = 'Detected a frontend compile step — will install JS deps and run the build after Composer.';
+        }
+
         return [
             'framework' => 'laravel',
             'deploy_kind' => 'framework',
             'language' => 'php',
-            'runtime' => $unsupportedForTarget ? '' : (string) ($capabilities['default_runtime'] ?? ''),
+            'runtime' => $unsupportedForTarget ? '' : $this->phpRuntime($composerJson, $capabilities),
             'entrypoint' => $unsupportedForTarget ? '' : (string) ($capabilities['default_entrypoint'] ?? 'public/index.php'),
             'entry_file' => '',
-            'build_command' => 'composer install --no-dev --optimize-autoloader',
+            'build_command' => $this->phpBuildCommand($workingDirectory, $packageJson),
             'artifact_output_path' => '.',
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => 'high',
