@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
 
@@ -59,8 +60,36 @@ test('fix rewrites file sessions to cookie', function () {
 });
 
 test('a cookie session with object storage is healthy', function () {
-    $site = filesystemDoctorSite("FILESYSTEM_DISK=s3\nSESSION_DRIVER=cookie\nQUEUE_CONNECTION=redis\n");
+    $site = filesystemDoctorSite("FILESYSTEM_DISK=s3\nSESSION_DRIVER=cookie\nLOG_CHANNEL=stderr\nQUEUE_CONNECTION=redis\n");
 
     $this->artisan('dply:serverless:filesystem-doctor', ['site' => $site->id])
         ->assertSuccessful();
+});
+
+test('it flags a log channel that writes to storage logs', function () {
+    $site = filesystemDoctorSite("FILESYSTEM_DISK=s3\nSESSION_DRIVER=cookie\nLOG_CHANNEL=stack\nQUEUE_CONNECTION=redis\n");
+
+    $exit = Artisan::call('dply:serverless:filesystem-doctor', [
+        'site' => $site->id,
+        '--json' => true,
+    ]);
+    $report = json_decode(Artisan::output(), true);
+
+    expect($exit)->toBe(1);
+    expect($report)->toBeArray();
+    expect($report['log_channel'] ?? null)->toBe('stack');
+    expect($report['problems'] ?? [])->not->toBeEmpty();
+    expect(implode("\n", $report['problems'] ?? []))->toContain('LOG_CHANNEL');
+    expect(implode("\n", $report['problems'] ?? []))->toContain('storage/logs');
+});
+
+test('fix rewrites file log channels to stderr', function () {
+    $site = filesystemDoctorSite("FILESYSTEM_DISK=s3\nSESSION_DRIVER=cookie\nLOG_CHANNEL=single\nQUEUE_CONNECTION=redis\n");
+
+    $this->artisan('dply:serverless:filesystem-doctor', ['site' => $site->id, '--fix' => true])
+        ->expectsOutputToContain('LOG_CHANNEL=stderr')
+        ->assertSuccessful();
+
+    expect((string) $site->fresh()->env_file_content)->toContain('LOG_CHANNEL=stderr');
+    expect((string) $site->fresh()->env_file_content)->not->toContain('LOG_CHANNEL=single');
 });

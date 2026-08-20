@@ -74,6 +74,14 @@ class ServerlessEnvironmentPreparer
                 $notes[] = 'defaulted SESSION_DRIVER to cookie';
             }
 
+            // File log channels mkdir storage/logs. The function filesystem
+            // is read-only except /tmp, so default to stderr (Monolog writes
+            // to the platform log stream and never creates a directory).
+            if (! $this->envHasKey($managed, 'LOG_CHANNEL')) {
+                $managed = $this->setEnvKey($managed, 'LOG_CHANNEL', 'stderr');
+                $notes[] = 'defaulted LOG_CHANNEL to stderr';
+            }
+
             $managed = $this->setEnvKey(
                 $managed,
                 'DPLY_MAINTENANCE',

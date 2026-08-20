@@ -32,6 +32,7 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessDeployHookRunner $hookRunner,
         private readonly ServerlessBuildHostTools $buildHostTools,
         private readonly ServerlessAssetPublisher $assetPublisher,
+        private readonly ServerlessLaravelOptimizeCache $optimizeCache,
     ) {}
 
     /**
@@ -496,8 +497,10 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * Bake `php artisan optimize` into the zip so cold starts load packaged
-     * bootstrap/cache instead of compiling config/routes in /tmp.
+     * Bake route / event / view caches into the zip so cold starts skip
+     * compiling them in /tmp. Config cache is stripped afterwards —
+     * `config:cache` freezes the build host's `storage_path()` and a
+     * function cannot write (or even see) that directory.
      */
     private function optimizeLaravel(Site $site, string $workingDirectory): string
     {
@@ -509,10 +512,24 @@ class DigitalOceanFunctionsArtifactBuilder
         $this->progress->active($site, 'optimize', 'Optimizing Laravel', 'php artisan optimize');
 
         try {
-            $output = $this->runShell('php artisan optimize --no-interaction', $workingDirectory, $site);
+            $output = $this->runShell(
+                'php artisan optimize --no-interaction',
+                $workingDirectory,
+                $site,
+                [
+                    // If neutralize() cannot unlink the file, a stderr-baked
+                    // config cache is still safer than storage/logs.
+                    'LOG_CHANNEL' => 'stderr',
+                    'LOG_STACK' => 'stderr',
+                ],
+            );
+            $neutralize = $this->optimizeCache->neutralize($workingDirectory);
             $this->progress->done($site, 'optimize', 'Optimized Laravel');
 
-            return $output !== '' ? $output : 'Ran php artisan optimize.';
+            return trim(implode("\n", array_filter([
+                $output !== '' ? $output : 'Ran php artisan optimize.',
+                $neutralize,
+            ])));
         } catch (\RuntimeException $e) {
             $this->progress->done($site, 'optimize', 'Skipped Laravel optimize');
 
@@ -528,7 +545,10 @@ class DigitalOceanFunctionsArtifactBuilder
         return $base.'-'.now()->format('YmdHis').'.zip';
     }
 
-    private function runShell(string $command, string $workingDirectory, Site $site): string
+    /**
+     * @param  array<string, string>  $extraEnv
+     */
+    private function runShell(string $command, string $workingDirectory, Site $site, array $extraEnv = []): string
     {
         // Control-plane workers often lack Composer and Node on PATH. Wrap
         // the command so the same shell installs them into storage/app/bin
@@ -537,7 +557,11 @@ class DigitalOceanFunctionsArtifactBuilder
         // with a raw `sh: 1: npm: not found`.
         $prepared = $this->buildHostTools->prepareShellCommand($command);
 
-        $process = Process::fromShellCommandline($prepared, $workingDirectory, $this->buildHostTools->processEnv());
+        $process = Process::fromShellCommandline(
+            $prepared,
+            $workingDirectory,
+            array_merge($this->buildHostTools->processEnv(), $extraEnv),
+        );
         $process->setTimeout(1800);
 
         $captured = '';

@@ -191,6 +191,24 @@ test('the wake url matches the route the wake controller is registered on', func
     $this->assertStringContainsString('DPLY_QUEUE_WAKE_URL=https://dply.tunnel.example'.$path, (string) $site->fresh()->env_file_content);
 });
 
+test('it defaults log channel to stderr when unset', function () {
+    $site = Site::factory()->create(['env_file_content' => "APP_ENV=production\n"]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $this->assertStringContainsString('LOG_CHANNEL=stderr', (string) $site->fresh()->env_file_content);
+});
+
+test('it keeps an explicit log channel', function () {
+    $site = Site::factory()->create(['env_file_content' => "LOG_CHANNEL=papertrail\n"]);
+
+    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+    $managed = (string) $site->fresh()->env_file_content;
+    $this->assertStringContainsString('LOG_CHANNEL=papertrail', $managed);
+    $this->assertStringNotContainsString('LOG_CHANNEL=stderr', $managed);
+});
+
 test('it defaults session driver to cookie when unset', function () {
     $site = Site::factory()->create(['env_file_content' => "APP_ENV=production\n"]);
 

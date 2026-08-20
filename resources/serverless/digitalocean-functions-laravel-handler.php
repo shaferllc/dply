@@ -11,12 +11,15 @@
  * maps the response back to the {statusCode, headers, body} shape OpenWhisk
  * expects.
  *
- * The OpenWhisk action filesystem is read-only except for /tmp, so before
- * the framework boots this redirects Laravel's storage path AND compiled
- * views into /tmp. Packaged `bootstrap/cache/*` from `artisan optimize` is
- * preferred over empty /tmp redirects — those files are read-only and that
- * is fine. Only missing cache files are pointed at /tmp so a cold boot that
- * needs to write them does not crash.
+ * The action filesystem is read-only except for /tmp, so before the
+ * framework boots this redirects Laravel's storage path AND compiled views
+ * into /tmp. Packaged `bootstrap/cache/*` from `artisan optimize` is
+ * preferred for routes/events/services — those files are read-only and that
+ * is fine. Config cache is different: `config:cache` freezes build-host
+ * `storage_path()` values (logging, views, file cache, sessions). A
+ * poisoned `bootstrap/cache/config.php` is discarded (or rewritten under
+ * /tmp) so Monolog never mkdir's `/home/dply/.../storage/logs`. File log
+ * channels are pointed at stderr so they never create a directory.
  *
  * The bootstrapped Application is reused across invocations in the same
  * container (Bref-style), capped by DPLY_WARM_MAX_REQUESTS (default 250).
@@ -153,12 +156,17 @@ if (! function_exists('main')) {
             putenv("{$key}={$value}");
         };
 
-        // Compiled views always live in /tmp — they are written at runtime.
+        // Storage + compiled views always live in /tmp — they are written
+        // at runtime. Set both Laravel 11+ env names so storage_path()
+        // cannot fall back to a baked build-host path.
+        $setEnv('APP_STORAGE_PATH', $storage);
+        $setEnv('LARAVEL_STORAGE_PATH', $storage);
         $setEnv('VIEW_COMPILED_PATH', $storage.'/framework/views');
 
-        // Prefer packaged bootstrap/cache from `artisan optimize`. Fall back
-        // to /tmp only when a file was not baked into the zip.
-        foreach (dply_do_functions_bootstrap_cache_env($root, $bootstrapCache) as $key => $value) {
+        // Prefer packaged bootstrap/cache from `artisan optimize` for
+        // routes/events/services. Config cache is sanitized or discarded
+        // when it still has build-host absolute paths.
+        foreach (dply_do_functions_bootstrap_cache_env($root, $bootstrapCache, $storage) as $key => $value) {
             $setEnv($key, $value);
         }
 
@@ -222,6 +230,11 @@ if (! function_exists('main')) {
                 /** @var Application $app */
                 $app = require $root.'/bootstrap/app.php';
                 $app->useStoragePath($storage);
+
+                // Config cache (or config/*.php) may still name a build-host
+                // log/view/cache path. Rewrite those onto /tmp / stderr
+                // before anything resolves the logger.
+                dply_do_functions_remap_runtime_paths($app, $storage, $root);
 
                 // Register the dply Queue connection, the shared lock store, and
                 // the failed-job provider, if this function has a namespace.
@@ -349,9 +362,13 @@ if (! function_exists('dply_do_functions_bootstrap_cache_env')) {
      * Map Laravel cache-path env keys to packaged bootstrap/cache files when
      * they exist in the zip, otherwise to writable /tmp copies.
      *
+     * Config cache is special: a file that still names `/home/dply/...`
+     * storage paths is discarded (APP_CONFIG_CACHE points at a missing
+     * /tmp file so Laravel loads `config/*.php`) or rewritten under /tmp.
+     *
      * @return array<string, string>
      */
-    function dply_do_functions_bootstrap_cache_env(string $root, string $tmpBootstrap): array
+    function dply_do_functions_bootstrap_cache_env(string $root, string $tmpBootstrap, string $storage = '/tmp/dply-storage'): array
     {
         $packaged = rtrim($root, '/').'/bootstrap/cache';
         $files = [
@@ -365,10 +382,243 @@ if (! function_exists('dply_do_functions_bootstrap_cache_env')) {
         $out = [];
         foreach ($files as $key => $file) {
             $packagedFile = $packaged.'/'.$file;
+            if ($key === 'APP_CONFIG_CACHE') {
+                $out[$key] = dply_do_functions_runtime_config_cache($packagedFile, $tmpBootstrap.'/config.php', $root, $storage);
+
+                continue;
+            }
             $out[$key] = is_file($packagedFile) ? $packagedFile : $tmpBootstrap.'/'.$file;
         }
 
         return $out;
+    }
+}
+
+if (! function_exists('dply_do_functions_runtime_config_cache')) {
+    /**
+     * Use the packaged config cache only when it has no build-host storage
+     * paths. Otherwise write a sanitized copy under /tmp, or leave that
+     * file missing so Laravel rebuilds from `config/*.php`.
+     */
+    function dply_do_functions_runtime_config_cache(string $packagedFile, string $tmpFile, string $runtimeRoot, string $storage): string
+    {
+        if (! is_file($packagedFile)) {
+            return $tmpFile;
+        }
+
+        $contents = (string) @file_get_contents($packagedFile);
+        if ($contents === '' || ! dply_do_functions_config_file_looks_poisoned($contents, $runtimeRoot)) {
+            return $packagedFile;
+        }
+
+        try {
+            $config = include $packagedFile;
+            if (! is_array($config)) {
+                return $tmpFile;
+            }
+
+            $sanitized = dply_do_functions_sanitize_cached_config($config, $runtimeRoot, $storage);
+            $exported = '<?php return '.var_export($sanitized, true).';'.PHP_EOL;
+            if (@file_put_contents($tmpFile, $exported) === false) {
+                return $tmpFile;
+            }
+
+            return $tmpFile;
+        } catch (Throwable) {
+            return $tmpFile;
+        }
+    }
+}
+
+if (! function_exists('dply_do_functions_config_file_looks_poisoned')) {
+    /**
+     * True when a packaged config.php still names an absolute storage path
+     * that is not under /tmp or the running action root.
+     */
+    function dply_do_functions_config_file_looks_poisoned(string $contents, string $runtimeRoot): bool
+    {
+        if (str_contains($contents, 'serverless-repositories')) {
+            return true;
+        }
+
+        if (preg_match('#([\'"])(/(?:home|var/www|opt)/[^\'"]+/storage/(?:logs|framework|app))#', $contents) === 1) {
+            return true;
+        }
+
+        if (preg_match_all('#([\'"])(/(?!tmp/)[^\'"]+/storage/(?:logs|framework)(?:/[^\'"]*)?)\\1#', $contents, $matches) === false) {
+            return false;
+        }
+
+        $root = rtrim($runtimeRoot, '/').'/';
+        foreach ($matches[2] ?? [] as $path) {
+            if (! str_starts_with((string) $path, $root) && ! str_starts_with((string) $path, '/tmp/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (! function_exists('dply_do_functions_detect_build_root')) {
+    /**
+     * Infer the Laravel root used when config was cached, from baked
+     * `.../storage/logs` or `.../storage/framework` paths.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    function dply_do_functions_detect_build_root(array $config): ?string
+    {
+        $found = [];
+        $walk = static function ($value) use (&$walk, &$found): void {
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    $walk($item);
+                }
+
+                return;
+            }
+
+            if (! is_string($value) || ! str_starts_with($value, '/') || str_starts_with($value, '/tmp/')) {
+                return;
+            }
+
+            if (preg_match('#^(.+)/(storage/(?:logs|framework|app)(?:/|$))#', $value, $m) === 1) {
+                $found[] = $m[1];
+            }
+        };
+        $walk($config);
+
+        if ($found === []) {
+            return null;
+        }
+
+        $counts = array_count_values($found);
+        arsort($counts);
+
+        return (string) array_key_first($counts);
+    }
+}
+
+if (! function_exists('dply_do_functions_sanitize_cached_config')) {
+    /**
+     * Rewrite baked build-host paths onto the running action root / /tmp
+     * storage, and point file log channels at stderr so Monolog never mkdir's.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    function dply_do_functions_sanitize_cached_config(array $config, string $runtimeRoot, string $runtimeStorage): array
+    {
+        $buildRoot = dply_do_functions_detect_build_root($config);
+        $runtimeRoot = rtrim($runtimeRoot, '/');
+        $runtimeStorage = rtrim($runtimeStorage, '/');
+
+        $rewrite = static function ($value) use (&$rewrite, $buildRoot, $runtimeRoot, $runtimeStorage) {
+            if (is_array($value)) {
+                foreach ($value as $key => $item) {
+                    $value[$key] = $rewrite($item);
+                }
+
+                return $value;
+            }
+
+            if (! is_string($value) || $value === '') {
+                return $value;
+            }
+
+            if (is_string($buildRoot) && $buildRoot !== '') {
+                $buildStorage = $buildRoot.'/storage';
+                if (str_starts_with($value, $buildStorage)) {
+                    return $runtimeStorage.substr($value, strlen($buildStorage));
+                }
+                if (str_starts_with($value, $buildRoot)) {
+                    return $runtimeRoot.substr($value, strlen($buildRoot));
+                }
+            }
+
+            if (preg_match('#^/.+/(storage/(?:logs|framework|app)(/.*)?)$#', $value, $m) === 1
+                && ! str_starts_with($value, '/tmp/')
+                && ! str_starts_with($value, $runtimeRoot.'/')) {
+                return $runtimeStorage.substr($m[1], strlen('storage'));
+            }
+
+            return $value;
+        };
+
+        $config = $rewrite($config);
+
+        foreach (['single', 'daily'] as $channel) {
+            $path = $config['logging']['channels'][$channel]['path'] ?? null;
+            if (is_string($path) && $path !== '' && ! str_starts_with($path, 'php://') && ! str_starts_with($path, '/dev/')) {
+                $config['logging']['channels'][$channel]['path'] = 'php://stderr';
+            }
+        }
+
+        return $config;
+    }
+}
+
+if (! function_exists('dply_do_functions_is_unsafe_runtime_path')) {
+    /**
+     * Absolute filesystem path that is neither /tmp nor the running action.
+     */
+    function dply_do_functions_is_unsafe_runtime_path(string $path, string $runtimeRoot): bool
+    {
+        if ($path === '' || str_starts_with($path, 'php://') || str_starts_with($path, '/dev/')) {
+            return false;
+        }
+
+        if (! str_starts_with($path, '/')) {
+            return false;
+        }
+
+        if (str_starts_with($path, '/tmp/')) {
+            return false;
+        }
+
+        $root = rtrim($runtimeRoot, '/').'/';
+
+        return ! str_starts_with($path, $root);
+    }
+}
+
+if (! function_exists('dply_do_functions_remap_runtime_paths')) {
+    /**
+     * After the Application exists, force file-backed Laravel paths under
+     * /tmp (or stderr) so a leftover config cache cannot mkdir on a
+     * read-only filesystem.
+     */
+    function dply_do_functions_remap_runtime_paths(mixed $app, string $storage, string $runtimeRoot): void
+    {
+        try {
+            $config = $app->make('config');
+        } catch (Throwable) {
+            return;
+        }
+
+        $storage = rtrim($storage, '/');
+
+        $config->set('view.compiled', $storage.'/framework/views');
+        $config->set('session.files', $storage.'/framework/sessions');
+
+        if ($config->get('cache.stores.file') !== null) {
+            $config->set('cache.stores.file.path', $storage.'/framework/cache/data');
+        }
+
+        foreach (['local' => '/app', 'public' => '/app/public'] as $disk => $suffix) {
+            $diskRoot = $config->get('filesystems.disks.'.$disk.'.root');
+            if (is_string($diskRoot) && dply_do_functions_is_unsafe_runtime_path($diskRoot, $runtimeRoot)) {
+                $config->set('filesystems.disks.'.$disk.'.root', $storage.$suffix);
+            }
+        }
+
+        foreach (['single', 'daily'] as $channel) {
+            $path = $config->get('logging.channels.'.$channel.'.path');
+            if (is_string($path) && $path !== '' && ! str_starts_with($path, 'php://') && ! str_starts_with($path, '/dev/')) {
+                $config->set('logging.channels.'.$channel.'.path', 'php://stderr');
+            }
+        }
     }
 }
 

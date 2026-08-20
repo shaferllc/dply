@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessLaravelHandlerCommandTest;
 
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -170,6 +172,106 @@ test('packaged bootstrap cache is preferred over empty tmp redirects', function 
 
     expect($paths['APP_CONFIG_CACHE'])->toBe($root.'/bootstrap/cache/config.php');
     expect($paths['APP_ROUTES_CACHE'])->toBe($tmp.'/routes.php');
+});
+
+test('packaged config cache with a baked build-host log path is rewritten or ignored', function () {
+    $root = sys_get_temp_dir().'/dply-fn-poison-'.uniqid();
+    mkdir($root.'/bootstrap/cache', 0777, true);
+    mkdir($root.'/tmp-bootstrap', 0777, true);
+
+    $buildRoot = '/home/dply/dplyio/storage/app/serverless-repositories/build-01m0frrk2s92q56z8a5bb9gkp8/repo';
+    $poisoned = [
+        'logging' => [
+            'default' => 'stack',
+            'channels' => [
+                'single' => [
+                    'driver' => 'single',
+                    'path' => $buildRoot.'/storage/logs/laravel.log',
+                ],
+            ],
+        ],
+        'view' => ['compiled' => $buildRoot.'/storage/framework/views'],
+    ];
+    file_put_contents($root.'/bootstrap/cache/config.php', '<?php return '.var_export($poisoned, true).';');
+
+    $storage = '/tmp/dply-storage';
+    $paths = dply_do_functions_bootstrap_cache_env($root, $root.'/tmp-bootstrap', $storage);
+
+    expect($paths['APP_CONFIG_CACHE'])->not->toBe($root.'/bootstrap/cache/config.php');
+
+    $resolved = $paths['APP_CONFIG_CACHE'];
+    if (is_file($resolved)) {
+        $loaded = include $resolved;
+        expect($loaded)->toBeArray();
+        expect((string) ($loaded['logging']['channels']['single']['path'] ?? ''))->not->toContain('/home/dply');
+        expect((string) ($loaded['logging']['channels']['single']['path'] ?? ''))->toBe('php://stderr');
+        expect((string) ($loaded['view']['compiled'] ?? ''))->toStartWith($storage);
+    }
+});
+
+test('sanitized logging does not target a build-host path and writing a log does not throw', function () {
+    $buildRoot = '/home/dply/dplyio/storage/app/serverless-repositories/build-xyz/repo';
+    $sanitized = dply_do_functions_sanitize_cached_config([
+        'logging' => [
+            'default' => 'stack',
+            'channels' => [
+                'single' => [
+                    'driver' => 'single',
+                    'path' => $buildRoot.'/storage/logs/laravel.log',
+                ],
+                'daily' => [
+                    'driver' => 'daily',
+                    'path' => $buildRoot.'/storage/logs/laravel.log',
+                ],
+            ],
+        ],
+        'view' => ['compiled' => $buildRoot.'/storage/framework/views'],
+        'cache' => ['stores' => ['file' => ['path' => $buildRoot.'/storage/framework/cache/data']]],
+        'session' => ['files' => $buildRoot.'/storage/framework/sessions'],
+    ], '/tmp/action/1/src', '/tmp/dply-storage');
+
+    $logPath = (string) $sanitized['logging']['channels']['single']['path'];
+    expect($logPath)->not->toContain('/home/dply');
+    expect($logPath)->not->toContain($buildRoot);
+    expect($logPath)->toBe('php://stderr');
+    expect((string) $sanitized['view']['compiled'])->toStartWith('/tmp/dply-storage');
+    expect((string) $sanitized['cache']['stores']['file']['path'])->toStartWith('/tmp/dply-storage');
+    expect((string) $sanitized['session']['files'])->toStartWith('/tmp/dply-storage');
+
+    $logger = new Logger('testing');
+    $logger->pushHandler(new StreamHandler($logPath, 100));
+    expect(fn () => $logger->info('functions boot'))->not->toThrow(\Throwable::class);
+});
+
+test('runtime remaps force baked file log paths onto stderr', function () {
+    $config = new \Illuminate\Config\Repository([
+        'logging' => [
+            'channels' => [
+                'single' => [
+                    'path' => '/home/dply/dplyio/storage/app/serverless-repositories/build-xyz/repo/storage/logs/laravel.log',
+                ],
+            ],
+        ],
+        'view' => ['compiled' => '/home/dply/dplyio/storage/app/serverless-repositories/build-xyz/repo/storage/framework/views'],
+        'cache' => ['stores' => ['file' => ['path' => '/home/dply/.../storage/framework/cache/data']]],
+        'session' => ['files' => '/home/dply/.../storage/framework/sessions'],
+    ]);
+    $app = new class($config)
+    {
+        public function __construct(private \Illuminate\Config\Repository $config) {}
+
+        public function make(string $abstract): mixed
+        {
+            return $this->config;
+        }
+    };
+
+    dply_do_functions_remap_runtime_paths($app, '/tmp/dply-storage', '/tmp/action/1/src');
+
+    expect($config->get('logging.channels.single.path'))->toBe('php://stderr');
+    expect($config->get('view.compiled'))->toBe('/tmp/dply-storage/framework/views');
+    expect($config->get('cache.stores.file.path'))->toBe('/tmp/dply-storage/framework/cache/data');
+    expect($config->get('session.files'))->toBe('/tmp/dply-storage/framework/sessions');
 });
 
 test('warm max requests defaults to 250 and is capped', function () {
