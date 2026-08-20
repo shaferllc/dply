@@ -79,7 +79,7 @@
                 @endphp
                 <li wire:key="deployment-{{ $deployment->id }}" class="group relative transition-colors hover:bg-brand-sand/15">
                     <a
-                        href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment]) }}"
+                        href="{{ \App\Support\Serverless\ServerlessWorkspaceUrl::deploymentShow($site, $deployment) }}"
                         wire:navigate
                         class="absolute inset-0 z-0"
                         aria-label="{{ __('View deployment :id', ['id' => $deployment->id]) }}"

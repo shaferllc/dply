@@ -9,7 +9,9 @@
         class="border-b border-brand-ink/10"
         icon="heroicon-o-arrows-right-left"
         :title="__('Sync deploy')"
-        :note="__('Select sites to ship together — typically this site and workers on the same repo. Each deploys in parallel.')"
+        :note="$isFunctionsDeployHub ?? false
+            ? __('Select functions that share this Git repo and ship them together. Each deploys in parallel.')
+            : __('Select sites to ship together — typically this site and workers on the same repo. Each deploys in parallel.')"
     >
         <x-slot:actions>
         @can('update', $site)
@@ -32,7 +34,9 @@
     <div class="px-3 py-2.5 sm:px-4">
         @if ($candidates->count() <= 1)
             <p class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-cream/30 px-3 py-2 text-xs text-brand-moss">
-                {{ __('No related sites found to deploy with this one. Sites are matched by shared Git repository (or the same server when no repo is set).') }}
+                {{ ($isFunctionsDeployHub ?? false)
+                    ? __('No other functions share this Git repository yet. Connect the same repo on another function to ship them together.')
+                    : __('No related sites found to deploy with this one. Sites are matched by shared Git repository (or the same server when no repo is set).') }}
             </p>
         @else
             <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-lg border border-brand-ink/10">
@@ -61,7 +65,9 @@
                     </li>
                 @endforeach
             </ul>
-            <p class="mt-3 text-xs text-brand-moss">{{ __('Sites are matched by shared Git repository (a worker runs the same code as its main site). You can deselect any you don’t want to ship this time.') }}</p>
+            <p class="mt-3 text-xs text-brand-moss">{{ ($isFunctionsDeployHub ?? false)
+                ? __('Matched by shared Git repository. Deselect any function you do not want to ship this time.')
+                : __('Sites are matched by shared Git repository (a worker runs the same code as its main site). You can deselect any you don’t want to ship this time.') }}</p>
         @endif
     </div>
 </section>

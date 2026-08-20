@@ -112,9 +112,50 @@ test('serverless deployments tab embeds the journey with a redeploy control', fu
 
     Livewire::actingAs($user)
         ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSee(__('Sync'))
+        ->assertSee(__('Quick deploy'))
+        ->assertSee(__('History'))
         // The embedded journey panel is the redeploy surface.
         ->assertSeeLivewire('serverless.journey')
         ->assertSee('Redeploy');
+});
+
+test('serverless deployments hub opens sync quick deploy and history', function () {
+    [$user, $server, $site] = makeFunctionsSite();
+    $site->update(['git_repository_url' => 'https://github.com/acme/laravel-demo']);
+    $ran = seedDeploy($site, SiteDeployment::STATUS_SUCCESS, now(), 'manual');
+
+    $component = Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site]);
+
+    $component
+        ->call('setTab', DeploymentsList::TAB_SYNC)
+        ->assertSet('tab', DeploymentsList::TAB_SYNC)
+        ->assertSee(__('Sync deploy'))
+        ->assertDontSeeLivewire('serverless.journey');
+
+    $component
+        ->call('setTab', DeploymentsList::TAB_WEBHOOK)
+        ->assertSet('tab', DeploymentsList::TAB_WEBHOOK)
+        ->assertSeeLivewire('sites.repository');
+
+    $component
+        ->call('setTab', DeploymentsList::TAB_HISTORY)
+        ->assertSet('tab', DeploymentsList::TAB_HISTORY)
+        ->assertSee($ran->id)
+        ->assertSee(route('serverless.deployments.show', ['site' => $site, 'deployment' => $ran]), false);
+});
+
+test('serverless overview shows function status and recent deploys', function () {
+    [$user, $server, $site] = makeFunctionsSite();
+    seedDeploy($site, SiteDeployment::STATUS_SUCCESS, now(), 'webhook');
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('setTab', DeploymentsList::TAB_OVERVIEW)
+        ->assertSee(__('Function'))
+        ->assertSee(__('Recent deploys'))
+        ->assertSee(__('Full history'));
 });
 function makeFunctionsSite(): array
 {
@@ -133,6 +174,7 @@ function makeFunctionsSite(): array
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        'meta' => ['runtime_profile' => 'digitalocean_functions_web'],
     ]);
 
     return [$user, $server, $site];

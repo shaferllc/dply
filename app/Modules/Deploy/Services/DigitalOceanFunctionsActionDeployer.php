@@ -224,6 +224,7 @@ final class DigitalOceanFunctionsActionDeployer
                     'timeout' => $limits['timeout'],
                     'memory' => $limits['memory'],
                     'concurrency' => $limits['concurrency'],
+                    'logs' => $limits['logs'],
                 ],
             ], static fn (array $value): bool => $value !== []));
 

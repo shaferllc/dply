@@ -59,12 +59,12 @@ trait ManagesServerless
     }
 
     /**
-     * Normalised serverless resource limits — memory (MB), timeout (ms), and
-     * per-container concurrency — with platform defaults filled in. The
-     * DigitalOcean Functions deployer reads these straight onto the
-     * OpenWhisk action's `limits` block at deploy time.
+     * Normalised serverless resource limits — memory (MB), timeout (ms),
+     * per-container concurrency, and log capture (KB) — with platform
+     * defaults filled in. The DigitalOcean Functions deployer reads these
+     * straight onto the OpenWhisk action's `limits` block at deploy time.
      *
-     * @return array{memory: int, timeout: int, concurrency: int}
+     * @return array{memory: int, timeout: int, concurrency: int, logs: int}
      */
     public function serverlessLimits(): array
     {
@@ -82,10 +82,14 @@ trait ManagesServerless
         $concurrency = (int) ($limits['concurrency'] ?? self::SERVERLESS_DEFAULT_CONCURRENCY);
         $concurrency = max(1, min(self::SERVERLESS_MAX_CONCURRENCY, $concurrency));
 
+        $logs = (int) ($limits['logs'] ?? self::SERVERLESS_DEFAULT_LOGS_KB);
+        $logs = max(self::SERVERLESS_MIN_LOGS_KB, min(self::SERVERLESS_MAX_LOGS_KB, $logs));
+
         return [
             'memory' => $memory,
             'timeout' => $timeout,
             'concurrency' => $concurrency,
+            'logs' => $logs,
         ];
     }
 

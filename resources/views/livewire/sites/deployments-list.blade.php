@@ -17,7 +17,9 @@
                     class="border-b border-brand-ink/10"
                     icon="heroicon-o-rocket-launch"
                     :title="__('Deployments')"
-                    :note="__('Deploy, review history, and manage release settings.')"
+                    :note="$isFunctionsDeployHub ?? false
+                        ? __('Deploy, sync related functions, and review history.')
+                        : __('Deploy, review history, and manage release settings.')"
                 >
                     <x-slot:actions>
                         @include('livewire.sites.partials.header-role-badge')
@@ -44,21 +46,7 @@
                 </div>
             @endif
 
-            @if ($site->server?->isDigitalOceanFunctionsHost())
-                {{-- Serverless deploy hub: journey + hooks as hairline strips
-                     inside this card (no nested dply-card). --}}
-                <livewire:serverless.journey
-                    :server="$server"
-                    :site="$site"
-                    :embedded="true"
-                    wire:key="deploy-journey-{{ $site->id }}"
-                />
-
-                <livewire:sites.deploy-hooks
-                    :site="$site"
-                    wire:key="deploy-hooks-{{ $site->id }}"
-                />
-            @elseif ($isVmDeployHub ?? false)
+            @if ($isDeployHub ?? false)
                 <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 @include('livewire.sites.partials.deployments._tabstrip')
             </div>
@@ -76,7 +64,16 @@
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_REPOSITORY)
                         @include('livewire.sites.partials.deployments._repository-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_DEPLOY)
-                        @include('livewire.sites.partials.deployments._deploy-panel')
+                        @if ($isFunctionsDeployHub ?? false)
+                            <livewire:serverless.journey
+                                :server="$server"
+                                :site="$site"
+                                :embedded="true"
+                                wire:key="deploy-journey-{{ $site->id }}"
+                            />
+                        @else
+                            @include('livewire.sites.partials.deployments._deploy-panel')
+                        @endif
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SYNC)
                         @include('livewire.sites.partials.deployments._sync-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_ENVIRONMENT)
@@ -103,6 +100,13 @@
                         @include('livewire.sites.partials.deployments._schedule-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SETTINGS)
                         @include('livewire.sites.partials.deployments._settings-panel')
+                    @elseif ($isFunctionsDeployHub ?? false)
+                        <livewire:serverless.journey
+                            :server="$server"
+                            :site="$site"
+                            :embedded="true"
+                            wire:key="deploy-journey-fallback-{{ $site->id }}"
+                        />
                     @else
                         @include('livewire.sites.partials.deployments._deploy-panel')
                     @endif
@@ -115,18 +119,23 @@
             @endif
 
             <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
-                <x-cli-snippet :commands="[
-                    ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-                    ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
-                    ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
-                ]" />
+                <x-cli-snippet :commands="$isFunctionsDeployHub ?? false
+                    ? [
+                        ['label' => __('Deploy'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
+                        ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                    ]
+                    : [
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                        ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                    ]" />
             </div>
             </main>
             </section>
         </div>
     </div>
 
-    @if ($isVmDeployHub ?? false)
+    @if ($isDeployHub ?? false)
         @include('livewire.partials.confirm-action-modal')
     @endif
 </div>

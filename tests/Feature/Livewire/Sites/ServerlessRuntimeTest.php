@@ -61,6 +61,7 @@ test('runtime tab renders the serverless control surface', function () {
         ->assertSee('Execution profile')
         ->assertSee('Resource limits')
         ->assertSee('Concurrency')
+        ->assertSee('Log capture')
         ->assertSee('Cold starts')
         // The VM runtime partial must NOT render for a function site.
         ->assertDontSee('Site processes')
@@ -68,7 +69,7 @@ test('runtime tab renders the serverless control surface', function () {
 });
 test('it hydrates limit fields from stored config', function () {
     [$user, $server, $site] = functionSite([
-        'limits' => ['memory' => 1024, 'timeout' => 90000, 'concurrency' => 6],
+        'limits' => ['memory' => 1024, 'timeout' => 90000, 'concurrency' => 6, 'logs' => 64],
     ]);
     Http::fake();
 
@@ -76,7 +77,8 @@ test('it hydrates limit fields from stored config', function () {
         ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->assertSet('serverless_memory', 1024)
         ->assertSet('serverless_timeout_ms', 90000)
-        ->assertSet('serverless_concurrency', 6);
+        ->assertSet('serverless_concurrency', 6)
+        ->assertSet('serverless_logs_kb', 64);
 });
 test('saving persists limits to site meta', function () {
     [$user, $server, $site] = functionSite();
@@ -87,6 +89,7 @@ test('saving persists limits to site meta', function () {
         ->set('serverless_memory', 1024)
         ->set('serverless_timeout_ms', 120000)
         ->set('serverless_concurrency', 8)
+        ->set('serverless_logs_kb', 128)
         ->call('saveServerlessRuntime')
         ->assertHasNoErrors();
 
@@ -94,6 +97,7 @@ test('saving persists limits to site meta', function () {
         'memory' => 1024,
         'timeout' => 120000,
         'concurrency' => 8,
+        'logs' => 128,
     ]);
 });
 test('it rejects an unsupported memory value', function () {
@@ -125,6 +129,16 @@ test('it rejects concurrency above the ceiling', function () {
         ->set('serverless_concurrency', 999)
         ->call('saveServerlessRuntime')
         ->assertHasErrors('serverless_concurrency');
+});
+test('it rejects log capture above the host ceiling', function () {
+    [$user, $server, $site] = functionSite();
+    Http::fake();
+
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+        ->set('serverless_logs_kb', 1024)
+        ->call('saveServerlessRuntime')
+        ->assertHasErrors('serverless_logs_kb');
 });
 test('it flags a pending redeploy when saved limits differ from deployed', function () {
     [$user, $server, $site] = functionSite([

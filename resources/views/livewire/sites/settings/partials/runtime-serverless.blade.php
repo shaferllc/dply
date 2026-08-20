@@ -21,6 +21,7 @@
         (int) ($deployedLimits['memory'] ?? 0) !== $savedLimits['memory']
         || (int) ($deployedLimits['timeout'] ?? 0) !== $savedLimits['timeout']
         || (int) ($deployedLimits['concurrency'] ?? 0) !== $savedLimits['concurrency']
+        || (isset($deployedLimits['logs']) && (int) $deployedLimits['logs'] !== $savedLimits['logs'])
     );
 
     // Read-only facts about the deployed action. Flat rows in one bordered grid
@@ -94,10 +95,11 @@
         <div class="space-y-3 px-3 py-3 sm:px-4">
             @if ($pendingRedeploy)
                 <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <p>{{ __('Saved limits differ from what is live (:mem MB · :to · concurrency :cc). Redeploy to apply them.', [
+                    <p>{{ __('Saved limits differ from what is live (:mem MB · :to · concurrency :cc · :logs KB logs). Redeploy to apply them.', [
                         'mem' => $deployedLimits['memory'] ?? '—',
                         'to' => isset($deployedLimits['timeout']) ? number_format(((int) $deployedLimits['timeout']) / 1000, 1).'s' : '—',
                         'cc' => $deployedLimits['concurrency'] ?? '—',
+                        'logs' => $deployedLimits['logs'] ?? '—',
                     ]) }}</p>
                     <button type="button" wire:click="redeployServerlessFunction" wire:loading.attr="disabled" wire:target="redeployServerlessFunction"
                         class="shrink-0 rounded-lg bg-brand-ink px-2.5 py-1 text-2xs font-semibold text-white hover:bg-brand-ink/90 disabled:opacity-50">
@@ -107,7 +109,7 @@
                 </div>
             @endif
 
-            <div class="grid gap-3 sm:grid-cols-3">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                     <x-input-label for="serverless_memory" :value="__('Memory')" />
                     <select id="serverless_memory" wire:model="serverless_memory" class="mt-1 block w-full rounded-lg border-brand-ink/15 py-1.5 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
@@ -133,6 +135,14 @@
                         min="1" max="{{ \App\Models\Site::SERVERLESS_MAX_CONCURRENCY }}" step="1" />
                     <p class="mt-1 text-2xs text-brand-moss">{{ __('Requests one container handles at once before another is spun up.') }}</p>
                     <x-input-error :messages="$errors->get('serverless_concurrency')" class="mt-1" />
+                </div>
+
+                <div>
+                    <x-input-label for="serverless_logs_kb" :value="__('Log capture (KB)')" />
+                    <x-text-input id="serverless_logs_kb" type="number" wire:model="serverless_logs_kb" class="mt-1 block w-full font-mono text-sm"
+                        min="{{ \App\Models\Site::SERVERLESS_MIN_LOGS_KB }}" max="{{ \App\Models\Site::SERVERLESS_MAX_LOGS_KB }}" step="1" />
+                    <p class="mt-1 text-2xs text-brand-moss">{{ __('Console output kept per request. The host caps this at :max KB.', ['max' => \App\Models\Site::SERVERLESS_MAX_LOGS_KB]) }}</p>
+                    <x-input-error :messages="$errors->get('serverless_logs_kb')" class="mt-1" />
                 </div>
             </div>
 
@@ -173,7 +183,7 @@
             class="border-b border-brand-ink/10"
             icon="heroicon-o-globe-alt"
             :title="__('HTTP access')"
-            :note="__('Whether the function answers HTTP, who may call it, and what parameters are bound to it. Applied to the live function on save.')"
+            :note="__('Whether the function answers HTTP, who may call it, and what parameters are bound to it. Applied to the live function on save. Web responses larger than 1 MB are rejected by the host.')"
         />
 
         <div class="space-y-3 px-3 py-3 sm:px-4">

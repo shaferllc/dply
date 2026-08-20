@@ -90,3 +90,71 @@ test('public files under public/ are served without hitting laravel routes', fun
     expect(dply_do_functions_public_response($root, '/missing.css'))->toBeNull();
     expect(dply_do_functions_public_response($root, '/../.env'))->toBeNull();
 });
+
+test('image responses are base64-encoded so OpenWhisk can decode them', function () {
+    $png = hex2bin('89504e470d0a1a0a');
+
+    $response = dply_do_functions_web_response(200, [
+        'Content-Type' => 'image/png',
+    ], $png);
+
+    expect($response['statusCode'])->toBe(200);
+    expect($response['headers']['Content-Type'])->toBe('image/png');
+    expect($response['body'])->toBe(base64_encode($png));
+    expect(json_encode($response))->not->toBeFalse();
+});
+
+test('html css js and json responses stay as plain text', function () {
+    $html = dply_do_functions_web_response(200, ['content-type' => 'text/html; charset=utf-8'], '<p>ok</p>');
+    $css = dply_do_functions_web_response(200, ['content-type' => 'text/css'], 'body{color:red}');
+    $js = dply_do_functions_web_response(200, ['Content-Type' => 'application/javascript'], 'console.log(1)');
+    $json = dply_do_functions_web_response(200, ['Content-Type' => 'application/json'], '{"ok":true}');
+
+    expect($html['body'])->toBe('<p>ok</p>');
+    expect($css['body'])->toBe('body{color:red}');
+    expect($js['body'])->toBe('console.log(1)');
+    expect($json['body'])->toBe('{"ok":true}');
+});
+
+test('svg fonts and downloads are encoded because OpenWhisk treats them as binary', function () {
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+    $woff2 = random_bytes(32);
+    $pdf = '%PDF-1.4 binary '.random_bytes(8);
+
+    expect(dply_do_functions_web_response(200, ['content-type' => 'image/svg+xml'], $svg)['body'])
+        ->toBe(base64_encode($svg));
+    expect(dply_do_functions_web_response(200, ['content-type' => 'font/woff2'], $woff2)['body'])
+        ->toBe(base64_encode($woff2));
+    expect(dply_do_functions_web_response(200, ['Content-Type' => 'application/pdf'], $pdf)['body'])
+        ->toBe(base64_encode($pdf));
+});
+
+test('public binary files are base64-encoded for the OpenWhisk web gateway', function () {
+    $root = sys_get_temp_dir().'/dply-fn-public-bin-'.uniqid();
+    mkdir($root.'/public', 0777, true);
+    $png = hex2bin('89504e470d0a1a0a0000000d49484452');
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>';
+    file_put_contents($root.'/public/photo.png', $png);
+    file_put_contents($root.'/public/logo.svg', $svg);
+
+    $pngResponse = dply_do_functions_public_response($root, '/photo.png');
+    $svgResponse = dply_do_functions_public_response($root, '/logo.svg');
+
+    expect($pngResponse['headers']['content-type'])->toBe('image/png');
+    expect($pngResponse['body'])->toBe(base64_encode($png));
+    expect($svgResponse['headers']['content-type'])->toBe('image/svg+xml');
+    expect($svgResponse['body'])->toBe(base64_encode($svg));
+});
+
+test('file downloads read the on-disk bytes instead of an empty getContent', function () {
+    $path = sys_get_temp_dir().'/dply-fn-download-'.uniqid().'.pdf';
+    $bytes = '%PDF-1.4 '.random_bytes(16);
+    file_put_contents($path, $bytes);
+
+    $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($path);
+    $response->headers->set('Content-Type', 'application/pdf');
+
+    expect(dply_do_functions_response_body($response))->toBe($bytes);
+
+    @unlink($path);
+});

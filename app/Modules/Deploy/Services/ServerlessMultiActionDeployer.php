@@ -137,7 +137,7 @@ final class ServerlessMultiActionDeployer
     /**
      * @param  array<string, mixed>  $descriptor
      * @param  array<string, mixed>  $context
-     * @param  array{memory: int, timeout: int, concurrency: int}  $limits
+     * @param  array{memory: int, timeout: int, concurrency: int, logs: int}  $limits
      * @return string The deployed invocation URL.
      */
     private function deployOne(Site $site, string $workingDirectory, array $descriptor, array $context, array $limits): string
@@ -247,24 +247,19 @@ final class ServerlessMultiActionDeployer
      * only `memory` should not also reset the timeout to a default.
      *
      * @param  array<string, mixed>  $descriptor
-     * @param  array{memory: int, timeout: int, concurrency: int}  $siteLimits
+     * @param  array{memory: int, timeout: int, concurrency: int, logs: int}  $siteLimits
      * @return array<string, int>
      */
     private function resolveLimits(array $descriptor, array $siteLimits): array
     {
         $manifest = is_array($descriptor['limits'] ?? null) ? $descriptor['limits'] : [];
 
-        $limits = [
+        return [
             'timeout' => (int) ($manifest['timeout'] ?? $siteLimits['timeout']),
             'memory' => (int) ($manifest['memory'] ?? $siteLimits['memory']),
             'concurrency' => (int) ($manifest['concurrency'] ?? $siteLimits['concurrency']),
+            'logs' => (int) ($manifest['logs'] ?? $siteLimits['logs']),
         ];
-
-        if (isset($manifest['logs'])) {
-            $limits['logs'] = (int) $manifest['logs'];
-        }
-
-        return $limits;
     }
 
     /**
@@ -295,7 +290,7 @@ final class ServerlessMultiActionDeployer
      * the table's own uniqueness rule.
      *
      * @param  array<string, mixed>  $descriptor
-     * @param  array{memory: int, timeout: int, concurrency: int}  $limits
+     * @param  array{memory: int, timeout: int, concurrency: int, logs: int}  $limits
      */
     private function recordAction(Site $site, array $descriptor, array $limits, string $url): void
     {

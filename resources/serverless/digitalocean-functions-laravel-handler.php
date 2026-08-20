@@ -245,7 +245,7 @@ if (! function_exists('main')) {
             $startedAt = microtime(true);
             $response = $kernel->handle($request);
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-            $body = $response->getContent();
+            $body = dply_do_functions_response_body($response);
             $kernel->terminate($request, $response);
 
             $headers = [];
@@ -271,11 +271,11 @@ if (! function_exists('main')) {
             // user's request path any longer than the fire-and-forget POST.
             $flushQueueWake();
 
-            return [
-                'statusCode' => $response->getStatusCode(),
-                'headers' => $headers,
-                'body' => is_string($body) ? $body : '',
-            ];
+            return dply_do_functions_web_response(
+                $response->getStatusCode(),
+                $headers,
+                $body,
+            );
         } catch (Throwable $e) {
             // OpenWhisk would otherwise swallow this behind a generic
             // "error processing your request" — surface the real cause.
@@ -941,6 +941,139 @@ if (! function_exists('dply_do_functions_public_host')) {
     }
 }
 
+if (! function_exists('dply_do_functions_content_type')) {
+    /**
+     * @param  array<string, string>  $headers
+     */
+    function dply_do_functions_content_type(array $headers): string
+    {
+        foreach ($headers as $name => $value) {
+            if (strtolower((string) $name) === 'content-type') {
+                return strtolower(trim(explode(';', (string) $value)[0]));
+            }
+        }
+
+        return '';
+    }
+}
+
+if (! function_exists('dply_do_functions_is_binary_body')) {
+    /**
+     * OpenWhisk (Pekko Http) base64-decodes the body when the content-type
+     * is binary. Sending raw bytes — or leaving SVG/fonts as text — yields
+     * the platform's generic "error processing your request".
+     *
+     * @param  array<string, string>  $headers
+     */
+    function dply_do_functions_is_binary_body(string $body, array $headers): bool
+    {
+        $type = dply_do_functions_content_type($headers);
+
+        if ($type === '' || str_starts_with($type, 'text/')) {
+            return $body !== '' && ! mb_check_encoding($body, 'UTF-8');
+        }
+
+        // Character types Pekko leaves as text. Encoding these would send
+        // base64 to the browser instead of HTML/CSS/JS/JSON.
+        if (in_array($type, [
+            'application/json',
+            'application/ld+json',
+            'application/json-patch+json',
+            'application/problem+json',
+            'application/manifest+json',
+            'application/javascript',
+            'application/ecmascript',
+            'application/xml',
+            'application/xml-dtd',
+            'application/xhtml+xml',
+            'application/x-www-form-urlencoded',
+            'application/graphql',
+        ], true)) {
+            return false;
+        }
+
+        // image/svg+xml is XML but Pekko marks it Binary — encode it.
+        if ($type !== 'image/svg+xml' && (str_ends_with($type, '+json') || str_ends_with($type, '+xml'))) {
+            return false;
+        }
+
+        foreach (['image/', 'audio/', 'video/', 'font/'] as $prefix) {
+            if (str_starts_with($type, $prefix)) {
+                return true;
+            }
+        }
+
+        foreach ([
+            'application/octet-stream',
+            'application/pdf',
+            'application/zip',
+            'application/gzip',
+            'application/wasm',
+            'application/font',
+            'application/x-font',
+            'application/vnd.',
+        ] as $prefix) {
+            if ($type === $prefix || str_starts_with($type, $prefix)) {
+                return true;
+            }
+        }
+
+        return $body !== '' && ! mb_check_encoding($body, 'UTF-8');
+    }
+}
+
+if (! function_exists('dply_do_functions_web_response')) {
+    /**
+     * Shape a web-action result so OpenWhisk can JSON-encode it and, for
+     * binary content-types, base64-decode it back to bytes for the client.
+     *
+     * @param  array<string, string>  $headers
+     * @return array{statusCode: int, headers: array<string, string>, body: string}
+     */
+    function dply_do_functions_web_response(int $status, array $headers, string $body): array
+    {
+        if (dply_do_functions_is_binary_body($body, $headers)) {
+            $body = base64_encode($body);
+        }
+
+        return [
+            'statusCode' => $status,
+            'headers' => $headers,
+            'body' => $body,
+        ];
+    }
+}
+
+if (! function_exists('dply_do_functions_response_body')) {
+    /**
+     * Illuminate's getContent() is empty for file() / download() / streamed
+     * replies — those still have to reach OpenWhisk as a string.
+     */
+    function dply_do_functions_response_body(Response $response): string
+    {
+        $content = $response->getContent();
+        if (is_string($content) && $content !== '') {
+            return $content;
+        }
+
+        if ($response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+            $file = $response->getFile();
+            if ($file->isFile()) {
+                return (string) file_get_contents($file->getPathname());
+            }
+        }
+
+        if ($response instanceof \Symfony\Component\HttpFoundation\StreamedResponse) {
+            ob_start();
+            $response->sendContent();
+
+            return (string) ob_get_clean();
+        }
+
+        return is_string($content) ? $content : '';
+    }
+}
+
 if (! function_exists('dply_do_functions_public_response')) {
     /**
      * Serve a file from public/ the way nginx would in front of Laravel.
@@ -976,25 +1109,25 @@ if (! function_exists('dply_do_functions_public_response')) {
             'woff2' => 'font/woff2',
             'woff' => 'font/woff',
             'ttf' => 'font/ttf',
+            'otf' => 'font/otf',
             'json', 'map' => 'application/json',
             'png' => 'image/png',
             'jpg', 'jpeg' => 'image/jpeg',
             'gif' => 'image/gif',
             'webp' => 'image/webp',
+            'avif' => 'image/avif',
             'ico' => 'image/x-icon',
             'txt' => 'text/plain; charset=utf-8',
             'xml' => 'application/xml',
+            'pdf' => 'application/pdf',
+            'wasm' => 'application/wasm',
             default => (mime_content_type($realFile) ?: 'application/octet-stream'),
         };
 
-        return [
-            'statusCode' => 200,
-            'headers' => [
-                'content-type' => $mime,
-                'cache-control' => 'public, max-age=31536000, immutable',
-            ],
-            'body' => (string) file_get_contents($realFile),
-        ];
+        return dply_do_functions_web_response(200, [
+            'content-type' => $mime,
+            'cache-control' => 'public, max-age=31536000, immutable',
+        ], (string) file_get_contents($realFile));
     }
 }
 

@@ -6,6 +6,7 @@ namespace App\Support\Serverless;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use Illuminate\Http\Request;
 
 /**
@@ -73,6 +74,26 @@ final class ServerlessWorkspaceUrl
     public static function journey(Site $site): string
     {
         return route('serverless.journey', ['site' => $site]);
+    }
+
+    /**
+     * History / detail URL for one deploy. Function sites stay on the
+     * Serverless product path; BYO keeps the server-scoped leaf.
+     */
+    public static function deploymentShow(Site $site, SiteDeployment $deployment): string
+    {
+        if ($site->usesFunctionsRuntime() || $site->server?->isDigitalOceanFunctionsHost()) {
+            return route('serverless.deployments.show', [
+                'site' => $site,
+                'deployment' => $deployment,
+            ]);
+        }
+
+        return route('sites.deployments.show', [
+            'server' => $site->server,
+            'site' => $site,
+            'deployment' => $deployment,
+        ]);
     }
 
     /**

@@ -183,6 +183,16 @@ class Site extends Model
     public const SERVERLESS_MAX_CONCURRENCY = 50;
 
     /**
+     * DigitalOcean Functions stores `limits.logs` in kilobytes and caps
+     * captured console output at 256 KB per invocation.
+     */
+    public const SERVERLESS_DEFAULT_LOGS_KB = 256;
+
+    public const SERVERLESS_MIN_LOGS_KB = 1;
+
+    public const SERVERLESS_MAX_LOGS_KB = 256;
+
+    /**
      * Site row exists, scaffold pipeline (PR 5/6) is in flight.
      * Distinct from container_provisioning so Container vs Scaffold
      * journeys don't share states or audit shapes.

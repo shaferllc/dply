@@ -39,6 +39,8 @@ trait ManagesServerlessRuntime
 
     public int $serverless_concurrency = Site::SERVERLESS_DEFAULT_CONCURRENCY;
 
+    public int $serverless_logs_kb = Site::SERVERLESS_DEFAULT_LOGS_KB;
+
     /** off | web | raw — how the function is reachable over HTTP. */
     public string $serverless_web_mode = FunctionConfiguration::MODE_WEB;
 
@@ -95,6 +97,7 @@ trait ManagesServerlessRuntime
         $this->serverless_memory = $limits['memory'];
         $this->serverless_timeout_ms = $limits['timeout'];
         $this->serverless_concurrency = $limits['concurrency'];
+        $this->serverless_logs_kb = $limits['logs'];
 
         $configuration = FunctionConfiguration::fromSiteConfig($this->site->serverlessConfig());
 
@@ -300,10 +303,12 @@ trait ManagesServerlessRuntime
             'serverless_memory' => ['required', 'integer', Rule::in(Site::SERVERLESS_MEMORY_OPTIONS_MB)],
             'serverless_timeout_ms' => ['required', 'integer', 'min:'.Site::SERVERLESS_MIN_TIMEOUT_MS, 'max:'.Site::SERVERLESS_MAX_TIMEOUT_MS],
             'serverless_concurrency' => ['required', 'integer', 'min:1', 'max:'.Site::SERVERLESS_MAX_CONCURRENCY],
+            'serverless_logs_kb' => ['required', 'integer', 'min:'.Site::SERVERLESS_MIN_LOGS_KB, 'max:'.Site::SERVERLESS_MAX_LOGS_KB],
         ], [], [
             'serverless_memory' => __('memory'),
             'serverless_timeout_ms' => __('timeout'),
             'serverless_concurrency' => __('concurrency'),
+            'serverless_logs_kb' => __('log capture'),
         ]);
 
         $meta = $this->site->meta;
@@ -312,6 +317,7 @@ trait ManagesServerlessRuntime
             'memory' => $this->serverless_memory,
             'timeout' => $this->serverless_timeout_ms,
             'concurrency' => $this->serverless_concurrency,
+            'logs' => $this->serverless_logs_kb,
         ];
         $meta['serverless'] = $serverless;
 

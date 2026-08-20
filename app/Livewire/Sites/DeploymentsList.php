@@ -216,7 +216,9 @@ class DeploymentsList extends Component
             'server' => $this->server,
             'site' => $this->site,
             'title' => __('Deployments'),
-            'description' => __('Deploy, review history, and manage release settings.'),
+            'description' => $this->isFunctionsDeployHub()
+                ? __('Deploy, sync related functions, and review history.')
+                : __('Deploy, review history, and manage release settings.'),
             'icon' => 'heroicon-o-rocket-launch',
             'section' => 'deploy',
             'tabs' => $tabs,
@@ -435,7 +437,31 @@ class DeploymentsList extends Component
      */
     public function getSyncCandidatesProperty(): Collection
     {
-        return SiteSyncPeers::forSite($this->site);
+        $peers = SiteSyncPeers::forSite($this->site);
+
+        if (! $this->isFunctionsDeployHub()) {
+            return $peers;
+        }
+
+        // A function should only ship with other functions — pairing it with
+        // a VM peer on the same repo would queue a BYO deploy that cannot
+        // run on a Functions host (and vice versa).
+        return $peers
+            ->filter(fn (Site $peer): bool => $peer->id === $this->site->id || $peer->usesFunctionsRuntime())
+            ->values();
+    }
+
+    /**
+     * Functions get the same Deployments hub as BYO (tabs, history, sync,
+     * quick deploy) — they just skip VM-only surfaces (pipeline, releases,
+     * recurring schedule).
+     */
+    public function isFunctionsDeployHub(?Site $site = null): bool
+    {
+        $site ??= $this->site;
+
+        return $site->usesFunctionsRuntime()
+            || (bool) $site->server?->isDigitalOceanFunctionsHost();
     }
 
     /** Persist (and mirror to the sidebar) the Sync selection as it changes. */
@@ -1051,9 +1077,12 @@ class DeploymentsList extends Component
         $isVmDeployHub = $runtimeMode === 'vm'
             && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime();
+        $isFunctionsDeployHub = $this->isFunctionsDeployHub();
+        $isDeployHub = $isVmDeployHub || $isFunctionsDeployHub;
 
         $atomicReleases = $isVmDeployHub && $this->site->deploy_strategy === 'atomic';
         $latestDeployment = null;
+        $recentDeployments = collect();
         $releases = null;
 
         // Paginated Releases tab list (named page so it doesn't collide with History).
@@ -1080,6 +1109,12 @@ class DeploymentsList extends Component
                 ]);
                 $latestDeployment = $this->site->deployments->first();
             }
+        } elseif ($isFunctionsDeployHub && $this->tab === self::TAB_OVERVIEW) {
+            $this->site->load([
+                'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
+            ]);
+            $recentDeployments = $this->site->deployments;
+            $latestDeployment = $recentDeployments->first();
         }
 
         $tabsVisible = $this->tabVisibility();
@@ -1096,8 +1131,9 @@ class DeploymentsList extends Component
         // (and the unknown-tab fallback, which renders the Deploy panel) and skip
         // the work entirely on History / Webhook / Hooks / Pipeline / Releases /
         // Overview switches.
-        $needsContract = in_array($this->tab, [self::TAB_DEPLOY, self::TAB_ENVIRONMENT], true)
-            || ! in_array($this->tab, self::TABS, true);
+        $needsContract = ! $isFunctionsDeployHub
+            && (in_array($this->tab, [self::TAB_DEPLOY, self::TAB_ENVIRONMENT], true)
+                || ! in_array($this->tab, self::TABS, true));
         $deploymentContract = $needsContract ? app(DeploymentContractBuilder::class)->build($this->site) : null;
         $deploymentPreflight = $needsContract ? app(DeploymentPreflightValidator::class)->validate($this->site) : [];
 
@@ -1116,8 +1152,11 @@ class DeploymentsList extends Component
                 'triggers' => $triggers,
                 'statuses' => self::ALLOWED_STATUSES,
                 'isVmDeployHub' => $isVmDeployHub,
+                'isFunctionsDeployHub' => $isFunctionsDeployHub,
+                'isDeployHub' => $isDeployHub,
                 'atomicReleases' => $atomicReleases,
                 'latestDeployment' => $latestDeployment,
+                'recentDeployments' => $recentDeployments,
                 'tabsVisible' => $tabsVisible,
                 'tabDefinitions' => $this->tabDefinitions(),
                 'overviewMetrics' => $overviewMetrics,

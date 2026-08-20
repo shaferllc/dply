@@ -73,9 +73,11 @@ class ServerlessProjectManifestWriter
     private function functionFromAction(Site $site, FunctionAction $action, FunctionConfiguration $configuration): array
     {
         $subdir = trim((string) ($action->meta['source_subdir'] ?? ''));
+        $siteLimits = $site->serverlessLimits();
         $limits = [
-            'timeout' => (int) round(((int) ($action->timeout_ms ?: $site->serverlessLimits()['timeout'])) / 1000),
-            'memory' => (int) ($action->memory_mb ?: $site->serverlessLimits()['memory']),
+            'timeout' => (int) round(((int) ($action->timeout_ms ?: $siteLimits['timeout'])) / 1000),
+            'memory' => (int) ($action->memory_mb ?: $siteLimits['memory']),
+            'logs' => $siteLimits['logs'],
         ];
 
         if (($action->concurrency ?? 0) > 1) {
@@ -111,6 +113,7 @@ class ServerlessProjectManifestWriter
             'limits' => [
                 'timeout' => (int) round($limits['timeout'] / 1000),
                 'memory' => $limits['memory'],
+                'logs' => $limits['logs'],
             ],
             'parameters' => $this->parameterReferences($configuration),
             'annotations' => $this->annotations($configuration),

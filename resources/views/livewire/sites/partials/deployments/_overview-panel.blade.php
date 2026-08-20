@@ -15,6 +15,10 @@
 @endphp
 
 <div>
+    @if ($isFunctionsDeployHub ?? false)
+        @include('livewire.sites.partials.deployments._overview-function-strip')
+    @endif
+
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head
             dense
