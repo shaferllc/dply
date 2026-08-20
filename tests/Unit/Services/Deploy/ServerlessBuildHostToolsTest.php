@@ -25,7 +25,48 @@ test('prepareShellCommand wraps composer installs with an on-demand installer', 
     expect($wrapped)->toContain(storage_path('app/bin'));
     expect($wrapped)->toContain('export HOME=');
     expect($wrapped)->toContain('export COMPOSER_HOME=');
+    expect($wrapped)->not->toContain('Node/npm not found on the Serverless build host');
     expect($tools->prepareShellCommand('php artisan migrate'))->toBe('php artisan migrate');
+});
+
+test('commandNeedsNode detects npm pnpm yarn bun and chained forms', function () {
+    $tools = new ServerlessBuildHostTools;
+
+    expect($tools->commandNeedsNode('npm ci && npm run build'))->toBeTrue();
+    expect($tools->commandNeedsNode('cd app && npm install'))->toBeTrue();
+    expect($tools->commandNeedsNode('npx vite build'))->toBeTrue();
+    expect($tools->commandNeedsNode('pnpm install && pnpm run build'))->toBeTrue();
+    expect($tools->commandNeedsNode('yarn install && yarn build'))->toBeTrue();
+    expect($tools->commandNeedsNode('bun install && bun run build'))->toBeTrue();
+    expect($tools->commandNeedsNode('composer install --no-dev'))->toBeFalse();
+    expect($tools->commandNeedsNode('php artisan migrate'))->toBeFalse();
+    expect($tools->commandNeedsNode('echo npmish'))->toBeFalse();
+    expect($tools->commandNeedsNode('bundle install'))->toBeFalse();
+});
+
+test('prepareShellCommand wraps npm commands with a Node/npm ensure prefix', function () {
+    $tools = new ServerlessBuildHostTools;
+    $wrapped = $tools->prepareShellCommand('npm ci && npm run build');
+
+    expect($wrapped)->toContain('command -v npm');
+    expect($wrapped)->toContain('npm ci && npm run build');
+    expect($wrapped)->toContain('[dply] Node/npm not found on the Serverless build host');
+    expect($wrapped)->toContain(storage_path('app/bin'));
+    expect($wrapped)->toContain('mise');
+    expect($wrapped)->toContain('nodejs.org/dist');
+    expect($wrapped)->not->toContain('getcomposer.org/installer');
+    expect($tools->prepareShellCommand('php artisan migrate'))->toBe('php artisan migrate');
+});
+
+test('prepareShellCommand wraps composer plus npm with both ensure prefixes', function () {
+    $wrapped = (new ServerlessBuildHostTools)->prepareShellCommand(
+        'composer install --no-dev --optimize-autoloader && npm ci && npm run build'
+    );
+
+    expect($wrapped)->toContain('getcomposer.org/installer');
+    expect($wrapped)->toContain('command -v npm');
+    expect($wrapped)->toContain('[dply] Node/npm not found on the Serverless build host');
+    expect($wrapped)->toContain('composer install --no-dev --optimize-autoloader && npm ci && npm run build');
 });
 
 test('processEnv always sets HOME and COMPOSER_HOME for queue workers', function () {
@@ -111,6 +152,7 @@ test('enrichedPath prefers storage bin and common install locations', function (
     $path = (new ServerlessBuildHostTools)->enrichedPath();
 
     expect($path)->toContain(storage_path('app/bin'));
+    expect($path)->toContain(storage_path('app/node/bin'));
     expect($path)->toContain('/usr/local/bin');
 });
 

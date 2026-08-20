@@ -469,9 +469,11 @@ class DigitalOceanFunctionsArtifactBuilder
 
     private function runShell(string $command, string $workingDirectory): string
     {
-        // Control-plane workers often lack Composer on PATH. Wrap the command
-        // so the same shell installs Composer into storage/app/bin when needed
-        // (same pattern as BYO SiteDeployPipelineRunner tooling guards).
+        // Control-plane workers often lack Composer and Node on PATH. Wrap
+        // the command so the same shell installs them into storage/app/bin
+        // when needed (same pattern as BYO SiteDeployPipelineRunner tooling
+        // guards). Frontend compile (`npm ci` after composer) must not die
+        // with a raw `sh: 1: npm: not found`.
         $prepared = $this->buildHostTools->prepareShellCommand($command);
 
         $process = Process::fromShellCommandline($prepared, $workingDirectory, $this->buildHostTools->processEnv());
