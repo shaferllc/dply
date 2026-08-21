@@ -91,7 +91,7 @@ class ResizeManagedDatabaseJob implements ShouldQueue
             return;
         }
 
-        $status = (string) ($result['status'] ?? '');
+        $status = (string) $result['status'];
         $online = $status === 'online';
 
         if (! $online) {

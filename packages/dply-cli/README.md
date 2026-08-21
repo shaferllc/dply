@@ -93,6 +93,31 @@ dply edge status              # linked site, or --site <id>
 dply edge status --wait       # block until latest deploy finishes
 ```
 
+### Serverless functions
+
+Requires the **`serverless.read`** scope.
+
+```sh
+dply serverless list                          # every function in the org
+dply serverless status checkout               # detail, limits, 24h health
+dply serverless errors --site checkout        # failed invocations
+dply serverless errors --site checkout --watch
+dply serverless invocations --site checkout --source web --limit 20
+dply serverless invocation <id> --site checkout   # + captured log lines
+dply serverless logs --site checkout --level error --follow
+```
+
+`serverless errors` reads **failed invocations**, which is where a function's
+failures actually live — the platform's activations API returns nothing, so
+dply's own invocation table is the only record. It exits 1 when anything failed.
+
+Two log surfaces, deliberately separate:
+
+| Command | Shows |
+| --- | --- |
+| `serverless logs` | the site's application log drain (searchable, level-filtered, 30-day) |
+| `serverless invocation <id>` | stdout/stderr captured from that one activation |
+
 ### Errors
 
 Open error events for a site (any kind — BYO, Edge, Serverless), newest first.

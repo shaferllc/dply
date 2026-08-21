@@ -8,6 +8,7 @@ use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\RestoreManagedDatabaseJob;
 use App\Modules\Database\Services\ManagedDatabaseBackups;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -91,7 +92,7 @@ test('the job creates the cluster from the backup and re dispatches while restor
         ], 201),
     ]);
 
-    (new RestoreManagedDatabaseJob($target->id, $source->id, '2026-08-20T04:00:00Z'))->handle(app(\App\Modules\Database\Backends\DatabaseRouter::class));
+    (new RestoreManagedDatabaseJob($target->id, $source->id, '2026-08-20T04:00:00Z'))->handle(app(DatabaseRouter::class));
 
     expect($target->fresh()?->backend_id)->toBe('do-new-1');
 
@@ -139,7 +140,7 @@ test('the job stores the connection once the restored cluster is online', functi
         ]),
     ]);
 
-    (new RestoreManagedDatabaseJob($target->id, $source->id, '2026-08-20T04:00:00Z'))->handle(app(\App\Modules\Database\Backends\DatabaseRouter::class));
+    (new RestoreManagedDatabaseJob($target->id, $source->id, '2026-08-20T04:00:00Z'))->handle(app(DatabaseRouter::class));
 
     $fresh = $target->fresh();
     expect($fresh?->status)->toBe(CloudDatabase::STATUS_ACTIVE)
@@ -159,7 +160,7 @@ test('a missing source marks the target failed', function () {
     $sourceId = $source->id;
     $source->delete();
 
-    (new RestoreManagedDatabaseJob($target->id, $sourceId, '2026-08-20T04:00:00Z'))->handle(app(\App\Modules\Database\Backends\DatabaseRouter::class));
+    (new RestoreManagedDatabaseJob($target->id, $sourceId, '2026-08-20T04:00:00Z'))->handle(app(DatabaseRouter::class));
 
     expect($target->fresh()?->status)->toBe(CloudDatabase::STATUS_FAILED);
 });

@@ -9,6 +9,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -69,10 +70,32 @@ class CloudResourceCostCalculator
                 });
         }
 
-        // Managed databases — billed once each, even when shared across apps.
+        /*
+         * Managed databases — billed once each, even when shared across apps.
+         *
+         * Grandfathered caches are excluded explicitly rather than by accident.
+         * They would already miss this query today, because it keys off the
+         * `cloud_database_site` pivot and a folded-in serverless cache attaches
+         * through `cache_site` instead — but that is a coincidence of how the
+         * predicate is written, not a decision, and changing this query to bill
+         * by organization would silently start charging people whose clusters
+         * were free when they provisioned them.
+         *
+         * See docs/adr/dply-cache.md, decision 10.
+         */
         if (Schema::hasTable('cloud_databases')) {
             CloudDatabase::query()
                 ->whereIn('status', [CloudDatabase::STATUS_ACTIVE, CloudDatabase::STATUS_PROVISIONING])
+                ->when(
+                    Schema::hasTable('managed_caches'),
+                    fn ($q) => $q->whereNotIn(
+                        'id',
+                        DB::table('managed_caches')
+                            ->whereNotNull('grandfathered_at')
+                            ->whereNotNull('cloud_database_id')
+                            ->pluck('cloud_database_id'),
+                    ),
+                )
                 ->whereHas('sites', fn ($q) => $q->whereIn('sites.id', $siteIds))
                 ->get(['id', 'size', 'status'])
                 ->each(function (CloudDatabase $database) use (&$total, $databaseRates, $markupPercent): void {

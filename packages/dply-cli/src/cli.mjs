@@ -5,6 +5,7 @@ import * as accountCommands from './account-commands.mjs';
 import * as serverCommands from './server-commands.mjs';
 import * as siteCommands from './site-commands.mjs';
 import * as errorsCommands from './errors-commands.mjs';
+import * as serverlessCommands from './serverless-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
 import { readSiteLink } from './config.mjs';
 import { linkedSiteProduct } from './site-context.mjs';
@@ -25,6 +26,7 @@ const TOP_LEVEL = {
   sites: { handler: commands.sites, summary: 'List Edge sites visible to your token.' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
   errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
+  serverless: { handler: runServerless, summary: 'Managed functions (list, status, errors, logs, invocations).' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
 };
@@ -105,6 +107,10 @@ export async function run(argv) {
     return runServer(rest);
   }
 
+  if (command === 'serverless') {
+    return runServerless(rest);
+  }
+
   if (command === 'auth') {
     return runAuth(rest);
   }
@@ -157,6 +163,16 @@ async function runAuth(argv) {
   }
 
   throw unknown(`auth ${sub}`);
+}
+
+async function runServerless(argv) {
+  if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h' || argv[0] === 'help') {
+    return serverlessCommands.serverlessCommand(['help'], parse(argv.slice(1)).flags);
+  }
+
+  const { args, flags } = parse(argv);
+
+  return serverlessCommands.serverlessCommand(args.length ? args : ['list'], flags);
 }
 
 async function runSite(argv) {
@@ -368,6 +384,11 @@ function printTopLevelHelp() {
   info(`  ${'deploy'.padEnd(18)} ${c.dim('Deploy linked repo (BYO or Edge via .dply/site.json)')}`);
   info(`  ${'link --byo <id>'.padEnd(18)} ${c.dim('Link repo for bare `dply deploy`')}`);
   info('');
+  info(c.bold('Serverless (functions):'));
+  for (const [name, summary] of Object.entries(serverlessCommands.SERVERLESS_COMMANDS)) {
+    info(`  serverless ${name.padEnd(11)} ${c.dim(summary)}`);
+  }
+  info('');
   info(c.bold('Edge:'));
   for (const [name, { summary }] of Object.entries(EDGE_COMMANDS)) {
     info(`  edge ${name.padEnd(12)} ${c.dim(summary)}`);
@@ -405,6 +426,7 @@ export function allCommandLines() {
     'site',
     'deploy',
     'errors',
+    'serverless',
     'billing',
     'server',
     'edge',
@@ -431,6 +453,11 @@ export function allCommandLines() {
   lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
 
   lines.push('errors', 'errors --full', 'errors --watch', 'errors help');
+
+  for (const name of serverlessCommands.SERVERLESS_SUBCOMMANDS) {
+    lines.push(`serverless ${name}`);
+  }
+  lines.push('serverless help');
 
   for (const name of Object.keys(SERVER_COMMANDS)) {
     lines.push(`server ${name}`);
@@ -477,7 +504,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
   }
 
   if (!normalized || normalized === 'account') {
@@ -499,6 +526,13 @@ function printCommandList(scope) {
     }
   }
 
+  if (!normalized || normalized === 'serverless' || normalized === 'functions') {
+    for (const name of serverlessCommands.SERVERLESS_SUBCOMMANDS) {
+      lines.push(`serverless ${name}`);
+    }
+    lines.push('serverless help');
+  }
+
   if (!normalized || normalized === 'site' || normalized === 'byo') {
     lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors');
   }
@@ -511,7 +545,7 @@ function printCommandList(scope) {
     lines.push(...shortcutCommandLines());
   }
 
-  if (normalized && !['top', 'account', 'billing', 'server', 'edge', 'project', 'projects', 'shortcuts', 'site', 'byo'].includes(normalized)) {
+  if (normalized && !['top', 'account', 'billing', 'server', 'edge', 'serverless', 'functions', 'project', 'projects', 'shortcuts', 'site', 'byo'].includes(normalized)) {
     throw unknown(`ls ${scope}`);
   }
 
@@ -521,7 +555,7 @@ function printCommandList(scope) {
     info(`  ${line}`);
   }
   info('');
-  info(c.dim('Scoped: dply ls account · dply ls site · dply ls project · dply ls shortcuts · dply ls server · dply ls edge'));
+  info(c.dim('Scoped: dply ls account · dply ls site · dply ls project · dply ls shortcuts · dply ls server · dply ls edge · dply ls serverless'));
   info(c.dim('Details: dply help'));
 
   return 0;

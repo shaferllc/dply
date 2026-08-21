@@ -23,6 +23,7 @@ final class DplyCliCommandCatalog
             ['key' => 'account', 'label' => __('Account'), 'description' => __('Profile, orgs, sessions, auth')],
             ['key' => 'server', 'label' => __('Server'), 'description' => __('BYO VMs — show, run, firewall, users')],
             ['key' => 'site', 'label' => __('Site (BYO)'), 'description' => __('VM sites — deploy, logs, env')],
+            ['key' => 'serverless', 'label' => __('Serverless'), 'description' => __('Functions — status, invocations, errors, logs')],
             ['key' => 'project', 'label' => __('Projects'), 'description' => __('Group servers + sites')],
             ['key' => 'billing', 'label' => __('Billing'), 'description' => __('Plan estimate and invoices')],
             ['key' => 'edge', 'label' => __('Edge'), 'description' => __('Static / SSG Edge sites')],
@@ -112,6 +113,13 @@ final class DplyCliCommandCatalog
             ['id' => 'site-env-rm', 'group' => 'site', 'title' => 'site env rm', 'command' => 'dply site env --site <site> rm KEY', 'summary' => 'Remove an environment variable.', 'scope' => 'sites.write'],
             ['id' => 'site-env-push', 'group' => 'site', 'title' => 'site env push', 'command' => 'dply site env --site <site> push --file .env', 'summary' => 'Push a local .env file to the site.', 'scope' => 'sites.write'],
             ['id' => 'site-help', 'group' => 'site', 'title' => 'site help', 'command' => 'dply site help', 'summary' => 'BYO site command help.'],
+            ['id' => 'serverless-list', 'group' => 'serverless', 'title' => 'serverless list', 'command' => 'dply serverless list', 'summary' => 'List managed functions.', 'scope' => 'serverless.read', 'keywords' => 'functions faas'],
+            ['id' => 'serverless-status', 'group' => 'serverless', 'title' => 'serverless status', 'command' => 'dply serverless status --site <site>', 'summary' => 'Function detail, limits, and 24h health.', 'scope' => 'serverless.read'],
+            ['id' => 'serverless-invocations', 'group' => 'serverless', 'title' => 'serverless invocations', 'command' => 'dply serverless invocations --site <site>', 'summary' => 'Recent invocations (--failed · --source · --limit).', 'scope' => 'serverless.read'],
+            ['id' => 'serverless-errors', 'group' => 'serverless', 'title' => 'serverless errors', 'command' => 'dply serverless errors --site <site>', 'summary' => 'Failed invocations. Exits 1 when any failed.', 'scope' => 'serverless.read', 'keywords' => 'failures broken 500'],
+            ['id' => 'serverless-invocation', 'group' => 'serverless', 'title' => 'serverless invocation', 'command' => 'dply serverless invocation <id> --site <site>', 'summary' => 'One invocation with its captured log lines.', 'scope' => 'serverless.read'],
+            ['id' => 'serverless-logs', 'group' => 'serverless', 'title' => 'serverless logs', 'command' => 'dply serverless logs --site <site> --follow', 'summary' => 'Application logs (--level error · --follow).', 'scope' => 'serverless.read', 'keywords' => 'tail'],
+            ['id' => 'serverless-help', 'group' => 'serverless', 'title' => 'serverless help', 'command' => 'dply serverless help', 'summary' => 'Serverless command help.'],
 
             // Projects
             ['id' => 'project-list', 'group' => 'project', 'title' => 'project list', 'command' => 'dply project list', 'summary' => 'List projects in this organization.', 'scope' => 'projects.read'],

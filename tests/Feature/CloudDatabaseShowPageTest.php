@@ -52,6 +52,20 @@ test('the admin password is masked until revealed', function () {
         ->assertSee('secret-pass');
 });
 
+test('every tab renders', function (string $tab) {
+    $user = ownerWithOrg();
+    $database = CloudDatabase::factory()->active()->create([
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+
+    // No provider credential on the row, so nothing here reaches the network —
+    // this is a Blade-and-wiring smoke test for each panel.
+    Livewire::actingAs($user)
+        ->test(CloudDatabaseShow::class, ['cloudDatabase' => $database])
+        ->set('tab', $tab)
+        ->assertOk();
+})->with(['overview', 'sites', 'users', 'network', 'scale', 'metrics', 'backups', 'danger']);
+
 test('page is gated by auth', function () {
     $database = CloudDatabase::factory()->create();
 

@@ -67,6 +67,7 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Cloud** | Managed-container PaaS (DO App Platform / AWS App Runner) behind `EdgeBackend`. `Actions/`, `Backends/`, `Cloudflare/`, lifecycle `Jobs/`. |
 | **Edge** | First-party Netlify-style static/SSG platform (Cloudflare R2/Workers). Build/publish jobs, edge workspace UI, previews. |
 | **Serverless** | FaaS (DO Functions, web functions). Adapters, `Contracts/`, create/deploy jobs. Also owns published front-end asset delivery + its storage/egress meters, and per-site app buckets (`docs/adr/serverless-asset-delivery.md`). |
+| **Database** | Managed database engine — the `DatabaseBackend` abstraction and its DigitalOcean / Vultr / Neon / PlanetScale / Supabase / Upstash implementations, plus day-two operations on a cluster (users, resize, metrics, backups + restore-to-new, trusted-source grants). The record is still `App\Models\CloudDatabase`; the on-box `ServerDatabase` lifecycle stays in the kernel. |
 | **Billing** | Revenue engine — subscriptions, Stripe sync, metering, usage cost calculators (other modules depend on these). |
 | **Insights** | Site/server health, metrics, URL-health checks, cost observatory. |
 | **Imports** | Server/site import flows (e.g. DO import). |
@@ -81,6 +82,7 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Marketplace** | Script/runbook marketplace + imports. |
 | **Roadmap** | Public roadmap + admin kanban + post-deploy AI auto-update. |
 | **Docs** | `/docs` front-matter docs system (manifest, contextual sidebar). |
+| **Blog** | Public build-in-public devlog at `/blog` — markdown in `content/blog/*.md` on the marketing shell. |
 | **Feedback** | Global feedback/bug slide-over + admin review. |
 | **Referrals** | Referral codes + Stripe-credit rewards. |
 | **Projects** | `Workspace` grouping container UI. |

@@ -38,6 +38,18 @@ Every approved device shows up under **CLI authentications**. **Revoke** a sessi
 - Server SSH: `dply server run --server <id> <command>` (needs the `commands.run` scope).
 - **GitHub Actions:** create an org API token with `sites.deploy`, link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.
 
+## Serverless functions
+
+`dply serverless` drives managed functions from the terminal. It needs the **`serverless.read`** scope.
+
+- `dply serverless list` — every function in the organization.
+- `dply serverless status <name>` — limits, invoke URL, and a 24-hour health rollup.
+- `dply serverless errors --site <name>` — failed invocations; `--watch` to poll. Exits 1 when any failed.
+- `dply serverless invocation <id> --site <name>` — one invocation with the stdout/stderr captured from it.
+- `dply serverless logs --site <name> --level error --follow` — the function's application log drain.
+
+Failures for a function live in dply's invocation table rather than in the error events shown by `dply errors`, because the provider's activations API returns nothing — so `serverless errors` and `errors` are separate views, not duplicates.
+
 ## Checking errors
 
 `dply errors` lists the open error events for a site — the same rows as the site workspace **Errors** tab, newest first. It needs the **`sites.read`** scope.
