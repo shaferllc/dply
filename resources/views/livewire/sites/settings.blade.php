@@ -385,10 +385,10 @@
                                 :description="__('Get told the moment a deploy fails, a certificate is about to expire, or the site goes down — routed to the channels your team already lives in.')"
                                 :eyebrow="__('Notifications preview')"
                                 :lines="[
-                                    ['tone' => 'cmd', 'text' => '~ $ dply notifications'],
-                                    ['tone' => 'muted', 'text' => 'deploy.failed   → #deploys (slack)'],
-                                    ['tone' => 'muted', 'text' => 'cert.expiring   → ops@ (email)'],
-                                    ['tone' => 'ok', 'text' => '2 rules · 3 channels armed'],
+                                    ['tone' => 'cmd', 'text' => '~ $ dply sites:notifications '.$site->slug],
+                                    ['tone' => 'muted', 'text' => 'site.errors.deploy_failed → #deploys (slack)'],
+                                    ['tone' => 'muted', 'text' => 'site.ssl.expiring         → ops@ (email)'],
+                                    ['tone' => 'ok', 'text' => '2 events routed · 3 channels available'],
                                 ]"
                                 :features="[
                                     ['icon' => 'rocket-launch', 'title' => __('Deploy alerts'), 'body' => __('Know instantly when a build or release fails — with the error attached.')],

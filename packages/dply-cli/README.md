@@ -161,19 +161,148 @@ Two log surfaces, deliberately separate:
 | `serverless logs` | the site's application log drain (searchable, level-filtered, 30-day) |
 | `serverless invocation <id>` | stdout/stderr captured from that one activation |
 
-### Errors
+### Sites
 
-Open error events for a site (any kind — BYO, Edge, Serverless), newest first.
-Requires the **`sites.read`** scope.
+One list, every kind. `Site` is a single model on the platform — a VM site, a
+Cloud container app, an Edge site and a serverless function differ by attributes
+— so `dply sites` shows them together with what each one is:
 
 ```sh
-dply errors                        # linked site, or --site <id> / $DPLY_SITE
+dply sites                     # vm · cloud · edge · serverless, one table
+dply sites --kind cloud        # one kind (vm | cloud | edge | serverless)
+dply sites checkout            # filter by name
+dply sites --json
+```
+
+| kind | what it is |
+| --- | --- |
+| `vm` | a site on a server you own (BYO) |
+| `cloud` | a managed container app (DO App Platform / AWS App Runner) |
+| `edge` | a static/SSG site on the edge network |
+| `serverless` | a managed function |
+
+The API says which: `/sites` returns every server-backed site with a `kind`
+field, and `/edge/sites` + `/serverless/sites` remain the scope-gated
+product-specific views. Cloud needs no list endpoint of its own.
+
+The product namespaces keep the verbs only they have — `dply edge previews`,
+`dply serverless invocations`, `dply site deploy` — and `dply site list` stays
+the VM-only list. Anything that works on a site regardless of where it runs
+(`dply errors`) resolves a name across all three kinds, and naming the wrong
+kind tells you where it actually lives:
+
+```
+$ dply site logs checkout-fn
+"checkout-fn" is a serverless function, not a VM site — try
+`dply serverless status checkout-fn`, or `dply errors checkout-fn`.
+```
+
+### Notifications
+
+One matrix: a **channel** × an **event key** × the **subject** it fires for (a
+site or a server). The workspace edits a slice per tab; the CLI shows every group
+that applies to the subject at once. Reading needs **`notifications.read`**,
+routing and tests need **`notifications.write`**.
+
+```sh
+dply notifications                     # what fires for the linked site, and where
+dply sites:notifications acme          # by name, any kind of site
+dply notifications --server <id>       # same, for a server
+dply notifications channels            # what you can route to
+dply notifications events --subject site
+dply notifications subscribe site.uptime.down --channel <id> --site acme
+dply notifications subscribe site.deployments site.ssl.expiring --channel <id>
+dply notifications unsubscribe site.uptime.down --channel <id>
+dply notifications test <channel>      # send that channel its test message
+```
+
+Subscribing **adds** to a channel instead of replacing its selection, so two
+people routing different events can't clobber each other. Events are validated
+against the subject: an Edge site is offered `edge.*`, a function
+`serverless.*`, and a `server.*` event on a site is refused.
+
+### Uptime monitors
+
+`dply uptime` (alias `dply monitor`) is the workspace Monitor tab, for every kind
+of site. Reading needs **`sites.read`**, probing needs **`sites.write`**.
+
+```sh
+dply uptime                        # status, HTTP code, latency, region per monitor
+dply sites:uptime acme             # by name, any kind of site
+dply sites:uptime:history acme     # 24h / 7d / 30d uptime + recent incidents
+dply uptime history --monitor <id> # one monitor's rollup
+dply uptime check <id>             # probe now · --all for every monitor
+dply uptime --watch                # print each status change (--interval ms)
+dply uptime --json
+```
+
+It **exits 1 while any monitor is down** (a monitor that has never been probed is
+`unchecked`, not down, so a fresh site doesn't fail the gate):
+
+```sh
+dply deploy --wait && dply uptime --no-prompt
+```
+
+Leave the monitor id off on a TTY and you get a picker; when something is down,
+the list offers to re-check it. Probes are unique per monitor for two minutes —
+asking twice in that window probes once.
+
+The **Platform** surface — what is actually running on the functions host:
+
+```sh
+dply serverless platform checkout             # action doc + namespace inventory
+dply serverless platform checkout --schedules # cron triggers
+dply serverless platform checkout --json
+
+dply serverless invoke checkout                              # a real GET /
+dply serverless invoke checkout --method POST --path /health --body '{"ping":1}'
+dply serverless invoke checkout --header 'X-Token: secret'
+```
+
+`invoke` runs your code and is recorded as a `source=test` invocation (it shows
+up in `dply serverless invocations --source test`), so it needs the
+**`serverless.invoke`** scope rather than `serverless.read`. It exits 1 when the
+function answers with a failure.
+
+### Errors
+
+Open error events for a site — **all four kinds**, since an error event belongs
+to the site whatever the site runs on. Newest first. Requires the
+**`sites.read`** scope.
+
+```sh
+dply errors                        # linked site — or pick one from a list on a TTY
+dply errors acme                   # by name or ID (prefix is enough)
+dply sites:errors acme             # same thing — any `a b` route also takes `a:b`
 dply errors --full                 # detail, remediation code, deep link
 dply errors --category ssl,deploy  # filter by category (comma-separated)
 dply errors --category function_invocation   # just the broken-function events
 dply errors --watch                # poll for new events (--interval ms)
 dply errors --json                 # raw payload
 ```
+
+With no site to go on, `dply errors` and `dply serverless errors` list what your
+token can see and ask which one — the same picker every site-scoped command now
+falls through to. Off a TTY (CI, pipes) they keep failing with exit 2 instead of
+blocking, so `--site` stays required in scripts.
+
+Reading is half of it — the same three verbs the workspace Errors view offers
+work from the terminal:
+
+```sh
+dply errors dismiss <id>           # clear one · --all clears every open error
+dply errors retry <id>             # re-run the operation that failed
+dply errors fix <id>               # apply the catalogued remediation (--action <key>)
+```
+
+Leave the id off and you pick from a list. On a TTY, plain `dply errors` goes
+one better: pick an error from the list it just printed and it offers exactly
+the actions that error supports — detail, retry (only when the category is
+retryable), the known fix (only when there is one), open in the dashboard,
+dismiss. `--no-prompt` / `$DPLY_NO_PROMPT` turns that off.
+
+`dismiss` needs **`sites.write`**; `retry` and `fix` run work on the box, so
+they need **`commands.run`**.
 
 `dply errors` **exits 1 when any error is open** and 0 when the site is clean, so
 it works as a post-deploy gate:

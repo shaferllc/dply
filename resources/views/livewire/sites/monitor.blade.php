@@ -307,11 +307,38 @@
                         </p>
                     </div>
 
+                    @php
+                        // Everything this tab does, from a terminal. `uptime` is
+                        // site-kind agnostic, so one set covers vm/cloud/edge/
+                        // serverless; the function-only rollup is appended for
+                        // functions. Ids come from the monitor list above.
+                        $cliSite = $site->slug;
+                        $cliMonitorId = $site->uptimeMonitors->first()?->id ?? '<id>';
+                        $cliCommands = [
+                            ['label' => __('Every monitor: status, code, latency'), 'command' => 'dply sites:uptime '.$cliSite],
+                            ['label' => __('Uptime % + recent incidents'), 'command' => 'dply sites:uptime:history '.$cliSite],
+                            ['label' => __('One monitor’s history'), 'command' => 'dply uptime history '.$cliSite.' --monitor '.$cliMonitorId],
+                            ['label' => __('Probe one monitor now'), 'command' => 'dply uptime check '.$cliMonitorId.' --site '.$cliSite],
+                            ['label' => __('Probe every monitor now'), 'command' => 'dply uptime check --all --site '.$cliSite],
+                            ['label' => __('Watch for status changes'), 'command' => 'dply uptime '.$cliSite.' --watch'],
+                            ['label' => __('Raw payload for scripts'), 'command' => 'dply uptime '.$cliSite.' --json'],
+                            ['label' => __('Gate a deploy on a healthy site (exits 1 while anything is down)'), 'command' => 'dply deploy --wait && dply uptime '.$cliSite.' --no-prompt'],
+                            ['label' => __('Errors raised by these checks'), 'command' => 'dply sites:errors '.$cliSite],
+                        ];
+
+                        if ($site->siteKind() === 'serverless') {
+                            $cliCommands[] = [
+                                'label' => __('Function health rollup (24h)'),
+                                'command' => 'dply serverless status '.$cliSite,
+                            ];
+                        }
+                    @endphp
+
                     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
-                        <x-cli-snippet :commands="[
-                            ['label' => __('Check uptime'), 'command' => 'dply sites:uptime '.$site->slug],
-                            ['label' => __('View history'), 'command' => 'dply sites:uptime:history '.$site->slug],
-                        ]" />
+                        <x-cli-snippet
+                            :commands="$cliCommands"
+                            :intro="__('`dply monitor` is an alias for `dply uptime`. On a terminal, leaving the id off opens a picker.')"
+                        />
                     </div>
                 @endif
 

@@ -16,6 +16,9 @@ use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
+use App\Services\Sites\SiteUptimeHistorySummary;
+use App\Support\Errors\ErrorEventActions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +33,7 @@ class SiteResourceApiController extends Controller
                 'id' => $site->id,
                 'slug' => $site->slug,
                 'name' => $site->name,
+                'kind' => $site->siteKind(),
                 'server_id' => $site->server_id,
                 'server_name' => $site->server?->name,
                 'type' => $site->type,
@@ -128,7 +132,7 @@ class SiteResourceApiController extends Controller
         ]);
     }
 
-    public function errors(Request $request, Site $site): JsonResponse
+    public function errors(Request $request, Site $site, ErrorEventActions $actions): JsonResponse
     {
         $this->checkOwnership($request, $site);
 
@@ -139,7 +143,7 @@ class SiteResourceApiController extends Controller
             ->whereNull('dismissed_at')
             ->orderByDesc('occurred_at')
             ->limit($limit)
-            ->get(['id', 'category', 'title', 'detail', 'link_url', 'occurred_at', 'remediation_code']);
+            ->get(['id', 'site_id', 'server_id', 'category', 'title', 'detail', 'link_url', 'occurred_at', 'remediation_code']);
 
         return response()->json([
             'data' => $events->map(fn (ErrorEvent $e) => [
@@ -149,9 +153,104 @@ class SiteResourceApiController extends Controller
                 'detail' => $e->detail,
                 'link_url' => $e->link_url,
                 'remediation_code' => $e->remediation_code,
+                // So a client can offer only the actions this event supports.
+                'retryable' => $actions->isRetryable($e),
                 'occurred_at' => $e->occurred_at->toIso8601String(),
             ]),
         ]);
+    }
+
+    /**
+     * Dismiss one error event, or every open one on the site (`?all=1`).
+     *
+     * Same verbs the workspace Errors view offers, through the same
+     * {@see ErrorEventActions} — the CLI is not a second implementation.
+     */
+    public function dismissErrors(Request $request, Site $site, ErrorEventActions $actions): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'id' => ['nullable', 'string', 'max:64'],
+            'all' => ['nullable', 'boolean'],
+        ]);
+
+        $userId = (string) $request->user()?->id ?: null;
+        $scope = $this->scopedErrors($site);
+
+        if (($data['all'] ?? false) && empty($data['id'])) {
+            return response()->json(['data' => ['dismissed' => $actions->dismissAll($scope, $userId)]]);
+        }
+
+        if (empty($data['id'])) {
+            return response()->json(['message' => 'Pass an error id, or all=1 to dismiss every open error.'], 422);
+        }
+
+        $dismissed = $actions->dismiss($scope, (string) $data['id'], $userId);
+
+        if ($dismissed === 0) {
+            return response()->json(['message' => 'No open error with that id on this site.'], 404);
+        }
+
+        return response()->json(['data' => ['dismissed' => $dismissed]]);
+    }
+
+    /** Re-dispatch the operation behind a failed error event, when its category is retryable. */
+    public function retryError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $error = $this->scopedErrors($site)->whereKey($event)->first();
+
+        if (! $error instanceof ErrorEvent) {
+            return response()->json(['message' => 'No error with that id on this site.'], 404);
+        }
+
+        if (! $actions->retry($error, (string) $request->user()?->id ?: null)) {
+            return response()->json([
+                'message' => 'This error is not retryable — re-run it at the source.',
+            ], 422);
+        }
+
+        return response()->json(['data' => ['queued' => true, 'id' => $error->id]], 202);
+    }
+
+    /** Queue the catalogued fix for an error (defaults to the recommended action). */
+    public function remediateError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate(['action' => ['nullable', 'string', 'max:64']]);
+        $error = $this->scopedErrors($site)->whereKey($event)->first();
+
+        if (! $error instanceof ErrorEvent) {
+            return response()->json(['message' => 'No error with that id on this site.'], 404);
+        }
+
+        $result = $actions->applyRemediation($error, $data['action'] ?? null, (string) $request->user()?->id ?: null);
+
+        if ($result !== 'applied') {
+            return response()->json(['message' => match ($result) {
+                'no_fix' => 'No known fix for this error.',
+                'stale_action' => 'That fix is no longer available.',
+                'manual' => 'This fix is a manual one — open the error in the dashboard for the steps.',
+                'no_server' => 'This error is not tied to a server, so it cannot be fixed automatically.',
+            }], 422);
+        }
+
+        return response()->json(['data' => [
+            'queued' => true,
+            'id' => $error->id,
+            'remediation_code' => $error->remediation_code,
+        ]], 202);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<ErrorEvent>
+     */
+    private function scopedErrors(Site $site): \Illuminate\Database\Eloquent\Builder
+    {
+        return ErrorEvent::query()->where('site_id', $site->id);
     }
 
     public function uptime(Request $request, Site $site): JsonResponse
@@ -161,12 +260,13 @@ class SiteResourceApiController extends Controller
         $monitors = SiteUptimeMonitor::query()
             ->where('site_id', $site->id)
             ->orderBy('sort_order')
-            ->get(['id', 'label', 'path', 'probe_region', 'last_checked_at', 'last_ok', 'last_http_status', 'last_latency_ms', 'last_error']);
+            ->get(['id', 'label', 'check_type', 'path', 'probe_region', 'last_checked_at', 'last_ok', 'last_http_status', 'last_latency_ms', 'last_error']);
 
         return response()->json([
             'data' => $monitors->map(fn (SiteUptimeMonitor $m) => [
                 'id' => $m->id,
                 'label' => $m->label,
+                'check_type' => $m->check_type,
                 'path' => $m->path,
                 'probe_region' => $m->probe_region,
                 'status' => $m->last_ok ? 'up' : ($m->last_checked_at ? 'down' : 'unchecked'),
@@ -176,6 +276,94 @@ class SiteResourceApiController extends Controller
                 'last_checked_at' => $m->last_checked_at?->toIso8601String(),
             ]),
         ]);
+    }
+
+    /**
+     * Uptime percentages and recent incidents per monitor — the numbers behind
+     * the workspace Monitor tab's history panel. `?monitor=<id>` narrows it.
+     *
+     * The latency series the browser charts is left out on purpose: it is ~150
+     * points per monitor and nothing on a terminal reads it.
+     */
+    public function uptimeHistory(Request $request, Site $site, SiteUptimeHistorySummary $history): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $only = trim((string) $request->query('monitor', ''));
+
+        $monitors = SiteUptimeMonitor::query()
+            ->where('site_id', $site->id)
+            ->when($only !== '', fn ($query) => $query->whereKey($only))
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json([
+            'data' => $monitors->map(function (SiteUptimeMonitor $monitor) use ($history) {
+                $summary = $history->forMonitor($monitor);
+
+                return [
+                    'id' => $monitor->id,
+                    'label' => $monitor->label,
+                    'has_data' => $summary['has_data'],
+                    'uptime' => $summary['uptime'],
+                    // ->all(), not the Collection: a Collection<array{...}> is
+                    // invariant, so returning one here fails the closure's
+                    // inferred return type. The JSON is identical.
+                    'incidents' => $summary['incidents']->map(fn ($incident) => [
+                        'id' => $incident->id,
+                        'severity' => $incident->severity,
+                        'cause' => $incident->cause,
+                        'started_at' => $incident->started_at?->toIso8601String(),
+                        'resolved_at' => $incident->resolved_at?->toIso8601String(),
+                        'ongoing' => $incident->resolved_at === null,
+                    ])->values()->all(),
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
+     * Probe one monitor now (`{"id": "…"}`) or every monitor on the site
+     * (`{"all": true}`) — the API face of the tab's "Check now" button, through
+     * the same job and console-action plumbing.
+     */
+    public function uptimeCheck(Request $request, Site $site): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'id' => ['nullable', 'string', 'max:64'],
+            'all' => ['nullable', 'boolean'],
+        ]);
+
+        $all = (bool) ($data['all'] ?? false) && empty($data['id']);
+
+        if (! $all && empty($data['id'])) {
+            return response()->json(['message' => 'Pass a monitor id, or all=1 to check every monitor.'], 422);
+        }
+
+        $monitors = SiteUptimeMonitor::query()
+            ->where('site_id', $site->id)
+            ->when(! $all, fn ($query) => $query->whereKey((string) $data['id']))
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($monitors->isEmpty()) {
+            return response()->json([
+                'message' => $all ? 'This site has no uptime monitors.' : 'No monitor with that id on this site.',
+            ], 404);
+        }
+
+        $userId = (string) $request->user()?->id ?: null;
+
+        foreach ($monitors as $monitor) {
+            RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($site, $monitor, $userId);
+        }
+
+        return response()->json(['data' => [
+            'queued' => $monitors->count(),
+            'ids' => $monitors->pluck('id')->values(),
+        ]], 202);
     }
 
     public function basicAuth(Request $request, Site $site): JsonResponse
@@ -401,6 +589,11 @@ class SiteResourceApiController extends Controller
         ]);
     }
 
+    /**
+     * Every site kind — VM, Cloud app, Edge site, function — is a Site row with
+     * a server behind it (`sites.server_id` is NOT NULL), so the server is the
+     * owner of record for all four and these endpoints need no per-kind branch.
+     */
     private function checkOwnership(Request $request, Site $site): void
     {
         $organization = $request->attributes->get('api_organization');

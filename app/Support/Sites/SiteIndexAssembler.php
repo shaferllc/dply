@@ -48,6 +48,8 @@ final class SiteIndexAssembler
             'workspace_id' => $site->workspace_id !== null ? (string) $site->workspace_id : null,
             'workspace_name' => $site->workspace?->name,
             'name' => (string) $site->name,
+            // vm | edge | cloud | serverless — one Site model, four products.
+            'kind' => $site->siteKind(),
             'type' => $site->type->value,
             'type_label' => $site->type->label(),
             'runtime' => $site->runtime,

@@ -469,4 +469,40 @@
             </div>
         </div>
     @endif
+    @php
+        // The shared sand CLI footer every workspace surface carries. Per tab,
+        // because each one does a different thing — reading the deployed action,
+        // its schedules, or firing a test request at it.
+        $cliSite = $site->slug;
+        $cliCommands = match ($tab) {
+            'triggers' => [
+                ['label' => __('Schedules on this function'), 'command' => 'dply serverless platform '.$cliSite.' --schedules'],
+                ['label' => __('Raw payload for scripts'), 'command' => 'dply serverless platform '.$cliSite.' --schedules --json'],
+                ['label' => __('What is deployed'), 'command' => 'dply serverless platform '.$cliSite],
+            ],
+            'console' => [
+                ['label' => __('Send a test request'), 'command' => 'dply serverless invoke '.$cliSite],
+                ['label' => __('POST with a body'), 'command' => 'dply serverless invoke '.$cliSite.' --method POST --path /health --body \'{"ping":1}\''],
+                ['label' => __('With a header'), 'command' => 'dply serverless invoke '.$cliSite.' --header \'X-Token: secret\''],
+                ['label' => __('Test invocations you have sent'), 'command' => 'dply serverless invocations '.$cliSite.' --source test'],
+                ['label' => __('One invocation with its logs'), 'command' => 'dply serverless invocation <id> --site '.$cliSite],
+            ],
+            'credentials' => [
+                ['label' => __('Check the host answers with this key'), 'command' => 'dply serverless platform '.$cliSite],
+                ['label' => __('Function status + 24h health'), 'command' => 'dply serverless status '.$cliSite],
+            ],
+            default => [
+                ['label' => __('Deployed action + namespace inventory'), 'command' => 'dply serverless platform '.$cliSite],
+                ['label' => __('Raw payload for scripts'), 'command' => 'dply serverless platform '.$cliSite.' --json'],
+                ['label' => __('Schedules'), 'command' => 'dply serverless platform '.$cliSite.' --schedules'],
+                ['label' => __('Send a test request'), 'command' => 'dply serverless invoke '.$cliSite],
+                ['label' => __('Function status + 24h health'), 'command' => 'dply serverless status '.$cliSite],
+                ['label' => __('Open errors for this function'), 'command' => 'dply sites:errors '.$cliSite],
+            ],
+        };
+    @endphp
+
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+        <x-cli-snippet :commands="$cliCommands" />
+    </div>
 </section>

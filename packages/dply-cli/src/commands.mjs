@@ -519,21 +519,78 @@ async function detectSiteProduct(api, siteId) {
   }
 }
 
-export async function sites() {
+/**
+ * `dply sites [needle] [--kind vm|edge|serverless]`
+ *
+ * Every site the token can see, of every kind — one table, because the platform
+ * has one Site model. `--kind` narrows it; a positional filters by name.
+ *
+ * @param {string[]} [args]
+ * @param {Record<string, unknown>} [flags]
+ */
+export async function sites(args = [], flags = {}) {
   const ctx = await resolveContext();
   const api = new ApiClient(ctx);
-  const response = await api.get('/edge/sites');
+  const { fetchAllSites, matchSites } = await import('./site-index.mjs');
+
+  let rows = await fetchAllSites(api, { kind: flags.kind });
+  const needle = args[0];
+
+  if (needle) {
+    rows = matchSites(rows, needle);
+  }
+
+  if (flags.json) {
+    printJson(rows.map(({ raw, ...row }) => row));
+
+    return 0;
+  }
+
+  if (rows.length === 0) {
+    warn(needle ? `No site matched "${needle}".` : 'No sites visible to this token.');
+    info(c.dim('Missing permissions? Try `dply auth refresh`. Filter with --kind vm|cloud|edge|serverless.'));
+
+    return 0;
+  }
+
   printTable(
-    ['id', 'name', 'hostname', 'status', 'runtime_mode', 'is_preview'],
-    (response.data ?? []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      hostname: s.hostname,
-      status: s.status,
-      runtime_mode: s.runtime_mode,
-      is_preview: s.is_preview ? 'yes' : 'no',
+    ['kind', 'name', 'status', 'url', 'where'],
+    rows.map((row) => ({
+      kind: kindCell(row.kind),
+      name: row.name,
+      status: row.status,
+      url: truncateCell(row.url, 44),
+      where: row.hint || '—',
     })),
   );
+
+  info('');
+  info(c.dim('Errors: `dply sites:errors <name>` (any kind) · deploy: `dply site:deploy <name>` · filter: --kind vm|cloud|edge|serverless'));
+
+  return 0;
+}
+
+/**
+ * @param {'vm'|'cloud'|'edge'|'serverless'} kind
+ */
+function kindCell(kind) {
+  if (kind === 'edge') {
+    return c.magenta('edge');
+  }
+
+  if (kind === 'serverless') {
+    return c.yellow('serverless');
+  }
+
+  return kind === 'cloud' ? c.green('cloud') : c.cyan('vm');
+}
+
+/**
+ * @param {string} text
+ * @param {number} max
+ */
+function truncateCell(text, max) {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 export async function deploy(args, flags) {
@@ -1117,7 +1174,7 @@ async function findRepoConfigFile() {
   return null;
 }
 
-async function openInBrowser(url) {
+export async function openInBrowser(url) {
   const platform = process.platform;
   if (platform === 'darwin') {
     await execFileAsync('open', [url]);

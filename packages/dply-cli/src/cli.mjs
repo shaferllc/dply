@@ -5,6 +5,8 @@ import * as accountCommands from './account-commands.mjs';
 import * as serverCommands from './server-commands.mjs';
 import * as siteCommands from './site-commands.mjs';
 import * as errorsCommands from './errors-commands.mjs';
+import * as uptimeCommands from './uptime-commands.mjs';
+import * as notificationsCommands from './notifications-commands.mjs';
 import * as updateCommands from './update-command.mjs';
 import * as serverlessCommands from './serverless-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
@@ -24,9 +26,13 @@ const TOP_LEVEL = {
   project: { handler: runProject, summary: 'Org projects — group servers/sites, deploy, health, members.' },
   billing: { handler: runBilling, summary: 'Plan estimate, breakdown, invoices (org admin).' },
   link: { handler: commands.link, summary: 'Link this repo to a BYO or Edge site (.dply/site.json).' },
-  sites: { handler: commands.sites, summary: 'List Edge sites visible to your token.' },
+  sites: { handler: commands.sites, summary: 'List every site — VM, Edge, serverless (--kind, name filter).' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
   errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
+  uptime: { handler: uptimeCommands.uptimeCommand, summary: 'Uptime monitors for a site (history, check, --watch).' },
+  monitor: { handler: uptimeCommands.uptimeCommand, summary: 'Alias for `uptime` — the workspace Monitor tab.' },
+  notifications: { handler: notificationsCommands.notificationsCommand, summary: 'Channels + event routing for a site or server.' },
+  notify: { handler: notificationsCommands.notificationsCommand, summary: 'Alias for `notifications`.' },
   serverless: { handler: runServerless, summary: 'Managed functions (list, status, errors, logs, invocations).' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
@@ -379,12 +385,15 @@ function printTopLevelHelp() {
   info(`  ${'server firewall'.padEnd(18)} ${c.dim('Show/apply UFW rules (network.read/write)')}`);
   info(`  ${'server system-users'.padEnd(18)} ${c.dim('Manage Linux accounts (see `dply server system-users help`)')}`);
   info('');
-  info(c.bold('Sites (BYO):'));
-  info(`  ${'site list'.padEnd(18)} ${c.dim('List VM-hosted sites')}`);
+  info(c.bold('Sites:'));
+  info(`  ${'sites'.padEnd(18)} ${c.dim('Every site: vm · edge · serverless (--kind X · `sites <name>` filters)')}`);
+  info(`  ${'site list'.padEnd(18)} ${c.dim('List VM-hosted sites only')}`);
   info(`  ${'site deploy'.padEnd(18)} ${c.dim('Queue a deploy (--site or linked repo)')}`);
   info(`  ${'site logs'.padEnd(18)} ${c.dim('Latest deploy log · --follow to tail')}`);
   info(`  ${'site status'.padEnd(18)} ${c.dim('Site + latest deployment summary')}`);
-  info(`  ${'errors'.padEnd(18)} ${c.dim('Open error events · --full · --watch · exit 1 when any')}`);
+  info(`  ${'errors [site]'.padEnd(18)} ${c.dim('Open error events · picks a site when omitted · --full · --watch')}`);
+  info(`  ${'uptime [site]'.padEnd(18)} ${c.dim('Monitors: status, history, check now · any kind of site')}`);
+  info(`  ${'notifications'.padEnd(18)} ${c.dim('Channels, the event catalog, and what routes where')}`);
   info(`  ${'deploy'.padEnd(18)} ${c.dim('Deploy linked repo (BYO or Edge via .dply/site.json)')}`);
   info(`  ${'link --byo <id>'.padEnd(18)} ${c.dim('Link repo for bare `dply deploy`')}`);
   info('');
@@ -398,8 +407,12 @@ function printTopLevelHelp() {
     info(`  edge ${name.padEnd(12)} ${c.dim(summary)}`);
   }
   info('');
+  info(c.dim('One model, one noun: `dply sites` spans vm/edge/serverless · product verbs stay under `edge` / `serverless`'));
   info(c.dim('Site context: BYO `--site` / $DPLY_SITE / link --byo · Edge `--site` / $DPLY_EDGE_SITE / link --edge'));
   info(c.dim('Shortcuts: projects · site · deploy · me · r · `dply ls shortcuts`'));
+  info(c.dim('Colon form: any `dply a b` also works as `dply a:b` — e.g. `dply sites:errors acme`'));
+  info(c.dim('Leave the site off and you get a picker: `dply errors` · `dply serverless errors`'));
+  info(c.dim('Act on what you see: `dply errors dismiss|retry|fix` — or pick an action from the list on a TTY'));
   info(c.dim('Interactive mode: run `dply` with no args · `dply menu` · `dply ls` · `dply help`'));
 
   return 0;
@@ -431,6 +444,9 @@ export function allCommandLines() {
     'site',
     'deploy',
     'errors',
+    'uptime',
+    'monitor',
+    'notifications',
     'serverless',
     'billing',
     'server',
@@ -455,9 +471,16 @@ export function allCommandLines() {
     'project help',
   );
 
-  lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
+  lines.push('sites', 'sites --kind', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
 
-  lines.push('errors', 'errors --full', 'errors --watch', 'errors help');
+  lines.push('errors', 'errors --full', 'errors --watch', 'errors dismiss', 'errors retry', 'errors fix', 'errors help');
+
+  lines.push('uptime', 'uptime history', 'uptime check', 'uptime check --all', 'uptime --watch', 'uptime help', 'monitor');
+
+  for (const name of notificationsCommands.NOTIFICATIONS_SUBCOMMANDS) {
+    lines.push(`notifications ${name}`);
+  }
+  lines.push('notifications', 'notify');
 
   for (const name of serverlessCommands.SERVERLESS_SUBCOMMANDS) {
     lines.push(`serverless ${name}`);
@@ -476,7 +499,15 @@ export function allCommandLines() {
 
   lines.push(...shortcutCommandLines());
 
-  return lines;
+  // Every two-word route also answers to `ns:sub`, so completion should offer it.
+  for (const line of [...lines]) {
+    const parts = line.split(' ');
+    if (parts.length === 2 && ! parts[1].startsWith('-')) {
+      lines.push(parts.join(':'));
+    }
+  }
+
+  return [...new Set(lines)];
 }
 
 /**
@@ -509,7 +540,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
   }
 
   if (!normalized || normalized === 'account') {
@@ -539,7 +570,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'site' || normalized === 'byo') {
-    lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors');
+    lines.push('sites', 'sites --kind vm', 'sites --kind edge', 'sites --kind serverless', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors', 'errors dismiss', 'errors retry', 'errors fix', 'uptime', 'uptime history', 'uptime check', 'notifications', 'notifications channels', 'notifications events', 'notifications subscribe', 'notifications test');
   }
 
   if (!normalized || normalized === 'project' || normalized === 'projects') {

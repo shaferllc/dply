@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteEnvApiController;
+use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\SiteResourceApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
@@ -36,6 +37,7 @@ use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
 use App\Modules\Queue\Http\Controllers\SqsCompatibilityController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessInvocationApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessLogApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessPlatformApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessSiteApiController;
 use Illuminate\Support\Facades\Route;
 
@@ -220,7 +222,23 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/sites/{site}/workers', [SiteResourceApiController::class, 'workers'])->middleware('ability:'.$apiAbilities['sites.workers']);
         Route::get('/sites/{site}/schedules', [SiteResourceApiController::class, 'schedules'])->middleware('ability:'.$apiAbilities['sites.schedules']);
         Route::get('/sites/{site}/errors', [SiteResourceApiController::class, 'errors'])->middleware('ability:'.$apiAbilities['sites.errors']);
+        // Acting on an error, not just reading it: `dply errors dismiss|retry|fix`.
+        Route::post('/sites/{site}/errors/dismiss', [SiteResourceApiController::class, 'dismissErrors'])->middleware('ability:'.$apiAbilities['sites.errors_dismiss']);
+        Route::post('/sites/{site}/errors/{event}/retry', [SiteResourceApiController::class, 'retryError'])->middleware('ability:'.$apiAbilities['sites.errors_retry']);
+        Route::post('/sites/{site}/errors/{event}/remediate', [SiteResourceApiController::class, 'remediateError'])->middleware('ability:'.$apiAbilities['sites.errors_remediate']);
+        // Notification routing — channels are org-level, subscriptions hang off
+        // a site or a server. Same matrix the workspace tabs write.
+        Route::get('/notifications/channels', [NotificationApiController::class, 'channels'])->middleware('ability:'.$apiAbilities['notifications.channels']);
+        Route::get('/notifications/events', [NotificationApiController::class, 'events'])->middleware('ability:'.$apiAbilities['notifications.events']);
+        Route::post('/notifications/channels/{channel}/test', [NotificationApiController::class, 'test'])->middleware('ability:'.$apiAbilities['notifications.test']);
+        Route::get('/sites/{site}/notifications', [NotificationApiController::class, 'siteIndex'])->middleware('ability:'.$apiAbilities['notifications.site_index']);
+        Route::post('/sites/{site}/notifications', [NotificationApiController::class, 'siteUpdate'])->middleware('ability:'.$apiAbilities['notifications.site_update']);
+        Route::get('/servers/{server}/notifications', [NotificationApiController::class, 'serverIndex'])->middleware('ability:'.$apiAbilities['notifications.server_index']);
+        Route::post('/servers/{server}/notifications', [NotificationApiController::class, 'serverUpdate'])->middleware('ability:'.$apiAbilities['notifications.server_update']);
+
         Route::get('/sites/{site}/uptime', [SiteResourceApiController::class, 'uptime'])->middleware('ability:'.$apiAbilities['sites.uptime']);
+        Route::get('/sites/{site}/uptime/history', [SiteResourceApiController::class, 'uptimeHistory'])->middleware('ability:'.$apiAbilities['sites.uptime_history']);
+        Route::post('/sites/{site}/uptime/check', [SiteResourceApiController::class, 'uptimeCheck'])->middleware('ability:'.$apiAbilities['sites.uptime_check']);
         Route::get('/sites/{site}/basic-auth', [SiteResourceApiController::class, 'basicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth']);
         Route::post('/sites/{site}/basic-auth', [SiteResourceApiController::class, 'addBasicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth_write']);
         Route::delete('/sites/{site}/basic-auth/{username}', [SiteResourceApiController::class, 'removeBasicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth_write'])->where('username', '[a-zA-Z0-9._-]+');
@@ -329,6 +347,15 @@ Route::prefix('v1')->group(function (): void {
 
             Route::get('/sites/{site}/logs', [ServerlessLogApiController::class, 'index'])
                 ->middleware('ability:'.$apiAbilities['serverless.logs.index']);
+
+            // The workspace Platform tab: what is deployed on the functions
+            // host, its cron triggers, and a real test request at it.
+            Route::get('/sites/{site}/platform', [ServerlessPlatformApiController::class, 'show'])
+                ->middleware('ability:'.$apiAbilities['serverless.platform.show']);
+            Route::get('/sites/{site}/platform/schedules', [ServerlessPlatformApiController::class, 'schedules'])
+                ->middleware('ability:'.$apiAbilities['serverless.platform.schedules']);
+            Route::post('/sites/{site}/invoke', [ServerlessPlatformApiController::class, 'invoke'])
+                ->middleware('ability:'.$apiAbilities['serverless.invoke']);
         });
     });
 });

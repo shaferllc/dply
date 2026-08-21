@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SERVERLESS_SUBCOMMANDS, invocationQuery, queryString, windowSeconds } from '../src/serverless-commands.mjs';
+import { __testing, SERVERLESS_SUBCOMMANDS, invocationQuery, queryString, windowSeconds } from '../src/serverless-commands.mjs';
 
 test('queryString drops empty values and encodes the rest', () => {
   assert.equal(queryString({}), '');
@@ -39,5 +39,18 @@ test('the documented subcommand list matches what the dispatcher accepts', () =>
     'errors',
     'logs',
     'invocation',
+    'platform',
+    'invoke',
   ]);
+});
+
+test('parseHeaders turns repeatable --header flags into an object', () => {
+  const { parseHeaders } = __testing;
+
+  assert.deepEqual(parseHeaders('X-Token: abc'), { 'X-Token': 'abc' });
+  assert.deepEqual(parseHeaders(['A: 1', 'B: 2']), { A: '1', B: '2' });
+  // A value containing a colon keeps it; a malformed entry is dropped.
+  assert.deepEqual(parseHeaders('Referer: https://a.test/x'), { Referer: 'https://a.test/x' });
+  assert.deepEqual(parseHeaders('nonsense'), {});
+  assert.deepEqual(parseHeaders(undefined), {});
 });

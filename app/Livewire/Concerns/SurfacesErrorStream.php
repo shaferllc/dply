@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Models\ErrorEvent;
-use App\Modules\Remediations\Services\RemediationCatalog;
-use App\Support\Errors\ErrorRetryRegistry;
+use App\Support\Errors\ErrorEventActions;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Url;
@@ -59,29 +57,23 @@ trait SurfacesErrorStream
     public function dismiss(string $id): void
     {
         $this->authorizeErrorAccess();
-        $this->scopedErrors()->whereKey($id)->whereNull('dismissed_at')->update([
-            'dismissed_at' => now(),
-            'dismissed_by' => auth()->id(),
-        ]);
+        $this->errorActions()->dismiss($this->scopedErrors(), $id, (string) auth()->id() ?: null);
     }
 
     public function restore(string $id): void
     {
         $this->authorizeErrorAccess();
-        $this->scopedErrors()->whereKey($id)->update(['dismissed_at' => null, 'dismissed_by' => null]);
+        $this->errorActions()->restore($this->scopedErrors(), $id);
     }
 
     public function dismissAll(): void
     {
         $this->authorizeErrorAccess();
-        $this->scopedErrors()->whereNull('dismissed_at')->update([
-            'dismissed_at' => now(),
-            'dismissed_by' => auth()->id(),
-        ]);
+        $this->errorActions()->dismissAll($this->scopedErrors(), (string) auth()->id() ?: null);
         $this->toastSuccess(__('All errors dismissed.'));
     }
 
-    public function retry(string $id, ErrorRetryRegistry $registry): void
+    public function retry(string $id): void
     {
         $this->authorizeErrorAccess();
         $event = $this->scopedErrors()->whereKey($id)->first();
@@ -89,7 +81,7 @@ trait SurfacesErrorStream
             return;
         }
 
-        if ($registry->retry($event, (string) auth()->id() ?: null)) {
+        if ($this->errorActions()->retry($event, (string) auth()->id() ?: null)) {
             $this->toastSuccess(__('Retrying — a new run was queued. Watch its workspace for progress.'));
         } else {
             $this->toastError(__('This error can’t be retried from here — open it to re-run at the source.'));
@@ -102,37 +94,24 @@ trait SurfacesErrorStream
         $this->authorizeErrorAccess();
 
         $event = $this->scopedErrors()->whereKey($id)->first();
-        $remediation = $event instanceof ErrorEvent ? $event->remediation() : null;
-        if ($event === null || $remediation === null) {
+        if (! $event instanceof ErrorEvent) {
             $this->toastError(__('No known fix for this error.'));
 
             return;
         }
 
-        $actions = $remediation['actions'] ?? [];
-        $actionKey ??= collect($actions)->firstWhere('recommended', true)['key'] ?? ($actions[0]['key'] ?? null);
-        if ($actionKey === null || app(RemediationCatalog::class)->action((string) $event->remediation_code, $actionKey) === null) {
-            $this->toastError(__('That fix is no longer available.'));
+        match ($this->errorActions()->applyRemediation($event, $actionKey, (string) auth()->id() ?: null)) {
+            'applied' => $this->toastSuccess(__('Applying the fix — it resolves this error when it finishes.')),
+            'no_fix' => $this->toastError(__('No known fix for this error.')),
+            'stale_action' => $this->toastError(__('That fix is no longer available.')),
+            'manual' => $this->toastError(__('This fix has to be applied by hand — open the error for the steps.')),
+            'no_server' => $this->toastError(__('This error isn’t tied to a server, so it can’t be fixed automatically.')),
+        };
+    }
 
-            return;
-        }
-
-        if ($event->server_id === null) {
-            $this->toastError(__('This error isn’t tied to a server, so it can’t be fixed automatically.'));
-
-            return;
-        }
-
-        ApplyRemediationJob::dispatch(
-            (string) $event->server_id,
-            $event->site_id ? (string) $event->site_id : null,
-            (string) $event->remediation_code,
-            $actionKey,
-            (string) (auth()->id() ?? '') ?: null,
-            (string) $event->id,
-        );
-
-        $this->toastSuccess(__('Applying the fix — it resolves this error when it finishes.'));
+    protected function errorActions(): ErrorEventActions
+    {
+        return app(ErrorEventActions::class);
     }
 
     /**

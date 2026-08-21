@@ -131,4 +131,20 @@
             </div>
         </form>
     </div>
+
+    @php
+        $cliSite = $site->slug;
+        $cliChannel = (string) ($uptimeNotifChannels->first()->id ?? '') ?: '<channel>';
+        $cliUptimeEvents = \App\Support\SiteUptimeNotificationKeys::eventKeys();
+    @endphp
+
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
+        <x-cli-snippet :commands="[
+            ['label' => __('What is routed for this site'), 'command' => 'dply sites:notifications '.$cliSite],
+            ['label' => __('Route uptime + SSL alerts'), 'command' => 'dply notifications subscribe '.implode(' ', $cliUptimeEvents).' --channel '.$cliChannel.' --site '.$cliSite],
+            ['label' => __('Stop routing them'), 'command' => 'dply notifications unsubscribe '.implode(' ', $cliUptimeEvents).' --channel '.$cliChannel.' --site '.$cliSite],
+            ['label' => __('Channels you can route to'), 'command' => 'dply notifications channels'],
+            ['label' => __('Monitors themselves'), 'command' => 'dply sites:uptime '.$cliSite],
+        ]" />
+    </div>
 </div>

@@ -106,8 +106,30 @@
 
     </div>
 
+    @php
+        // The whole tab from a terminal. `notifications` is subject-scoped, so
+        // one set covers vm/cloud/edge/serverless — and it lists every event
+        // group that applies to this site, not just the ones on screen.
+        $cliSite = $site->slug;
+        $cliChannel = (string) (collect($assignableNotificationChannels)->first()->id ?? '') ?: '<channel>';
+        $cliCommands = [
+            ['label' => __('What fires for this site, and where it goes'), 'command' => 'dply sites:notifications '.$cliSite],
+            ['label' => __('Channels you can route to'), 'command' => 'dply notifications channels'],
+            ['label' => __('Every event this site can subscribe to'), 'command' => 'dply notifications events --subject site'],
+            ['label' => __('Route an event'), 'command' => 'dply notifications subscribe site.uptime.down --channel '.$cliChannel.' --site '.$cliSite],
+            ['label' => __('Route several at once'), 'command' => 'dply notifications subscribe site.deployments site.ssl.expiring --channel '.$cliChannel.' --site '.$cliSite],
+            ['label' => __('Stop routing one'), 'command' => 'dply notifications unsubscribe site.uptime.down --channel '.$cliChannel.' --site '.$cliSite],
+            ['label' => __('Send the channel a test message'), 'command' => 'dply notifications test '.$cliChannel],
+            ['label' => __('Same, for a server'), 'command' => 'dply notifications --server '.$site->server_id],
+            ['label' => __('Raw payload for scripts'), 'command' => 'dply notifications '.$cliSite.' --json'],
+        ];
+    @endphp
+
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
-        <x-cli-snippet tone="stub" />
+        <x-cli-snippet
+            :commands="$cliCommands"
+            :intro="__('Subscriptions made here and from the CLI are the same rows — the CLI writes through this matrix.')"
+        />
     </div>
 
     @include('livewire.partials.create-notification-channel-modal')

@@ -238,6 +238,33 @@ trait ManagesEdgeHosting
         return is_string($this->container_backend) && $this->container_backend !== '';
     }
 
+    /**
+     * Which product this site is, as one word: `vm`, `edge`, `cloud`, or
+     * `serverless`.
+     *
+     * Every kind is the same Site row differing by attributes, which is exactly
+     * why callers keep re-deriving this from `edge_backend` /
+     * `container_backend` / the runtime profile. API payloads expose it so the
+     * CLI (`dply sites`) and any other client can say what a site IS without
+     * knowing the column layout.
+     */
+    public function siteKind(): string
+    {
+        if ($this->usesFunctionsRuntime()) {
+            return 'serverless';
+        }
+
+        if (is_string($this->edge_backend) && $this->edge_backend !== '') {
+            return 'edge';
+        }
+
+        if ($this->isCloudContainerSite()) {
+            return 'cloud';
+        }
+
+        return 'vm';
+    }
+
     public function isCloudPreview(): bool
     {
         $container = is_array($this->meta['container'] ?? null) ? $this->meta['container'] : [];

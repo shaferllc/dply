@@ -14,6 +14,7 @@
  */
 import { requireClient } from './server-context.mjs';
 import { readSiteLink } from './config.mjs';
+import { pickRow } from './pick.mjs';
 import { c, info, printJson, printKeyValues, printTable, warn } from './print.mjs';
 
 const SUBCOMMANDS = {
@@ -23,6 +24,8 @@ const SUBCOMMANDS = {
   errors: '[site] — every failed invocation (--watch to poll).',
   logs: '[site] — application logs (--follow, --level error).',
   invocation: '<id> [--site …] — one invocation with its log lines.',
+  platform: '[site] — what is deployed on the host (--schedules).',
+  invoke: '[site] — send a test request (--method, --path, --body).',
 };
 
 /**
@@ -53,6 +56,11 @@ export async function serverlessCommand(args, flags) {
       return serverlessLogs(rest, flags);
     case 'invocation':
       return serverlessInvocation(rest, flags);
+    case 'platform':
+      return serverlessPlatform(rest, flags);
+    case 'invoke':
+    case 'test':
+      return serverlessInvoke(rest, flags);
     default:
       throw cliError(`Unknown serverless command: ${sub}. Run \`dply serverless help\`.`, 2);
   }
@@ -378,6 +386,199 @@ async function tail(client, path, query, render, flags) {
 }
 
 /**
+ * `dply serverless platform [site]` — the workspace Platform tab's Inspector:
+ * the action actually deployed on the functions host, plus what else lives in
+ * its namespace. `--schedules` swaps in the cron triggers panel.
+ *
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverlessPlatform(args, flags) {
+  const { client, siteId } = await context(args[0], flags);
+
+  if (flags.schedules) {
+    return platformSchedules(client, siteId, flags);
+  }
+
+  const data = (await client.get(`/serverless/sites/${encodeURIComponent(siteId)}/platform`))?.data ?? {};
+
+  if (flags.json) {
+    printJson(data);
+
+    return 0;
+  }
+
+  const action = data.action;
+
+  info(c.bold(String(data.action_name || siteId)));
+
+  if (! action) {
+    warn(data.error ?? 'No action deployed on the host yet.');
+
+    return 1;
+  }
+
+  printKeyValues([
+    ['version', action.version ?? '—'],
+    ['runtime', action.runtime ?? '—'],
+    ['entry', action.entry ?? '—'],
+    ['memory', action.memory_mb ? `${action.memory_mb} MB` : '—'],
+    ['timeout', action.timeout_ms ? `${action.timeout_ms} ms` : '—'],
+    ['concurrency', action.concurrency != null ? String(action.concurrency) : '—'],
+    ['log limit', action.log_limit_mb ? `${action.log_limit_mb} MB` : '—'],
+    ['web export', action.web_export ? 'yes' : 'no'],
+    ['published', action.published ? 'yes' : 'no'],
+    ['code size', action.code_bytes ? `${Math.round(action.code_bytes / 1024)} KB` : '—'],
+  ]);
+
+  const ns = data.namespace ?? {};
+
+  info('');
+  info(c.bold('Namespace'));
+  printKeyValues([
+    ['actions', countAndNames(ns.actions)],
+    ['packages', countAndNames(ns.packages)],
+    ['triggers', countAndNames(ns.triggers)],
+    ['rules', countAndNames(ns.rules)],
+  ]);
+
+  info('');
+  info(c.dim('Schedules: `dply serverless platform --schedules` · test it: `dply serverless invoke`'));
+
+  return 0;
+}
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} siteId
+ * @param {Record<string, unknown>} flags
+ */
+async function platformSchedules(client, siteId, flags) {
+  const data = (await client.get(`/serverless/sites/${encodeURIComponent(siteId)}/platform/schedules`))?.data ?? {};
+
+  if (flags.json) {
+    printJson(data);
+
+    return 0;
+  }
+
+  if (data.error) {
+    warn(String(data.error));
+  }
+
+  const schedules = data.schedules ?? [];
+
+  if (schedules.length === 0) {
+    info(c.dim('No schedules on this function.'));
+  } else {
+    printTable(
+      ['name', 'cron', 'enabled'],
+      schedules.map((row) => ({
+        name: String(row.name ?? '—'),
+        cron: String(row.cron ?? row.scheduled_details?.cron ?? '—'),
+        enabled: row.is_enabled === false ? c.dim('off') : c.green('on'),
+      })),
+    );
+  }
+
+  info('');
+  info(c.dim(`triggers: ${(data.triggers ?? []).length} · rules: ${(data.rules ?? []).length} — add or remove them on the Platform tab`));
+
+  return 0;
+}
+
+/**
+ * `dply serverless invoke [site]` — the Console panel. Recorded as a test
+ * invocation, so it shows up in `dply serverless invocations` afterwards.
+ *
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverlessInvoke(args, flags) {
+  const { client, siteId } = await context(args[0], flags);
+
+  const body = {
+    method: String(flags.method ?? flags.X ?? 'GET').toUpperCase(),
+    path: String(flags.path ?? '/'),
+    body: flags.body != null ? String(flags.body) : '',
+    query: flags.query != null ? String(flags.query) : '',
+    headers: parseHeaders(flags.header ?? flags.H),
+  };
+
+  const data = (await client.post(`/serverless/sites/${encodeURIComponent(siteId)}/invoke`, body))?.data ?? {};
+
+  if (flags.json) {
+    printJson(data);
+
+    return data.success ? 0 : 1;
+  }
+
+  const status = data.status_code != null ? String(data.status_code) : (data.success ? 'ok' : 'fail');
+
+  info(`${data.success ? c.green('●') : c.red('●')} ${body.method} ${body.path} ${c.bold(status)} ${c.dim(`${data.duration_ms ?? 0}ms`)}`);
+
+  if (data.error) {
+    warn(String(data.error));
+  }
+
+  if (data.excerpt) {
+    info('');
+    info(String(data.excerpt));
+  }
+
+  for (const line of data.logs ?? []) {
+    info(c.dim(typeof line === 'string' ? line : JSON.stringify(line)));
+  }
+
+  if (data.id) {
+    info('');
+    info(c.dim(`Recorded as invocation ${data.id} — \`dply serverless invocation ${data.id}\``));
+  }
+
+  return data.success ? 0 : 1;
+}
+
+/**
+ * `--header 'K: V'` (repeatable) → an object the API accepts.
+ *
+ * @param {unknown} value
+ * @returns {Record<string, string>}
+ */
+export function parseHeaders(value) {
+  const raw = value == null ? [] : (Array.isArray(value) ? value : [value]);
+  /** @type {Record<string, string>} */
+  const headers = {};
+
+  for (const entry of raw) {
+    const text = String(entry);
+    const colon = text.indexOf(':');
+
+    if (colon < 1) {
+      continue;
+    }
+
+    headers[text.slice(0, colon).trim()] = text.slice(colon + 1).trim();
+  }
+
+  return headers;
+}
+
+/**
+ * @param {unknown} names
+ */
+function countAndNames(names) {
+  const list = Array.isArray(names) ? names : [];
+
+  if (list.length === 0) {
+    return '0';
+  }
+
+  const shown = list.slice(0, 4).join(', ');
+
+  return `${list.length} ${c.dim(`(${shown}${list.length > 4 ? ', …' : ''})`)}`;
+}
+
+/**
  * Resolve a function by ID or name. Names are matched against the org's
  * function list, so `dply serverless status checkout` works without an ID.
  *
@@ -396,6 +597,16 @@ async function context(positional, flags) {
   }
 
   if (! candidate) {
+    // On a TTY, "which function?" is a prompt, not an error.
+    const picked = await pickRow(await listFunctions(client), {
+      title: 'Which function?',
+      hint: (row) => [row.runtime, row.is_live ? 'live' : row.status].filter(Boolean).join(' \u00b7 '),
+    });
+
+    if (picked?.id) {
+      return { client, siteId: String(picked.id) };
+    }
+
     throw cliError(
       'No function specified. Pass --site <id-or-name>, set DPLY_SERVERLESS_SITE, or run `dply serverless list`.',
       2,
@@ -406,7 +617,7 @@ async function context(positional, flags) {
     return { client, siteId: candidate };
   }
 
-  const rows = (await client.get('/serverless/sites'))?.data ?? [];
+  const rows = await listFunctions(client);
   const needle = candidate.toLowerCase();
 
   const exact = rows.find((row) => String(row.name).toLowerCase() === needle);
@@ -419,12 +630,31 @@ async function context(positional, flags) {
     return { client, siteId: partial[0].id };
   }
 
+  if (partial.length > 1) {
+    const picked = await pickRow(partial, {
+      title: `Functions matching "${candidate}"`,
+      hint: (row) => [row.runtime, row.is_live ? 'live' : row.status].filter(Boolean).join(' \u00b7 '),
+    });
+
+    if (picked?.id) {
+      return { client, siteId: String(picked.id) };
+    }
+  }
+
   throw cliError(
     partial.length > 1
       ? `Multiple functions match "${candidate}". Pass the full site ID instead.`
       : `No function matched "${candidate}". Run \`dply serverless list\`.`,
     2,
   );
+}
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @returns {Promise<Array<Record<string, any>>>}
+ */
+async function listFunctions(client) {
+  return (await client.get('/serverless/sites'))?.data ?? [];
 }
 
 /**
@@ -528,3 +758,5 @@ function cliError(message, exitCode = 1) {
 export const SERVERLESS_COMMANDS = SUBCOMMANDS;
 
 export const SERVERLESS_SUBCOMMANDS = Object.keys(SUBCOMMANDS);
+
+export const __testing = { parseHeaders };

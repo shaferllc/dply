@@ -10,11 +10,15 @@
  * per-invocation record behind that last one is `dply serverless errors`.
  */
 import { requireClient } from './server-context.mjs';
-import { resolveSiteId } from './site-context.mjs';
-import { c, info, printJson, printKeyValues, printTable, warn } from './print.mjs';
+import { resolveAnySiteId } from './site-context.mjs';
+import { isInteractive, pickRow } from './pick.mjs';
+import { c, info, ok, printJson, printKeyValues, printTable, warn } from './print.mjs';
 
 /** The API clamps `limit` to this — mirror it so `--limit 500` fails loudly here. */
 const MAX_LIMIT = 50;
+
+/** Subcommands that act on an error instead of selecting a site. */
+const ACTIONS = new Set(['dismiss', 'retry', 'fix', 'remediate']);
 
 /**
  * @param {string[]} args
@@ -27,12 +31,18 @@ export async function errorsCommand(args, flags) {
     return printErrorsHelp();
   }
 
+  if (sub && ACTIONS.has(sub.toLowerCase())) {
+    const action = sub.toLowerCase() === 'remediate' ? 'fix' : sub.toLowerCase();
+
+    return runAction(action, args.slice(1), flags);
+  }
+
   // `dply errors [site]` — the only positional is an optional site selector,
   // so anything in args[0] that is not a subcommand is that selector.
   const positional = sub === 'list' || sub === 'ls' ? args[1] : sub;
 
   const client = await requireClient(flags);
-  const siteId = await resolveSiteId(client, flags, positional);
+  const siteId = await resolveAnySiteId(client, flags, positional);
 
   if (watchRequested(flags)) {
     return watchErrors(client, siteId, flags);
@@ -48,13 +58,201 @@ export async function errorsCommand(args, flags) {
 
   if (flags.full) {
     printDetailed(events);
-
-    return events.length === 0 ? 0 : 1;
+  } else {
+    printSummary(events);
   }
 
-  printSummary(events);
+  if (events.length === 0) {
+    return 0;
+  }
 
-  return events.length === 0 ? 0 : 1;
+  // On a TTY the list is the start of triage, not the end of it: pick an error
+  // and act on it without hunting for its id. `--no-prompt` (or a pipe, or
+  // $DPLY_NO_PROMPT) keeps the old print-and-exit shape for scripts.
+  if (promptAllowed(flags)) {
+    await triage(client, siteId, events, flags);
+  }
+
+  return 1;
+}
+
+/**
+ * `dply errors dismiss <id|--all>` · `retry <id>` · `fix <id> [--action key]`
+ *
+ * @param {string} action
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+async function runAction(action, args, flags) {
+  const client = await requireClient(flags);
+  const siteId = await resolveAnySiteId(client, flags, undefined);
+  const all = Boolean(flags.all);
+  let id = args[0];
+
+  if (! id && ! all) {
+    const events = filterEvents(await fetchErrors(client, siteId, flags), flags);
+
+    if (events.length === 0) {
+      info(`${c.green('✓')} No open errors.`);
+
+      return 0;
+    }
+
+    const picked = await pickErrorRow(events, actionTitle(action));
+    if (! picked) {
+      throw cliError(`Which error? Pass an id (see \`dply errors\`)${action === 'dismiss' ? ', or --all' : ''}.`, 2);
+    }
+
+    id = String(picked.id);
+  }
+
+  return applyAction(client, siteId, action, { id, all, actionKey: flags.action });
+}
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} siteId
+ * @param {string} action
+ * @param {{ id?: string, all?: boolean, actionKey?: unknown }} options
+ */
+async function applyAction(client, siteId, action, { id, all = false, actionKey }) {
+  const base = `/sites/${encodeURIComponent(siteId)}/errors`;
+
+  if (action === 'dismiss') {
+    const response = await client.post(`${base}/dismiss`, all ? { all: true } : { id });
+    const count = response?.data?.dismissed ?? 0;
+
+    ok(all ? `Dismissed ${count} ${count === 1 ? 'error' : 'errors'}.` : 'Dismissed.');
+
+    return 0;
+  }
+
+  if (action === 'retry') {
+    await client.post(`${base}/${encodeURIComponent(String(id))}/retry`, {});
+    ok('Retry queued — follow it with `dply errors --watch` or the site workspace.');
+
+    return 0;
+  }
+
+  await client.post(
+    `${base}/${encodeURIComponent(String(id))}/remediate`,
+    actionKey ? { action: String(actionKey) } : {},
+  );
+  ok('Fix queued — the error clears itself when it finishes.');
+
+  return 0;
+}
+
+/**
+ * Pick an error, then pick what to do with it. Loops until the operator stops,
+ * so a screen full of errors can be cleared in one sitting.
+ *
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} siteId
+ * @param {Array<Record<string, any>>} events
+ * @param {Record<string, unknown>} flags
+ */
+async function triage(client, siteId, events, flags) {
+  let remaining = events;
+
+  while (remaining.length > 0) {
+    const event = await pickErrorRow(remaining, 'Act on an error');
+    if (! event) {
+      return;
+    }
+
+    const choice = await pickRow(actionsFor(event), {
+      title: truncate(String(event.title ?? 'Error'), 68),
+      label: (row) => row.label,
+      hint: (row) => row.hint ?? '',
+    });
+
+    if (! choice) {
+      return;
+    }
+
+    try {
+      if (choice.key === 'open') {
+        const { openInBrowser } = await import('./commands.mjs');
+        await openInBrowser(String(event.link_url));
+      } else if (choice.key === 'detail') {
+        info('');
+        printDetailed([event]);
+      } else {
+        await applyAction(client, siteId, choice.key, { id: String(event.id) });
+      }
+    } catch (err) {
+      warn(err?.message ?? String(err));
+    }
+
+    // Re-read rather than splice locally: a queued fix clears its own event, so
+    // the server's list is the only honest one.
+    remaining = filterEvents(await fetchErrors(client, siteId, flags), flags);
+
+    if (remaining.length === 0) {
+      info('');
+      info(`${c.green('✓')} No open errors left.`);
+    }
+  }
+}
+
+/**
+ * @param {Array<Record<string, any>>} events
+ * @param {string} title
+ */
+function pickErrorRow(events, title) {
+  return pickRow(events, {
+    title,
+    label: (event) => truncate(String(event.title ?? event.id), 68),
+    hint: (event) => [formatTime(event.occurred_at), event.category].filter(Boolean).join(' · '),
+  });
+}
+
+/**
+ * Only the verbs this event actually supports — the API says which.
+ *
+ * @param {Record<string, any>} event
+ */
+function actionsFor(event) {
+  /** @type {Array<{ key: string, label: string, hint?: string }>} */
+  const actions = [{ key: 'detail', label: 'Show detail', hint: 'full text + remediation code' }];
+
+  if (event.retryable) {
+    actions.push({ key: 'retry', label: 'Retry', hint: 're-run the operation that failed' });
+  }
+
+  if (event.remediation_code) {
+    actions.push({ key: 'fix', label: 'Apply the known fix', hint: String(event.remediation_code) });
+  }
+
+  if (event.link_url) {
+    actions.push({ key: 'open', label: 'Open in the dashboard' });
+  }
+
+  actions.push({ key: 'dismiss', label: 'Dismiss', hint: 'clear it from the stream' });
+
+  return actions;
+}
+
+/**
+ * @param {string} action
+ */
+function actionTitle(action) {
+  return action === 'dismiss' ? 'Dismiss which error?' : action === 'retry' ? 'Retry which error?' : 'Fix which error?';
+}
+
+/**
+ * Prompting is for humans at a terminal. Pipes, CI, --json and --watch keep the
+ * old behaviour so `dply deploy --wait && dply errors` stays a clean gate.
+ *
+ * @param {Record<string, unknown>} flags
+ */
+function promptAllowed(flags) {
+  if (flags['no-prompt'] || flags.quiet || flags.json || process.env.DPLY_NO_PROMPT) {
+    return false;
+  }
+
+  return isInteractive();
 }
 
 /**
@@ -273,9 +471,13 @@ function indent(text) {
 function printErrorsHelp() {
   info(`${c.bold('dply errors')} — open error events for a site`);
   info('');
-  info(`  ${'errors [site]'.padEnd(18)} ${c.dim('Newest open errors (linked site, --site, or DPLY_SITE)')}`);
+  info(`  ${'errors [site]'.padEnd(24)} ${c.dim('Newest open errors (linked site, --site, or DPLY_SITE)')}`);
+  info(`  ${'errors dismiss [id]'.padEnd(24)} ${c.dim('Clear one error · --all for every open one')}`);
+  info(`  ${'errors retry [id]'.padEnd(24)} ${c.dim('Re-run the operation that failed (commands.run)')}`);
+  info(`  ${'errors fix [id]'.padEnd(24)} ${c.dim('Apply the catalogued fix · --action <key> (commands.run)')}`);
   info('');
-  info(c.dim(`Flags: --full · --json · --limit N (max ${MAX_LIMIT}) · --category a,b · --watch [--interval ms]`));
+  info(c.dim('Leave the id off on a TTY and you get a picker · listing on a TTY offers the same actions'));
+  info(c.dim(`Flags: --full · --json · --limit N (max ${MAX_LIMIT}) · --category a,b · --watch [--interval ms] · --no-prompt`));
   info(c.dim('Exit code is 1 when any open error is reported — usable as a CI gate.'));
   info(c.dim('Serverless functions fold to one event here; `dply serverless errors` lists each.'));
 
@@ -300,4 +502,4 @@ function cliError(message, exitCode = 1) {
   return err;
 }
 
-export const __testing = { filterEvents, parseLimit, parseInterval, truncate, watchRequested };
+export const __testing = { actionsFor, filterEvents, parseLimit, parseInterval, promptAllowed, truncate, watchRequested };

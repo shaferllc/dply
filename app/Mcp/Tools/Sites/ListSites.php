@@ -15,7 +15,7 @@ class ListSites extends AbstractDplyTool
 {
     protected string $name = 'list_sites';
 
-    protected string $description = 'List all sites in the authenticated organization. Optionally filter by server. Returns each site\'s id, name, server, runtime, status, and deploy strategy.';
+    protected string $description = 'List all sites in the authenticated organization. Optionally filter by server. Returns each site\'s id, name, kind (vm | cloud | edge | serverless), server, runtime, status, and deploy strategy.';
 
     protected string $ability = 'sites.read';
 
@@ -39,13 +39,16 @@ class ListSites extends AbstractDplyTool
             ->when($serverId, fn ($q) => $q->where('server_id', $serverId))
             ->with(['server:id,name'])
             ->orderBy('name')
-            ->get(['id', 'server_id', 'name', 'slug', 'type', 'runtime', 'deploy_strategy', 'status', 'document_root', 'last_deploy_at', 'created_at']);
+            // edge_backend / container_backend / meta are what siteKind() reads —
+            // without them every row would report itself as a plain VM site.
+            ->get(['id', 'server_id', 'name', 'slug', 'type', 'runtime', 'deploy_strategy', 'status', 'document_root', 'edge_backend', 'container_backend', 'meta', 'last_deploy_at', 'created_at']);
 
         return Response::json([
             'data' => $sites->map(fn (Site $s) => [
                 'id' => $s->id,
                 'slug' => $s->slug,
                 'name' => $s->name,
+                'kind' => $s->siteKind(),
                 'server_id' => $s->server_id,
                 'server_name' => $s->server?->name,
                 'type' => $s->type,

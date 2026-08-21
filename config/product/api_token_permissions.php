@@ -97,7 +97,26 @@ return [
         'sites.workers' => 'sites.read',
         'sites.schedules' => 'sites.read',
         'sites.errors' => 'sites.read',
+        'sites.errors_dismiss' => 'sites.write',
+        // Retry re-dispatches the original job and a remediation runs steps on
+        // the box — both do work on a live host, so they sit behind commands.run
+        // like the other SSH-backed mutations above.
+        'sites.errors_retry' => 'commands.run',
+        'sites.errors_remediate' => 'commands.run',
+        'notifications.channels' => 'notifications.read',
+        'notifications.events' => 'notifications.read',
+        'notifications.site_index' => 'notifications.read',
+        'notifications.server_index' => 'notifications.read',
+        'notifications.site_update' => 'notifications.write',
+        'notifications.server_update' => 'notifications.write',
+        // Sending a test message actually pages someone, so it is a write.
+        'notifications.test' => 'notifications.write',
+
         'sites.uptime' => 'sites.read',
+        'sites.uptime_history' => 'sites.read',
+        // Probing a URL is an outbound HTTP check dply runs, not work on the
+        // box — sites.write, not commands.run.
+        'sites.uptime_check' => 'sites.write',
         'sites.basic_auth' => 'auth_users.read',
         'sites.basic_auth_write' => 'auth_users.write',
         'sites.ssl' => 'certificates.read',
@@ -188,6 +207,11 @@ return [
         'serverless.invocations.index' => 'serverless.read',
         'serverless.invocations.show' => 'serverless.read',
         'serverless.logs.index' => 'serverless.read',
+        'serverless.platform.show' => 'serverless.read',
+        'serverless.platform.schedules' => 'serverless.read',
+        // Invoking runs the customer's code and bills an invocation, so it is
+        // its own ability rather than folded into serverless.read.
+        'serverless.invoke' => 'serverless.invoke',
     ],
 
     'categories' => [
@@ -322,6 +346,14 @@ return [
             ],
         ],
         [
+            'id' => 'notifications',
+            'label' => 'Notifications',
+            'permissions' => [
+                ['ability' => 'notifications.read', 'label' => 'Read channels and event subscriptions'],
+                ['ability' => 'notifications.write', 'label' => 'Route events to channels, send tests'],
+            ],
+        ],
+        [
             'id' => 'insights',
             'label' => 'Insights',
             'permissions' => [
@@ -359,6 +391,7 @@ return [
             'label' => 'Serverless',
             'permissions' => [
                 ['ability' => 'serverless.read', 'label' => 'Read functions, invocations, and logs'],
+                ['ability' => 'serverless.invoke', 'label' => 'Send test requests at a function'],
             ],
         ],
         [

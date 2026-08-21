@@ -127,10 +127,39 @@
                             @include('livewire.sites.partials.errors.reference-lookup')
                             @include('livewire.partials.error-stream', ['errorStreamNested' => true])
 
+                            @php
+                                // Everything this tab does, from a terminal. `errors` is
+                                // site-kind agnostic, so one set covers vm/cloud/edge/
+                                // serverless; the function-only drill-down is appended
+                                // for functions. Ids come from the list rows above.
+                                $cliSite = $site->slug;
+                                $cliExampleId = $this->events->first()?->id ?? '<id>';
+                                $cliCommands = [
+                                    ['label' => __('Open errors, newest first'), 'command' => 'dply sites:errors '.$cliSite],
+                                    ['label' => __('With detail + remediation code'), 'command' => 'dply sites:errors '.$cliSite.' --full'],
+                                    ['label' => __('Watch for new events'), 'command' => 'dply sites:errors '.$cliSite.' --watch'],
+                                    ['label' => __('One category only'), 'command' => 'dply sites:errors '.$cliSite.' --category deploy,ssl'],
+                                    ['label' => __('Dismiss one · every open one'), 'command' => 'dply errors dismiss '.$cliExampleId.' --site '.$cliSite],
+                                    ['label' => __('Dismiss all'), 'command' => 'dply errors dismiss --all --site '.$cliSite],
+                                    ['label' => __('Retry the failed operation'), 'command' => 'dply errors retry '.$cliExampleId.' --site '.$cliSite],
+                                    ['label' => __('Apply the known fix'), 'command' => 'dply errors fix '.$cliExampleId.' --site '.$cliSite],
+                                    ['label' => __('Raw payload for scripts'), 'command' => 'dply sites:errors '.$cliSite.' --json'],
+                                    ['label' => __('Gate a deploy on a clean site (exits 1 when any are open)'), 'command' => 'dply deploy --wait && dply errors '.$cliSite.' --no-prompt'],
+                                ];
+
+                                if ($site->siteKind() === 'serverless') {
+                                    $cliCommands[] = [
+                                        'label' => __('Every failed invocation behind these events'),
+                                        'command' => 'dply serverless errors '.$cliSite,
+                                    ];
+                                }
+                            @endphp
+
                             <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
-                                <x-cli-snippet :commands="[
-                                    ['command' => 'dply sites:errors '.$site->slug],
-                                ]" />
+                                <x-cli-snippet
+                                    :commands="$cliCommands"
+                                    :intro="__('Run these anywhere the CLI is signed in. On a terminal, leaving the id off opens a picker.')"
+                                />
                             </div>
                         @endif
 
