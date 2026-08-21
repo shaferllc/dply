@@ -7,6 +7,7 @@ namespace App\Modules\Serverless\Actions;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -33,11 +34,16 @@ use Throwable;
  *  - Fail the local delete because the remote call failed. A revoked or
  *    rate-limited credential must not strand a function in dply forever; the
  *    remote error is logged and reported, and the local rows still go.
+ *
+ * It also destroys the function's own app bucket, if dply provisioned one.
+ * That bucket holds customer data and is reached by a live Spaces key, and
+ * both outlive the site row otherwise — billing quietly, with nothing in dply
+ * pointing at them.
  */
 class DeleteServerlessFunction
 {
     /**
-     * @return array{namespace_deleted: bool, host_deleted: bool, remote_error: ?string}
+     * @return array{namespace_deleted: bool, host_deleted: bool, remote_error: ?string, bucket_deleted: bool, bucket_error: ?string}
      */
     public function handle(Site $site): array
     {
@@ -74,6 +80,22 @@ class DeleteServerlessFunction
             }
         }
 
+        // Before the site row goes, because the binding that names the bucket
+        // and its key goes with it. Reported, not raised: a function the
+        // customer asked to be rid of must still go, and an orphaned bucket is
+        // recoverable from the log while a stuck delete is not.
+        $bucketDeleted = false;
+        $bucketError = null;
+        try {
+            $bucketDeleted = app(ServerlessAppBucketProvisioner::class)->destroy($site);
+        } catch (Throwable $e) {
+            $bucketError = $e->getMessage();
+            Log::error('serverless.app_bucket.destroy_failed', [
+                'site_id' => $siteId,
+                'error' => $bucketError,
+            ]);
+        }
+
         // Site::deleting fans out to SiteRelationPurger for the non-cascading
         // relations, so the site delete is the single chokepoint — don't
         // hand-roll cleanup here.
@@ -90,6 +112,8 @@ class DeleteServerlessFunction
             'namespace_deleted' => $namespaceDeleted,
             'host_deleted' => $hostDeletable,
             'remote_error' => $remoteError,
+            'bucket_deleted' => $bucketDeleted,
+            'bucket_error' => $bucketError,
         ];
     }
 

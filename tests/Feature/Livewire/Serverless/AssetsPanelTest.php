@@ -8,8 +8,10 @@ use App\Models\Organization;
 use App\Models\ServerlessUsageSnapshot;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Models\User;
 use App\Modules\Serverless\Livewire\AssetsPanel;
+use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -118,4 +120,40 @@ test('a pending custom domain is shown but is not yet billable', function () {
         ->assertOk()
         ->assertSee('cdn.acme.com')
         ->assertSee('Validating');
+});
+
+test('it says nothing about app storage when the function has no bucket', function () {
+    Livewire::actingAs($this->user)
+        ->test(AssetsPanel::class, ['site' => $this->site])
+        ->assertDontSee('App storage');
+});
+
+test('it shows the app bucket and what it is holding', function () {
+    SiteBinding::query()->create([
+        'site_id' => $this->site->id,
+        'type' => 'storage',
+        'name' => 'uploads',
+        'mode' => 'provision_new',
+        'status' => SiteBinding::STATUS_CONFIGURED,
+        'target_type' => 'object_storage',
+        'injected_env' => ['AWS_UPLOADS_BUCKET' => 'dply-fn-orders-a1b2c3d4'],
+        'config' => [
+            'disk' => 'uploads',
+            'bucket' => 'dply-fn-orders-a1b2c3d4',
+            'region' => 'nyc3',
+            'managed_by' => ServerlessAppBucketProvisioner::MANAGED_BY,
+        ],
+    ]);
+
+    $site = $this->site->fresh();
+    $meta = $site->meta;
+    $meta['serverless']['app_bucket'] = ['storage_bytes' => 3 * 1024 ** 2, 'storage_measured_at' => now()->toIso8601String()];
+    $site->forceFill(['meta' => $meta])->save();
+
+    Livewire::actingAs($this->user)
+        ->test(AssetsPanel::class, ['site' => $site])
+        ->assertOk()
+        ->assertSee('App storage')
+        ->assertSee('dply-fn-orders-a1b2c3d4')
+        ->assertSee('3 MB');
 });

@@ -196,6 +196,62 @@ into the artifact — so the app reads them through Dotenv like any other config
 The disk is named `uploads`, not `s3`: the primary disk stays the operator's to
 attach, so dply never silently repoints `FILESYSTEM_DISK`.
 
+#### The full-access key does not outlive provisioning
+
+A Spaces key can only be granted to buckets that already exist, so creating one
+needs a key with no grants — which on Spaces means full access to *every*
+bucket on the account, including the shared asset bucket. That key is minted
+for the call and revoked in a `finally`, failure path included. Nothing
+persists it, and nothing hands it to an app. The credential that survives is
+the second key, granted `readwrite` on one bucket.
+
+#### CORS and a `tmp/` expiry are part of provisioning
+
+A function has a hard request-size cap, so the upload path that actually works
+is the one Vapor uses: the browser PUTs straight to the bucket against a signed
+URL the app mints (`Storage::disk('uploads')->temporaryUploadUrl()`), and the
+function never carries the bytes. That is a cross-origin request, so a bucket
+without CORS makes browser uploads impossible — the policy is applied at
+provision time, not left as a support ticket. `AllowedOrigins: *` is right
+here: the signature and its expiry are the authorization, and a fixed origin
+list would break every preview and custom domain the same app is served from.
+
+Its counterpart is a lifecycle rule expiring `tmp/` after a day, plus abandoned
+multipart uploads. Uploads land in `tmp/` and the app moves them out when it
+accepts them, so whatever is left is an upload nobody claimed — otherwise it
+accumulates forever on a bill no one is reading.
+
+Both are best-effort at provision time (a bucket without them still serves
+every server-side read and write, and losing a deploy over a policy call would
+be the worse trade) and stamped on the binding, so a bucket that missed them
+— or predates them — is healed on the next deploy without costing a provider
+call in the steady state.
+
+#### Deleting the function deletes the bucket
+
+`DeleteServerlessFunction` destroys the app bucket and revokes its key before
+the site row goes, because the binding that names both goes with it. Reported,
+never raised: a customer asking to be rid of a function must not be blocked by
+a provider error, and an orphaned bucket is recoverable from the log while a
+stuck delete is not.
+
+#### App-bucket storage is measured, not billed
+
+`ServerlessAssetGarbageCollector` already runs a daily per-site pass and Spaces
+charges nothing per LIST, so it measures each app bucket while it is there and
+records the figure on the site; the collector carries it onto the snapshot's
+`meta.app_storage_bytes`.
+
+Deliberately *not* folded into `asset_storage_bytes`: that column is what the
+published-build allowance and `ServerlessAssetGuardrail` are measured against,
+and allowances sized for a Vite bundle would fire a warning at the first real
+upload. Same precedent as `asset_requests` — recorded so the tail is visible,
+priced later without a backfill if it needs to be.
+
+Egress from an app bucket is neither measured nor billed: it goes direct from
+Spaces rather than through Cloudflare, and DO exposes no per-bucket transfer
+figure.
+
 ## Cutover
 
 Reversible at every step, and no site goes dark:

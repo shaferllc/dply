@@ -58,6 +58,30 @@ trait ManagesDoSpacesRegistry
     }
 
     /**
+     * Revoke a Spaces access key.
+     *
+     * A 404 means it is already gone, which is the outcome a teardown wanted,
+     * so it reports false rather than raising. Every other failure raises —
+     * a key that outlives its bucket is a live credential nobody is watching.
+     */
+    public function deleteSpacesKey(string $accessKey): bool
+    {
+        $accessKey = trim($accessKey);
+        if ($accessKey === '') {
+            return false;
+        }
+
+        $response = $this->request('delete', '/spaces/keys/'.rawurlencode($accessKey));
+        if ($response->status() === 404) {
+            return false;
+        }
+
+        $this->assertSuccess($response, 'delete Spaces key');
+
+        return true;
+    }
+
+    /**
      * Create a container registry in DigitalOcean.
      *
      * @return array<string, mixed>

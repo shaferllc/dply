@@ -29,10 +29,11 @@ class SweepServerlessAssetsCommand extends Command
         $result = $collector->sweep($dryRun);
 
         $this->info(sprintf(
-            '%s %d site(s) — %s stored, %d object(s) %s (%s reclaimed)',
+            '%s %d site(s) — %s stored (+%s in app buckets), %d object(s) %s (%s reclaimed)',
             $dryRun ? '[dry-run] Swept' : 'Swept',
             $result['sites'],
             $this->bytes($result['bytes']),
+            $this->bytes($result['app_bytes']),
             $result['deleted'],
             $dryRun ? 'would be deleted' : 'deleted',
             $this->bytes($result['reclaimed_bytes']),

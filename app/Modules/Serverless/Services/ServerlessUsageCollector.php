@@ -71,6 +71,7 @@ class ServerlessUsageCollector
             $usage = $this->usageForSite($site, $day, $dayEnd);
             $assets = $assetEgress[(string) $site->id] ?? ['requests' => 0, 'bytes' => 0, 'by_hostname' => []];
             $assetStorageBytes = $this->assetStorageBytes($site);
+            $appStorageBytes = $this->appStorageBytes($site);
 
             $totalInvocations += $usage['invocations'];
             $totalGibSeconds += $usage['gib_seconds'];
@@ -102,6 +103,15 @@ class ServerlessUsageCollector
                         // double-counting rule can be recomputed from stored
                         // data instead of re-collected.
                         'assets_by_hostname' => $assets['by_hostname'] ?: null,
+                        // The function's OWN bucket — recorded, never priced.
+                        // Same precedent as asset_requests: measuring it makes
+                        // the tail visible, and pricing it later needs no
+                        // backfill. Kept out of asset_storage_bytes on
+                        // purpose: that column is what the build allowance and
+                        // {@see ServerlessAssetGuardrail} are measured
+                        // against, and folding uploads in would trip a warning
+                        // written about a Vite bundle.
+                        'app_storage_bytes' => $appStorageBytes ?: null,
                     ],
                 ],
             );
@@ -124,6 +134,17 @@ class ServerlessUsageCollector
         $assets = $site->serverlessConfig()['assets'] ?? [];
 
         return is_array($assets) ? max(0, (int) ($assets['storage_bytes'] ?? 0)) : 0;
+    }
+
+    /**
+     * Last measured bytes in the function's own app bucket, written by the
+     * same sweep. Zero until it has one and has been swept once.
+     */
+    private function appStorageBytes(Site $site): int
+    {
+        $bucket = $site->serverlessConfig()['app_bucket'] ?? [];
+
+        return is_array($bucket) ? max(0, (int) ($bucket['storage_bytes'] ?? 0)) : 0;
     }
 
     /**

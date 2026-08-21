@@ -35,17 +35,21 @@ use Throwable;
  * past assets that are still being served.
  *
  * DigitalOcean Spaces bills no per-operation fee, so a daily LIST per site
- * costs nothing.
+ * costs nothing — which is also why the same pass measures each function's own
+ * app bucket ({@see ServerlessAppBucketProvisioner}) while it is here. That
+ * figure is recorded, not billed: the storage a customer's app chooses to keep
+ * is a different product decision from the build dply publishes for them, and
+ * recording it now means pricing it later needs no backfill.
  */
 class ServerlessAssetGarbageCollector
 {
     /**
-     * @return array{sites: int, bytes: int, deleted: int, reclaimed_bytes: int}
+     * @return array{sites: int, bytes: int, deleted: int, reclaimed_bytes: int, app_bytes: int}
      */
     public function sweep(bool $dryRun = false): array
     {
         $sites = $this->assetBearingSites();
-        $totals = ['sites' => 0, 'bytes' => 0, 'deleted' => 0, 'reclaimed_bytes' => 0];
+        $totals = ['sites' => 0, 'bytes' => 0, 'deleted' => 0, 'reclaimed_bytes' => 0, 'app_bytes' => 0];
 
         foreach ($sites as $site) {
             try {
@@ -66,6 +70,7 @@ class ServerlessAssetGarbageCollector
             $totals['bytes'] += $result['bytes'];
             $totals['deleted'] += $result['deleted'];
             $totals['reclaimed_bytes'] += $result['reclaimed_bytes'];
+            $totals['app_bytes'] += $result['app_bytes'];
         }
 
         return $totals;
@@ -75,7 +80,7 @@ class ServerlessAssetGarbageCollector
      * Sweep one site: total what it stores, delete what no retained publish
      * still references, and record the measurement on the site.
      *
-     * @return array{bytes: int, deleted: int, reclaimed_bytes: int}
+     * @return array{bytes: int, deleted: int, reclaimed_bytes: int, app_bytes: int}
      */
     public function sweepSite(Site $site, bool $dryRun = false): array
     {
@@ -112,11 +117,13 @@ class ServerlessAssetGarbageCollector
             }
         }
 
+        $appBytes = $this->appBucketBytes($site);
+
         if (! $dryRun) {
-            $this->recordMeasurement($site, $bytes);
+            $this->recordMeasurement($site, $bytes, $appBytes);
         }
 
-        return ['bytes' => $bytes, 'deleted' => $deleted, 'reclaimed_bytes' => $reclaimed];
+        return ['bytes' => $bytes, 'deleted' => $deleted, 'reclaimed_bytes' => $reclaimed, 'app_bytes' => $appBytes ?? 0];
     }
 
     /**
@@ -202,11 +209,39 @@ class ServerlessAssetGarbageCollector
     }
 
     /**
-     * Persist the measurement the usage collector reads. Kept on the site
+     * What the app itself is storing in its own bucket, or null when it has no
+     * dply-provisioned bucket (or the measurement failed).
+     *
+     * Measured here rather than in its own job because this is already the
+     * daily per-site pass that writes the storage meta the collector reads,
+     * and Spaces charges nothing for the LIST it costs.
+     *
+     * Never fails the sweep: the published-asset numbers are the billed ones,
+     * and losing them to an unreachable app bucket would be the worse trade.
+     */
+    private function appBucketBytes(Site $site): ?int
+    {
+        try {
+            return app(ServerlessAppBucketProvisioner::class)->storageBytes($site);
+        } catch (Throwable $e) {
+            Log::warning('serverless.app_bucket.measure_failed', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Persist the measurements the usage collector reads. Kept on the site
      * rather than written straight to a snapshot so the collector stays a pure
      * roll-up and can run on its own cadence.
+     *
+     * A null app-bucket figure leaves the previous one in place — "could not
+     * measure today" is not "the bucket is empty".
      */
-    private function recordMeasurement(Site $site, int $bytes): void
+    private function recordMeasurement(Site $site, int $bytes, ?int $appBytes = null): void
     {
         $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
@@ -214,8 +249,15 @@ class ServerlessAssetGarbageCollector
 
         $assets['storage_bytes'] = $bytes;
         $assets['storage_measured_at'] = now()->toIso8601String();
-
         $serverless['assets'] = $assets;
+
+        if ($appBytes !== null) {
+            $appBucket = is_array($serverless['app_bucket'] ?? null) ? $serverless['app_bucket'] : [];
+            $appBucket['storage_bytes'] = $appBytes;
+            $appBucket['storage_measured_at'] = now()->toIso8601String();
+            $serverless['app_bucket'] = $appBucket;
+        }
+
         $meta['serverless'] = $serverless;
 
         $site->forceFill(['meta' => $meta])->save();

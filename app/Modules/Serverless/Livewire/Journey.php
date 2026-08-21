@@ -377,9 +377,14 @@ class Journey extends Component
 
         $this->confirmingDeleteFunction = false;
 
-        // A namespace dply couldn't reach is the operator's problem to finish,
-        // so name it rather than reporting a clean success.
-        if ($result['remote_error'] !== null) {
+        // A namespace or bucket dply couldn't reach is the operator's problem
+        // to finish, so name it rather than reporting a clean success.
+        if ($result['bucket_error'] !== null) {
+            $this->toastError(__('Deleted :name from dply, but its storage bucket could not be removed. (:error)', [
+                'name' => $name,
+                'error' => $result['bucket_error'],
+            ]));
+        } elseif ($result['remote_error'] !== null) {
             $this->toastError(__('Deleted :name from dply, but its functions namespace could not be removed. (:error)', [
                 'name' => $name,
                 'error' => $result['remote_error'],

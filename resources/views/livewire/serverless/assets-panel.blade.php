@@ -57,6 +57,34 @@
             @endunless
         </div>
 
+        {{-- The app's own bucket. Deliberately its own block, not a third
+             meter: this is storage the app writes, on separate credentials,
+             and it is measured rather than billed. --}}
+        @if ($appBucket)
+            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                    <span class="font-semibold text-brand-ink">{{ __('App storage') }}</span>
+                    <span class="text-2xs tabular-nums text-brand-moss">
+                        {{ $bytes($appBucket['bytes']) }}
+                        @if ($appBucket['measured_at'] !== '')
+                            · {{ __('measured :when', ['when' => \Illuminate\Support\Carbon::parse($appBucket['measured_at'])->diffForHumans()]) }}
+                        @endif
+                    </span>
+                </div>
+                <p class="mt-1 text-2xs text-brand-moss">
+                    {{ __('Your app writes here with :disk — credentials are in its environment as :prefix*, and reach no other function.', [
+                        'disk' => 'Storage::disk(\''.$appBucket['disk'].'\')',
+                        'prefix' => $appBucket['env_prefix'],
+                    ]) }}
+                </p>
+                <code class="mt-1 block break-all text-2xs text-brand-ink">{{ $appBucket['bucket'] }}@if ($appBucket['region'] !== '') · {{ $appBucket['region'] }}@endif</code>
+                <p class="mt-1 text-2xs text-brand-moss">
+                    {{ __('Uploads from the browser go straight to the bucket with a signed URL — the function never carries the file.') }}
+                    <a href="{{ route('docs.markdown', 'serverless-storage') }}" class="font-semibold text-brand-forest hover:underline">{{ __('How to upload') }}</a>
+                </p>
+            </div>
+        @endif
+
         {{-- Usage against the included allowance. --}}
         <div class="grid gap-3 sm:grid-cols-2">
             @foreach ([
