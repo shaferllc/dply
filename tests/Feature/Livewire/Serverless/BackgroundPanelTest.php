@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Serverless\Livewire\BackgroundPanel;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -144,4 +145,85 @@ test('the panel warns when the connection has been pointed away from a live name
     Livewire::actingAs($this->user)
         ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
         ->assertSee('not being used');
+});
+
+/** Warm start on with no tick recorded: the panel must say so, not look healthy. */
+test('warm start reports when no ping has ever landed', function () {
+    $this->site->setServerlessKeepWarm(true);
+
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
+        ->assertSee('No ping recorded yet')
+        ->assertDontSee('served warm');
+});
+
+test('warm start shows the last ping when the tick is current', function () {
+    $this->site->setServerlessKeepWarm(true);
+
+    FunctionInvocation::create([
+        'site_id' => $this->site->id,
+        'source' => FunctionInvocation::SOURCE_TICK,
+        'state' => FunctionInvocation::STATE_COMPLETED,
+        'task' => 'keep-warm',
+        'success' => true,
+        'duration_ms' => 228,
+        'cold' => false,
+        'created_at' => now()->subSeconds(30),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
+        ->assertSee('Pinged')
+        ->assertSee('served warm')
+        ->assertSee('228 ms')
+        ->assertDontSee('No ping recorded yet');
+});
+
+/** A stopped control-plane scheduler is the failure this line exists to expose. */
+test('warm start flags a stale tick as a stopped scheduler', function () {
+    $this->site->setServerlessKeepWarm(true);
+
+    FunctionInvocation::create([
+        'site_id' => $this->site->id,
+        'source' => FunctionInvocation::SOURCE_TICK,
+        'state' => FunctionInvocation::STATE_COMPLETED,
+        'task' => 'keep-warm',
+        'success' => true,
+        'duration_ms' => 228,
+        'cold' => false,
+        'created_at' => now()->subMinutes(20),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
+        ->assertSee('dply expects one every minute')
+        ->assertDontSee('served warm');
+});
+
+test('warm start separates a failing function from a missing ping', function () {
+    $this->site->setServerlessKeepWarm(true);
+
+    FunctionInvocation::create([
+        'site_id' => $this->site->id,
+        'source' => FunctionInvocation::SOURCE_TICK,
+        'state' => FunctionInvocation::STATE_COMPLETED,
+        'task' => 'keep-warm',
+        'success' => false,
+        'duration_ms' => 12,
+        'cold' => true,
+        'created_at' => now()->subSeconds(30),
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
+        ->assertSee('did not answer')
+        ->assertDontSee('No ping recorded yet');
+});
+
+/** Off means quiet — no ping line, no false alarm about the scheduler. */
+test('warm start off shows no ping feedback at all', function () {
+    Livewire::actingAs($this->user)
+        ->test(BackgroundPanel::class, ['site' => $this->site])
+        ->assertSee('Warm start')
+        ->assertDontSee('No ping recorded yet');
 });

@@ -11,6 +11,7 @@ use App\Modules\Serverless\Models\ServerlessFailedJob;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
 use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
+use App\Modules\Serverless\Support\WarmStartStatus;
 use App\Support\Sites\SiteRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -215,6 +216,18 @@ class BackgroundPanel extends Component
     public function failedJobCount(): int
     {
         return ServerlessFailedJob::query()->where('site_id', $this->siteId)->count();
+    }
+
+    /**
+     * The most recent dply tick against this function — the panel's proof
+     * that warming is actually happening, or that nothing is pinging at all.
+     *
+     * @return array{human: string, iso: string, ok: bool, durationMs: int, cold: bool, task: string, stale: bool}|null
+     */
+    #[Computed]
+    public function lastTick(): ?array
+    {
+        return WarmStartStatus::for($this->site());
     }
 
     private function flip(string $key): bool

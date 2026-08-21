@@ -13,6 +13,11 @@
     $lastDeployedAt = $cfg['last_deployed_at'] ?? null;
     $keepWarm = $site->serverlessKeepWarmEnabled();
     $backgroundEnabled = $site->serverlessBackgroundProcessingEnabled();
+
+    // Whether any ping is expected at all. Only then is a missing tick worth
+    // reporting — a warm-start-off function is supposed to be silent.
+    $warmExpected = $keepWarm || $backgroundEnabled;
+    $warmStatus = $warmExpected ? \App\Modules\Serverless\Support\WarmStartStatus::for($site) : null;
     $neverDeployed = $revision === '';
 
     // Saved limits live in meta.serverless.limits; deployed_limits is what the
@@ -463,6 +468,14 @@
                 </button>
             </x-slot:actions>
         </x-workspace-panel-head>
+
+        {{-- The toggle alone cannot tell the operator warming is happening;
+             this is the same evidence line the Overview panel shows. --}}
+        @if ($warmExpected)
+            <div class="px-3 pb-3 sm:px-4">
+                <x-warm-start-status :status="$warmStatus" />
+            </div>
+        @endif
     </section>
 
     {{-- 5. CLI parity --}}

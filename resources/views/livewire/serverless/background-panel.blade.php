@@ -181,23 +181,34 @@
             </div>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-3">
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Warm start') }}</p>
-                <p class="mt-0.5 text-xs text-brand-moss">
-                    @if ($enabled)
-                        {{ __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.') }}
-                    @elseif ($keepWarm)
-                        {{ __('A minute ping holds the function warm so visitors do not pay a cold start. No redeploy needed.') }}
-                    @else
-                        {{ __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.') }}
-                    @endif
-                </p>
+        {{-- Warming is invisible by construction: the pings leave the control
+             plane on a cron and nothing about the toggle proves they landed. The
+             last-tick line below is that proof, and it is the only place a
+             stopped scheduler shows up in the UI. Polled so it stays true while
+             the tab is open — .visible keeps the panel's queries off-screen. --}}
+        <div class="border-t border-brand-ink/10 pt-3" @if ($keepWarm || $enabled) wire:poll.60s.visible @endif>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Warm start') }}</p>
+                    <p class="mt-0.5 text-xs text-brand-moss">
+                        @if ($enabled)
+                            {{ __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.') }}
+                        @elseif ($keepWarm)
+                            {{ __('A minute ping holds the function warm so visitors do not pay a cold start. No redeploy needed.') }}
+                        @else
+                            {{ __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.') }}
+                        @endif
+                    </p>
+                </div>
+                <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" wire:target="toggleKeepWarm" class="{{ $btnOutline }} shrink-0">
+                    <span wire:loading.remove wire:target="toggleKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
+                    <span wire:loading wire:target="toggleKeepWarm">{{ __('Saving…') }}</span>
+                </button>
             </div>
-            <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" wire:target="toggleKeepWarm" class="{{ $btnOutline }} shrink-0">
-                <span wire:loading.remove wire:target="toggleKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
-                <span wire:loading wire:target="toggleKeepWarm">{{ __('Saving…') }}</span>
-            </button>
+
+            @if ($keepWarm || $enabled)
+                <x-warm-start-status :status="$this->lastTick" class="mt-2" />
+            @endif
         </div>
     </div>
 
