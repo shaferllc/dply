@@ -2,13 +2,13 @@
 
 namespace App\Modules\Certificates\Services;
 
-use App\Http\Controllers\AcmeDnsHookController;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Models\ServerWildcardCertificate;
 use App\Modules\Cloud\Namecheap\NamecheapDnsService;
 use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\SshConnection;
+use App\Support\Acme\AcmeDnsHook;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -169,8 +169,8 @@ class WildcardCertificateIssuer
             'DPLY_ACME_PROVIDER='.escapeshellarg($provider),
             'DPLY_ACME_TOKEN='.escapeshellarg($token),
             'DPLY_ACME_ZONE='.escapeshellarg($zone),
-            'DPLY_ACME_HOOK_URL='.escapeshellarg(AcmeDnsHookController::hookUrl()),
-            'DPLY_ACME_HOOK_SECRET='.escapeshellarg(AcmeDnsHookController::hookSecret()),
+            'DPLY_ACME_HOOK_URL='.escapeshellarg(AcmeDnsHook::url()),
+            'DPLY_ACME_HOOK_SECRET='.escapeshellarg(AcmeDnsHook::secret()),
             '',
         ]);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\Acme\AcmeDnsHook;
 use App\Modules\Cloud\Namecheap\NamecheapDnsService;
 use App\Support\TestingDomains;
 use Illuminate\Http\JsonResponse;
@@ -62,20 +63,18 @@ class AcmeDnsHookController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Retained as thin delegates so existing callers keep working. The values
+     * live in {@see AcmeDnsHook} because the Certificates module needs them
+     * too, and a module may not reach into the presentation shell.
+     */
     public static function hookSecret(): string
     {
-        $explicit = trim((string) config('testing_domains.acme_hook_secret', ''));
-        if ($explicit !== '') {
-            return $explicit;
-        }
-
-        return (string) config('app.key', '');
+        return AcmeDnsHook::secret();
     }
 
     public static function hookUrl(): string
     {
-        $base = rtrim((string) (config('dply.public_app_url') ?: config('app.url')), '/');
-
-        return $base.'/hooks/acme-dns';
+        return AcmeDnsHook::url();
     }
 }
