@@ -94,8 +94,20 @@ A credential's secret is shown **once**, when it is minted. dply stores a hash, 
 
 Revoking takes effect immediately. Any app still presenting a revoked key starts failing every cache call, including its locks.
 
+## Dedicated caches
+
+If you need speed rather than coordination — or tagged caching, which the shared tier cannot do — create a **dedicated cache** instead. It is a real Redis cluster: roughly 40× faster, as large as you size it, and `Cache::tags()` and `Cache::flush()` both work.
+
+Create one from the same **New cache** button and pick the Dedicated tier. It takes a few minutes to provision, and the cache page shows the cluster's status while it does.
+
+Resizing, backups, and deleting the cluster live on the cluster's own page under **Cloud → Databases**, linked from the cache. There is one control surface for it rather than two.
+
+Managed Redis clusters you created before dply Cache existed still work exactly as they did — they now also appear under **Services → Caches** so they are manageable in one place.
+
 ## Pricing
 
-Free. There is no paid tier of the shared cache, and no per-request charge.
+The shared cache is **free**. There is no paid tier of it and no per-request charge.
 
-If you need speed rather than coordination, a **dedicated cache** — a real Redis cluster — is the upgrade, billed like any other managed database. Moving to one changes `CACHE_STORE` from `dynamodb` to `redis`, so it is a redeploy rather than a hot swap.
+A dedicated cache is billed like any other managed database, on top of your plan.
+
+Moving a site from shared to dedicated changes `CACHE_STORE` from `dynamodb` to `redis`, so it takes effect on the next deploy rather than instantly. Detaching removes every variable from both tiers, so a swap never leaves half a configuration behind.

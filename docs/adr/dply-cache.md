@@ -275,6 +275,14 @@ attached.
     is instant and touches no infrastructure. The UI must not show a
     provisioning spinner for the second.
 
+    **Amended during M3.** Resize is not reimplemented on the cache surface at
+    all — the dedicated cache page links to the cluster's existing management
+    page instead. Duplicating the control would be a second surface for one
+    resource, next to the backups and deletion that already live there, and the
+    ADR's own decision 3 says the dedicated tier delegates rather than grows its
+    own path. Shared caches have no scale control, because decision 16 removed
+    the paid quota tiers there was going to be something to change.
+
     **Flush is a dashboard operation.** `DynamoDbStore::flush()` throws because
     DynamoDB cannot truncate a table — but dply owns the shared store, so the
     control plane can do what the driver cannot. This is the most-wanted cache

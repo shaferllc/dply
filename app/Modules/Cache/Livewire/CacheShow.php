@@ -202,13 +202,22 @@ class CacheShow extends Component
             'usage' => $usage,
             'quotaBytes' => $cache->quotaBytes(),
             'quotaFraction' => $usage->fractionOf($cache->quotaBytes()),
-            'credentials' => $cache->credentials()->orderByDesc('created_at')->get(),
+            'credentials' => $cache->isShared()
+                ? $cache->credentials()->orderByDesc('created_at')->get()
+                : collect(),
             'attachedSites' => $cache->sites()->get(),
             'attachableSites' => Site::query()
                 ->where('organization_id', $cache->organization_id)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'endpoint' => CacheEndpoint::base(),
+            // Rendered rather than composed in the view so the tier branch
+            // lives in one place. Secrets are the cluster's own password,
+            // which dply already stores and can re-show — unlike a shared
+            // cache's credential, which is hashed.
+            'dedicatedEnvPreview' => $cache->isShared()
+                ? ''
+                : CacheWiring::asEnvBlock(CacheWiring::envFor($cache, null, null)),
             'canManage' => auth()->user()?->can('update', $cache) ?? false,
             'canManageCredentials' => auth()->user()?->can('manageCredentials', $cache) ?? false,
             'canFlush' => auth()->user()?->can('flush', $cache) ?? false,

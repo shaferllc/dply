@@ -38,22 +38,57 @@ final class CacheWiring
         'CACHE_STORE',
         'CACHE_DRIVER',
         'CACHE_PREFIX',
+        // Shared tier.
         'DYNAMODB_ENDPOINT',
         'DYNAMODB_CACHE_TABLE',
         'AWS_ACCESS_KEY_ID',
         'AWS_SECRET_ACCESS_KEY',
         'AWS_DEFAULT_REGION',
+        // Dedicated tier. Listed here even though only one tier writes them at
+        // a time, because a site can be MOVED between tiers — and a detach
+        // that only knew about the tier the cache happens to be on now would
+        // strip half of what an earlier attach wrote.
+        'REDIS_URL',
+        'REDIS_HOST',
+        'REDIS_PORT',
+        'REDIS_USERNAME',
+        'REDIS_PASSWORD',
+        'REDIS_SCHEME',
     ];
 
     /**
+     * The env for one cache, whichever tier it is on.
+     *
+     * The two tiers produce genuinely different maps — `CACHE_STORE=dynamodb`
+     * plus an endpoint, or `CACHE_STORE=redis` plus a connection — which is the
+     * seam the ADR accepted when it chose protocol compatibility over a RESP
+     * proxy: upgrading a site from shared to dedicated is a redeploy, not a hot
+     * swap. Vapor has the same seam.
+     *
      * @return array<string, string>
      */
     public static function envFor(
         ManagedCache $cache,
-        ServiceCredential $credential,
-        string $plaintextSecret,
+        ?ServiceCredential $credential,
+        ?string $plaintextSecret,
         ?string $keyPrefix = null,
     ): array {
+        $env = $cache->isShared()
+            ? self::sharedEnv($cache, $credential, $plaintextSecret)
+            : self::dedicatedEnv($cache);
+
+        if ($keyPrefix !== null && trim($keyPrefix) !== '') {
+            $env['CACHE_PREFIX'] = trim($keyPrefix);
+        }
+
+        return $env;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function sharedEnv(ManagedCache $cache, ?ServiceCredential $credential, ?string $secret): array
+    {
         $env = [
             'CACHE_STORE' => 'dynamodb',
             // The pre-11 alias, so an older app picks the store up too. Same
@@ -61,16 +96,38 @@ final class CacheWiring
             'CACHE_DRIVER' => 'dynamodb',
             'DYNAMODB_ENDPOINT' => CacheEndpoint::base(),
             'DYNAMODB_CACHE_TABLE' => $cache->id,
-            'AWS_ACCESS_KEY_ID' => $credential->accessKeyId(),
-            'AWS_SECRET_ACCESS_KEY' => $plaintextSecret,
             'AWS_DEFAULT_REGION' => (string) config('cache_service.region', 'us-east-1'),
         ];
 
-        if ($keyPrefix !== null && trim($keyPrefix) !== '') {
-            $env['CACHE_PREFIX'] = trim($keyPrefix);
+        if ($credential !== null && $secret !== null) {
+            $env['AWS_ACCESS_KEY_ID'] = $credential->accessKeyId();
+            $env['AWS_SECRET_ACCESS_KEY'] = $secret;
         }
 
         return $env;
+    }
+
+    /**
+     * The dedicated tier's map, derived from the backing cluster.
+     *
+     * Delegated to `CloudDatabase::connectionEnvVars('REDIS')` rather than
+     * rebuilt here, so the TLS handling stays in one place — DigitalOcean and
+     * Upstash managed Redis are TLS-only, and a plaintext dial to :25061
+     * surfaces as "read error on connection" and a 500 after deploy rather
+     * than anything that names the real problem.
+     *
+     * @return array<string, string>
+     */
+    private static function dedicatedEnv(ManagedCache $cache): array
+    {
+        $database = $cache->cloudDatabase;
+
+        $connection = $database === null ? [] : $database->connectionEnvVars('REDIS');
+
+        return array_merge([
+            'CACHE_STORE' => 'redis',
+            'CACHE_DRIVER' => 'redis',
+        ], $connection);
     }
 
     /**

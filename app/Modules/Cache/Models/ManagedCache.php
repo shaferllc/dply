@@ -124,15 +124,50 @@ class ManagedCache extends Model
         return $this->tier === self::TIER_SHARED;
     }
 
+    /**
+     * Whether this cache is usable.
+     *
+     * For a dedicated cache the answer is the CLUSTER's, not this row's. The
+     * cluster already has a provisioning job that maintains its own status, so
+     * mirroring it into a second column would create two truths that drift
+     * whenever a poll lands between them. Delegating means there is nothing to
+     * keep in sync.
+     */
     public function isActive(): bool
     {
-        return $this->status === self::STATUS_ACTIVE;
+        if ($this->isShared()) {
+            return $this->status === self::STATUS_ACTIVE;
+        }
+
+        return $this->cloudDatabase?->isActive() ?? false;
     }
 
-    /** Whether the data plane should serve requests for this cache at all. */
+    /** The status to show, resolved the same way {@see isActive()} resolves. */
+    public function effectiveStatus(): string
+    {
+        if ($this->isShared()) {
+            return $this->status;
+        }
+
+        return match ($this->cloudDatabase?->status) {
+            CloudDatabase::STATUS_ACTIVE => self::STATUS_ACTIVE,
+            CloudDatabase::STATUS_FAILED => self::STATUS_FAILED,
+            CloudDatabase::STATUS_DELETING => self::STATUS_DELETING,
+            default => self::STATUS_PROVISIONING,
+        };
+    }
+
+    /**
+     * Whether the dply-hosted data plane should serve requests for this cache.
+     *
+     * Shared only, and deliberately narrower than {@see isActive()}: a
+     * dedicated cache is a cluster the customer's app dials directly, so there
+     * is nothing for the compatibility endpoint to serve and a request naming
+     * one is a ResourceNotFound rather than a redirect.
+     */
     public function isReachable(): bool
     {
-        return $this->isActive() && $this->isShared();
+        return $this->isShared() && $this->status === self::STATUS_ACTIVE;
     }
 
     /**

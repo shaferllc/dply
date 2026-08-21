@@ -42,12 +42,20 @@ class DatabaseCreate extends Component
     public string $region = '';
 
     /**
+     * Engines offered here.
+     *
+     * Redis is deliberately absent. A managed Redis IS a cache, and it now has
+     * a product surface of its own at /caches — offering it from two places
+     * would ship exactly the discoverability failure
+     * docs/adr/managed-services-tier.md was written to fix, this time
+     * knowingly. Existing `engine=redis` rows keep working and are adopted by
+     * a ManagedCache; see docs/adr/dply-cache.md, decision 10.
+     *
      * @var list<string>
      */
     private const ENGINES = [
         CloudDatabase::ENGINE_POSTGRES,
         CloudDatabase::ENGINE_MYSQL,
-        CloudDatabase::ENGINE_REDIS,
     ];
 
     public function mount(): void

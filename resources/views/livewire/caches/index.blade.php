@@ -128,17 +128,26 @@
                                         {{ $cache->isShared() ? __('Shared · free') : __('Dedicated') }}
                                     </td>
                                     <td class="px-4 py-3">
-                                        <div class="flex items-center gap-2">
-                                            <div class="h-1.5 w-24 overflow-hidden rounded-full bg-brand-ink/10">
-                                                <div class="h-full rounded-full {{ $meterTone($fraction) }}" style="width: {{ max(2, (int) round($fraction * 100)) }}%"></div>
+                                        @if ($cache->isShared())
+                                            <div class="flex items-center gap-2">
+                                                <div class="h-1.5 w-24 overflow-hidden rounded-full bg-brand-ink/10">
+                                                    <div class="h-full rounded-full {{ $meterTone($fraction) }}" style="width: {{ max(2, (int) round($fraction * 100)) }}%"></div>
+                                                </div>
+                                                <span class="text-xs text-brand-moss">{{ $bytes($u->residentBytes) }} / {{ $bytes($quota) }}</span>
                                             </div>
-                                            <span class="text-xs text-brand-moss">{{ $bytes($u->residentBytes) }} / {{ $bytes($quota) }}</span>
-                                        </div>
+                                        @else
+                                            {{-- A dedicated cache's bytes live on someone else's cluster; dply
+                                                 has no counter for it and should not invent one. --}}
+                                            <span class="text-xs text-brand-moss">{{ $cache->cloudDatabase?->size ?: __('—') }}</span>
+                                        @endif
                                     </td>
-                                    <td class="px-4 py-3 text-sm tabular-nums text-brand-moss">{{ number_format($u->itemCount) }}</td>
+                                    <td class="px-4 py-3 text-sm tabular-nums text-brand-moss">
+                                        {{ $cache->isShared() ? number_format($u->itemCount) : '—' }}
+                                    </td>
                                     <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$cache->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
-                                            {{ ucfirst($cache->status) }}
+                                        @php $state = $cache->effectiveStatus(); @endphp
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ $statusTone[$state] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
+                                            {{ ucfirst($state) }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 text-right">
@@ -179,6 +188,36 @@
                     class="mt-1 w-full rounded-xl border-brand-ink/15 text-sm focus:border-brand-sage focus:ring-brand-sage"
                 />
                 @error('createName') <p class="mt-1 text-xs text-brand-rust">{{ $message }}</p> @enderror
+
+                <fieldset class="mt-4">
+                    <legend class="text-sm font-medium text-brand-ink">{{ __('Tier') }}</legend>
+                    <div class="mt-2 space-y-2">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-ink/10 p-3 hover:bg-brand-sand/20">
+                            <input type="radio" wire:model.live="createTier" value="shared" class="mt-1 text-brand-ink focus:ring-brand-sage" />
+                            <span>
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Shared — free') }}</span>
+                                <span class="block text-xs text-brand-moss">{{ __('Ready immediately. Best for locks and counters. ~10–40ms per operation, 64 MiB.') }}</span>
+                            </span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-ink/10 p-3 hover:bg-brand-sand/20">
+                            <input type="radio" wire:model.live="createTier" value="dedicated" class="mt-1 text-brand-ink focus:ring-brand-sage" />
+                            <span>
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Dedicated Redis') }}</span>
+                                <span class="block text-xs text-brand-moss">{{ __('Your own cluster, ~40× faster, supports tagged caching. Takes a few minutes and is billed as a managed database.') }}</span>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                @if ($createTier === 'dedicated')
+                    <label for="createSize" class="mt-4 block text-sm font-medium text-brand-ink">{{ __('Size') }}</label>
+                    <select id="createSize" wire:model="createSize" class="mt-1 w-full rounded-xl border-brand-ink/15 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                        @foreach ($sizeTiers as $tier)
+                            <option value="{{ $tier }}">{{ ucfirst($tier) }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Billed as a managed database, on top of your plan.') }}</p>
+                @endif
 
                 <div class="mt-6 flex justify-end gap-2">
                     <button type="button" wire:click="cancelCreate" class="rounded-xl px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>

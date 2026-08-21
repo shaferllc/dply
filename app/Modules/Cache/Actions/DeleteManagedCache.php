@@ -28,7 +28,7 @@ final class DeleteManagedCache
     public function __construct(private readonly PostgresCacheStore $store) {}
 
     /**
-     * @return array{items: int, credentials: int, sites: int}
+     * @return array{items: int, credentials: int, sites: int, cluster: ?string}
      */
     public function handle(ManagedCache $cache): array
     {
@@ -52,12 +52,25 @@ final class DeleteManagedCache
 
         $sites = DB::table('cache_site')->where('cache_id', $cache->id)->delete();
 
+        /*
+         * A dedicated cache's CLUSTER is deliberately left running.
+         *
+         * Deleting it is destructive, irreversible, and owned by the Cloud
+         * surface that created it — the same place its backups, resizes and
+         * billing live. Tearing down a customer's Redis as a side effect of
+         * removing a product-page row is not a decision this action should be
+         * making on their behalf. The caller surfaces the cluster so it can be
+         * dealt with deliberately.
+         */
+        $cluster = $cache->isShared() ? null : $cache->cloud_database_id;
+
         $cache->delete();
 
         return [
             'items' => $items,
             'credentials' => $credentials->count(),
             'sites' => $sites,
+            'cluster' => $cluster,
         ];
     }
 }

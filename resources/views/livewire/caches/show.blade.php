@@ -34,7 +34,7 @@
             icon="heroicon-o-bolt"
         >
             <x-slot:actions>
-                @if ($canFlush)
+                @if ($canFlush && $cache->isShared())
                     <button type="button" wire:click="confirmFlush" class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-sand/40">
                         <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                         {{ __('Flush') }}
@@ -60,7 +60,10 @@
                 </div>
             @endif
 
-            {{-- Usage --}}
+            {{-- Usage. Shared tier only: a dedicated cache's bytes live on a
+                 cluster dply does not count, and inventing a number for it
+                 would be worse than showing none. --}}
+            @if ($cache->isShared())
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-5">
                 <div class="flex items-baseline justify-between">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Storage') }}</h3>
@@ -75,17 +78,59 @@
                     {{ __('At quota, writes are refused rather than evicted — expired keys are reclaimed on a schedule, and nothing is evicted early to make room. If you are storing page output rather than locks and counters, a dedicated cache is both larger and far faster.') }}
                 </p>
             </section>
+            @else
+            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Cluster') }}</h3>
+                @if ($cache->cloudDatabase)
+                    <dl class="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                        <div class="flex justify-between gap-4 py-1">
+                            <dt class="text-brand-moss">{{ __('Status') }}</dt>
+                            <dd class="text-brand-ink">{{ ucfirst($cache->effectiveStatus()) }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4 py-1">
+                            <dt class="text-brand-moss">{{ __('Size') }}</dt>
+                            <dd class="text-brand-ink">{{ $cache->cloudDatabase->size }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4 py-1">
+                            <dt class="text-brand-moss">{{ __('Region') }}</dt>
+                            <dd class="text-brand-ink">{{ $cache->cloudDatabase->region ?: '—' }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4 py-1">
+                            <dt class="text-brand-moss">{{ __('Backend') }}</dt>
+                            <dd class="text-brand-ink">{{ $cache->cloudDatabase->backend }}</dd>
+                        </div>
+                    </dl>
+                    {{-- Resize, backups and deletion live where the cluster
+                         does. Duplicating them here would be a second control
+                         surface for one resource. --}}
+                    @if (Route::has('cloud.databases.show'))
+                        <a href="{{ route('cloud.databases.show', $cache->cloudDatabase) }}" wire:navigate class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-ink hover:text-brand-forest">
+                            {{ __('Resize or manage this cluster') }}
+                            <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                        </a>
+                    @endif
+                @else
+                    <p class="mt-2 text-sm text-brand-rust">{{ __('The backing cluster is missing — this cache cannot serve anything.') }}</p>
+                @endif
+            </section>
+            @endif
 
             {{-- Capability surface. Stated, not discovered in production. --}}
             <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5">
                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('What works on this tier') }}</h3>
                 <dl class="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
-                    @foreach ([
+                    @foreach ($cache->isShared() ? [
                         ['Cache::get() / put() / increment()', true, __('Atomic.')],
                         ['Cache::lock()', true, __('Real mutexes across containers.')],
                         ['Cache::many() / putMany()', true, __('One round trip for N keys.')],
                         ['Cache::tags()', false, __('Throws — the driver is not taggable.')],
                         ['Cache::flush()', false, __('Throws — use the Flush button above.')],
+                    ] : [
+                        ['Cache::get() / put() / increment()', true, __('Atomic.')],
+                        ['Cache::lock()', true, __('Real mutexes across containers.')],
+                        ['Cache::many() / putMany()', true, __('Pipelined.')],
+                        ['Cache::tags()', true, __('Supported — RedisStore is taggable.')],
+                        ['Cache::flush()', true, __('Supported.')],
                     ] as [$label, $supported, $note])
                         <div class="flex items-start gap-2 py-1">
                             @if ($supported)
@@ -100,9 +145,11 @@
                         </div>
                     @endforeach
                 </dl>
-                <p class="mt-3 text-xs text-brand-moss">
-                    {{ __('Each operation is one HTTPS round trip (roughly 10–40ms), against about 0.5ms for a local Redis. That is the trade: this tier exists to make coordination work at all, not to make pages faster. Use Cache::many() for bulk reads, and avoid Cache::get() inside a loop.') }}
-                </p>
+                @if ($cache->isShared())
+                    <p class="mt-3 text-xs text-brand-moss">
+                        {{ __('Each operation is one HTTPS round trip (roughly 10–40ms), against about 0.5ms for a local Redis. That is the trade: this tier exists to make coordination work at all, not to make pages faster. Use Cache::many() for bulk reads, and avoid Cache::get() inside a loop.') }}
+                    </p>
+                @endif
             </section>
 
             {{-- Sites --}}
@@ -151,7 +198,11 @@
                 @endif
             </section>
 
-            {{-- Credentials --}}
+            {{-- Credentials. Shared tier only: a dedicated cache is dialled
+                 over RESP with the cluster's own password, so there is no dply
+                 endpoint in front of it and nothing for a ServiceCredential to
+                 authorise. --}}
+            @if ($cache->isShared())
             <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5">
                 <div class="flex items-center justify-between">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
@@ -188,20 +239,28 @@
                     @endforeach
                 </ul>
             </section>
+            @endif
 
             {{-- Manual wiring, for an app that is not a dply site. --}}
             <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5">
                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Wiring an external app') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('No package to install — this is Laravel\'s built-in dynamodb cache store.') }}
-                </p>
-                <pre class="mt-3 overflow-x-auto rounded-xl bg-brand-ink px-3 py-2 text-xs leading-relaxed text-brand-cream"><code>CACHE_STORE=dynamodb
+                @if ($cache->isShared())
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('No package to install — this is Laravel\'s built-in dynamodb cache store.') }}
+                    </p>
+                    <pre class="mt-3 overflow-x-auto rounded-xl bg-brand-ink px-3 py-2 text-xs leading-relaxed text-brand-cream"><code>CACHE_STORE=dynamodb
 DYNAMODB_ENDPOINT={{ $endpoint ?: 'https://…' }}
 DYNAMODB_CACHE_TABLE={{ $cache->id }}
 AWS_DEFAULT_REGION={{ config('cache_service.region') }}
 AWS_ACCESS_KEY_ID=&lt;{{ __('from a credential above') }}&gt;
 AWS_SECRET_ACCESS_KEY=&lt;{{ __('shown once, when minted') }}&gt;</code></pre>
-                @if ($endpoint === '')
+                @else
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('Laravel\'s built-in redis store, dialled directly. The connection is TLS-only, which REDIS_SCHEME carries.') }}
+                    </p>
+                    <pre class="mt-3 overflow-x-auto rounded-xl bg-brand-ink px-3 py-2 text-xs leading-relaxed text-brand-cream"><code>{{ $dedicatedEnvPreview }}</code></pre>
+                @endif
+                @if ($cache->isShared() && $endpoint === '')
                     <p class="mt-2 text-xs text-brand-rust">
                         {{ __('No public endpoint is configured — set DPLY_CACHE_PUBLIC_URL or DPLY_PUBLIC_APP_URL, or nothing outside this machine can reach the cache.') }}
                     </p>
