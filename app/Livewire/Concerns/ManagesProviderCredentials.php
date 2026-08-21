@@ -21,6 +21,7 @@ use App\Modules\Cloud\Services\UpCloudService;
 use App\Modules\Cloud\Services\VultrService;
 use App\Support\Cloud\GcpAccessToken;
 use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
+use App\Services\Providers\ProviderCredentialHealth;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
@@ -836,6 +837,8 @@ trait ManagesProviderCredentials
             'name' => $credential->name,
         ]);
 
+        app(ProviderCredentialHealth::class)->markHealthy($credential);
+
         $this->toastSuccess('Provider connected.');
         $this->notifyProviderCredentialStored($provider);
 
@@ -878,27 +881,17 @@ trait ManagesProviderCredentials
                 return;
             }
 
-            match ($credential->provider) {
-                // Light GET /account — confirms the token works (same check as when connecting).
-                'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
-                'cloudflare' => EdgeOrgCredentialConfig::isBootstrapped($credential)
-                    ? (new CloudflareEdgeCredentialValidator)->validate($credential)
-                    : (new CloudflareDnsService($credential))->verifyToken(),
-                'hetzner' => (new HetznerService($credential))->validateToken(),
-                'linode' => (new LinodeService($credential))->validateToken(),
-                'vultr' => (new VultrService($credential))->validateToken(),
-                'upcloud' => (new UpCloudService($credential))->validateToken(),
-                'aws' => (new AwsEc2Service($credential))->validateCredentials(),
-                'gcp' => (new GcpDnsService($credential))->validateCredentials(),
-                'azure' => (new AzureComputeService($credential))->validateCredentials(),
-                'oracle' => (new OracleComputeService($credential))->validateCredentials(),
-                'ploi' => PloiImportDriver::for($credential)->validateConnection(),
-                'forge' => ForgeImportDriver::for($credential)->validateConnection(),
-                default => throw new \RuntimeException(__('Unknown provider.')),
-            };
-
-            $ok = true;
-            $this->toastSuccess(__('Credentials verified with the provider API.'));
+            $result = app(ProviderCredentialHealth::class)->refresh($credential, force: true);
+            if ($result === true) {
+                $ok = true;
+                $this->toastSuccess(__('Credentials verified with the provider API.'));
+            } elseif ($result === false) {
+                $error = $credential->fresh()?->validation_error ?: __('The provider rejected this credential.');
+                $this->toastError($error);
+            } else {
+                $error = __('Could not reach the provider just now. Try again in a moment.');
+                $this->toastError($error);
+            }
         } catch (\Throwable $e) {
             $error = $e->getMessage();
             $this->toastError($error);

@@ -67,6 +67,16 @@
         </div>
     @endif
 
+    @if ($this->fleetCredentialAlert())
+        <div class="border-b border-rose-200 bg-rose-50 px-5 py-3 sm:px-6">
+            <p class="text-sm font-semibold text-rose-900">{{ $this->fleetCredentialAlert()['message'] }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-rose-800">
+                {{ __('“:name” can no longer connect. Add a new token before adding or retrying a worker.', ['name' => $this->fleetCredentialAlert()['name']]) }}
+            </p>
+            <a href="{{ route('credentials.index') }}" wire:navigate class="mt-2 inline-flex items-center text-xs font-semibold text-rose-900 underline underline-offset-2 hover:text-rose-950">{{ __('Open credentials') }}</a>
+        </div>
+    @endif
+
     @if ($this->fleetScaleRun() && ! $showWorkerProcessModal)
         <div class="border-b border-brand-ink/10">
             @include('livewire.partials.console-action-banner-static', [

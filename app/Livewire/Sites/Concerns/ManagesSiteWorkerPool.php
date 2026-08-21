@@ -117,6 +117,11 @@ trait ManagesSiteWorkerPool
         return null;
     }
 
+    /**
+     * Stored token health for the banner on Worker servers — no live API call.
+     *
+     * @return array{name: string, message: string}|null
+     */
     public function fleetIsInstalling(): bool
     {
         foreach ($this->site->attachedWorkerPools() as $pool) {
@@ -369,7 +374,8 @@ trait ManagesSiteWorkerPool
 
         $server = $this->site->server;
         $org = $this->site->organization ?? $server?->organization;
-        if ($server === null || $org === null || $server->provider_credential_id === null) {
+        $credential = $server instanceof Server ? ProviderCredential::preferredForServer($server) : null;
+        if ($server === null || $org === null || $credential === null) {
             $this->addWorkerCatalogLoading = false;
             $this->addWorkerCatalogError = __('This server has no provider credential to list sizes.');
 
@@ -380,13 +386,15 @@ trait ManagesSiteWorkerPool
             $catalog = ResolveServerCreateCatalog::run(
                 $org,
                 $server->provider->value,
-                (string) $server->provider_credential_id,
+                (string) $credential->id,
                 $this->addWorkerRegion,
                 true,
             );
         } catch (\Throwable $e) {
             $this->addWorkerCatalogLoading = false;
-            $this->addWorkerCatalogError = $e->getMessage();
+            $this->addWorkerCatalogError = ProviderAuthFailure::detected($e->getMessage())
+                ? ProviderAuthFailure::message($server->provider->value)
+                : $e->getMessage();
 
             return;
         }
@@ -422,9 +430,12 @@ trait ManagesSiteWorkerPool
         }
 
         $this->addWorkerSizes = $sizes;
-        $this->addWorkerCatalogError = isset($catalog['error']) && is_string($catalog['error']) && $catalog['error'] !== ''
+        $catalogError = isset($catalog['error']) && is_string($catalog['error']) && $catalog['error'] !== ''
             ? $catalog['error']
             : null;
+        $this->addWorkerCatalogError = $catalogError !== null && ProviderAuthFailure::detected($catalogError)
+            ? ProviderAuthFailure::message($server->provider->value)
+            : $catalogError;
 
         if ($sizes !== [] && ! collect($sizes)->contains(fn (array $size): bool => $size['value'] === $this->addWorkerSize)) {
             $this->addWorkerSize = $sizes[0]['value'];

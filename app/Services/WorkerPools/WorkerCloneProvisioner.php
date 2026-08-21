@@ -158,7 +158,7 @@ class WorkerCloneProvisioner
             'name' => $name,
             'provider' => $app->provider,
             'hosting_backend' => $app->hosting_backend,
-            'provider_credential_id' => $this->preferredProviderCredentialId($app),
+            'provider_credential_id' => ProviderCredential::preferredForServer($app)?->id ?? $app->provider_credential_id,
             'region' => $region,
             'size' => $size,
             'hetzner_network_id' => $sameRegion ? $app->hetzner_network_id : null,
@@ -202,7 +202,8 @@ class WorkerCloneProvisioner
 
         $server->forceFill([
             'status' => Server::STATUS_PENDING,
-            'provider_credential_id' => $this->preferredProviderCredentialId($origin ?? $server),
+            'provider_credential_id' => ProviderCredential::preferredForServer($origin ?? $server)?->id
+                ?? $server->provider_credential_id,
             'meta' => $meta,
         ])->save();
 
@@ -211,23 +212,6 @@ class WorkerCloneProvisioner
         if (filled($server->worker_pool_id)) {
             ReconcileWorkerPoolJob::dispatch((string) $server->worker_pool_id);
         }
-    }
-
-    /**
-     * Adding a token on Credentials creates a new row. Existing servers keep
-     * the credential they were created with, so a worker cloned from the app
-     * would otherwise retry with the dead token.
-     */
-    private function preferredProviderCredentialId(Server $source): ?string
-    {
-        $provider = $source->provider->value;
-        $newest = ProviderCredential::query()
-            ->where('organization_id', $source->organization_id)
-            ->where('provider', $provider)
-            ->orderByDesc('created_at')
-            ->value('id');
-
-        return filled($newest) ? (string) $newest : $source->provider_credential_id;
     }
 
     private function resolveProvider(?string $provider, Server $source): ServerProvider

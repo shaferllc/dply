@@ -25,6 +25,17 @@ test('reports ok when provider validation succeeds', function () {
     expect($result['status'])->toBe('ok');
     expect($result['severity'])->toBe('info');
 });
+
+test('reports invalid when DigitalOcean cannot authenticate', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Unable to authenticate you'], 401),
+    ]);
+
+    $result = BuildProviderCredentialHealth::run('digitalocean', digitalOceanCredential());
+
+    expect($result['status'])->toBe('invalid')
+        ->and($result['severity'])->toBe('error');
+});
 test('reports under scoped when provider rejects access', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Forbidden'], 403),
@@ -38,16 +49,6 @@ test('reports under scoped when provider rejects access', function () {
     expect($result['severity'])->toBe('error');
 });
 
-test('reports invalid when DigitalOcean cannot authenticate', function () {
-    Http::fake([
-        'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Unable to authenticate you'], 401),
-    ]);
-
-    $result = BuildProviderCredentialHealth::run('digitalocean', digitalOceanCredential());
-
-    expect($result['status'])->toBe('invalid')
-        ->and($result['severity'])->toBe('error');
-});
 test('reports rate limited when provider is rate limited', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Rate limit exceeded'], 429),
