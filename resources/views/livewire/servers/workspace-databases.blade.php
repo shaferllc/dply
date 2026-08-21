@@ -105,6 +105,11 @@
                         :icon="$engine === 'sqlite' ? 'heroicon-o-archive-box' : 'heroicon-o-circle-stack'"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
+                        {{-- Icon goes through the component's `icon` prop, not the
+                             slot: x-server-workspace-tab already swaps the icon
+                             for a spinner on its own wire:target. Hand-rolling
+                             that pair in here rendered a SECOND spinner beside
+                             the component's, so a tab click showed two. --}}
                         <span class="inline-flex items-center gap-2">
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! ($capabilities[$engine] ?? false) && ! $engineRow)
