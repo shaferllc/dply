@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\SqsCompatibilityTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Actions\RevokeQueueCredential;
-use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use Aws\Credentials\Credentials;
 use Aws\Signature\SignatureV4;
@@ -24,7 +24,7 @@ use Psr\Http\Message\RequestInterface;
 uses(RefreshDatabase::class);
 
 /**
- * @return array{namespace: QueueNamespace, credential: QueueCredential, secret: string}
+ * @return array{namespace: QueueNamespace, credential: ServiceCredential, secret: string}
  */
 function sqsNamespace(array $queueConfig = []): array
 {
@@ -122,7 +122,7 @@ test('an unknown access key id is rejected', function () {
     // Sign with a key id that was never minted. The credential row is left
     // untouched — mutating it would just make the lookup succeed again.
     $ctx = sqsNamespace();
-    $ctx['credential'] = new QueueCredential(['token_prefix' => 'dplyqzzzzzzzzzzzzzzz']);
+    $ctx['credential'] = new ServiceCredential(['token_prefix' => 'dplyqzzzzzzzzzzzzzzz']);
 
     sqsCall($ctx, 'SendMessage', ['MessageBody' => 'x'])->assertStatus(403);
 });
@@ -263,7 +263,7 @@ test('a credential cannot reach another namespace', function () {
 
 test('a push-only credential cannot receive', function () {
     $ctx = sqsNamespace();
-    $ctx['credential']->forceFill(['scopes' => [QueueCredential::SCOPE_PUSH]])->save();
+    $ctx['credential']->forceFill(['scopes' => [ServiceCredential::SCOPE_PUSH]])->save();
 
     sqsCall($ctx, 'SendMessage', ['MessageBody' => 'x'])->assertOk();
     sqsCall($ctx, 'ReceiveMessage')->assertStatus(403);

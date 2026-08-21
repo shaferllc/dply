@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Models;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Models\Site;
 use App\Modules\Queue\Support\QueueTier;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -37,7 +38,7 @@ use Illuminate\Support\Collection;
  * @property string $tier
  * @property-read ?Organization $organization
  * @property-read ?Site $site
- * @property-read \Illuminate\Database\Eloquent\Collection<int, QueueCredential> $credentials
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ServiceCredential> $credentials
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -92,10 +93,19 @@ class QueueNamespace extends Model
         return $this->belongsTo(Site::class);
     }
 
-    /** @return HasMany<QueueCredential, $this> */
-    public function credentials(): HasMany
+    /**
+     * Credentials granted on this namespace.
+     *
+     * A query, not a relation. Since credentials became org-owned keys holding
+     * a grant map (docs/adr/dply-cache.md, decision 6) there is no
+     * `namespace_id` to hang a `hasMany` on — one key may name this namespace
+     * *and* a cache. The jsonb key test is served by the GIN index on `grants`.
+     *
+     * @return Builder<ServiceCredential>
+     */
+    public function credentials(): Builder
     {
-        return $this->hasMany(QueueCredential::class, 'namespace_id');
+        return ServiceCredential::query()->forResource(ServiceCredential::SERVICE_QUEUE, $this->id);
     }
 
     public function isActive(): bool
@@ -182,7 +192,7 @@ class QueueNamespace extends Model
      * Credentials that could authenticate a request right now — not revoked,
      * not expired. Two may be live at once during a rotation.
      *
-     * @return Collection<int, QueueCredential>
+     * @return Collection<int, ServiceCredential>
      */
     public function liveCredentials()
     {

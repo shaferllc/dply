@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Actions;
 
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use Illuminate\Support\Facades\Log;
 
@@ -36,7 +36,7 @@ final class DeleteQueueNamespace
         $credentials = $namespace->credentials()->get();
 
         foreach ($credentials as $credential) {
-            /** @var QueueCredential $credential */
+            /** @var ServiceCredential $credential */
             $this->revoke->handle($credential);
         }
 

@@ -206,6 +206,7 @@
                 <nav class="flex gap-1 px-3 sm:px-4" aria-label="{{ __('Queue sections') }}">
                     @foreach ([
                         'overview' => __('Overview'),
+                        'workers' => __('Workers'),
                         'credentials' => __('Credentials'),
                         'failed' => __('Failed jobs'),
                     ] as $key => $label)
@@ -465,6 +466,16 @@
                                 <x-danger-button wire:click="confirmDelete">{{ __('Delete queue') }}</x-danger-button>
                             </div>
                         @endif
+                    </div>
+                @endif
+
+                {{-- ============ WORKERS ============ --}}
+                {{-- Its own Livewire component: the worker readout polls every
+                     few seconds, and polling this page would re-run the depth
+                     query and the failed-job reader at the same cadence. --}}
+                @if ($tab === 'workers')
+                    <div class="-mx-3 -mb-3 sm:-mx-4 sm:-mb-4">
+                        @livewire('queue-fleet-panel', ['queueNamespace' => $this->namespace], key('fleet-panel-'.$this->namespace->id))
                     </div>
                 @endif
 

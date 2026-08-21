@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use App\Modules\Serverless\Services\ServerlessAssetPublisher;
+use App\Modules\Serverless\Services\ServerlessLogDrainProvisioner;
 use App\Support\DeployLogSanitizer;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -223,6 +224,13 @@ class DigitalOceanFunctionsArtifactBuilder
         $appBucketLog = $this->ensureAppBucket($site);
         if ($appBucketLog !== '') {
             $log[] = $appBucketLog;
+        }
+
+        // Same window, same reason: the drain's variables must be in the
+        // managed environment before prepare() bundles it, and prepare() only
+        // defaults LOG_CHANNEL when the key is absent.
+        if ($this->syncLogDrain($site)) {
+            $log[] = 'Application log drain attached.';
         }
 
         // Bundle dply's managed environment into the artifact (and mint a
@@ -649,6 +657,29 @@ class DigitalOceanFunctionsArtifactBuilder
         $bucket = (string) (data_get($binding->config, 'bucket') ?? '');
 
         return $bucket === '' ? '' : 'App storage bucket ready: '.$bucket;
+    }
+
+    /**
+     * Re-assert an attached log drain's variables so a hand-edited environment
+     * heals on deploy. Never fatal: losing the drain costs log delivery, and
+     * failing the deploy over it would cost the release.
+     */
+    private function syncLogDrain(Site $site): bool
+    {
+        if ($site->serverless_backend !== Site::SERVERLESS_BACKEND_DPLY) {
+            return false;
+        }
+
+        try {
+            return app(ServerlessLogDrainProvisioner::class)->sync($site);
+        } catch (\Throwable $e) {
+            Log::warning('serverless.log_drain.sync_failed', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function zipExclusions(string $workingDirectory): array

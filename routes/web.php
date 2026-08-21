@@ -55,6 +55,7 @@ use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
+use App\Livewire\Cloud\DatabaseShow as CloudDatabaseShow;
 use App\Livewire\Cloud\DeployDetail;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
@@ -648,6 +649,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');
         Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
+        // Registered after the literal /create leaf so the wizard is not swallowed
+        // by the {cloudDatabase} binding.
+        Route::livewire('cloud/databases/{cloudDatabase}', CloudDatabaseShow::class)->name('cloud.databases.show');
     });
     Route::middleware('feature:surface.edge')->group(function (): void {
         Route::livewire('edge', EdgeIndex::class)->name('edge.index');

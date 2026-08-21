@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\QueueControlPlaneTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Models\User;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
+use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Actions\RevokeQueueCredential;
 use App\Modules\Queue\Actions\RotateQueueCredential;
-use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -72,7 +73,7 @@ test('the credential cache key is derivable from the stored row', function () {
     $result = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders');
 
     expect($result['credential']->cacheKey())
-        ->toBe(QueueCredential::cacheKeyForHash(hash('sha256', $result['plaintext'])));
+        ->toBe(ServiceCredential::cacheKeyForHash(hash('sha256', $result['plaintext'])));
 });
 
 test('revoking a credential evicts its cache entry immediately', function () {
@@ -138,7 +139,7 @@ test('revoking one frees a rotation slot', function () {
 test('an expired credential is not usable and not counted as live', function () {
     $namespace = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders')['namespace'];
 
-    $expired = QueueCredential::mint($namespace, 'old', expiresAt: now()->subDay())['credential'];
+    $expired = (new MintQueueCredential)->handle($namespace, 'old', expiresAt: now()->subDay())['credential'];
 
     expect($expired->isUsable())->toBeFalse();
     expect($namespace->liveCredentials()->pluck('id'))->not->toContain($expired->id);
@@ -147,18 +148,18 @@ test('an expired credential is not usable and not counted as live', function () 
 test('scopes gate push and pop independently', function () {
     $namespace = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders')['namespace'];
 
-    $pushOnly = QueueCredential::mint($namespace, 'producer', [QueueCredential::SCOPE_PUSH])['credential'];
+    $pushOnly = (new MintQueueCredential)->handle($namespace, 'producer', [ServiceCredential::SCOPE_PUSH])['credential'];
 
-    expect($pushOnly->allows(QueueCredential::SCOPE_PUSH))->toBeTrue();
-    expect($pushOnly->allows(QueueCredential::SCOPE_POP))->toBeFalse();
+    expect($pushOnly->allows(ServiceCredential::SCOPE_PUSH))->toBeTrue();
+    expect($pushOnly->allows(ServiceCredential::SCOPE_POP))->toBeFalse();
 });
 
 test('an empty scope list means unrestricted', function () {
     $namespace = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders')['namespace'];
-    $credential = QueueCredential::mint($namespace, 'legacy', [])['credential'];
+    $credential = (new MintQueueCredential)->handle($namespace, 'legacy', [])['credential'];
 
-    expect($credential->allows(QueueCredential::SCOPE_PUSH))->toBeTrue();
-    expect($credential->allows(QueueCredential::SCOPE_POP))->toBeTrue();
+    expect($credential->allows(ServiceCredential::SCOPE_PUSH))->toBeTrue();
+    expect($credential->allows(ServiceCredential::SCOPE_POP))->toBeTrue();
 });
 
 test('bumping the epoch is how a namespace revokes everything at once', function () {

@@ -93,6 +93,26 @@ dply edge status              # linked site, or --site <id>
 dply edge status --wait       # block until latest deploy finishes
 ```
 
+### Errors
+
+Open error events for a site (any kind — BYO, Edge, Serverless), newest first.
+Requires the **`sites.read`** scope.
+
+```sh
+dply errors                        # linked site, or --site <id> / $DPLY_SITE
+dply errors --full                 # detail, remediation code, deep link
+dply errors --category ssl,deploy  # filter by category (comma-separated)
+dply errors --watch                # poll for new events (--interval ms)
+dply errors --json                 # raw payload
+```
+
+`dply errors` **exits 1 when any error is open** and 0 when the site is clean, so
+it works as a post-deploy gate:
+
+```sh
+dply deploy --wait && dply errors
+```
+
 ### Run a command on a server
 
 Requires the **`commands.run`** scope (included in admin CLI presets; refresh with `dply auth refresh`):
@@ -121,5 +141,5 @@ See **Profile → CLI** in the web app. Run `dply help`, `dply ls site`, or `dpl
 | Code | Meaning |
 | --- | --- |
 | 0 | Success |
-| 1 | API or runtime error |
+| 1 | API or runtime error · `dply errors` found open errors |
 | 2 | Bad arguments / not logged in |

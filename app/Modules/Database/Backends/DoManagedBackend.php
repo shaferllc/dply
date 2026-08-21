@@ -37,6 +37,16 @@ class DoManagedBackend implements DatabaseBackend
         return CloudDatabase::BACKEND_DIGITALOCEAN;
     }
 
+    public function supports(string $capability): bool
+    {
+        return in_array($capability, [
+            self::CAP_USERS,
+            self::CAP_RESIZE,
+            self::CAP_METRICS,
+            self::CAP_BACKUPS,
+        ], true);
+    }
+
     public function supportedEngines(): array
     {
         return [
@@ -154,6 +164,72 @@ class DoManagedBackend implements DatabaseBackend
         }
 
         $service->resizeDatabaseCluster((string) $database->backend_id, $size);
+    }
+
+    public function metricCatalog(CloudDatabase $database): array
+    {
+        $catalog = [
+            ['key' => 'cpu', 'label' => __('CPU'), 'format' => 'percent'],
+            ['key' => 'memory_utilization', 'label' => __('Memory'), 'format' => 'percent'],
+            ['key' => 'load_1', 'label' => __('Load (1m)'), 'format' => 'load'],
+        ];
+
+        // Valkey holds its dataset in memory; DigitalOcean reports no disk
+        // series for it, and an always-empty chart reads as a broken one.
+        if ($database->engine !== CloudDatabase::ENGINE_REDIS) {
+            array_splice($catalog, 2, 0, [
+                ['key' => 'disk_utilization', 'label' => __('Disk'), 'format' => 'percent'],
+            ]);
+        }
+
+        return $catalog;
+    }
+
+    public function metric(CloudDatabase $database, string $metric, int $start, int $end): array
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            return [];
+        }
+
+        return $this->service($database)->getDatabaseMetric($database->backend_id, $metric, $start, $end);
+    }
+
+    public function backups(CloudDatabase $database): array
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            return [];
+        }
+
+        return $this->service($database)->listDatabaseBackups($database->backend_id);
+    }
+
+    public function provisionFromBackup(CloudDatabase $target, CloudDatabase $source, string $backupCreatedAt): void
+    {
+        if (! is_string($source->backend_id) || $source->backend_id === '') {
+            throw new RuntimeException(__('The source cluster has no DigitalOcean id.'));
+        }
+
+        $service = $this->service($target);
+
+        // `backup_restore` keys off the provider's cluster *name*, which dply
+        // generates at create and never stores — so it has to be read back.
+        $sourceName = trim($service->getDatabaseCluster($source->backend_id)['name']);
+        if ($sourceName === '') {
+            throw new RuntimeException(__('DigitalOcean did not report a name for the source cluster.'));
+        }
+
+        $cluster = $service->createDatabaseClusterFromBackup(
+            $target->backendEngineSlug(),
+            $target->region !== '' ? $target->region : 'nyc3',
+            $target->backendSizeSlug(),
+            $this->clusterName($target),
+            $sourceName,
+            $backupCreatedAt,
+            $target->backendEngineVersion(),
+            ProviderResourceTags::forCloudDatabase($target),
+        );
+
+        $target->forceFill(['backend_id' => (string) $cluster['id']])->save();
     }
 
     /**

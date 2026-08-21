@@ -8,7 +8,8 @@ use App\Models\Site;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
+use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueDepth;
 use App\Modules\Queue\Support\QueueEndpoint;
@@ -183,14 +184,14 @@ final class ServerlessQueueProvisioner
     {
         $live = $namespace->liveCredentials()->first();
 
-        if ($live instanceof QueueCredential && (string) $live->secret !== '') {
+        if ($live instanceof ServiceCredential && (string) $live->secret !== '') {
             return [
                 'access_key_id' => $live->accessKeyId(),
                 'secret' => (string) $live->secret,
             ];
         }
 
-        $minted = QueueCredential::mint($namespace, __('Deploy credential'));
+        $minted = (new MintQueueCredential)->handle($namespace, __('Deploy credential'));
 
         return [
             'access_key_id' => $minted['credential']->accessKeyId(),

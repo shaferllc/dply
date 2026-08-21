@@ -6,7 +6,7 @@ namespace App\Modules\Queue\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Support\ClaimedJob;
 use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueEntitlements;
@@ -90,7 +90,7 @@ class SqsCompatibilityController extends Controller
 
     private function sendMessage(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_PUSH)) {
+        if (! $context->allows(ServiceCredential::SCOPE_PUSH)) {
             return $this->error('AccessDenied', 'This credential cannot push.', 403);
         }
 
@@ -122,7 +122,7 @@ class SqsCompatibilityController extends Controller
 
     private function sendMessageBatch(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_PUSH)) {
+        if (! $context->allows(ServiceCredential::SCOPE_PUSH)) {
             return $this->error('AccessDenied', 'This credential cannot push.', 403);
         }
 
@@ -173,7 +173,7 @@ class SqsCompatibilityController extends Controller
 
     private function receiveMessage(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_POP)) {
+        if (! $context->allows(ServiceCredential::SCOPE_POP)) {
             return $this->error('AccessDenied', 'This credential cannot receive.', 403);
         }
 
@@ -206,7 +206,7 @@ class SqsCompatibilityController extends Controller
 
     private function deleteMessage(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_POP)) {
+        if (! $context->allows(ServiceCredential::SCOPE_POP)) {
             return $this->error('AccessDenied', 'This credential cannot delete.', 403);
         }
 
@@ -243,7 +243,7 @@ class SqsCompatibilityController extends Controller
      */
     private function deleteMessageBatch(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_POP)) {
+        if (! $context->allows(ServiceCredential::SCOPE_POP)) {
             return $this->error('AccessDenied', 'This credential cannot delete.', 403);
         }
 
@@ -309,7 +309,7 @@ class SqsCompatibilityController extends Controller
 
     private function changeMessageVisibility(Request $request, QueueRequestContext $context): JsonResponse
     {
-        if (! $context->allows(QueueCredential::SCOPE_POP)) {
+        if (! $context->allows(ServiceCredential::SCOPE_POP)) {
             return $this->error('AccessDenied', 'This credential cannot change visibility.', 403);
         }
 

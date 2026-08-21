@@ -89,7 +89,9 @@
                             };
                         @endphp
                         <tr>
-                            <td class="px-4 py-3 font-medium text-slate-900">{{ $database->name }}</td>
+                            <td class="px-4 py-3 font-medium text-slate-900">
+                                <a href="{{ route('cloud.databases.show', $database) }}" wire:navigate class="hover:underline">{{ $database->name }}</a>
+                            </td>
                             <td class="px-4 py-3 text-slate-700">{{ $engineLabel }}</td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $database->version ?: '—' }}</td>
                             <td class="px-4 py-3 text-slate-700">{{ ucfirst((string) $database->size) }}</td>

@@ -147,9 +147,17 @@ final class ServerlessAssetHost
      */
     public static function hostRegex(string $apex): string
     {
+        // Only dots are escaped. A hostname can only contain [a-z0-9.-], and a
+        // hyphen outside a character class is literal in both PCRE and the Rust
+        // engine Cloudflare evaluates `matches` with — so preg_quote's `\-`
+        // would be noise in an expression a human has to paste, and one more
+        // escape sequence for that parser to disagree about. The strip keeps
+        // this injection-safe regardless of what lands in config.
+        $safeApex = (string) preg_replace('/[^a-z0-9.-]/', '', strtolower(trim($apex)));
+
         return '^([a-z0-9][a-z0-9-]*)'
-            .preg_quote(self::HOST_SUFFIX, '/')
-            .'\.'.preg_quote(strtolower(trim($apex)), '/').'$';
+            .self::HOST_SUFFIX
+            .'\.'.str_replace('.', '\.', $safeApex).'$';
     }
 
     /**

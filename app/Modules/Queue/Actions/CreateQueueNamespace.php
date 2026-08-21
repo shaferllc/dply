@@ -6,7 +6,7 @@ namespace App\Modules\Queue\Actions;
 
 use App\Models\Organization;
 use App\Models\Site;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEntitlements;
 use RuntimeException;
@@ -24,7 +24,7 @@ final class CreateQueueNamespace
     public function __construct(private readonly QueueEntitlements $entitlements) {}
 
     /**
-     * @return array{namespace: QueueNamespace, credential: QueueCredential, plaintext: string}
+     * @return array{namespace: QueueNamespace, credential: ServiceCredential, plaintext: string}
      */
     public function handle(
         Organization $organization,
@@ -72,7 +72,7 @@ final class CreateQueueNamespace
             'max_queue_depth' => $tier->hasQueueDepthLimit() ? $tier->maxQueueDepth : null,
         ]);
 
-        $minted = QueueCredential::mint($namespace, __('Default credential'), userId: $userId);
+        $minted = (new MintQueueCredential)->handle($namespace, __('Default credential'), userId: $userId);
 
         return [
             'namespace' => $namespace,

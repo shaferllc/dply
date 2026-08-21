@@ -20,7 +20,14 @@ use Throwable;
 
 /**
  * Resizes a managed DigitalOcean database / Valkey cluster in place and
- * stamps the new plan on the CloudDatabase + binding once it is online.
+ * stamps the new plan on the CloudDatabase (and the site binding, when the
+ * cluster was provisioned for one) once it is online.
+ *
+ * $siteBindingId is nullable because the same cluster reaches this job from
+ * two places: a VM site's `database` binding, which owns a console run and a
+ * status to update, and the standalone managed-databases surface, where the
+ * CloudDatabase row is the only thing there is. The provider call is identical;
+ * only the reporting differs.
  */
 class ResizeManagedDatabaseJob implements ShouldQueue
 {
@@ -35,7 +42,7 @@ class ResizeManagedDatabaseJob implements ShouldQueue
 
     public function __construct(
         public string $cloudDatabaseId,
-        public string $siteBindingId,
+        public ?string $siteBindingId,
         public string $size,
         public int $attempt = 1,
         public ?string $seededConsoleRunId = null,
@@ -46,14 +53,23 @@ class ResizeManagedDatabaseJob implements ShouldQueue
     public function handle(DatabaseRouter $router): void
     {
         $database = CloudDatabase::query()->find($this->cloudDatabaseId);
-        $binding = SiteBinding::query()->find($this->siteBindingId);
-        if ($database === null || ! $binding instanceof SiteBinding) {
+        if ($database === null) {
+            return;
+        }
+
+        $binding = $this->siteBindingId !== null
+            ? SiteBinding::query()->find($this->siteBindingId)
+            : null;
+
+        // A binding id that no longer resolves means the database was detached
+        // mid-resize — stop rather than report against a stale row.
+        if ($this->siteBindingId !== null && ! $binding instanceof SiteBinding) {
             return;
         }
 
         $size = CloudDatabase::resolveSizeSlug($this->size);
         $from = $database->backendSizeSlug();
-        $run = $this->consoleRun($binding, $size);
+        $run = $binding instanceof SiteBinding ? $this->consoleRun($binding, $size) : null;
         $backend = $router->backendFor($database);
 
         try {
@@ -70,7 +86,7 @@ class ResizeManagedDatabaseJob implements ShouldQueue
                 'cloud_database_id' => $database->id,
                 'error' => $e->getMessage(),
             ]);
-            $this->markFailed($binding, $e->getMessage(), $run);
+            $this->markFailed($database, $binding, $e->getMessage(), $run);
 
             return;
         }
@@ -91,7 +107,7 @@ class ResizeManagedDatabaseJob implements ShouldQueue
             }
 
             if ($this->attempt >= self::MAX_ATTEMPTS) {
-                $this->markFailed($binding, 'The cluster resize did not finish in time.', $run);
+                $this->markFailed($database, $binding, 'The cluster resize did not finish in time.', $run);
 
                 return;
             }
@@ -107,15 +123,19 @@ class ResizeManagedDatabaseJob implements ShouldQueue
             return;
         }
 
-        $database->forceFill(['size' => $size])->save();
+        $meta = $database->meta;
+        unset($meta['resizing_to'], $meta['error'], $meta['error_at']);
+        $database->forceFill(['size' => $size, 'meta' => $meta])->save();
 
-        $config = is_array($binding->config) ? $binding->config : [];
-        $config['size'] = $size;
-        unset($config['resizing_to']);
-        $binding->forceFill([
-            'config' => $config,
-            'last_error' => null,
-        ])->save();
+        if ($binding instanceof SiteBinding) {
+            $config = is_array($binding->config) ? $binding->config : [];
+            $config['size'] = $size;
+            unset($config['resizing_to']);
+            $binding->forceFill([
+                'config' => $config,
+                'last_error' => null,
+            ])->save();
+        }
 
         if ($run instanceof ConsoleAction) {
             ManagedDatabaseProvisionConsole::noteIfNew(
@@ -140,15 +160,25 @@ class ResizeManagedDatabaseJob implements ShouldQueue
         return ManagedDatabaseProvisionConsole::ensureResize($site, $binding, $size, $this->seededConsoleRunId);
     }
 
-    private function markFailed(SiteBinding $binding, string $error, ?ConsoleAction $run = null): void
+    private function markFailed(CloudDatabase $database, ?SiteBinding $binding, string $error, ?ConsoleAction $run = null): void
     {
-        $config = is_array($binding->config) ? $binding->config : [];
-        unset($config['resizing_to']);
+        // The database row carries the failure too — on the standalone surface
+        // there is no binding to read it from.
+        $meta = $database->meta;
+        unset($meta['resizing_to']);
+        $meta['error'] = $error;
+        $meta['error_at'] = now()->toIso8601String();
+        $database->forceFill(['meta' => $meta])->save();
 
-        $binding->forceFill([
-            'config' => $config,
-            'last_error' => $error,
-        ])->save();
+        if ($binding instanceof SiteBinding) {
+            $config = is_array($binding->config) ? $binding->config : [];
+            unset($config['resizing_to']);
+
+            $binding->forceFill([
+                'config' => $config,
+                'last_error' => $error,
+            ])->save();
+        }
 
         if ($run instanceof ConsoleAction) {
             ManagedDatabaseProvisionConsole::fail($run, $error);

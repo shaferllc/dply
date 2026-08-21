@@ -41,9 +41,16 @@ class FleetReconciler
 
         $decision = $this->autoscaler->decide($fleet, $this->signal($fleet));
 
+        // The reason is persisted, not just logged: "why is this fleet running
+        // four workers" is the first question anyone asks of an autoscaler,
+        // and the panel has nowhere else to read the answer from.
+        $meta = is_array($fleet->meta) ? $fleet->meta : [];
+        $meta['last_reason'] = $decision->reason;
+
         $fleet->forceFill([
             'desired_workers' => $decision->desired,
             'quiet_ticks' => $decision->quietTicks,
+            'meta' => $meta,
         ]);
 
         if ($decision->isChange()) {

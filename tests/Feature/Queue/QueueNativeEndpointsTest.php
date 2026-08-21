@@ -14,7 +14,12 @@ use Illuminate\Testing\TestResponse;
 uses(RefreshDatabase::class);
 
 /**
- * The dply-native half of the queue API — locks and failed jobs.
+ * The dply-native half of the queue API — failed jobs.
+ *
+ * Locks used to live here too. They were retired with the queue's own lock
+ * store (docs/adr/dply-cache.md, decision 8): the endpoints had no client,
+ * because stock Laravel's `Cache::lock()` reaches the configured cache store
+ * and nothing else. Locks now come from dply Cache through `DynamoDbLock`.
  *
  * Bearer-authenticated rather than SigV4: these are not SQS operations, so
  * there is no compatibility contract to honour, and requiring a signature
@@ -43,70 +48,28 @@ function nativeCall(array $ctx, string $method, string $path, array $payload = [
 test('a bearer token authenticates the native endpoints', function () {
     $ctx = nativeCtx();
 
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'a', 'owner' => 'o1', 'seconds' => 60])
+    nativeCall($ctx, 'GET', '/failed-jobs')
         ->assertOk()
-        ->assertJson(['acquired' => true]);
+        ->assertJsonStructure(['data']);
 });
 
 test('an unknown bearer token is rejected', function () {
     $ctx = nativeCtx();
     $ctx['secret'] = 'not-a-real-secret';
 
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'a', 'owner' => 'o1'])->assertStatus(403);
+    nativeCall($ctx, 'GET', '/failed-jobs')->assertStatus(403);
 });
 
 test('a revoked credential loses access to the native endpoints too', function () {
     $ctx = nativeCtx();
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'a', 'owner' => 'o1'])->assertOk();
+    nativeCall($ctx, 'GET', '/failed-jobs')->assertOk();
 
     $credential = $ctx['namespace']->credentials()->first();
     app(RevokeQueueCredential::class)->handle($credential);
 
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'b', 'owner' => 'o1'])->assertStatus(403);
+    nativeCall($ctx, 'GET', '/failed-jobs')->assertStatus(403);
 });
 
-test('a held lock is refused to a second owner over HTTP', function () {
-    $ctx = nativeCtx();
-
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'unique-job', 'owner' => 'a', 'seconds' => 60])
-        ->assertJson(['acquired' => true]);
-
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'unique-job', 'owner' => 'b', 'seconds' => 60])
-        ->assertJson(['acquired' => false]);
-});
-
-test('release frees the lock, and a stale owner cannot', function () {
-    $ctx = nativeCtx();
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'j', 'owner' => 'a', 'seconds' => 60]);
-
-    nativeCall($ctx, 'POST', '/locks/release', ['name' => 'j', 'owner' => 'wrong'])
-        ->assertJson(['released' => false]);
-
-    nativeCall($ctx, 'POST', '/locks/release', ['name' => 'j', 'owner' => 'a'])
-        ->assertJson(['released' => true]);
-
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'j', 'owner' => 'b', 'seconds' => 60])
-        ->assertJson(['acquired' => true]);
-});
-
-test('lock endpoints require a name and owner', function () {
-    $ctx = nativeCtx();
-
-    nativeCall($ctx, 'POST', '/locks/acquire', ['owner' => 'a'])->assertStatus(400);
-    nativeCall($ctx, 'POST', '/locks/release', ['name' => 'a'])->assertStatus(400);
-});
-
-test('locks are isolated between namespaces', function () {
-    $mine = nativeCtx();
-    $theirs = nativeCtx();
-
-    nativeCall($theirs, 'POST', '/locks/acquire', ['name' => 'same', 'owner' => 'them', 'seconds' => 60])
-        ->assertJson(['acquired' => true]);
-
-    // Same lock name, different tenant — must not collide.
-    nativeCall($mine, 'POST', '/locks/acquire', ['name' => 'same', 'owner' => 'me', 'seconds' => 60])
-        ->assertJson(['acquired' => true]);
-});
 
 test('a failed job is recorded and listed', function () {
     $ctx = nativeCtx();
@@ -211,10 +174,10 @@ test('one namespace cannot read or forget another namespace failed jobs', functi
 });
 
 test('the native routes are matched before the SQS catch-all', function () {
-    // `/locks/acquire` would otherwise be read as a queue named "locks".
+    // `/failed-jobs` would otherwise be read as a queue named "failed-jobs".
     $ctx = nativeCtx();
 
-    nativeCall($ctx, 'POST', '/locks/acquire', ['name' => 'n', 'owner' => 'o', 'seconds' => 30])
+    nativeCall($ctx, 'GET', '/failed-jobs')
         ->assertOk()
-        ->assertJsonStructure(['acquired']);
+        ->assertJsonStructure(['data']);
 });

@@ -4,6 +4,7 @@ import * as billingCommands from './billing-commands.mjs';
 import * as accountCommands from './account-commands.mjs';
 import * as serverCommands from './server-commands.mjs';
 import * as siteCommands from './site-commands.mjs';
+import * as errorsCommands from './errors-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
 import { readSiteLink } from './config.mjs';
 import { linkedSiteProduct } from './site-context.mjs';
@@ -23,6 +24,7 @@ const TOP_LEVEL = {
   link: { handler: commands.link, summary: 'Link this repo to a BYO or Edge site (.dply/site.json).' },
   sites: { handler: commands.sites, summary: 'List Edge sites visible to your token.' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
+  errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
 };
@@ -362,6 +364,7 @@ function printTopLevelHelp() {
   info(`  ${'site deploy'.padEnd(18)} ${c.dim('Queue a deploy (--site or linked repo)')}`);
   info(`  ${'site logs'.padEnd(18)} ${c.dim('Latest deploy log · --follow to tail')}`);
   info(`  ${'site status'.padEnd(18)} ${c.dim('Site + latest deployment summary')}`);
+  info(`  ${'errors'.padEnd(18)} ${c.dim('Open error events · --full · --watch · exit 1 when any')}`);
   info(`  ${'deploy'.padEnd(18)} ${c.dim('Deploy linked repo (BYO or Edge via .dply/site.json)')}`);
   info(`  ${'link --byo <id>'.padEnd(18)} ${c.dim('Link repo for bare `dply deploy`')}`);
   info('');
@@ -401,6 +404,7 @@ export function allCommandLines() {
     'project',
     'site',
     'deploy',
+    'errors',
     'billing',
     'server',
     'edge',
@@ -425,6 +429,8 @@ export function allCommandLines() {
   );
 
   lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
+
+  lines.push('errors', 'errors --full', 'errors --watch', 'errors help');
 
   for (const name of Object.keys(SERVER_COMMANDS)) {
     lines.push(`server ${name}`);
@@ -471,7 +477,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'sites', 'site', 'account', 'project', 'server', 'edge');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge');
   }
 
   if (!normalized || normalized === 'account') {
@@ -494,7 +500,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'site' || normalized === 'byo') {
-    lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo');
+    lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors');
   }
 
   if (!normalized || normalized === 'project' || normalized === 'projects') {

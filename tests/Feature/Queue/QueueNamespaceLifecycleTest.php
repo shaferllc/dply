@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\QueueNamespaceLifecycleTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Actions\DeleteQueueNamespace;
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Models\QueueUsageDaily;
 use App\Modules\Queue\Services\QueueUsageMeter;
@@ -71,7 +71,7 @@ test('deleting a namespace revokes its credentials first', function () {
     $result = app(DeleteQueueNamespace::class)->handle($namespace);
 
     expect($result['credentials'])->toBe(1);
-    expect(QueueCredential::query()->where('namespace_id', $namespace->id)->count())->toBe(0);
+    expect(ServiceCredential::query()->forResource(ServiceCredential::SERVICE_QUEUE, $namespace->id)->count())->toBe(0);
 });
 
 test('deleting a namespace leaves usage history alone', function () {

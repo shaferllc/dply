@@ -134,7 +134,11 @@ class QueueDoctorCommand extends Command
      */
     private function checkSchema(): array
     {
-        $required = ['dply_queue_jobs', 'dply_queue_failed_jobs', 'dply_queue_locks'];
+        // `dply_queue_locks` is deliberately absent: the queue's own lock
+        // store was retired in favour of dply Cache (docs/adr/dply-cache.md,
+        // decision 8), so requiring the table here would fail every healthy
+        // install.
+        $required = ['dply_queue_jobs', 'dply_queue_failed_jobs'];
 
         try {
             $missing = [];

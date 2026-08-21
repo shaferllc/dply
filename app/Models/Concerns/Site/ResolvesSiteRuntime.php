@@ -334,10 +334,7 @@ trait ResolvesSiteRuntime
 
     public function usesFunctionsRuntime(): bool
     {
-        return in_array($this->runtimeProfile(), [
-            'digitalocean_functions_web',
-            'aws_lambda_bref_web',
-        ], true);
+        return in_array($this->runtimeProfile(), Site::SERVERLESS_RUNTIME_PROFILES, true);
     }
 
     public function usesAwsLambdaRuntime(): bool

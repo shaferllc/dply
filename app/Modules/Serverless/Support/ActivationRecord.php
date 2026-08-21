@@ -75,7 +75,9 @@ final class ActivationRecord
             cold: $initTime !== null && $initTime > 0,
             statusCode: $statusCode > 0 ? $statusCode : null,
             success: $success,
-            logLines: array_values(array_filter((array) data_get($activation, 'logs', []), 'is_string')),
+            // Filtered at capture, so the sentinel pair OpenWhisk emits per
+            // activation never reaches the database in the first place.
+            logLines: ActivationLogLines::meaningful((array) data_get($activation, 'logs', [])),
             resultExcerpt: self::excerpt($result),
             raw: $raw,
         );

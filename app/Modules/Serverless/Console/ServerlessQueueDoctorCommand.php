@@ -127,18 +127,31 @@ class ServerlessQueueDoctorCommand extends Command
          * *looks* like it works — the exact failure class this command was
          * written to eliminate.
          */
-        // When dply Queue is wired, the injected handler registers a shared
-        // lock store and a server-side failed-job provider, so both gaps are
-        // closed rather than merely reported.
+        // When dply Queue is wired, the injected handler registers a
+        // server-side failed-job provider, so that gap is closed rather than
+        // merely reported.
         $dplyQueueWired = trim((string) ($env['DPLY_QUEUE_URL'] ?? '')) !== ''
             && trim((string) ($env['DPLY_QUEUE_SECRET'] ?? '')) !== '';
 
         $cacheStore = trim((string) ($env['CACHE_STORE'] ?? $env['CACHE_DRIVER'] ?? ''));
         $cacheIsPerContainer = $cacheStore === '' || in_array($cacheStore, ['array', 'file'], true);
 
-        if ($cacheIsPerContainer && ! $dplyQueueWired) {
+        /*
+         * Note this is NOT gated on dply Queue being wired, as it once was.
+         * That gate encoded a promise the product could not keep: the queue's
+         * lock endpoints had no client, because dply injects exactly one file
+         * into a function (the handler stub) and stock Laravel's
+         * `Cache::lock()` goes to the configured cache store or nowhere. A
+         * wired queue therefore never closed this gap, and saying so silenced
+         * the warning on precisely the functions that still had the bug.
+         *
+         * The fix is a shared cache — dply Cache (`CACHE_STORE=dynamodb`)
+         * gives `Cache::lock()` a real `DynamoDbLock` with no injected code.
+         * See docs/adr/dply-cache.md, decision 8.
+         */
+        if ($cacheIsPerContainer) {
             $notes[] = 'The cache store is '.($cacheStore === '' ? 'unset (the handler defaults it to `array`)' : '`'.$cacheStore.'`')
-                .', which is per-container on a function. `ShouldBeUnique`, `WithoutOverlapping`, and `RateLimited` are backed by the cache, not the queue — with a per-container store they silently do nothing while appearing to work. Point CACHE_STORE at redis, or move this function to dply Queue, which ships a shared lock store.';
+                .', which is per-container on a function. `ShouldBeUnique`, `WithoutOverlapping`, and `RateLimited` are backed by the cache, not the queue — with a per-container store they silently do nothing while appearing to work. Attach a dply Cache, or point CACHE_STORE at a Redis this function can reach.';
         }
 
         $dbConnection = trim((string) ($env['DB_CONNECTION'] ?? ''));

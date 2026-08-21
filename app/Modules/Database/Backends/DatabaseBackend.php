@@ -23,8 +23,30 @@ use App\Modules\Cloud\Backends\CloudBackend;
  */
 interface DatabaseBackend
 {
+    /** Create, delete and rotate users on the cluster. */
+    public const CAP_USERS = 'users';
+
+    /** Change the cluster plan in place. */
+    public const CAP_RESIZE = 'resize';
+
+    /** Report CPU / memory / disk time series for the cluster. */
+    public const CAP_METRICS = 'metrics';
+
+    /** List automatic backups and restore one into a new cluster. */
+    public const CAP_BACKUPS = 'backups';
+
     /** Stable backend key persisted on CloudDatabase.backend (e.g. digitalocean_managed_database). */
     public function key(): string;
+
+    /**
+     * Whether this backend can perform a day-two operation — one of the
+     * CAP_* constants above.
+     *
+     * Declared rather than probed: the detail page needs the answer on every
+     * render, before any provider call, so an unsupported panel can say so
+     * instead of rendering an empty one that reads as a failed load.
+     */
+    public function supports(string $capability): bool;
 
     /**
      * Engine slugs this backend can offer (postgres / mysql / redis …).
@@ -74,4 +96,41 @@ interface DatabaseBackend
      * reports `online`.
      */
     public function resize(CloudDatabase $database, string $size): void;
+
+    /**
+     * The metrics this backend can chart for this database, in display order.
+     *
+     * Engine-dependent: a Valkey cluster has no disk-utilization series to
+     * plot. `format` matches the spec x-metrics-line-chart understands
+     * ('percent' | 'load' | 'bytes-per-sec').
+     *
+     * @return list<array{key: string, label: string, format: string}>
+     */
+    public function metricCatalog(CloudDatabase $database): array;
+
+    /**
+     * Raw datapoints for one metric over a UNIX-timestamp window.
+     *
+     * An empty list means "nothing to plot" — a cluster too young to have
+     * datapoints is the common case and is not an error.
+     *
+     * @return list<array{t: int, v: float}>
+     */
+    public function metric(CloudDatabase $database, string $metric, int $start, int $end): array;
+
+    /**
+     * Automatic backups available to restore, newest first.
+     *
+     * @return list<array{created_at: string, size_gigabytes: float}>
+     */
+    public function backups(CloudDatabase $database): array;
+
+    /**
+     * Provision $target as a copy of $source seeded from the backup taken at
+     * $backupCreatedAt. $source is never modified — restore always lands in a
+     * new cluster, so a bad restore costs money rather than data.
+     *
+     * Returns immediately, like {@see provision()}; the caller polls $target.
+     */
+    public function provisionFromBackup(CloudDatabase $target, CloudDatabase $source, string $backupCreatedAt): void;
 }

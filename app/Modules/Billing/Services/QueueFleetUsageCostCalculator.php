@@ -41,9 +41,11 @@ class QueueFleetUsageCostCalculator
      */
     public function estimate(array $totals): array
     {
-        $flex = max(0, (int) ($totals['flex_mib_seconds'] ?? 0));
-        $pro = max(0, (int) ($totals['pro_mib_seconds'] ?? 0));
-        $operations = max(0, (int) ($totals['operations'] ?? 0));
+        // No null-coalescing: the shape is guaranteed by the parameter type,
+        // and a fallback here would only hide a reader that stopped filling it.
+        $flex = max(0, $totals['flex_mib_seconds']);
+        $pro = max(0, $totals['pro_mib_seconds']);
+        $operations = max(0, $totals['operations']);
 
         if (! $this->isEnabled()) {
             return $this->empty($flex, $pro, $operations);

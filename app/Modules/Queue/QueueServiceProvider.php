@@ -12,6 +12,7 @@ use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Contracts\WorkerRuntime;
 use App\Modules\Queue\Livewire\QueueNamespaceShow;
+use App\Modules\Queue\Livewire\FleetPanel;
 use App\Modules\Queue\Livewire\Queues;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Observers\QueueNamespaceBillingObserver;
@@ -96,6 +97,9 @@ class QueueServiceProvider extends ServiceProvider
         // them keeps resolving.
         Livewire::component('queues', Queues::class);
         Livewire::component('queue-namespace-show', QueueNamespaceShow::class);
+        // Embedded on the namespace page; its own component because the live
+        // worker readout polls and the page around it must not.
+        Livewire::component('queue-fleet-panel', FleetPanel::class);
         Livewire::component('organizations.queues', Queues::class);
         Livewire::component('organizations.queue-namespace-show', QueueNamespaceShow::class);
     }

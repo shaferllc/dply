@@ -74,6 +74,67 @@ class ManagedDatabaseUsers
     }
 
     /**
+     * Drop a user from the cluster.
+     *
+     * The cluster's own admin account is refused here rather than at the
+     * provider: deleting it would strand every attached site, and dply derives
+     * their env vars from exactly that login.
+     */
+    public function delete(CloudDatabase $database, string $name): void
+    {
+        if (! $this->supports($database)) {
+            throw new RuntimeException('This database does not support managing users from dply.');
+        }
+
+        $name = self::normalizeName($name);
+        if ($name === '') {
+            throw new RuntimeException('Enter a username.');
+        }
+
+        if ($this->isClusterAdmin($database, $name)) {
+            throw new RuntimeException('The cluster admin user cannot be deleted.');
+        }
+
+        $this->service($database)->deleteDatabaseUser((string) $database->backend_id, $name);
+    }
+
+    /**
+     * Rotate a user's password and return the replacement.
+     *
+     * Returned once and never stored — the caller shows it and lets it go.
+     * Rotating the admin login is allowed but will break every attached site
+     * until they are re-attached, so callers should say so first.
+     */
+    public function rotatePassword(CloudDatabase $database, string $name): string
+    {
+        if (! $this->supports($database)) {
+            throw new RuntimeException('This database does not support managing users from dply.');
+        }
+
+        $name = self::normalizeName($name);
+        if ($name === '') {
+            throw new RuntimeException('Enter a username.');
+        }
+
+        $user = $this->service($database)->resetDatabaseUserAuth((string) $database->backend_id, $name);
+        if ($user['password'] === '') {
+            throw new RuntimeException('The provider did not return a new password.');
+        }
+
+        return $user['password'];
+    }
+
+    /** Whether $name is the login the cluster's connection block was issued for. */
+    public function isClusterAdmin(CloudDatabase $database, string $name): bool
+    {
+        $connection = $database->getAttribute('connection');
+        $connection = is_array($connection) ? $connection : [];
+        $admin = trim((string) ($connection['username'] ?? $connection['user'] ?? ''));
+
+        return $admin !== '' && strcasecmp($admin, $name) === 0;
+    }
+
+    /**
      * The password for a named user, read back from the provider.
      *
      * Passwords are not stored by dply for users it did not provision, so the

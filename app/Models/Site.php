@@ -168,6 +168,16 @@ class Site extends Model
      *
      * @var array<int, int>
      */
+    /**
+     * Runtime profiles that make a Site a serverless function rather than a VM
+     * site. The `meta->runtime_profile` value is the only thing distinguishing
+     * the two, so both the row predicate ({@see usesFunctionsRuntime()}) and
+     * every `whereIn` that scopes a function list read this one list.
+     *
+     * @var list<string>
+     */
+    public const SERVERLESS_RUNTIME_PROFILES = ['digitalocean_functions_web', 'aws_lambda_bref_web'];
+
     public const SERVERLESS_MEMORY_OPTIONS_MB = [128, 256, 512, 1024];
 
     public const SERVERLESS_DEFAULT_MEMORY_MB = 512;

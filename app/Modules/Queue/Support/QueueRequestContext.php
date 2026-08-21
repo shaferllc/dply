@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Support;
 
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 
 /**
@@ -20,7 +20,7 @@ final readonly class QueueRequestContext
 {
     public function __construct(
         public QueueNamespace $namespace,
-        public QueueCredential $credential,
+        public ServiceCredential $credential,
         public int $requestsPerMinute,
     ) {}
 
@@ -51,8 +51,21 @@ final readonly class QueueRequestContext
         return $this->namespace->organization_id;
     }
 
+    /**
+     * Whether the presented key may do `$scope` on *this* namespace.
+     *
+     * The namespace is passed explicitly rather than trusted implicitly: a
+     * credential now carries grants for several resources, so "may push" is
+     * meaningless without saying push *where*. Since `namespace` here came
+     * from the request context and never from the body, this stays the same
+     * tenancy guarantee it always was.
+     */
     public function allows(string $scope): bool
     {
-        return $this->credential->allows($scope);
+        return $this->credential->allows(
+            ServiceCredential::SERVICE_QUEUE,
+            $this->namespace->id,
+            $scope,
+        );
     }
 }

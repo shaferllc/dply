@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Serverless\Contracts\ServerlessFeature;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Modules\Serverless\Services\AsyncFunctionInvoker;
 use App\Modules\Serverless\Services\FunctionInvoker;
 use App\Modules\Serverless\Services\ServerlessFeatureMatrix;
+use App\Modules\Serverless\Services\ServerlessLogDrainProvisioner;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -28,6 +29,12 @@ use Livewire\Component;
  *  - Runtime output — the log lines from every row, flattened into one
  *    stream. For a FaaS Laravel app this is the application log.
  *  - Deploy logs — the SiteDeployment history (unchanged).
+ *
+ * Everything above is bounded and unsearchable by construction: the tabs read
+ * fixed slices of `function_invocations`, and the pruner drops organic rows
+ * after 7 days. The drain toggle here is the way out of that — pointed at
+ * dply's drain, the same lines land in `app_logs`, which is searchable,
+ * level-filterable, and kept for 30 days.
  */
 class LogsPanel extends Component
 {
@@ -76,6 +83,39 @@ class LogsPanel extends Component
 
     /** Re-renders, which re-queries every log source. */
     public function refreshLogs(): void {}
+
+    /**
+     * Start shipping this function's application log to dply's drain.
+     *
+     * Takes effect on the next deploy: the variables go into the managed
+     * environment, which is bundled into the artifact at build time — a
+     * function has no way to be reconfigured in place.
+     */
+    public function enableLogDrain(ServerlessLogDrainProvisioner $drains): void
+    {
+        $site = Site::findOrFail($this->siteId);
+        $this->authorize('update', $site);
+
+        try {
+            $drains->enable($site);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->toastSuccess(__('Log drain attached — it starts shipping on the next deploy.'));
+    }
+
+    public function disableLogDrain(ServerlessLogDrainProvisioner $drains): void
+    {
+        $site = Site::findOrFail($this->siteId);
+        $this->authorize('update', $site);
+
+        $drains->disable($site);
+
+        $this->toastSuccess(__('Log drain removed — logging returns to stderr on the next deploy.'));
+    }
 
     /**
      * Invoke the function once from the UI, recording the activation as a
@@ -177,8 +217,12 @@ class LogsPanel extends Component
         $errors = $settled->filter(fn (FunctionInvocation $i): bool => ! $i->success)->count();
         $total = $settled->count();
 
+        $drains = app(ServerlessLogDrainProvisioner::class);
+
         return view('livewire.serverless.logs-panel', [
             'site' => $site,
+            'drainAvailable' => $drains->isAvailable(),
+            'drainEnabled' => $drains->isEnabled($site),
             'supportsAsync' => app(ServerlessFeatureMatrix::class)
                 ->siteSupports($site, ServerlessFeature::AsyncInvocation),
             // In-flight async invocations keep the page polling until they

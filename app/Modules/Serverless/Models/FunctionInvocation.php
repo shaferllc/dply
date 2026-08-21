@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 namespace App\Modules\Serverless\Models;
-use App\Models\User;
-use App\Models\Site;
-use App\Models\FunctionAction;
 
+use App\Models\FunctionAction;
+use App\Models\Site;
+use App\Modules\Serverless\Support\ActivationLogLines;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -37,7 +37,7 @@ use Illuminate\Support\Carbon;
  * @property bool $success
  * @property string|null $task
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $updated_at
  */
 class FunctionInvocation extends Model
 {
@@ -158,10 +158,10 @@ class FunctionInvocation extends Model
     /** @return list<string> */
     public function logLines(): array
     {
-        return array_values(array_filter(
-            $this->log_lines,
-            'is_string',
-        ));
+        // Filtered on read as well as on capture: rows written before the
+        // sentinel pair was recognised are already in the database, and they
+        // would otherwise keep burying real output in the Runtime tab.
+        return ActivationLogLines::meaningful($this->log_lines);
     }
 
     /**

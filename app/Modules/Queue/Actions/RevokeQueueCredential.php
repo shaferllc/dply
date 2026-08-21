@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Actions;
 
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Cache;
  */
 final class RevokeQueueCredential
 {
-    public function handle(QueueCredential $credential): QueueCredential
+    public function handle(ServiceCredential $credential): ServiceCredential
     {
         if (! $credential->isRevoked()) {
             $credential->forceFill(['revoked_at' => now()])->save();

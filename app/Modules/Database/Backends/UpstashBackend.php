@@ -7,6 +7,7 @@ namespace App\Modules\Database\Backends;
 use App\Models\CloudDatabase;
 use App\Models\Server;
 use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
+use App\Modules\Database\Backends\Concerns\SupportsNoManagedOperations;
 use App\Modules\Database\Services\UpstashService;
 use RuntimeException;
 
@@ -20,6 +21,7 @@ use RuntimeException;
 class UpstashBackend implements DatabaseBackend
 {
     use CannotResizeManagedDatabase;
+    use SupportsNoManagedOperations;
 
     public function key(): string
     {

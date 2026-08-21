@@ -9,7 +9,7 @@ use App\Models\Organization;
 use App\Modules\Queue\Actions\RevokeQueueCredential;
 use App\Modules\Queue\Actions\RotateQueueCredential;
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\QueueFailedJobReader;
 use App\Modules\Queue\Support\QueueEndpoint;
@@ -228,7 +228,7 @@ class QueueNamespaceShow extends Component
             ? $this->namespace->credentials()->whereKey($this->revokingId)->first()
             : null;
 
-        if (! $credential instanceof QueueCredential) {
+        if (! $credential instanceof ServiceCredential) {
             $this->toastError(__('That credential no longer exists.'));
             $this->cancelRevoke();
 

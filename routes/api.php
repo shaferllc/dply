@@ -32,8 +32,10 @@ use App\Modules\Edge\Http\Controllers\Api\EdgePreviewApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeSiteApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeUsageApiController;
 use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
-use App\Modules\Queue\Http\Controllers\QueueLockController;
 use App\Modules\Queue\Http\Controllers\SqsCompatibilityController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessInvocationApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessLogApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessSiteApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -307,6 +309,26 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware('ability:'.$apiAbilities['edge.env.destroy'])
                 ->where('key', '[A-Z][A-Z0-9_]{0,127}');
         });
+
+        // Serverless surface. Shares the edge-api throttle for the same
+        // reason: `serverless logs --follow` and `serverless errors --watch`
+        // poll on a timer, and the default v1 limit is sized for one-shot calls.
+        Route::prefix('serverless')->middleware('throttle:edge-api')->group(function () use ($apiAbilities): void {
+            Route::get('/sites', [ServerlessSiteApiController::class, 'index'])
+                ->middleware('ability:'.$apiAbilities['serverless.sites.index']);
+            Route::get('/sites/{site}', [ServerlessSiteApiController::class, 'show'])
+                ->middleware('ability:'.$apiAbilities['serverless.sites.show']);
+
+            // ?failed=1 is the serverless error feed — DO's activations API
+            // returns nothing, so a failed invocation is only readable here.
+            Route::get('/sites/{site}/invocations', [ServerlessInvocationApiController::class, 'index'])
+                ->middleware('ability:'.$apiAbilities['serverless.invocations.index']);
+            Route::get('/sites/{site}/invocations/{invocation}', [ServerlessInvocationApiController::class, 'show'])
+                ->middleware('ability:'.$apiAbilities['serverless.invocations.show']);
+
+            Route::get('/sites/{site}/logs', [ServerlessLogApiController::class, 'index'])
+                ->middleware('ability:'.$apiAbilities['serverless.logs.index']);
+        });
     });
 });
 
@@ -336,16 +358,17 @@ Route::prefix('queue/v1')
     ->middleware(['auth.queue', 'throttle:dply-queue'])
     ->group(function (): void {
         // dply-native endpoints. Registered BEFORE the SQS catch-all, which
-        // would otherwise swallow `/locks/...` as a queue name.
+        // would otherwise swallow `/failed-jobs` as a queue name.
         //
         // These are not SQS operations, so they take a bearer token rather
         // than a SigV4 signature — there is no compatibility contract to
         // honour, and requiring a signature would mean shipping a signer into
         // every customer app.
-        Route::post('/locks/acquire', [QueueLockController::class, 'acquire'])->name('queue.locks.acquire');
-        Route::post('/locks/release', [QueueLockController::class, 'release'])->name('queue.locks.release');
-        Route::post('/locks/force-release', [QueueLockController::class, 'forceRelease'])->name('queue.locks.force-release');
-        Route::post('/locks/owner', [QueueLockController::class, 'owner'])->name('queue.locks.owner');
+        //
+        // The `/locks/*` routes that used to lead this group are gone: locks
+        // are a cache concern and now come from dply Cache's DynamoDB-
+        // compatible endpoint through the framework's own `DynamoDbLock`, with
+        // no injected client code. See docs/adr/dply-cache.md, decision 8.
 
         // Failed jobs. Backs a FailedJobProviderInterface in the app, so a job
         // that exhausts its attempts is recorded here instead of in a

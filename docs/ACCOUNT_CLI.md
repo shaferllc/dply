@@ -38,6 +38,16 @@ Every approved device shows up under **CLI authentications**. **Revoke** a sessi
 - Server SSH: `dply server run --server <id> <command>` (needs the `commands.run` scope).
 - **GitHub Actions:** create an org API token with `sites.deploy`, link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.
 
+## Checking errors
+
+`dply errors` lists the open error events for a site — the same rows as the site workspace **Errors** tab, newest first. It needs the **`sites.read`** scope.
+
+- `dply errors --site <id>` — newest open errors.
+- `dply errors --full` — detail, remediation code, and the deep link back into the workspace.
+- `dply errors --watch` — poll for new events (`--interval` ms).
+
+The command **exits 1 when any error is open**, so `dply deploy --wait && dply errors` gates a CI job on a clean site.
+
 ## Related
 
 - [[api]] — organization API tokens used for CI and automation.

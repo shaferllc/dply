@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\QueueBatchAckTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Contracts\QueueStore;
-use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueRequestContext;
@@ -143,7 +143,7 @@ it('gives polling reads their own allowance', function () {
     $namespace = batchNs();
     $context = new QueueRequestContext(
         namespace: $namespace,
-        credential: new QueueCredential,
+        credential: new ServiceCredential,
         requestsPerMinute: 600,
     );
 

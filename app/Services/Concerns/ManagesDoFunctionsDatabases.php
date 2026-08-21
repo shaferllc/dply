@@ -123,7 +123,7 @@ trait ManagesDoFunctionsDatabases
      * Create a DigitalOcean Managed Database cluster. It returns immediately
      * with status `creating`; poll {@see getDatabaseCluster()} until `online`.
      *
-     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     * @return array{id: string, name: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     /**
      * Regions DigitalOcean currently offers for this managed-database engine.
@@ -321,6 +321,20 @@ trait ManagesDoFunctionsDatabases
             $payload['tags'] = $tags;
         }
 
+        return $this->sendDatabaseCreate($payload);
+    }
+
+    /**
+     * POST a create payload to /v2/databases. Shared by a fresh create and a
+     * restore-from-backup create, which differ only by a `backup_restore`
+     * block — the error handling below (a slow API reads as a bad token, and
+     * a 4xx says nothing about what we sent) is the reason not to duplicate it.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{id: string, name: string, status: string, engine: string, tags: list<string>, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    private function sendDatabaseCreate(array $payload): array
+    {
         try {
             $response = $this->request('post', '/databases', $payload);
         } catch (ConnectionException $e) {
@@ -336,10 +350,10 @@ trait ManagesDoFunctionsDatabases
             throw new \RuntimeException(sprintf(
                 'DigitalOcean API failed to create database cluster: %s (sent engine=%s version=%s region=%s size=%s)',
                 $message,
-                $payload['engine'],
+                $payload['engine'] ?? '',
                 $payload['version'] ?? '',
-                $payload['region'],
-                $payload['size'],
+                $payload['region'] ?? '',
+                $payload['size'] ?? '',
             ));
         }
 
@@ -405,7 +419,7 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
-     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     * @return array{id: string, name: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     public function getDatabaseCluster(string $id): array
     {
@@ -419,7 +433,7 @@ trait ManagesDoFunctionsDatabases
      * Change the cluster plan in place. DigitalOcean moves the cluster to
      * `resizing` then back to `online`; the hostname usually stays the same.
      *
-     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     * @return array{id: string, name: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     public function resizeDatabaseCluster(string $id, string $size, int $numNodes = 1): array
     {
@@ -647,6 +661,199 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
+     * Delete a user from a managed cluster.
+     *
+     * The provider's own admin user (doadmin / valkey's default) cannot be
+     * removed; DigitalOcean answers 403 and we let that surface rather than
+     * pretending it worked. A 404 is success — the user is gone either way.
+     */
+    public function deleteDatabaseUser(string $clusterId, string $name): bool
+    {
+        $response = $this->request('delete', '/databases/'.$clusterId.'/users/'.rawurlencode($name));
+        if ($response->status() === 404) {
+            return false;
+        }
+        $this->assertSuccess($response, 'delete database user');
+
+        return true;
+    }
+
+    /**
+     * Rotate a user's password. The provider generates the replacement and
+     * returns it in this response and nowhere else — the caller has one
+     * chance to show it.
+     *
+     * @return array{name: string, role: string, password: string}
+     */
+    public function resetDatabaseUserAuth(string $clusterId, string $name): array
+    {
+        $response = $this->request('post', '/databases/'.$clusterId.'/users/'.rawurlencode($name).'/reset_auth', []);
+        $this->assertSuccess($response, 'reset database user password');
+
+        $user = (array) $response->json('user', []);
+
+        return [
+            'name' => (string) ($user['name'] ?? $name),
+            'role' => (string) ($user['role'] ?? 'normal'),
+            'password' => (string) ($user['password'] ?? ''),
+        ];
+    }
+
+    /**
+     * A cluster's automatic backups, newest first.
+     *
+     * DigitalOcean keeps a rolling window (7 days on current plans) and does
+     * not expose individual restore points beyond `created_at` — that
+     * timestamp is the handle {@see createDatabaseClusterFromBackup()} takes.
+     *
+     * @return list<array{created_at: string, size_gigabytes: float}>
+     */
+    public function listDatabaseBackups(string $clusterId): array
+    {
+        $response = $this->request('get', '/databases/'.$clusterId.'/backups');
+        $this->assertSuccess($response, 'list database backups');
+
+        $backups = [];
+        foreach ((array) $response->json('database_backups', []) as $backup) {
+            if (! is_array($backup)) {
+                continue;
+            }
+
+            $createdAt = trim((string) ($backup['created_at'] ?? ''));
+            if ($createdAt === '') {
+                continue;
+            }
+
+            $backups[] = [
+                'created_at' => $createdAt,
+                'size_gigabytes' => (float) ($backup['size_gigabytes'] ?? 0),
+            ];
+        }
+
+        usort($backups, static fn (array $a, array $b): int => strcmp($b['created_at'], $a['created_at']));
+
+        return $backups;
+    }
+
+    /**
+     * Create a new cluster from another cluster's backup.
+     *
+     * Restore never touches the source: DigitalOcean builds a second cluster
+     * seeded from the backup, which is also why $sourceClusterName is the
+     * cluster's *provider* name rather than its id — `backup_restore` keys off
+     * the name DigitalOcean knows it by.
+     *
+     * @param  list<string>  $tags
+     * @return array{id: string, name: string, status: string, engine: string, tags: list<string>, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function createDatabaseClusterFromBackup(
+        string $engine,
+        string $region,
+        string $size,
+        string $name,
+        string $sourceClusterName,
+        string $backupCreatedAt,
+        ?string $version = null,
+        array $tags = [],
+    ): array {
+        $constrained = $this->constrainDatabaseCreateToCatalog($engine, $region, $size, $version);
+
+        $payload = [
+            'name' => $name,
+            'engine' => $constrained['engine'],
+            'region' => $constrained['region'],
+            'size' => $constrained['size'],
+            'num_nodes' => 1,
+            'backup_restore' => [
+                'database_name' => $sourceClusterName,
+                'backup_created_at' => $backupCreatedAt,
+            ],
+        ];
+        if ($constrained['version'] !== '') {
+            $payload['version'] = $constrained['version'];
+        }
+        $tags = $this->normalizeDatabaseTags($tags);
+        if ($tags !== []) {
+            $payload['tags'] = $tags;
+        }
+
+        return $this->sendDatabaseCreate($payload);
+    }
+
+    /**
+     * Fetch a monitoring metric for a managed cluster over a UNIX-timestamp
+     * window. $metric is the DigitalOcean metric path segment — `cpu`,
+     * `memory_utilization`, `disk_utilization`, `load_1`, `load_5`, `load_15`.
+     *
+     * The payload is the same Prometheus-style `matrix` App Platform returns
+     * ({@see \App\Modules\Cloud\Services\DigitalOceanAppPlatformService::getAppMetric()}):
+     * `data.result[].values` is a list of [unix-ts, "string-value"] pairs. A
+     * cluster too young to have datapoints answers 200 with an empty result,
+     * so an empty list here means "nothing to plot", never "the call failed".
+     *
+     * Cached 60s per cluster+metric+window: the metrics tab draws one chart
+     * per metric and Livewire re-renders all of them on every interaction.
+     *
+     * Docs: GET /v2/monitoring/metrics/database/{metric}
+     *
+     * @return list<array{t: int, v: float}>
+     */
+    public function getDatabaseMetric(string $clusterId, string $metric, int $start, int $end): array
+    {
+        $cacheKey = 'do_db_metric:'.sha1(implode('|', [$this->token, $clusterId, $metric, (string) $start, (string) $end]));
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $response = $this->request('get', '/monitoring/metrics/database/'.$metric, [
+            'host_id' => $clusterId,
+            'start' => (string) $start,
+            'end' => (string) $end,
+        ]);
+        $this->assertSuccess($response, 'get database metric '.$metric);
+
+        $points = $this->flattenPrometheusMatrix($response->json());
+        Cache::put($cacheKey, $points, now()->addSeconds(60));
+
+        return $points;
+    }
+
+    /**
+     * Flatten the first series of a Prometheus `matrix` response into
+     * {t, v} points. Anything unexpected degrades to an empty list — a
+     * missing chart is a better failure than a 500 on the page around it.
+     *
+     * @return list<array{t: int, v: float}>
+     */
+    private function flattenPrometheusMatrix(mixed $payload): array
+    {
+        $payload = is_array($payload) ? $payload : [];
+        $result = $payload['data']['result'] ?? null;
+        if (! is_array($result) || $result === []) {
+            return [];
+        }
+
+        $series = is_array($result[0] ?? null) ? $result[0] : null;
+        if (! is_array($series) || ! is_array($series['values'] ?? null)) {
+            return [];
+        }
+
+        $points = [];
+        foreach ($series['values'] as $pair) {
+            if (! is_array($pair) || count($pair) < 2) {
+                continue;
+            }
+            $points[] = [
+                't' => (int) $pair[0],
+                'v' => (float) $pair[1],
+            ];
+        }
+
+        return $points;
+    }
+
+    /**
      * Delete a DigitalOcean Managed Database cluster. Returns true on a
      * successful delete (204), false on a 404 (already gone) so teardown
      * is idempotent — mirrors {@see deleteKubernetesCluster()}.
@@ -663,7 +870,7 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
-     * @return array{id: string, status: string, engine: string, tags: list<string>, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     * @return array{id: string, name: string, status: string, engine: string, tags: list<string>, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     private function normalizeDatabaseCluster(mixed $database): array
     {
@@ -672,6 +879,10 @@ trait ManagesDoFunctionsDatabases
 
         return [
             'id' => (string) ($database['id'] ?? ''),
+            // The provider-side cluster name. dply generates it at create and
+            // never stores it, so a restore has to read it back from here —
+            // `backup_restore` keys off the name, not the id.
+            'name' => (string) ($database['name'] ?? ''),
             'status' => (string) ($database['status'] ?? ''),
             'engine' => (string) ($database['engine'] ?? ''),
             'tags' => $this->normalizeDatabaseTags(is_array($database['tags'] ?? null) ? $database['tags'] : []),

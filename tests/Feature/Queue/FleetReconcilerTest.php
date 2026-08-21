@@ -215,5 +215,14 @@ test('scaling up does not mint a credential per worker', function () {
     push(60);
     reconciler()->reconcile($this->fleet);
 
-    expect(\App\Modules\Queue\Models\QueueCredential::query()->count())->toBe(1);
+    expect(\App\Models\ServiceCredential::query()->count())->toBe(1);
+});
+
+/** The panel has nowhere else to read "why is this fleet this size" from. */
+test('the tick persists the reason it scaled', function () {
+    push(60);
+
+    reconciler()->reconcile($this->fleet);
+
+    expect($this->fleet->fresh()->meta['last_reason'] ?? '')->toContain('pending');
 });

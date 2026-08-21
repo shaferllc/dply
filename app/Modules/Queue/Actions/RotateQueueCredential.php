@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Actions;
 
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use RuntimeException;
 
@@ -30,7 +30,7 @@ final class RotateQueueCredential
     public const MAX_LIVE_CREDENTIALS = 2;
 
     /**
-     * @return array{credential: QueueCredential, plaintext: string}
+     * @return array{credential: ServiceCredential, plaintext: string}
      */
     public function handle(QueueNamespace $namespace, ?string $name = null, ?string $userId = null): array
     {
@@ -43,7 +43,7 @@ final class RotateQueueCredential
             );
         }
 
-        $minted = QueueCredential::mint(
+        $minted = (new MintQueueCredential)->handle(
             $namespace,
             $name ?? __('Rotated :date', ['date' => now()->toDateString()]),
             userId: $userId,

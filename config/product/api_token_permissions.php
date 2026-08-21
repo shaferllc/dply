@@ -182,6 +182,12 @@ return [
         'edge.env.update' => 'edge.env.write',
         'edge.env.upsert' => 'edge.env.write',
         'edge.env.destroy' => 'edge.env.write',
+
+        'serverless.sites.index' => 'serverless.read',
+        'serverless.sites.show' => 'serverless.read',
+        'serverless.invocations.index' => 'serverless.read',
+        'serverless.invocations.show' => 'serverless.read',
+        'serverless.logs.index' => 'serverless.read',
     ],
 
     'categories' => [
@@ -346,6 +352,13 @@ return [
                 ['ability' => 'projects.write', 'label' => 'Create and update projects, members, and resources'],
                 ['ability' => 'projects.deploy', 'label' => 'Queue project-wide deploys'],
                 ['ability' => 'projects.delete', 'label' => 'Delete projects'],
+            ],
+        ],
+        [
+            'id' => 'serverless',
+            'label' => 'Serverless',
+            'permissions' => [
+                ['ability' => 'serverless.read', 'label' => 'Read functions, invocations, and logs'],
             ],
         ],
         [

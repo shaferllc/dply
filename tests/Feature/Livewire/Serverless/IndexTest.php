@@ -37,14 +37,20 @@ function makeFunction(User $user, Organization $org, string $name): Site
     ]);
 }
 
-test('it shows the empty state with no apps', function () {
+/**
+ * An empty, non-production org gets the standalone starter page rather than
+ * the inventory shell ($showStarter in serverless-index-page). The narrow
+ * "No apps yet" fallback below it only renders for the production surface or a
+ * custom empty slot, so asserting that copy here tested the wrong branch.
+ */
+test('it shows the starter page with no apps', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)
-        ->assertSee('No apps yet')
         ->assertSee('Laravel first')
         ->assertSee('How it works')
-        ->assertSee('Create an app')
-        ->assertSee('Start from Laravel');
+        // The starter's two calls to action, as they read today.
+        ->assertSee('Deploy from Git')
+        ->assertSee('Deploy the demo');
 });
 
 test('it lists the organizations apps', function () {
@@ -53,7 +59,9 @@ test('it lists the organizations apps', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)
         ->assertSee('Orders API')
-        ->assertDontSee('No apps yet');
+        // Starter-only copy: 'Laravel first' would not distinguish the two,
+        // since the inventory shell's own description also uses it.
+        ->assertDontSee('How it works');
 });
 
 test('it does not list another organizations apps', function () {

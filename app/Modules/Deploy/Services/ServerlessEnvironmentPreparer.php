@@ -162,6 +162,38 @@ class ServerlessEnvironmentPreparer
     }
 
     /**
+     * Drop keys from a function's managed environment entirely.
+     *
+     * The counterpart to {@see mergeKeys()}, for detaching a resource. Setting
+     * the value to an empty string instead would leave a dead `KEY=` line in
+     * the Environment panel and, for a credential, keep the operator looking at
+     * a variable that no longer means anything.
+     *
+     * @param  list<string>  $keys
+     */
+    public function forgetKeys(Site $site, array $keys): void
+    {
+        $content = (string) $site->env_file_content;
+        if (trim($content) === '' || $keys === []) {
+            return;
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $content) ?: [];
+
+        $kept = array_filter($lines, function ($line) use ($keys): bool {
+            foreach ($keys as $key) {
+                if (preg_match('/^\s*'.preg_quote($key, '/').'\s*=/', (string) $line) === 1) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        $site->forceFill(['env_file_content' => implode("\n", $kept)])->save();
+    }
+
+    /**
      * Point ASSET_URL at the published origin after `public/build` has been
      * uploaded (the attached disk's public URL, or the function hostname when
      * that disk is still the control plane). APP_URL stays the function hostname.

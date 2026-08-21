@@ -114,7 +114,13 @@ return [
             'secret' => env('SERVERLESS_ASSETS_S3_SECRET'),
             'region' => env('SERVERLESS_ASSETS_S3_REGION', 'nyc3'),
             'bucket' => env('SERVERLESS_ASSETS_S3_BUCKET'),
-            'endpoint' => env('SERVERLESS_ASSETS_S3_ENDPOINT'),
+            // Derived from the region when unset. Without a default the SDK
+            // would fall back to AWS's own endpoint and quietly talk to S3
+            // instead of Spaces — a confusing failure for one missing var.
+            // Matches the digitalocean_spaces endpoint_template in
+            // config/product/object_storage.php.
+            'endpoint' => env('SERVERLESS_ASSETS_S3_ENDPOINT')
+                ?: 'https://'.env('SERVERLESS_ASSETS_S3_REGION', 'nyc3').'.digitaloceanspaces.com',
             'use_path_style_endpoint' => false,
             // Only consulted when the CDN is off; otherwise ASSET_URL is the
             // site's own hostname (see ServerlessAssetPublisher::cdnUrl()).

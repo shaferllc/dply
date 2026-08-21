@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire\Queue\QueuesPageTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Models\User;
+use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Livewire\QueueNamespaceShow;
 use App\Modules\Queue\Livewire\Queues;
-use App\Modules\Queue\Models\QueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -246,7 +247,7 @@ test('a third live credential is refused', function () {
     // A third means an earlier rotation was abandoned, leaving a secret live
     // forever — so the cap is enforced rather than warned about.
     $namespace = makeNamespace($this->organization);
-    QueueCredential::mint($namespace, 'second');
+    (new MintQueueCredential)->handle($namespace, 'second');
 
     Livewire::actingAs($this->user)
         ->test(QueueNamespaceShow::class, [
@@ -322,7 +323,7 @@ function makeNamespace(Organization $organization, string $name = 'orders'): Que
         'status' => QueueNamespace::STATUS_ACTIVE,
     ]);
 
-    QueueCredential::mint($namespace, 'Default credential');
+    (new MintQueueCredential)->handle($namespace, 'Default credential');
 
     return $namespace;
 }

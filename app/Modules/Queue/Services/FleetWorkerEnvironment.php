@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Services;
 
 use App\Modules\Queue\Models\ManagedQueueFleet;
-use App\Modules\Queue\Models\QueueCredential;
+use App\Models\ServiceCredential;
+use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEndpoint;
 use RuntimeException;
@@ -66,14 +67,14 @@ class FleetWorkerEnvironment
     {
         $live = $namespace->liveCredentials()->first();
 
-        if ($live instanceof QueueCredential && (string) $live->secret !== '') {
+        if ($live instanceof ServiceCredential && (string) $live->secret !== '') {
             return [
                 'access_key_id' => $live->accessKeyId(),
                 'secret' => (string) $live->secret,
             ];
         }
 
-        $minted = QueueCredential::mint($namespace, __('Managed worker credential'));
+        $minted = (new MintQueueCredential)->handle($namespace, __('Managed worker credential'));
 
         return [
             'access_key_id' => $minted['credential']->accessKeyId(),
