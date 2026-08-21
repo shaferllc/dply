@@ -197,3 +197,42 @@ test('the cloud database create form no longer offers redis', function () {
     expect($engines)->not->toContain(CloudDatabase::ENGINE_REDIS);
     expect($engines)->toContain(CloudDatabase::ENGINE_POSTGRES);
 });
+
+test('a grandfathered cluster is excluded from the cloud resource bill', function () {
+    // The M4 fold-in materialises per-function Valkey clusters as
+    // cloud_databases rows. Those clusters were free when they were
+    // provisioned, so a refactor must not start charging for them — and the
+    // exclusion is explicit rather than relying on which pivot the calculator
+    // happens to key off today.
+    config([
+        'subscription.standard.cloud_markup_percent' => 0,
+        'subscription.standard.cloud_database_cents' => ['small' => 1500],
+        'subscription.standard.cloud_container_cents' => [],
+        'subscription.standard.cloud_bucket_cents' => 0,
+    ]);
+
+    $site = Site::factory()->create(['organization_id' => $this->organization->id]);
+
+    $billed = redisCluster(['name' => 'billed']);
+    $free = redisCluster(['name' => 'free']);
+
+    $billed->sites()->attach($site->id);
+    $free->sites()->attach($site->id);
+
+    $calculator = app(\App\Modules\Billing\Services\CloudResourceCostCalculator::class);
+
+    // Both attached, both billed.
+    expect($calculator->subtotalCents(collect([$site])))->toBe(3000);
+
+    ManagedCache::query()->create([
+        'organization_id' => $this->organization->id,
+        'name' => 'folded',
+        'tier' => ManagedCache::TIER_DEDICATED,
+        'status' => ManagedCache::STATUS_ACTIVE,
+        'cloud_database_id' => $free->id,
+        'grandfathered_at' => now(),
+    ]);
+
+    // The grandfathered one drops out; the other is untouched.
+    expect($calculator->subtotalCents(collect([$site])))->toBe(1500);
+});

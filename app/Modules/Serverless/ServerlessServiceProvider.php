@@ -6,7 +6,6 @@ namespace App\Modules\Serverless;
 
 use App\Modules\Serverless\Livewire\BackgroundPanel;
 use App\Modules\Serverless\Livewire\AssetsPanel;
-use App\Modules\Serverless\Livewire\CachePanel;
 use App\Modules\Serverless\Livewire\Create;
 use App\Modules\Serverless\Livewire\DatabasePanel;
 use App\Modules\Serverless\Livewire\DnsPanel;
@@ -66,7 +65,6 @@ class ServerlessServiceProvider extends ServiceProvider
         Livewire::component('serverless.journey', Journey::class);
         Livewire::component('serverless.background-panel', BackgroundPanel::class);
         Livewire::component('serverless.assets-panel', AssetsPanel::class);
-        Livewire::component('serverless.cache-panel', CachePanel::class);
         Livewire::component('serverless.database-panel', DatabasePanel::class);
         Livewire::component('serverless.dns-panel', DnsPanel::class);
         Livewire::component('serverless.logs-panel', LogsPanel::class);

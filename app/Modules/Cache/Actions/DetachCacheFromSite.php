@@ -10,6 +10,7 @@ use App\Models\SiteBinding;
 use App\Modules\Cache\Models\CacheSite;
 use App\Modules\Cache\Models\ManagedCache;
 use App\Modules\Cache\Support\CacheWiring;
+use App\Support\Sites\SiteEnvFile;
 use Illuminate\Support\Facades\Cache as CacheFacade;
 
 /**
@@ -33,7 +34,7 @@ final class DetachCacheFromSite
             ->where('cache_id', $cache->id)
             ->delete();
 
-        $this->stripEnv($site);
+        SiteEnvFile::strip($site, CacheWiring::MANAGED_KEYS);
 
         // Revoke only the credentials minted for this site, identified by the
         // name attach gave them. A cache's other site credentials, and any key
@@ -54,35 +55,5 @@ final class DetachCacheFromSite
             ->where('target_type', 'managed_cache')
             ->where('target_id', $cache->id)
             ->delete();
-    }
-
-    /**
-     * Remove the managed keys from the site's env file.
-     *
-     * Line-wise rather than through a merge, because merging can only ever set
-     * a key to something else — there is no "unset" in an upsert.
-     */
-    private function stripEnv(Site $site): void
-    {
-        $content = (string) $site->env_file_content;
-
-        if (trim($content) === '') {
-            return;
-        }
-
-        $managed = CacheWiring::MANAGED_KEYS;
-        $lines = preg_split('/\r\n|\r|\n/', $content) ?: [];
-
-        $kept = array_values(array_filter($lines, function (string $line) use ($managed): bool {
-            foreach ($managed as $key) {
-                if (preg_match('/^\s*'.preg_quote($key, '/').'\s*=/', $line) === 1) {
-                    return false;
-                }
-            }
-
-            return true;
-        }));
-
-        $site->forceFill(['env_file_content' => implode("\n", $kept)])->save();
     }
 }

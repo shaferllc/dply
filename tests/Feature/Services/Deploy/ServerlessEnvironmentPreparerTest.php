@@ -23,7 +23,7 @@ test('it seeds managed env from the repo and mints an app key', function () {
     File::put($this->dir.'/.env', "APP_ENV=production\nLOG_CHANNEL=stderr\n");
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('APP_ENV=production', $managed);
@@ -35,7 +35,7 @@ test('it seeds managed env from the repo and mints an app key', function () {
 test('it injects the command secret for background ticks', function () {
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     // The baked secret is the site's stable command secret — not the
     // operator-rotatable webhook_secret.
@@ -49,7 +49,7 @@ test('the command secret survives a webhook secret rotation', function () {
 
     // Operator regenerates the webhook secret, then redeploys.
     $site->update(['webhook_secret' => 'a-freshly-rotated-webhook-secret']);
-    (new ServerlessEnvironmentPreparer)->prepare($site->fresh(), $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site->fresh(), $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$commandSecret, $managed);
@@ -62,7 +62,7 @@ test('it overwrites a stale command secret', function () {
         'env_file_content' => "APP_ENV=production\nDPLY_COMMAND_SECRET=stale-old-value\n",
     ]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->fresh()->ensureServerlessCommandSecret(), $managed);
@@ -71,7 +71,7 @@ test('it overwrites a stale command secret', function () {
 test('it injects a stable log ingest secret', function () {
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     expect($managed)->toMatch('/DPLY_LOG_INGEST_SECRET=[a-f0-9]{48}/');
@@ -80,7 +80,7 @@ test('it injects a stable log ingest secret', function () {
     $secret = data_get($site->fresh()->meta, 'serverless.log_ingest_secret');
     expect($secret)->not->toBeEmpty();
 
-    (new ServerlessEnvironmentPreparer)->prepare($site->fresh(), $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site->fresh(), $this->dir, true);
     expect(data_get($site->fresh()->meta, 'serverless.log_ingest_secret'))->toBe($secret);
 });
 test('it skips the ingest url when no public url is configured', function () {
@@ -89,7 +89,7 @@ test('it skips the ingest url when no public url is configured', function () {
     config(['dply.public_app_url' => null]);
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringNotContainsString('DPLY_LOG_INGEST_URL=', (string) $site->fresh()->env_file_content);
 });
@@ -98,7 +98,7 @@ test('it builds the ingest url from the public app url', function () {
     config(['dply.public_app_url' => 'dply.tunnel.example']);
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringContainsString(
         'DPLY_LOG_INGEST_URL=https://dply.tunnel.example/hooks/functions/'.$site->id.'/log',
@@ -109,7 +109,7 @@ test('it keeps an existing app key', function () {
     $existing = "APP_ENV=production\nAPP_KEY=base64:keepme0000000000000000000000000000000000000=\n";
     $site = Site::factory()->create(['env_file_content' => $existing]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     expect(substr_count($managed, 'APP_KEY='))->toBe(1);
@@ -119,7 +119,7 @@ test('a non laravel function gets no app key', function () {
     File::put($this->dir.'/.env', "PORT=3000\n");
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, false);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, false);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('PORT=3000', $managed);
@@ -131,7 +131,7 @@ test('managed env is authoritative over the repo env', function () {
         'env_file_content' => "APP_KEY=base64:set\nMANAGED=1\n",
     ]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $built = (string) file_get_contents($this->dir.'/.env');
     $this->assertStringContainsString('MANAGED=1', $built);
@@ -142,7 +142,7 @@ test('it injects the queue wake url alongside the ingest url', function () {
     config(['dply.public_app_url' => 'dply.tunnel.example']);
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringContainsString(
         'DPLY_QUEUE_WAKE_URL=https://dply.tunnel.example/hooks/functions/'.$site->id.'/queue/wake',
@@ -156,7 +156,7 @@ test('it skips the queue wake url when no public url is configured', function ()
     config(['dply.public_app_url' => null]);
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringNotContainsString('DPLY_QUEUE_WAKE_URL=', (string) $site->fresh()->env_file_content);
 });
@@ -169,7 +169,7 @@ test('it force-sets app url and asset url to the function hostname', function ()
     ]);
     $host = $site->ensureServerlessProxySlug().'.'.ServerlessTestingDomains::apexFor($site->id);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('APP_URL=https://'.$host, $managed);
@@ -183,7 +183,7 @@ test('the wake url matches the route the wake controller is registered on', func
     config(['dply.public_app_url' => 'dply.tunnel.example']);
     $site = Site::factory()->create(['env_file_content' => null]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $expected = route('hooks.functions.queue.wake', ['site' => $site->id]);
     $path = (string) parse_url($expected, PHP_URL_PATH);
@@ -194,7 +194,7 @@ test('the wake url matches the route the wake controller is registered on', func
 test('it defaults log channel to stderr when unset', function () {
     $site = Site::factory()->create(['env_file_content' => "APP_ENV=production\n"]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringContainsString('LOG_CHANNEL=stderr', (string) $site->fresh()->env_file_content);
 });
@@ -202,7 +202,7 @@ test('it defaults log channel to stderr when unset', function () {
 test('it keeps an explicit log channel', function () {
     $site = Site::factory()->create(['env_file_content' => "LOG_CHANNEL=papertrail\n"]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('LOG_CHANNEL=papertrail', $managed);
@@ -212,7 +212,7 @@ test('it keeps an explicit log channel', function () {
 test('it defaults session driver to cookie when unset', function () {
     $site = Site::factory()->create(['env_file_content' => "APP_ENV=production\n"]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $this->assertStringContainsString('SESSION_DRIVER=cookie', (string) $site->fresh()->env_file_content);
 });
@@ -220,7 +220,7 @@ test('it defaults session driver to cookie when unset', function () {
 test('it keeps an explicit session driver', function () {
     $site = Site::factory()->create(['env_file_content' => "SESSION_DRIVER=redis\n"]);
 
-    (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+    app(ServerlessEnvironmentPreparer::class)->prepare($site, $this->dir, true);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('SESSION_DRIVER=redis', $managed);
@@ -234,7 +234,7 @@ test('it overwrites asset url after off-function publish', function () {
     File::put($this->dir.'/.env', (string) $site->env_file_content);
 
     $published = 'https://dply.example/serverless-assets/'.$site->id;
-    (new ServerlessEnvironmentPreparer)->applyAssetUrl($site, $this->dir, $published);
+    app(ServerlessEnvironmentPreparer::class)->applyAssetUrl($site, $this->dir, $published);
 
     $managed = (string) $site->fresh()->env_file_content;
     $this->assertStringContainsString('ASSET_URL='.$published, $managed);

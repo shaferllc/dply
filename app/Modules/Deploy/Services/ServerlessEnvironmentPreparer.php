@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Deploy\Services;
 
 use App\Models\Site;
+use App\Modules\Cache\Services\ServerlessCacheProvisioner;
+use App\Support\Sites\SiteEnvFile;
 
 /**
  * Prepares the `.env` a serverless function deploys with.
@@ -23,6 +25,24 @@ use App\Models\Site;
  */
 class ServerlessEnvironmentPreparer
 {
+    /**
+     * Required, deliberately not `?Foo $x = null`.
+     *
+     * The first version of this was nullable-with-a-default, on the theory that
+     * it kept the class constructible without the Cache module. What it
+     * actually did was hide a circular dependency: Deploy wanted Cache, Cache's
+     * attach wanted Deploy, the container failed to resolve the chain, and
+     * because a default was available it substituted `null` instead of
+     * throwing. The auto-wiring compiled, passed a test that resolved the
+     * provisioner directly, and would have silently done nothing in production.
+     *
+     * A required dependency cannot fail that way — it either resolves or the
+     * container says so out loud. The cycle itself is gone: both sides now
+     * share {@see SiteEnvFile} in the kernel rather than each other.
+     */
+    public function __construct(private readonly ServerlessCacheProvisioner $cacheProvisioner) {}
+
+
     /**
      * @param  bool  $isLaravel  whether the artifact builder detected Laravel
      * @return string a short log line describing what happened
@@ -119,6 +139,32 @@ class ServerlessEnvironmentPreparer
         // Persist so the value is stable and editable in the Environment panel.
         if ($managed !== $original) {
             $site->forceFill(['env_file_content' => $managed])->save();
+        }
+
+        /*
+         * Give the function a shared cache if it has none.
+         *
+         * A function's default cache store is per-invocation, so
+         * `ShouldBeUnique`, `WithoutOverlapping` and `RateLimited` silently do
+         * nothing — the defect ServerlessQueueDoctorCommand reports. Wiring it
+         * automatically is the point of the free tier: a customer should not
+         * have to know the failure mode exists in order not to have it.
+         *
+         * Runs AFTER the save above, deliberately. The attach writes its own
+         * keys through mergeKeys(), so doing it earlier would leave this
+         * method holding a stale $managed and overwrite them a few lines
+         * later. The env is re-read rather than merged in memory for the same
+         * reason — the attach is the authority on what it wrote.
+         *
+         * See docs/adr/dply-cache.md, decision 3.
+         */
+        if ($isLaravel) {
+            $wired = $this->cacheProvisioner->wire($site, SiteEnvFile::parse($managed));
+
+            if ($wired !== []) {
+                $managed = (string) ($site->fresh()?->env_file_content ?? $managed);
+                $notes[] = 'attached a dply Cache';
+            }
         }
 
         // Bundle the managed env into the artifact — Laravel's Dotenv reads it.

@@ -10,7 +10,7 @@ use App\Models\SiteBinding;
 use App\Modules\Cache\Models\CacheSite;
 use App\Modules\Cache\Models\ManagedCache;
 use App\Modules\Cache\Support\CacheWiring;
-use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Support\Sites\SiteEnvFile;
 use RuntimeException;
 
 /**
@@ -32,10 +32,7 @@ use RuntimeException;
  */
 final class AttachCacheToSite
 {
-    public function __construct(
-        private readonly ServerlessEnvironmentPreparer $environment,
-        private readonly DetachCacheFromSite $detach,
-    ) {}
+    public function __construct(private readonly DetachCacheFromSite $detach) {}
 
     /**
      * @return array<string, string> the env map written to the site
@@ -81,7 +78,7 @@ final class AttachCacheToSite
 
         $env = CacheWiring::envFor($cache, $minted['credential'], $minted['plaintext'], $keyPrefix);
 
-        $this->environment->mergeKeys($site, $env);
+        SiteEnvFile::merge($site, $env);
 
         if ($site->serverless_backend === null) {
             $this->writeBindingProjection($site, $cache, $env);

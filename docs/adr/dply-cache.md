@@ -464,6 +464,24 @@ An upgrade from shared to dedicated changes `CACHE_STORE` from `dynamodb` to
 
 ## Implementation notes
 
+- **A nullable dependency with a default hides a circular dependency.** M4's
+  first attempt gave `ServerlessEnvironmentPreparer` a
+  `?ServerlessCacheProvisioner $x = null`, on the reasoning that it kept the
+  class constructible without the Cache module. What it actually did was hide a
+  cycle — Deploy wanted Cache, Cache's attach wanted Deploy — which made
+  container resolution fail, and because a default was available Laravel
+  substituted `null` rather than throwing. The auto-wiring compiled, passed a
+  test that resolved the provisioner directly, and would have done **nothing at
+  all in production**.
+
+  The fix is both halves: break the cycle by moving the shared piece
+  (`SiteEnvFile`) into the kernel — the same remedy `ModuleBoundaryTest` prints
+  for a module→shell edge — and then make the dependency **required**, so it can
+  never silently be absent again. A nullable-with-default dependency on a
+  behaviour you rely on is not defensive; it converts a loud failure into a
+  silent one.
+
+
 - **A test handler must reproduce Guzzle's error contract.**
   `Aws\WrappedHttpHandler` treats *any fulfilled promise* as success and turns
   only a **rejected** one into an `AwsException`. The real `GuzzleHandler` gets

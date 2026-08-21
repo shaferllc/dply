@@ -96,14 +96,15 @@ class ServerlessCostEstimator
             ];
         }
 
-        $cache = is_array($config['cache'] ?? null) ? $config['cache'] : [];
-        if (($cache['size'] ?? '') !== '') {
-            $lines[] = [
-                'label' => 'Managed Redis',
-                'amount' => $this->cacheMonthly((string) $cache['size']),
-                'billed_by' => 'DigitalOcean',
-            ];
-        }
+        /*
+         * No cache line.
+         *
+         * A function's cache is no longer a cluster stored on this site: the
+         * shared tier is free and the dedicated tier is a CloudDatabase, which
+         * the cloud-resource estimate already accounts for. Leaving the old
+         * line here would double-count a dedicated cache and invent a charge
+         * for a free one. See docs/adr/dply-cache.md, decision 10.
+         */
 
         return [
             'lines' => $lines,
