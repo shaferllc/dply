@@ -544,7 +544,12 @@ class Site extends Model
     /**
      * Hidden worker-host copies of this site (same repo, drain the same queue).
      *
-     * @return Collection<int, Site>
+     * `static`, not `Site`: the query is built with `static::query()`, and
+     * Eloquent's Collection is invariant in TModel, so a Collection<int, static>
+     * is not a Collection<int, Site>. Site is subclassed (PhpStanTraitHarness),
+     * so this is a real distinction rather than a formality.
+     *
+     * @return Collection<int, static>
      */
     public function fleetReplicaSites()
     {

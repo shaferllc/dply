@@ -28,6 +28,42 @@ Check the hosted version:
 curl -fsSL https://your-dply.example/cli/version.json
 ```
 
+## Update
+
+New commands ship with the instance, not with a registry release — the tarball
+is built on demand from the running app. So updating is one command:
+
+```sh
+dply update             # install what your instance is serving
+dply update --check     # report only; exits 1 when your build differs
+dply update --json      # {installed, serving, up_to_date, base_url}
+dply --version          # what you are running right now
+```
+
+The check is an **equality**, not a greater-than: the instance is the source of
+truth, so an instance that has rolled back rolls your CLI back too. `--force`
+reinstalls the same version.
+
+If the global install hits a permission wall, re-run with `sudo` or fall back to
+the installer (`curl -fsSL https://your-dply.example/cli/install.sh | bash`).
+
+### Developing on the CLI
+
+Point the global `dply` at your checkout once, and every edit is live — no
+reinstall, no repack:
+
+```sh
+cd packages/dply-cli
+npm link                 # global `dply` becomes a symlink to this directory
+which dply && ls -la $(which dply)   # confirm it resolves into your repo
+```
+
+Undo with `npm unlink -g @dply/cli`, then re-run the installer for a packed build.
+
+While linked, `dply update` refuses and tells you to `git pull` instead —
+installing the packed tarball would replace the symlink and quietly end dev
+mode. `dply update --force` overrides that if you actually want the packed build.
+
 ### Self-hosted config
 
 In `.env` on the dply app:
@@ -100,16 +136,23 @@ Requires the **`serverless.read`** scope.
 ```sh
 dply serverless list                          # every function in the org
 dply serverless status checkout               # detail, limits, 24h health
-dply serverless errors --site checkout        # failed invocations
+dply serverless errors --site checkout        # every failed invocation
 dply serverless errors --site checkout --watch
 dply serverless invocations --site checkout --source web --limit 20
 dply serverless invocation <id> --site checkout   # + captured log lines
 dply serverless logs --site checkout --level error --follow
 ```
 
-`serverless errors` reads **failed invocations**, which is where a function's
-failures actually live — the platform's activations API returns nothing, so
-dply's own invocation table is the only record. It exits 1 when anything failed.
+`serverless errors` reads **failed invocations** — every one, raw. That is where
+a function's failures actually live: the platform's activations API returns
+nothing, so dply's own invocation table is the only record. It exits 1 when
+anything failed.
+
+It is the drill-down under `dply errors`, not a rival. A failing streak also
+folds into **one** open error event for the site, so `dply errors` (and the
+site's Errors tab, and site-error notifications) tells you the function is
+broken, and `dply serverless errors` tells you which requests broke. The folded
+event closes by itself once the function serves a successful invocation again.
 
 Two log surfaces, deliberately separate:
 
@@ -127,6 +170,7 @@ Requires the **`sites.read`** scope.
 dply errors                        # linked site, or --site <id> / $DPLY_SITE
 dply errors --full                 # detail, remediation code, deep link
 dply errors --category ssl,deploy  # filter by category (comma-separated)
+dply errors --category function_invocation   # just the broken-function events
 dply errors --watch                # poll for new events (--interval ms)
 dply errors --json                 # raw payload
 ```

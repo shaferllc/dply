@@ -5,6 +5,7 @@ import * as accountCommands from './account-commands.mjs';
 import * as serverCommands from './server-commands.mjs';
 import * as siteCommands from './site-commands.mjs';
 import * as errorsCommands from './errors-commands.mjs';
+import * as updateCommands from './update-command.mjs';
 import * as serverlessCommands from './serverless-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
 import { readSiteLink } from './config.mjs';
@@ -29,6 +30,7 @@ const TOP_LEVEL = {
   serverless: { handler: runServerless, summary: 'Managed functions (list, status, errors, logs, invocations).' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
+  update: { handler: updateCommands.updateCommand, summary: 'Install the CLI build your instance is serving (--check).' },
 };
 
 const EDGE_COMMANDS = {
@@ -84,7 +86,9 @@ export async function run(argv) {
     return printCommandList(argv[1]);
   }
   if (argv[0] === '--version' || argv[0] === '-V') {
-    info('dply CLI 0.1.0');
+    // Read, not hardcoded: `dply update` compares this against what the
+    // instance serves, so a stale literal here would report a false match.
+    info(`dply CLI ${await updateCommands.localVersion()}`);
 
     return 0;
   }
@@ -419,6 +423,7 @@ export function allCommandLines() {
     'ls',
     'help',
     'guide',
+    'update',
     'link',
     'sites',
     'account',
@@ -504,7 +509,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'link', 'deploy', 'errors', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
   }
 
   if (!normalized || normalized === 'account') {

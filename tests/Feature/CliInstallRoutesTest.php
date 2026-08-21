@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Cli\CliPackageTarballBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -71,4 +72,27 @@ test('cli package tarball bakes the request origin as default base', function ()
     /** @var array{baseUrl?: string} $defaults */
     $defaults = json_decode((string) file_get_contents($defaultsPath), true, 512, JSON_THROW_ON_ERROR);
     expect($defaults['baseUrl'] ?? null)->toBe('https://dply.test');
+});
+
+test('the version manifest carries a build fingerprint that moves with the source', function () {
+    $builder = app(CliPackageTarballBuilder::class);
+    $before = $builder->buildId();
+
+    $this->getJson('/cli/version.json')
+        ->assertOk()
+        ->assertJsonPath('build', $before)
+        ->assertJsonStructure(['name', 'version', 'build', 'install_url', 'package_url']);
+
+    // A new command is a source change with no version bump — the fingerprint
+    // is what makes `dply update` notice it.
+    $scratch = base_path('packages/dply-cli/src/__fingerprint_probe.mjs');
+    file_put_contents($scratch, "export const probe = 1;\n");
+
+    try {
+        expect($builder->buildId())->not->toBe($before);
+    } finally {
+        @unlink($scratch);
+    }
+
+    expect($builder->buildId())->toBe($before);
 });

@@ -43,7 +43,7 @@ class CliInstallController extends Controller
         ]);
     }
 
-    public function packageVersion(Request $request): JsonResponse
+    public function packageVersion(Request $request, CliPackageTarballBuilder $builder): JsonResponse
     {
         $packageJson = base_path('packages/dply-cli/package.json');
         abort_unless(is_readable($packageJson), 404);
@@ -56,6 +56,10 @@ class CliInstallController extends Controller
         return response()->json([
             'name' => $meta['name'] ?? '@dply/cli',
             'version' => $meta['version'] ?? '0.0.0',
+            // What `dply update` actually compares. See
+            // {@see CliPackageTarballBuilder::buildId()} — package.json's
+            // version is hand-maintained and does not move when a command lands.
+            'build' => $builder->buildId(),
             'install_url' => $origin.'/cli/install.sh',
             'package_url' => $origin.'/cli/dply-cli.tgz',
         ]);
