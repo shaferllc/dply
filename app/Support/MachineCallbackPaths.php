@@ -37,6 +37,7 @@ final class MachineCallbackPaths
         'serverless-assets/*',         // published Functions Laravel Vite/build assets
         'api/edge/preview-comments/*', // cross-origin preview-comment widget (per-site token)
         'api/queue/*',                 // dply Queue data plane (SigV4, per-namespace credential)
+        'api/cache/*',                 // dply Cache data plane (SigV4, per-cache grant)
         'up',                          // uptime/health probe
     ];
 

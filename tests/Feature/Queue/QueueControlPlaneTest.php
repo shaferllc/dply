@@ -40,7 +40,7 @@ test('creating a namespace mints a usable credential and reveals it once', funct
     expect($result['namespace']->isActive())->toBeTrue();
 
     // The access key id is the public half — AWS-shaped, safe to display.
-    expect($result['credential']->accessKeyId())->toStartWith('dplyq');
+    expect($result['credential']->accessKeyId())->toStartWith('dply');
     expect(strlen($result['credential']->accessKeyId()))->toBe(20);
 
     // The hash still matches the secret: it remains the lookup/cache key and
@@ -58,7 +58,7 @@ test('the secret is encrypted at rest, not stored in the clear', function () {
     // RealtimeApp::app_secret makes. The raw column must never be readable.
     $result = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders');
 
-    $raw = DB::table('dply_queue_credentials')
+    $raw = DB::table('service_credentials')
         ->where('id', $result['credential']->id)
         ->value('secret');
 
@@ -150,16 +150,28 @@ test('scopes gate push and pop independently', function () {
 
     $pushOnly = (new MintQueueCredential)->handle($namespace, 'producer', [ServiceCredential::SCOPE_PUSH])['credential'];
 
-    expect($pushOnly->allows(ServiceCredential::SCOPE_PUSH))->toBeTrue();
-    expect($pushOnly->allows(ServiceCredential::SCOPE_POP))->toBeFalse();
+    $queue = ServiceCredential::SERVICE_QUEUE;
+
+    expect($pushOnly->allows($queue, $namespace->id, ServiceCredential::SCOPE_PUSH))->toBeTrue();
+    expect($pushOnly->allows($queue, $namespace->id, ServiceCredential::SCOPE_POP))->toBeFalse();
+
+    // A grant is per resource, so a key scoped to this namespace says no to
+    // every other one — including for the scope it *does* hold here.
+    expect($pushOnly->allows($queue, 'some-other-namespace', ServiceCredential::SCOPE_PUSH))->toBeFalse();
 });
 
 test('an empty scope list means unrestricted', function () {
     $namespace = app(CreateQueueNamespace::class)->handle(queueOrg(), 'orders')['namespace'];
     $credential = (new MintQueueCredential)->handle($namespace, 'legacy', [])['credential'];
 
-    expect($credential->allows(ServiceCredential::SCOPE_PUSH))->toBeTrue();
-    expect($credential->allows(ServiceCredential::SCOPE_POP))->toBeTrue();
+    $queue = ServiceCredential::SERVICE_QUEUE;
+
+    expect($credential->allows($queue, $namespace->id, ServiceCredential::SCOPE_PUSH))->toBeTrue();
+    expect($credential->allows($queue, $namespace->id, ServiceCredential::SCOPE_POP))->toBeTrue();
+
+    // Unrestricted means unrestricted *on the granted resource*, never a
+    // wildcard across resources.
+    expect($credential->allows($queue, 'some-other-namespace', ServiceCredential::SCOPE_PUSH))->toBeFalse();
 });
 
 test('bumping the epoch is how a namespace revokes everything at once', function () {
@@ -204,6 +216,6 @@ test('the masked token identifies a credential without exposing it', function ()
 
     $masked = $result['credential']->maskedToken();
 
-    expect($masked)->toStartWith('dplyq');
+    expect($masked)->toStartWith('dply');
     expect($masked)->not->toContain($result['plaintext']);
 });

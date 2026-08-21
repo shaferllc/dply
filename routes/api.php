@@ -31,6 +31,7 @@ use App\Modules\Edge\Http\Controllers\Api\EdgeLogApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgePreviewApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeSiteApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeUsageApiController;
+use App\Modules\Cache\Http\Controllers\DynamoDbCompatibilityController;
 use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
 use App\Modules\Queue\Http\Controllers\SqsCompatibilityController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessInvocationApiController;
@@ -382,4 +383,30 @@ Route::prefix('queue/v1')
         Route::post('/{queue?}', SqsCompatibilityController::class)
             ->where('queue', '[A-Za-z0-9._-]{1,128}')
             ->name('queue.sqs');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| dply Cache data plane
+|--------------------------------------------------------------------------
+|
+| The DynamoDB-compatible surface. Sits OUTSIDE the /v1 group for the same
+| reasons the queue's does: auth is SigV4 with a service credential rather than
+| an ApiToken bearer, and `throttle:api` at 60/min would be exhausted by a
+| single page doing twenty cache reads.
+|
+| ONE route, no path parameter — unlike the queue, which lets a client address
+| a queue by URL. The AWS JSON protocol dispatches on the X-Amz-Target header
+| and names the table in the body, so a path segment here would be a second,
+| unauthenticated way to say which cache a request is for. There is exactly one
+| tenancy input and the grant map decides it (docs/adr/dply-cache.md,
+| decision 14).
+|
+| CSRF exemption comes from App\Support\MachineCallbackPaths (`api/cache/*`).
+|
+*/
+Route::prefix('cache/v1')
+    ->middleware(['auth.cache', 'throttle:dply-cache'])
+    ->group(function (): void {
+        Route::post('/', DynamoDbCompatibilityController::class)->name('cache.dynamodb');
     });

@@ -181,10 +181,31 @@ attached.
 
    **Quota: 64 MiB.** Generous for what decision 13 says the tier is *for* —
    locks and counters are bytes — and small enough that page-caching workloads
-   reach it and get pushed to the tier that serves them properly. Enforced by a
-   counter column updated in the same statement as the write, not a periodic
-   `pg_total_relation_size` sample: a quota discovered ten minutes late is not a
-   quota.
+   reach it and get pushed to the tier that serves them properly. Maintained
+   live, not sampled from `pg_total_relation_size`: a quota discovered ten
+   minutes late is not a quota.
+
+   **Amended during M1.** This originally said "a counter column updated in the
+   same statement as the write", meaning a column on `managed_caches`. That is
+   wrong, and wrong specifically in the configuration this ADR recommends: the
+   counter would have to be maintained by the item store, which lives on the
+   `dply_cache` connection — a *separate database* — and Postgres cannot update
+   across databases. It would have worked in the shared configuration and failed
+   silently in the isolated one.
+
+   The counter therefore lives in `dply_cache_usage`, beside the items it
+   counts, maintained by **statement-level** triggers with transition tables. It
+   is statement-level rather than row-level so a sweep deleting five thousand
+   expired items takes one lock on one counter row instead of five thousand.
+   Maintaining it in triggers rather than in the store service is what stops it
+   drifting: the sweeper, a flush, and a customer write all account for
+   themselves without having to remember to.
+
+   The quota *check* reads that counter before the write rather than inside it,
+   so two concurrent writes can both pass at the boundary and overshoot by one
+   item each. Deliberate: making it exact means serializing every write to a
+   cache behind one row lock, which is a worse property than a bounded overshoot
+   on a limit whose entire job is to stop unbounded growth.
 
    Revenue comes from the dedicated tier, which already bills through
    `CloudResourceCostCalculator`.
@@ -432,6 +453,25 @@ The customer-facing env for a shared cache is six keys, all machine-written:
 
 An upgrade from shared to dedicated changes `CACHE_STORE` from `dynamodb` to
 `redis`, so it is a redeploy, not a hot swap. Vapor has the same seam.
+
+## Implementation notes
+
+- **A test handler must reproduce Guzzle's error contract.**
+  `Aws\WrappedHttpHandler` treats *any fulfilled promise* as success and turns
+  only a **rejected** one into an `AwsException`. The real `GuzzleHandler` gets
+  that free, because Guzzle's `http_errors` raises on 4xx. A test `http_handler`
+  that fulfils on a 400 therefore makes every error path silently pass:
+  ConditionalCheckFailed reads as success, so `add()` always returns true and a
+  lock is never actually held. `tests/Feature/Cache/DynamoDbCompatibilityTest`
+  rejects on `>= 400` for this reason, and the four conditional-operation tests
+  are meaningless without it.
+
+- **Expression forms are matched, not parsed.** `DynamoDbStore` emits exactly
+  four `UpdateExpression` strings and four `ConditionExpression` strings. The
+  adapter compares against those literals and answers anything else with a
+  `ValidationException`. A general expression evaluator would be a large amount
+  of security-relevant surface built to serve eight known strings, and
+  mis-evaluating a condition on a lock is far worse than refusing it.
 
 ## Open
 

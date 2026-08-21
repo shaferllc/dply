@@ -50,7 +50,7 @@ test('a bearer token authenticates the native endpoints', function () {
 
     nativeCall($ctx, 'GET', '/failed-jobs')
         ->assertOk()
-        ->assertJsonStructure(['data']);
+        ->assertJsonStructure(['failed_jobs']);
 });
 
 test('an unknown bearer token is rejected', function () {
@@ -179,5 +179,5 @@ test('the native routes are matched before the SQS catch-all', function () {
 
     nativeCall($ctx, 'GET', '/failed-jobs')
         ->assertOk()
-        ->assertJsonStructure(['data']);
+        ->assertJsonStructure(['failed_jobs']);
 });

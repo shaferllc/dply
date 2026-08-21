@@ -3,6 +3,7 @@
 use App\Modules\Backups\BackupsServiceProvider;
 use App\Modules\Billing\BillingServiceProvider;
 use App\Modules\Blog\BlogServiceProvider;
+use App\Modules\Cache\CacheServiceProvider;
 use App\Modules\Certificates\CertificatesServiceProvider;
 use App\Modules\Cloud\CloudServiceProvider;
 use App\Modules\Database\DatabaseServiceProvider;
@@ -37,6 +38,7 @@ return [
     BackupsServiceProvider::class,
     BillingServiceProvider::class,
     CertificatesServiceProvider::class,
+    CacheServiceProvider::class,
     CloudServiceProvider::class,
     DatabaseServiceProvider::class,
     DeployServiceProvider::class,

@@ -80,6 +80,7 @@ use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
 use App\Modules\Queue\Support\QueueAction;
+use App\Modules\Cache\Support\CacheRequestContext;
 use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
@@ -715,6 +716,30 @@ class AppServiceProvider extends ServiceProvider
             // Unauthenticated: a tight IP limit, so credential stuffing cannot
             // ride the generous per-namespace allowance.
             return Limit::perMinute(60)->by('dq-ip:'.$request->ip());
+        });
+
+        // dply Cache data plane. Keyed by ACCESS KEY rather than by cache,
+        // because a cache request names its table in the body and this runs
+        // before the body is decoded — the credential is the only tenant
+        // identity available this early.
+        //
+        // The ceiling is a constant, not an entitlement: the shared tier is
+        // free and bounded by BYTES, not throughput (docs/adr/dply-cache.md,
+        // decisions 7 and 16), so there is no tier to read a rate off. What
+        // this exists to stop is a runaway loop, not a paying customer.
+        //
+        // Generous on purpose. A page doing twenty cache reads is twenty
+        // requests here, where the same page on Redis would be twenty pipelined
+        // commands — so a limit tuned to "requests" would punish exactly the
+        // usage the product is for.
+        RateLimiter::for('dply-cache', function (Request $request) {
+            $credential = $request->attributes->get('cache_context');
+
+            if ($credential instanceof CacheRequestContext) {
+                return Limit::perMinute(6_000)->by('dc:'.$credential->credential->id);
+            }
+
+            return Limit::perMinute(60)->by('dc-ip:'.$request->ip());
         });
     }
 

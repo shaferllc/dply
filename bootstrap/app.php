@@ -2,6 +2,7 @@
 
 use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\AuthenticateCacheCredential;
 use App\Http\Middleware\AuthenticateQueueCredential;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
@@ -65,6 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'fleet.operator' => ValidateFleetOperatorToken::class,
             'bundle.service' => ValidateBundleServiceToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
+            'auth.cache' => AuthenticateCacheCredential::class,
             'auth.queue' => AuthenticateQueueCredential::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,

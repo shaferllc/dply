@@ -226,3 +226,12 @@ test('the tick persists the reason it scaled', function () {
 
     expect($this->fleet->fresh()->meta['last_reason'] ?? '')->toContain('pending');
 });
+
+/** The panel has nowhere else to read "why is this fleet this size" from. */
+test('the tick persists the reason it scaled', function () {
+    push(60);
+
+    reconciler()->reconcile($this->fleet);
+
+    expect($this->fleet->fresh()->meta['last_reason'] ?? '')->toContain('pending');
+});

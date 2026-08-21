@@ -140,6 +140,34 @@ return [
             'timezone' => env('DB_TIMEZONE', 'UTC'),
         ],
 
+        /*
+        | dply Cache's item store. Same fall-through shape as `dply_queue`
+        | above, and the same warning applies twice over: a cache is HIGHER
+        | churn than a queue, so leaving these unset puts that write volume on
+        | the Postgres serving the dashboard. `CacheStoreIsolation` surfaces
+        | the condition rather than failing closed — sharing is a legitimate
+        | way to run a small install.
+        |
+        | The items table itself is UNLOGGED, so even in the shared
+        | configuration it generates no WAL. See docs/adr/dply-cache.md,
+        | decision 5.
+        */
+        'dply_cache' => [
+            'driver' => 'pgsql',
+            'url' => env('DPLY_CACHE_DB_URL'),
+            'host' => env('DPLY_CACHE_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DPLY_CACHE_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('DPLY_CACHE_DB_DATABASE', env('DB_DATABASE', 'laravel')),
+            'username' => env('DPLY_CACHE_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DPLY_CACHE_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DPLY_CACHE_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+            'timezone' => env('DB_TIMEZONE', 'UTC'),
+        ],
+
     ],
 
     /*

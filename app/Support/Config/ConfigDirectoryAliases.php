@@ -33,6 +33,7 @@ final class ConfigDirectoryAliases
         'audit' => 'product.audit',
         'backup_staging' => 'product.backup_staging',
         'bundle' => 'product.bundle',
+        'cache_service' => 'product.cache_service',
         'caddy_modules' => 'product.caddy_modules',
         'cli' => 'product.cli',
         'console_actions' => 'product.console_actions',

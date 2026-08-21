@@ -22,14 +22,18 @@ use Illuminate\Support\Facades\Cache;
  * — so it must not touch Postgres in the common case and must never write to
  * it.
  *
- * Two cache layers, each earning its place:
+ * Caching is **negative only**, 10s. A stale `.env` after a rotation, or a
+ * credential-stuffing loop, would otherwise cost a Postgres query per request;
+ * a valid key costs one indexed probe on a unique column, which is cheap
+ * enough not to be worth the invalidation surface.
  *
- *  - **Positive**, 60s. The steady state. Keyed off `token_hash`, a column we
- *    already store, so revocation can evict the exact entry. The TTL is a
- *    self-healing backstop for a cache node that missed the eviction, not the
- *    primary mechanism.
- *  - **Negative**, 10s. A stale `.env` after a rotation, or a credential
- *    stuffing loop, otherwise becomes a Postgres query per request.
+ * Note that this is what the queue's resolver actually did too, despite a
+ * docblock there describing a positive layer it never implemented. The
+ * eviction contract that layer would need is nonetheless real and preserved:
+ * `ServiceCredential::cacheKey()` is derived from `token_hash` alone, so
+ * revocation can evict an exact entry without knowing the plaintext — which is
+ * the property the sha256-over-bcrypt choice exists to buy, and what a future
+ * positive layer would be built on.
  *
  * `last_used_at` is written at most once per minute per credential. At poll
  * frequency an unconditional touch would make that a single hot row taking

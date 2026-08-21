@@ -53,9 +53,13 @@ function sqsNamespace(array $queueConfig = []): array
  * signature is produced by the SDK's own SignatureV4, so if our verification
  * drifts from the real thing, these fail.
  *
+ * `$service` is the AWS service name written into the credential scope. It is
+ * a parameter rather than a constant so a test can sign a genuine, valid
+ * signature that is simply scoped to the wrong product.
+ *
  * @param  array<string, mixed>  $payload
  */
-function sqsCall(array $ctx, string $action, array $payload = [], ?string $queue = null): TestResponse
+function sqsCall(array $ctx, string $action, array $payload = [], ?string $queue = null, string $service = 'sqs'): TestResponse
 {
     $url = url('/api/queue/v1'.($queue !== null ? '/'.$queue : ''));
     $body = (string) json_encode($payload);
@@ -66,7 +70,7 @@ function sqsCall(array $ctx, string $action, array $payload = [], ?string $queue
         'Host' => parse_url($url, PHP_URL_HOST),
     ], $body);
 
-    $signed = (new SignatureV4('sqs', 'us-east-1'))->signRequest(
+    $signed = (new SignatureV4($service, 'us-east-1'))->signRequest(
         $psr,
         new Credentials($ctx['credential']->accessKeyId(), $ctx['secret']),
     );
@@ -263,7 +267,9 @@ test('a credential cannot reach another namespace', function () {
 
 test('a push-only credential cannot receive', function () {
     $ctx = sqsNamespace();
-    $ctx['credential']->forceFill(['scopes' => [ServiceCredential::SCOPE_PUSH]])->save();
+    $ctx['credential']->forceFill(['grants' => [
+        ServiceCredential::grantKey(ServiceCredential::SERVICE_QUEUE, $ctx['namespace']->id) => [ServiceCredential::SCOPE_PUSH],
+    ]])->save();
 
     sqsCall($ctx, 'SendMessage', ['MessageBody' => 'x'])->assertOk();
     sqsCall($ctx, 'ReceiveMessage')->assertStatus(403);
@@ -472,4 +478,14 @@ test('a signature older than the skew window is rejected', function () {
     $headers['X-Amz-Date'] = gmdate('Ymd\THis\Z', time() - 3600);
 
     test()->call('POST', $url, [], [], [], sqsServerHeaders($headers), $body)->assertStatus(403);
+});
+
+test('a signature scoped to another service is refused', function () {
+    // The credential is valid and the signature is genuine — only the service
+    // in the credential scope is wrong. Honouring that scope is what stops a
+    // key that legitimately holds both a queue and a cache grant from spending
+    // the cache one on this endpoint. See docs/adr/dply-cache.md, decision 6.
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessage', ['MessageBody' => 'x'], service: 'dynamodb')->assertStatus(403);
 });
