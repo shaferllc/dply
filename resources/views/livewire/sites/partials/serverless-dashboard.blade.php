@@ -131,6 +131,7 @@
 
     {{-- Resource panels render their own hairline strips (embedded chrome), so
          they continue the card rather than stacking four more floating cards. --}}
+    @livewire('serverless.network-panel', ['site' => $site], key('serverless-network-'.$site->id))
     @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
     @livewire('serverless.cache-panel', ['site' => $site], key('serverless-cache-'.$site->id))
     @livewire('serverless.background-panel', ['site' => $site], key('serverless-bg-'.$site->id))

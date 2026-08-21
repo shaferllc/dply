@@ -7,6 +7,7 @@ namespace App\Modules\Serverless\Jobs;
 use App\Models\Site;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Serverless\Services\ServerlessNetworkService;
 use App\Modules\Serverless\Services\ServerlessQueueBackend;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -67,8 +68,11 @@ class ProvisionServerlessCacheJob implements ShouldQueue
                     (string) ($cache['size'] ?? 'db-s-1vcpu-1gb'),
                     'dply-cache-'.(Str::slug((string) $site->slug) ?: 'fn').'-'.Str::lower(Str::random(6)),
                     '8',
+                    [],
+                    app(ServerlessNetworkService::class)->vpcUuid($site),
                 );
                 $cache['cluster_id'] = $cluster['id'];
+                $cache['network_id'] = (string) ($site->serverlessConfig()['network_id'] ?? '');
             } else {
                 $cluster = $service->getDatabaseCluster((string) $cache['cluster_id']);
             }
@@ -109,6 +113,7 @@ class ProvisionServerlessCacheJob implements ShouldQueue
         $cache['status'] = 'online';
         $cache['host'] = $connection['host'];
         $cache['port'] = $connection['port'];
+        $cache['private_host'] = (string) ($cluster['private_host'] ?? '');
         unset($cache['error']);
         $this->persist($site->fresh() ?? $site, $cache);
 

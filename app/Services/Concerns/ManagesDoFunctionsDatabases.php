@@ -301,8 +301,11 @@ trait ManagesDoFunctionsDatabases
 
     /**
      * @param  list<string>  $tags
+     * @param  ?string  $vpcUuid  Place the cluster's private interface inside this VPC.
+     *                            The public hostname stays reachable either way — a VPC only
+     *                            decides who can talk to the cluster over private networking.
      */
-    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null, array $tags = []): array
+    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null, array $tags = [], ?string $vpcUuid = null): array
     {
         $constrained = $this->constrainDatabaseCreateToCatalog($engine, $region, $size, $version);
 
@@ -315,6 +318,9 @@ trait ManagesDoFunctionsDatabases
         ];
         if ($constrained['version'] !== '') {
             $payload['version'] = $constrained['version'];
+        }
+        if (is_string($vpcUuid) && trim($vpcUuid) !== '') {
+            $payload['private_network_uuid'] = trim($vpcUuid);
         }
         $tags = $this->normalizeDatabaseTags($tags);
         if ($tags !== []) {
@@ -458,6 +464,8 @@ trait ManagesDoFunctionsDatabases
 
         return [
             'name' => (string) ($pool['name'] ?? $name),
+            'private_network_uuid' => (string) ($database['private_network_uuid'] ?? ''),
+            'private_host' => (string) ((is_array($database['private_connection'] ?? null) ? $database['private_connection'] : [])['host'] ?? ''),
             'connection' => [
                 'host' => (string) ($connection['host'] ?? ''),
                 'port' => (int) ($connection['port'] ?? 0),
