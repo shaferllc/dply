@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Modules\Serverless\Livewire\LogsPanel;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -28,12 +29,12 @@ use RuntimeException;
  * ## Why this is worth more than parity
  *
  * Without a drain, a function's application log is only readable through the
- * `LogsPanel` Runtime tab, which flattens log lines off the last 50
+ * {@see LogsPanel} Runtime tab, which flattens log lines off the last 50
  * invocations — no search, no level filter, and
  * `serverless:prune-invocations` drops organic rows after 7 days.
  *
- * Pointed at the dply drain, the same lines land in `app_logs`, where
- * `SiteAppLogs` filters by level and searches the message, with 30-day
+ * Pointed at the dply drain, the same lines land in `app_logs`, where the
+ * shell's `SiteAppLogs` filters by level and searches the message, with 30-day
  * retention and a per-site ingest rate limit. Turning this on is therefore also
  * how a function gets searchable, longer-lived logs.
  *

@@ -3,10 +3,12 @@
  *
  * Against /api/v1/serverless/*. Two things worth knowing about the shape here:
  *
- *  - `serverless errors` reads *failed invocations*, not ErrorEvent rows. The
- *    platform's activations API returns nothing, so a failed invocation is only
- *    readable from dply's own invocation table. `dply errors` (site-level, all
- *    kinds) is the ErrorEvent view and stays separate.
+ *  - `serverless errors` reads *failed invocations* — every one, raw. It is the
+ *    drill-down under `dply errors`, not a rival: a failing streak also folds
+ *    into one ErrorEvent row per site, so `dply errors` reports that the
+ *    function is broken and this reports which requests broke.
+ *    (The platform's activations API returns nothing, so dply's own invocation
+ *    table is the only record of a failure.)
  *  - `serverless logs` reads the site's *application* log drain. Per-invocation
  *    stdout/stderr lives on the invocation — `serverless invocation <id>`.
  */
@@ -18,7 +20,7 @@ const SUBCOMMANDS = {
   list: 'List functions in your organization.',
   status: '[site] — function detail + 24h health.',
   invocations: '[site] — recent invocations (--failed, --source, --limit).',
-  errors: '[site] — failed invocations (--watch to poll).',
+  errors: '[site] — every failed invocation (--watch to poll).',
   logs: '[site] — application logs (--follow, --level error).',
   invocation: '<id> [--site …] — one invocation with its log lines.',
 };
@@ -174,7 +176,8 @@ export async function serverlessInvocations(args, flags) {
  * Failed invocations. Same feed as `invocations --failed`, given its own verb
  * because "why is my function broken" is the question people actually arrive
  * with. Exits 1 when anything failed, so it gates a deploy the same way
- * `dply errors` does.
+ * `dply errors` does — and unlike `dply errors`, which folds a streak to one
+ * open event, this lists every failure.
  *
  * @param {string[]} args
  * @param {Record<string, unknown>} flags
@@ -497,8 +500,8 @@ function printServerlessHelp() {
   info('');
   info(c.dim('Site: --site <id-or-name> · $DPLY_SERVERLESS_SITE · $DPLY_SITE · linked repo'));
   info(c.dim('Flags: --json · --limit N · --window s · --interval ms · --source web|tick|test'));
-  info(c.dim('`serverless errors` reads failed invocations and exits 1 when any failed.'));
-  info(c.dim('`dply errors` is the separate site-level ErrorEvent view (all site kinds).'));
+  info(c.dim('`serverless errors` lists every failed invocation and exits 1 when any failed.'));
+  info(c.dim('`dply errors` is the folded view — one open event per broken function.'));
 
   return 0;
 }

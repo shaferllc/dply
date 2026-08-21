@@ -60,6 +60,8 @@ final class DplyCliCommandCatalog
             ['id' => 'ls', 'group' => 'setup', 'title' => 'ls', 'command' => 'dply ls', 'summary' => 'Compact command index. Scopes: top · account · server · site · edge · billing · shortcuts.', 'keywords' => 'index list commands'],
             ['id' => 'ls-server', 'group' => 'setup', 'title' => 'ls server', 'command' => 'dply ls server', 'summary' => 'List server-family commands only.', 'keywords' => 'index'],
             ['id' => 'guide', 'group' => 'setup', 'title' => 'guide', 'command' => 'dply guide', 'summary' => 'Short getting-started guide in the terminal.', 'keywords' => 'onboarding'],
+            ['id' => 'update', 'group' => 'setup', 'title' => 'update', 'command' => 'dply update', 'summary' => 'Install the CLI build this instance is serving — how you pick up new commands.', 'keywords' => 'upgrade newer version outdated install'],
+            ['id' => 'update-check', 'group' => 'setup', 'title' => 'update --check', 'command' => 'dply update --check', 'summary' => 'Report only; exits 1 when your build differs from the instance.', 'keywords' => 'upgrade ci version'],
             ['id' => 'link', 'group' => 'setup', 'title' => 'link', 'command' => 'dply link', 'summary' => 'Interactive picker — link repo to BYO or Edge (.dply/site.json).', 'keywords' => 'repo link'],
             ['id' => 'link-byo', 'group' => 'setup', 'title' => 'link --byo', 'command' => 'dply link --byo <site>', 'summary' => 'Link this repo to a BYO site for bare `dply deploy`.', 'keywords' => 'byo'],
             ['id' => 'link-edge', 'group' => 'setup', 'title' => 'link --edge', 'command' => 'dply link --edge <site>', 'summary' => 'Link this repo to an Edge site.', 'keywords' => 'edge'],
