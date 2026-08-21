@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless;
 
-use App\Modules\Serverless\Livewire\BackgroundPanel;
 use App\Modules\Serverless\Livewire\AssetsPanel;
+use App\Modules\Serverless\Livewire\BackgroundPanel;
 use App\Modules\Serverless\Livewire\Create;
 use App\Modules\Serverless\Livewire\DatabasePanel;
 use App\Modules\Serverless\Livewire\DnsPanel;
@@ -13,6 +13,7 @@ use App\Modules\Serverless\Livewire\Glue;
 use App\Modules\Serverless\Livewire\Index;
 use App\Modules\Serverless\Livewire\Journey;
 use App\Modules\Serverless\Livewire\LogsPanel;
+use App\Modules\Serverless\Livewire\NetworkPanel;
 use App\Modules\Serverless\Livewire\PlatformPanel;
 use App\Modules\Serverless\Livewire\RollbackPanel;
 use Illuminate\Support\ServiceProvider;
@@ -26,8 +27,8 @@ use Livewire\Livewire;
  * bootstrap/app.php via a repointed reference), the contract/exception, the
  * provisioning/rollback jobs, and the tick/collect-usage commands.
  *
- * Re-registers the commands and all 11 Livewire components (4 full-page route
- * components + 7 embedded panels) under their original serverless.* names.
+ * Re-registers the commands and all 12 Livewire components (4 full-page route
+ * components + 8 embedded panels) under their original serverless.* names.
  *
  * The serverless DEPLOY adapters (App\Modules\Deploy\Services\Serverless*) and BILLING
  * usage services (App\Modules\Billing\Services\Serverless*) stay in those hub domains;
@@ -68,6 +69,7 @@ class ServerlessServiceProvider extends ServiceProvider
         Livewire::component('serverless.database-panel', DatabasePanel::class);
         Livewire::component('serverless.dns-panel', DnsPanel::class);
         Livewire::component('serverless.logs-panel', LogsPanel::class);
+        Livewire::component('serverless.network-panel', NetworkPanel::class);
         Livewire::component('serverless.platform-panel', PlatformPanel::class);
         Livewire::component('serverless.rollback-panel', RollbackPanel::class);
     }

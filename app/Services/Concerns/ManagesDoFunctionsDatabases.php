@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Concerns;
 
 use App\Models\CloudDatabase;
+use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -301,8 +302,11 @@ trait ManagesDoFunctionsDatabases
 
     /**
      * @param  list<string>  $tags
+     * @param  ?string  $vpcUuid  Place the cluster's private interface inside this VPC.
+     *                            The public hostname stays reachable either way — a VPC only
+     *                            decides who can talk to the cluster over private networking.
      */
-    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null, array $tags = []): array
+    public function createDatabaseCluster(string $engine, string $region, string $size, string $name, ?string $version = null, array $tags = [], ?string $vpcUuid = null): array
     {
         $constrained = $this->constrainDatabaseCreateToCatalog($engine, $region, $size, $version);
 
@@ -315,6 +319,9 @@ trait ManagesDoFunctionsDatabases
         ];
         if ($constrained['version'] !== '') {
             $payload['version'] = $constrained['version'];
+        }
+        if (is_string($vpcUuid) && trim($vpcUuid) !== '') {
+            $payload['private_network_uuid'] = trim($vpcUuid);
         }
         $tags = $this->normalizeDatabaseTags($tags);
         if ($tags !== []) {
@@ -472,6 +479,8 @@ trait ManagesDoFunctionsDatabases
 
         return [
             'name' => (string) ($pool['name'] ?? $name),
+            'private_network_uuid' => (string) ($database['private_network_uuid'] ?? ''),
+            'private_host' => (string) ((is_array($database['private_connection'] ?? null) ? $database['private_connection'] : [])['host'] ?? ''),
             'connection' => [
                 'host' => (string) ($connection['host'] ?? ''),
                 'port' => (int) ($connection['port'] ?? 0),
@@ -786,7 +795,7 @@ trait ManagesDoFunctionsDatabases
      * `memory_utilization`, `disk_utilization`, `load_1`, `load_5`, `load_15`.
      *
      * The payload is the same Prometheus-style `matrix` App Platform returns
-     * ({@see \App\Modules\Cloud\Services\DigitalOceanAppPlatformService::getAppMetric()}):
+     * ({@see DigitalOceanAppPlatformService::getAppMetric()}):
      * `data.result[].values` is a list of [unix-ts, "string-value"] pairs. A
      * cluster too young to have datapoints answers 200 with an empty result,
      * so an empty list here means "nothing to plot", never "the call failed".

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Jobs;
 
 use App\Models\Site;
-use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
+use App\Modules\Serverless\Services\ServerlessNetworkService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -61,6 +62,11 @@ class ProvisionServerlessDatabaseJob implements ShouldQueue
 
         $service = new DigitalOceanService($credential);
 
+        // Networks house the app's resources (see ServerlessNetworkService). A
+        // cluster's VPC is fixed at create time, so the network the app is
+        // attached to NOW is stamped alongside the cluster id.
+        $networks = app(ServerlessNetworkService::class);
+
         try {
             if (empty($database['cluster_id'])) {
                 $cluster = $service->createDatabaseCluster(
@@ -68,8 +74,12 @@ class ProvisionServerlessDatabaseJob implements ShouldQueue
                     $server->region !== '' ? (string) $server->region : 'nyc1',
                     (string) ($database['size'] ?? 'db-s-1vcpu-1gb'),
                     'dply-'.(Str::slug((string) $site->slug) ?: 'fn').'-'.Str::lower(Str::random(6)),
+                    null,
+                    [],
+                    $networks->vpcUuid($site),
                 );
                 $database['cluster_id'] = $cluster['id'];
+                $database['network_id'] = (string) ($site->serverlessConfig()['network_id'] ?? '');
             } else {
                 $cluster = $service->getDatabaseCluster((string) $database['cluster_id']);
             }
@@ -134,6 +144,7 @@ class ProvisionServerlessDatabaseJob implements ShouldQueue
         $database['database'] = $connection['database'];
         $database['username'] = $connection['user'];
         $database['pooled'] = $pooled;
+        $database['private_host'] = (string) ($cluster['private_host'] ?? '');
         unset($database['error']);
         $this->persist($site->fresh() ?? $site, $database);
     }

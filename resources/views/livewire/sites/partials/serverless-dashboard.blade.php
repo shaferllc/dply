@@ -131,6 +131,7 @@
 
     {{-- Resource panels render their own hairline strips (embedded chrome), so
          they continue the card rather than stacking four more floating cards. --}}
+    @livewire('serverless.network-panel', ['site' => $site], key('serverless-network-'.$site->id))
     @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
     {{-- The per-function cache panel is retired. A cache is an org-owned
          resource at /caches now, not a JSON blob on this site, and a function
