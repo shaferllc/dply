@@ -6,6 +6,8 @@ namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Models\SiteBinding;
+use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use App\Modules\Serverless\Services\ServerlessAssetDomainProvisioner;
 use App\Modules\Serverless\Services\ServerlessAssetGuardrail;
 use App\Modules\Serverless\Services\ServerlessAssetGuardrailStatus;
@@ -93,6 +95,42 @@ class AssetsPanel extends Component
         $this->toastSuccess(__('Domain removed.'));
     }
 
+    /**
+     * The function's own upload bucket, if it has one — separate from the
+     * published build above, and the only storage the app itself can write.
+     *
+     * Null until the function has deployed once with app buckets enabled, in
+     * which case the panel says nothing about storage at all rather than
+     * advertising a feature this environment does not provision.
+     *
+     * @return array{bucket: string, disk: string, env_prefix: string, region: string, bytes: int, measured_at: string}|null
+     */
+    private function appBucket(Site $site): ?array
+    {
+        $binding = app(ServerlessAppBucketProvisioner::class)->existingBinding($site);
+        if (! $binding instanceof SiteBinding) {
+            return null;
+        }
+
+        $bucket = trim((string) (data_get($binding->config, 'bucket') ?? ''));
+        if ($bucket === '') {
+            return null;
+        }
+
+        $disk = trim((string) (data_get($binding->config, 'disk') ?? 'uploads'));
+        $meta = $site->serverlessConfig()['app_bucket'] ?? [];
+        $meta = is_array($meta) ? $meta : [];
+
+        return [
+            'bucket' => $bucket,
+            'disk' => $disk,
+            'env_prefix' => 'AWS_'.strtoupper($disk).'_',
+            'region' => trim((string) (data_get($binding->config, 'region') ?? '')),
+            'bytes' => max(0, (int) ($meta['storage_bytes'] ?? 0)),
+            'measured_at' => trim((string) ($meta['storage_measured_at'] ?? '')),
+        ];
+    }
+
     public function render(): View
     {
         $site = $this->site();
@@ -110,6 +148,7 @@ class AssetsPanel extends Component
             'publishedAt' => trim((string) ($serverless['assets_published_at'] ?? '')),
             'fileCount' => (int) ($serverless['assets_file_count'] ?? 0),
             'measuredAt' => trim((string) ($assets['storage_measured_at'] ?? '')),
+            'appBucket' => $this->appBucket($site),
             'isOver' => $status->state === ServerlessAssetGuardrailStatus::STATE_OVER,
             'isWarn' => $status->state === ServerlessAssetGuardrailStatus::STATE_WARN,
         ]);

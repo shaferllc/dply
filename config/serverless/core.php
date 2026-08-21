@@ -229,6 +229,17 @@ return [
              | bucket the app did not ask for.
              */
             'disk' => env('DPLY_SERVERLESS_APP_BUCKETS_DISK', 'uploads'),
+            /*
+             | Prefix browser-direct uploads are staged under, and how long an
+             | unclaimed one survives there. The app promotes an upload out of
+             | this prefix once it accepts it, so anything left is an upload
+             | that was never claimed — one day is the finest granularity an
+             | S3 lifecycle rule offers. Both are baked into each bucket's
+             | lifecycle policy at provision time, so changing them only
+             | affects buckets provisioned afterwards.
+             */
+            'tmp_prefix' => env('DPLY_SERVERLESS_APP_BUCKETS_TMP_PREFIX', 'tmp/'),
+            'tmp_expiry_days' => (int) env('DPLY_SERVERLESS_APP_BUCKETS_TMP_EXPIRY_DAYS', 1),
         ],
     ],
 ];
