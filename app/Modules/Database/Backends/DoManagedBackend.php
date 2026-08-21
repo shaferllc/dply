@@ -213,7 +213,11 @@ class DoManagedBackend implements DatabaseBackend
 
         // `backup_restore` keys off the provider's cluster *name*, which dply
         // generates at create and never stores — so it has to be read back.
-        $sourceName = trim($service->getDatabaseCluster($source->backend_id)['name']);
+        // Null-coalesced before trim(): DigitalOcean can return a cluster
+        // without a `name`, and trim(null) is a TypeError on PHP 8 — which
+        // would throw past the empty-name guard immediately below instead of
+        // reporting it. Recovered from stash/0-queue-fleet-panel-wip.
+        $sourceName = trim((string) ($service->getDatabaseCluster($source->backend_id)['name'] ?? ''));
         if ($sourceName === '') {
             throw new RuntimeException(__('DigitalOcean did not report a name for the source cluster.'));
         }
