@@ -43,6 +43,7 @@ use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
+use App\Modules\Cache\Console\SweepExpiredCacheItemsCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
@@ -359,6 +360,24 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('sweep-expired-maintenance-windows');
+
+        /*
+         * Reclaim expired dply Cache items.
+         *
+         * Space only — expired rows are already filtered on READ, so however
+         * far behind this falls a stale value can never be served. That
+         * separation is why this can be a plain scheduled sweep rather than
+         * something correctness depends on.
+         *
+         * Every five minutes rather than every minute: it is bounded by
+         * batch_size x max_batches, and running it more often just means more
+         * empty passes against the item store.
+         */
+        $schedule->command(SweepExpiredCacheItemsCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->when(fn (): bool => (bool) config('cache_service.enabled', false))
+            ->name('sweep-expired-cache-items');
 
         // Keep warm-pool buckets topped up to their min + retire idle surplus.
         // No-op unless warm_pool.enabled and buckets are configured.

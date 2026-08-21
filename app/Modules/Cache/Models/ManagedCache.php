@@ -193,17 +193,4 @@ class ManagedCache extends Model
         return app(PostgresCacheStore::class)->usage($this->id);
     }
 
-    /**
-     * Whether dply bills for this cache.
-     *
-     * The shared tier is free for everyone (decision 7), so only a dedicated
-     * cache can cost anything — and not if it was adopted by the M4 fold-in,
-     * which grandfathers clusters that were provisioned when they were free.
-     */
-    public function isBillable(): bool
-    {
-        return ! $this->isShared()
-            && $this->grandfathered_at === null
-            && (bool) config('cache_service.billing.enabled', false);
-    }
 }

@@ -116,3 +116,20 @@ test('a failure never takes the deploy down', function () {
     expect(app(ServerlessCacheProvisioner::class)->wire($site, []))->toBe([]);
     expect(CacheSite::query()->where('site_id', $site->id)->exists())->toBeFalse();
 });
+
+test('the doctor reports the store isolation condition rather than hiding it', function () {
+    // Sharing the control plane's database is a legitimate way to run a small
+    // install, so this must surface rather than fail closed — but it is
+    // reported as a failed check, because the surrounding code is written as
+    // though it is not true.
+    $this->artisan('dply:cache:doctor --json')
+        ->assertFailed()
+        ->expectsOutputToContain('store_isolation');
+});
+
+test('the doctor confirms the item store is unlogged', function () {
+    // UNLOGGED is not cosmetic — it is the reason a cache's write volume does
+    // not put WAL pressure on whatever database this resolves to.
+    $this->artisan('dply:cache:doctor --json')
+        ->expectsOutputToContain('UNLOGGED');
+});

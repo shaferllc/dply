@@ -116,26 +116,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Billing
-    |--------------------------------------------------------------------------
-    |
-    | The shared tier has no price and no tiers — decision 7 declined them as a
-    | dominated product, since a dedicated cache is ~40x faster for $15. This
-    | switch therefore governs only the DEDICATED tier, which bills through
-    | CloudResourceCostCalculator like any other CloudDatabase.
-    |
-    | Off until the M4 fold-in has stamped grandfathered rows. Flipping it
-    | early charges existing Serverless customers for a cluster that was free
-    | when they provisioned it.
-    |
-    */
-
-    'billing' => [
-        'enabled' => filter_var(env('DPLY_CACHE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOL),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Entitlements
     |--------------------------------------------------------------------------
     |

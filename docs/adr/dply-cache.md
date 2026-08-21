@@ -312,11 +312,21 @@ attached.
     `queue_service.php` is not `queue.php`: one configures the cache dply runs,
     the other the cache dply sells.
 
-    It carries a `billing_enabled` guard defaulting off, mirroring Queue's —
-    decision 3's auto-provisioning creates the same hazard the Queue comment
-    warns about. The nav entry lands in `services-index-nav.blade.php`
-    immediately; both nav components guard on `Route::has()` *and* the flag, so
-    a parked entry does not render.
+    The nav entry lands in `services-index-nav.blade.php` immediately; both nav
+    components guard on `Route::has()` *and* the flag, so a parked entry does
+    not render.
+
+    **Amended during M5.** This originally specified a `billing_enabled` guard
+    mirroring Queue's. It was built, and then removed, because decisions 7 and
+    16 had already made it dormant: the shared tier is free with no tiers to
+    switch on, and the dedicated tier bills as a `CloudDatabase` through
+    machinery that is already live and correctly gated by the grandfather stamp.
+    The dial gated one `isBillable()` method that nothing called.
+
+    `managed-services-tier.md` decision 6 is explicit that dormant pricing dials
+    "are how someone later ships a surprise charge" — so leaving a switch whose
+    only effect would be to start billing, wired to nothing and defaulting off,
+    is precisely the thing that ADR deleted `monthly_included_jobs` to avoid.
 
 13. **The shared tier is a correctness cache, not a performance cache**, and
     the docs say so.
@@ -418,7 +428,7 @@ in production.
 | **M2** | `/caches` index + show, create/delete, attach/detach, flush, `surface.cache`, Services nav, docs page | Cache, shell | yes |
 | **M3** | Dedicated tier: `CloudDatabase` delegation, resize, `/cloud/databases` drops Redis, adopt existing rows | Cache, Cloud, Database | yes |
 | **M4** | Serverless fold-in: migrate `meta['serverless']['cache']`, grandfather stamp, retire `CachePanel` + `ProvisionServerlessCacheJob`, auto-provision on first deploy | Cache, Serverless | yes |
-| **M5** | `billing_enabled` flip for the dedicated tier; the decision 4 revisit | Billing | yes |
+| **M5** | Schedule the TTL sweep; `dply:cache:doctor`; delete the dormant billing dial; the decision 4 revisit | Cache, Billing | yes |
 
 **M0 ships standalone** despite delivering no customer value. It is small — a
 model, a grants column, a resolver change, four route deletions — and it is the
@@ -432,7 +442,10 @@ clusters onto `Cache` → `CloudDatabase`, and that machinery *is* the dedicated
 tier. Reversing the order leaves those clusters with nowhere to land.
 
 Decision 7 removes most of what M5 was going to be: no Stripe roles, no cache
-tier prices, no flip notification.
+tier prices, no flip notification. What remained turned out to be the two
+operational promises decision 5 made and the earlier milestones had not kept —
+the TTL sweep was written but never scheduled, and the `CacheStoreIsolation`
+doctor line existed as a class with nothing to print it.
 
 ## Consequences
 

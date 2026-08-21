@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Cache;
 
 use App\Modules\Cache\Console\AdoptRedisDatabasesCommand;
+use App\Modules\Cache\Console\CacheDoctorCommand;
 use App\Modules\Cache\Console\SweepExpiredCacheItemsCommand;
 use App\Modules\Cache\Livewire\CacheShow;
 use App\Modules\Cache\Livewire\Caches;
@@ -45,6 +46,7 @@ class CacheServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 AdoptRedisDatabasesCommand::class,
+                CacheDoctorCommand::class,
                 SweepExpiredCacheItemsCommand::class,
             ]);
         }
