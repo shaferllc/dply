@@ -12,7 +12,9 @@ use App\Modules\Serverless\Contracts\ServerlessFeature;
 use App\Modules\Serverless\Services\AsyncFunctionInvoker;
 use App\Modules\Serverless\Services\FunctionInvoker;
 use App\Modules\Serverless\Services\ServerlessFeatureMatrix;
+use App\Services\Logging\LoggingChannelCatalog;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -55,6 +57,17 @@ class LogsPanel extends Component
      * function whose timeout exceeds what a blocking call can hold open.
      */
     public bool $testAsync = false;
+
+    /**
+     * Runtime-tab filters. The level is parsed off each line rather than read
+     * from a column — these are opaque strings, see {@see self::levelOf()}.
+     */
+    public string $runtimeLevel = '';
+
+    public string $runtimeSearch = '';
+
+    /** 15m | 1h | 24h | 7d | all — window over the invocation's created_at. */
+    public string $runtimeRange = 'all';
 
     public function mount(Site $site): void
     {
@@ -131,6 +144,38 @@ class LogsPanel extends Component
             : __('Test request ran but the function reported an error — see the row below.'));
     }
 
+    public function resetRuntimeFilters(): void
+    {
+        $this->runtimeLevel = '';
+        $this->runtimeSearch = '';
+        $this->runtimeRange = 'all';
+    }
+
+    /** Start of the runtime tab's window; null when the range is 'all'. */
+    private function runtimeSince(): ?Carbon
+    {
+        return match ($this->runtimeRange) {
+            '15m' => now()->subMinutes(15),
+            '1h' => now()->subHour(),
+            '24h' => now()->subDay(),
+            '7d' => now()->subDays(7),
+            default => null,
+        };
+    }
+
+    /**
+     * The Monolog level a runtime line carries, or null when the line is not a
+     * record header. Matches the default LineFormatter header that the injected
+     * handler writes (`[datetime] channel.LEVEL: message`), optionally behind
+     * the `<timestamp> stdout:` prefix DigitalOcean prepends to activation logs.
+     */
+    private static function levelOf(string $line): ?string
+    {
+        return preg_match('/^(?:\S+\s+std(?:out|err):\s*)?\[[^\]]+\]\s+\S+\.([A-Za-z]+):/', $line, $m) === 1
+            ? strtolower($m[1])
+            : null;
+    }
+
     public function render(): View
     {
         $site = Site::with('server')->findOrFail($this->siteId);
@@ -152,15 +197,37 @@ class LogsPanel extends Component
 
         // Runtime output — log lines from every recent invocation, regardless
         // of source, flattened oldest-first into one chronological stream.
+        // The time range bounds the invocations we read; level and search then
+        // filter the lines those invocations carry.
         $runtimeLines = [];
+        $runtimeTotal = 0;
         $runtimeRows = FunctionInvocation::query()
             ->where('site_id', $this->siteId)
+            ->when($this->runtimeSince(), fn ($q, $since) => $q->where('created_at', '>=', $since))
             ->orderByDesc('created_at')
             ->limit(50)
             ->get()
             ->sortBy('created_at');
+        $needle = trim($this->runtimeSearch);
         foreach ($runtimeRows as $row) {
+            // Continuation lines (a stack trace, a bare stdout write) belong to
+            // the record above them, so the level carries down until the next
+            // header. It resets per invocation — a new activation starts fresh.
+            $level = null;
             foreach ($row->logLines() as $line) {
+                $level = self::levelOf($line) ?? $level;
+                $runtimeTotal++;
+
+                if ($this->runtimeLevel !== '' && $level !== $this->runtimeLevel) {
+                    continue;
+                }
+                // ponytail: substring match per line, so a hit inside a stack
+                // trace shows that line without its header. Group by record if
+                // that reads badly in practice.
+                if ($needle !== '' && stripos($line, $needle) === false) {
+                    continue;
+                }
+
                 $runtimeLines[] = $line;
             }
         }
@@ -190,6 +257,9 @@ class LogsPanel extends Component
             'activations' => $activations,
             'visits' => $visits,
             'runtimeLines' => $runtimeLines,
+            'runtimeTotal' => $runtimeTotal,
+            'runtimeLevels' => LoggingChannelCatalog::LEVELS,
+            'runtimeFiltered' => $this->runtimeLevel !== '' || trim($this->runtimeSearch) !== '' || $this->runtimeRange !== 'all',
             'deployments' => $deployments,
             'metrics' => [
                 'total' => $total,

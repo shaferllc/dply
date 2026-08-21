@@ -161,12 +161,42 @@
 
     {{-- ── Runtime output ──────────────────────────────────────────────── --}}
     @elseif ($tab === 'runtime')
+        {{-- Filters stay visible even when nothing matches — otherwise a filter
+             that hides every line also hides the way to clear it. --}}
+        <div class="flex flex-wrap items-center gap-2">
+            <input type="search" wire:model.live.debounce.400ms="runtimeSearch"
+                   placeholder="{{ __('Search output') }}" class="dply-input text-xs" />
+            <select wire:model.live="runtimeLevel" class="dply-input text-xs">
+                <option value="">{{ __('All levels') }}</option>
+                @foreach ($runtimeLevels as $lvl)
+                    <option value="{{ $lvl }}">{{ $lvl }}</option>
+                @endforeach
+            </select>
+            <select wire:model.live="runtimeRange" class="dply-input text-xs">
+                <option value="all">{{ __('All time') }}</option>
+                <option value="15m">{{ __('Last 15 minutes') }}</option>
+                <option value="1h">{{ __('Last hour') }}</option>
+                <option value="24h">{{ __('Last 24 hours') }}</option>
+                <option value="7d">{{ __('Last 7 days') }}</option>
+            </select>
+            @if ($runtimeFiltered)
+                <button type="button" wire:click="resetRuntimeFilters"
+                        class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Clear') }}</button>
+            @endif
+        </div>
+
         @if (count($runtimeLines) === 0)
             <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
-                {{ __('No runtime output yet — no recent invocation has written to stdout, stderr, or the Laravel log.') }}
+                {{ $runtimeFiltered
+                    ? __('No runtime output matches these filters.')
+                    : __('No runtime output yet — no recent invocation has written to stdout, stderr, or the Laravel log.') }}
             </div>
         @else
-            <p class="text-2xs text-brand-moss/60">{{ __(':n lines from recent invocations, oldest first.', ['n' => count($runtimeLines)]) }}</p>
+            <p class="text-2xs text-brand-moss/60">
+                {{ $runtimeFiltered
+                    ? __(':n of :total lines from recent invocations, oldest first.', ['n' => count($runtimeLines), 'total' => $runtimeTotal])
+                    : __(':n lines from recent invocations, oldest first.', ['n' => count($runtimeLines)]) }}
+            </p>
             <pre class="max-h-[26rem] overflow-auto rounded-lg bg-brand-ink p-2.5 text-xs leading-snug text-brand-cream">{{ implode("\n", $runtimeLines) }}</pre>
         @endif
 
