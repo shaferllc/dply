@@ -104,6 +104,54 @@ test('runtime tab flattens log lines oldest first', function () {
         ->call('setTab', 'runtime')
         ->assertSeeInOrder(['first line', 'second line']);
 });
+test('runtime tab filters by level, carrying the level onto trace lines', function () {
+    [$user, $site] = functionSite();
+    invocation($site, ['log_lines' => [
+        '[2026-08-21 12:00:00] production.ERROR: Boom',
+        '#0 /app/Http/Kernel.php(12): boom()',
+        '[2026-08-21 12:00:01] production.INFO: Everything is fine',
+        // DigitalOcean prefixes activation logs with its own timestamp+stream.
+        '2026-08-21T12:00:02.000Z stdout: [2026-08-21 12:00:02] production.WARNING: Careful',
+    ]]);
+
+    Livewire::actingAs($user)
+        ->test(LogsPanel::class, ['site' => $site])
+        ->call('setTab', 'runtime')
+        ->set('runtimeLevel', 'error')
+        ->assertSee('Boom')
+        ->assertSee('/app/Http/Kernel.php(12)')
+        ->assertDontSee('Everything is fine')
+        ->assertDontSee('Careful')
+        ->set('runtimeLevel', 'warning')
+        ->assertSee('Careful')
+        ->assertDontSee('Boom');
+});
+test('runtime tab searches output case-insensitively', function () {
+    [$user, $site] = functionSite();
+    invocation($site, ['log_lines' => ['connection refused', 'cache warmed']]);
+
+    Livewire::actingAs($user)
+        ->test(LogsPanel::class, ['site' => $site])
+        ->call('setTab', 'runtime')
+        ->set('runtimeSearch', 'REFUSED')
+        ->assertSee('connection refused')
+        ->assertDontSee('cache warmed');
+});
+test('runtime tab bounds output by the selected time range', function () {
+    [$user, $site] = functionSite();
+    invocation($site, ['log_lines' => ['ancient line'], 'created_at' => now()->subDays(3)]);
+
+    Livewire::actingAs($user)
+        ->test(LogsPanel::class, ['site' => $site])
+        ->call('setTab', 'runtime')
+        ->assertSee('ancient line')
+        ->set('runtimeRange', '15m')
+        ->assertDontSee('ancient line')
+        ->set('runtimeRange', '7d')
+        ->assertSee('ancient line')
+        ->call('resetRuntimeFilters')
+        ->assertSee('ancient line');
+});
 test('deploy tab lists function deployments', function () {
     [$user, $site] = functionSite();
     SiteDeployment::query()->create([
