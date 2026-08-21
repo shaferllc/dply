@@ -154,7 +154,7 @@ test('warm start reports when no ping has ever landed', function () {
     Livewire::actingAs($this->user)
         ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
         ->assertSee('No ping recorded yet')
-        ->assertDontSee('served warm');
+        ->assertDontSee('Warming');
 });
 
 test('warm start shows the last ping when the tick is current', function () {
@@ -173,9 +173,9 @@ test('warm start shows the last ping when the tick is current', function () {
 
     Livewire::actingAs($this->user)
         ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
-        ->assertSee('Pinged')
-        ->assertSee('served warm')
+        ->assertSee('Warming')
         ->assertSee('228 ms')
+        ->assertSee('Last ping')
         ->assertDontSee('No ping recorded yet');
 });
 
@@ -197,7 +197,7 @@ test('warm start flags a stale tick as a stopped scheduler', function () {
     Livewire::actingAs($this->user)
         ->test(BackgroundPanel::class, ['site' => $this->site->fresh()])
         ->assertSee('dply expects one every minute')
-        ->assertDontSee('served warm');
+        ->assertDontSee('Warming');
 });
 
 test('warm start separates a failing function from a missing ping', function () {

@@ -472,7 +472,7 @@
         {{-- The toggle alone cannot tell the operator warming is happening;
              this is the same evidence line the Overview panel shows. --}}
         @if ($warmExpected)
-            <div class="px-3 pb-3 sm:px-4">
+            <div class="px-3 pb-3 pt-3 sm:px-4">
                 <x-warm-start-status :status="$warmStatus" />
             </div>
         @endif
