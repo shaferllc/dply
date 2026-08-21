@@ -369,6 +369,24 @@ return [
             // once across all customers — this allowance is dply's gift, not a
             // pass-through, and is what the flat fee is buying.
             'included_gib_seconds_per_function' => (int) env('DPLY_SERVERLESS_USAGE_INCLUDED_GIB_SECONDS_PER_FUNCTION', 90_000),
+
+            // Published front-end assets. Cost floor is DigitalOcean Spaces
+            // list price — $0.02/GiB/mo stored, $0.01/GiB out — with
+            // markup_percent applied on top like every other rate here, so the
+            // rates below must stay at cost or margin compounds.
+            //
+            // There is deliberately no operations rate: Spaces bills no
+            // per-request fee, unlike Cloudflare R2 behind Edge. asset_requests
+            // is metered and shown, never charged.
+            'asset_storage_cents_per_gb_month' => (int) env('DPLY_SERVERLESS_ASSET_STORAGE_CENTS_PER_GB_MONTH', 2),
+            'asset_egress_cents_per_gb' => (int) env('DPLY_SERVERLESS_ASSET_EGRESS_CENTS_PER_GB', 1),
+            // A Vite public/build is single-digit MB, so 1 GiB is ~100x
+            // headroom and the egress allowance matches Edge's per-site one.
+            // These exist so an honest site never sees a cent — the meter is
+            // here for the tail (a large binary committed under public/), not
+            // to sell a storage tier.
+            'included_asset_storage_gb_per_function' => (int) env('DPLY_SERVERLESS_INCLUDED_ASSET_STORAGE_GB_PER_FUNCTION', 1),
+            'included_asset_egress_gb_per_function' => (int) env('DPLY_SERVERLESS_INCLUDED_ASSET_EGRESS_GB_PER_FUNCTION', 100),
         ],
     ],
 

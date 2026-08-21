@@ -49,6 +49,8 @@ class ServerlessServiceProvider extends ServiceProvider
                 Console\BackfillFunctionActionsCommand::class,
                 Console\PruneFunctionInvocationsCommand::class,
                 Console\ServerlessManifestCommand::class,
+                Console\SweepServerlessAssetsCommand::class,
+                Console\BackfillServerlessAssetsCommand::class,
             ]);
         }
     }

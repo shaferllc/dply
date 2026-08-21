@@ -7,12 +7,16 @@ namespace App\Modules\Queue;
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Queue\Console\MeterQueueUsageCommand;
 use App\Modules\Queue\Console\QueueDoctorCommand;
+use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Contracts\WorkerRuntime;
 use App\Modules\Queue\Livewire\QueueNamespaceShow;
 use App\Modules\Queue\Livewire\Queues;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Observers\QueueNamespaceBillingObserver;
 use App\Modules\Queue\Services\PostgresQueueStore;
+use App\Modules\Queue\Services\Runtimes\DockerWorkerRuntime;
+use App\Modules\Queue\Services\Runtimes\FakeWorkerRuntime;
 use App\Policies\QueueNamespacePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -37,6 +41,23 @@ class QueueServiceProvider extends ServiceProvider
         // throughput — a much larger job than a second binding here.
         $this->app->bind(QueueStore::class, PostgresQueueStore::class);
 
+        // The substrate managed workers run on. Fake is the default because
+        // the alternative default is "start containers on whatever machine
+        // booted this container" — a real runtime has to be chosen, never
+        // arrived at. See docs/adr/managed-queue-workers.md, decision 3.
+        $this->app->bind(WorkerRuntime::class, function ($app) {
+            $runtimes = [
+                'fake' => FakeWorkerRuntime::class,
+                'docker' => DockerWorkerRuntime::class,
+            ];
+
+            $configured = (string) config('queue_service.fleets.runtime', 'fake');
+
+            return $app->make($runtimes[$configured] ?? FakeWorkerRuntime::class);
+        });
+
+        $this->app->singleton(FakeWorkerRuntime::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 // Per-namespace observational rollup, feeding the dashboard
@@ -50,6 +71,8 @@ class QueueServiceProvider extends ServiceProvider
                 // Readiness readout — kill switch, endpoint, store isolation,
                 // schema and table health in one green/red pass.
                 QueueDoctorCommand::class,
+                // Sizes managed worker fleets against real queue pressure.
+                QueueFleetTickCommand::class,
             ]);
         }
     }

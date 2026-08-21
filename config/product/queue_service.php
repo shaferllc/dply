@@ -199,6 +199,29 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Managed worker fleets
+    |--------------------------------------------------------------------------
+    |
+    | dply-owned workers that drain a namespace's queue. See
+    | docs/adr/managed-queue-workers.md.
+    |
+    | `runtime` names the substrate. It defaults to `fake` deliberately: a real
+    | runtime starts containers running customer code on dply's machines, and
+    | that has to be a decision someone made, not a default they inherited.
+    |
+    | `target_drain_seconds` is the single scaling dial — how fast a visible
+    | backlog should be absorbed. Everything else the autoscaler needs it
+    | measures for itself.
+    |
+    */
+
+    'fleets' => [
+        'runtime' => env('DPLY_QUEUE_FLEET_RUNTIME', 'fake'),
+        'target_drain_seconds' => (int) env('DPLY_QUEUE_FLEET_TARGET_DRAIN', 20),
+    ],
+
     'entitlements' => [
         'defaults' => [
             'available' => true,

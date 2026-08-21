@@ -143,4 +143,92 @@ return [
             env('DPLY_EDGE_CF_API_TOKEN', env('CLOUDFLARE_API_TOKEN')),
         ),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Published front-end assets
+    |--------------------------------------------------------------------------
+    |
+    | A Functions Laravel app publishes `public/build` off the function (the
+    | 1 MB HTTP response cap makes serving Vite CSS through it impossible) into
+    | one shared bucket, one prefix per site, delivered by Cloudflare.
+    |
+    | See ServerlessAssetHost for why the prefix and the hostname's DNS label
+    | are the same string, and for the Cloudflare rule that relies on it.
+    |
+    | DNS needs nothing extra in the default `wildcard` testing_dns mode: the
+    | hand-created `*.{apex}` record already answers for {label}-assets.{apex},
+    | and Universal SSL covers one wildcard level.
+    */
+    'assets' => [
+        /*
+         | Refuse to publish a build larger than this. Sized for "someone
+         | committed a video into public/", not as a billing tier — the priced
+         | allowance sits far below it, so ordinary overage is billed and only
+         | the absurd is refused. Checked against the local directory before
+         | anything uploads, so the deploy fails while the user can still fix it.
+         */
+        'max_bytes' => (int) env('DPLY_SERVERLESS_ASSET_MAX_BYTES', 5 * 1024 ** 3),
+
+        /*
+         | How many successful deploys' assets to keep. Publishing is additive
+         | and filenames are content-hashed, so the union of the last N builds
+         | is exactly what rollback to any of them needs. Below this the
+         | garbage collector deletes nothing at all.
+         */
+        'retain_deploys' => max(1, (int) env('DPLY_SERVERLESS_ASSET_RETAIN_DEPLOYS', 5)),
+
+        /*
+         | Clock-skew guard on the GC cutoff. Object mtimes come from the
+         | storage provider while deploy timestamps come from the app, so the
+         | cutoff is nudged back before anything is deleted.
+         */
+        'gc_grace_hours' => max(0, (int) env('DPLY_SERVERLESS_ASSET_GC_GRACE_HOURS', 2)),
+
+        /*
+         | Percentage of the billed allowance at which the guardrail flips to
+         | `warn`. Delivery is never cut off past 100% — see
+         | ServerlessAssetGuardrailStatus for why.
+         */
+        'warn_at_percent' => max(1, min(99, (int) env('DPLY_SERVERLESS_ASSET_WARN_AT_PERCENT', 80))),
+
+        'cdn' => [
+            /*
+             | Turns ASSET_URL into the site's own CDN hostname. Off leaves the
+             | existing behaviour intact (disk URL, else same-origin /build via
+             | the function proxy), which is what makes the cutover reversible:
+             | flip this back and sites fall to a path that still works because
+             | the controller reads through the same disk.
+             */
+            'enabled' => filter_var(env('DPLY_SERVERLESS_ASSET_CDN_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        ],
+
+        /*
+         | Per-site buckets the APP writes to (uploads, user media) — distinct
+         | from the shared, platform-written asset bucket above.
+         |
+         | These have to be separate. Spaces grants are scoped per bucket, not
+         | per prefix, so a key handed to a customer's app to write its own
+         | files could read and overwrite every other tenant's. A bucket each,
+         | with a key granted to just that bucket, is the only safe shape — and
+         | it costs nothing, since one Spaces subscription covers many buckets
+         | and shares its allowances across them.
+         |
+         | Provisioned on demand, then injected into the function's managed
+         | .env like any attached resource. See ServerlessAppBucketProvisioner.
+         */
+        'app_buckets' => [
+            'enabled' => filter_var(env('DPLY_SERVERLESS_APP_BUCKETS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+            'region' => env('DPLY_SERVERLESS_APP_BUCKETS_REGION', 'nyc3'),
+            'name_prefix' => env('DPLY_SERVERLESS_APP_BUCKETS_NAME_PREFIX', 'dply-fn'),
+            /*
+             | Laravel disk name, and the env prefix it implies
+             | (AWS_UPLOADS_BUCKET, AWS_UPLOADS_ACCESS_KEY_ID, …).
+             | Deliberately NOT `s3`: the primary disk stays the operator's to
+             | attach, so dply never silently repoints FILESYSTEM_DISK at a
+             | bucket the app did not ask for.
+             */
+            'disk' => env('DPLY_SERVERLESS_APP_BUCKETS_DISK', 'uploads'),
+        ],
+    ],
 ];

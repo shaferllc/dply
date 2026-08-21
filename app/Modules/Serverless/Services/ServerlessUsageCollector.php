@@ -8,6 +8,8 @@ use App\Models\ServerlessUsageSnapshot;
 use App\Models\Site;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Rolls up the operational {@see FunctionInvocation} log into daily
@@ -26,9 +28,24 @@ use Carbon\CarbonInterface;
  * already owns. Rows whose action is unknown fall back to the site's
  * configured memory limit — the same value the deployer writes onto the
  * OpenWhisk action.
+ *
+ * Published front-end assets are metered here too, from two sources that both
+ * come from elsewhere:
+ *
+ *  - storage, measured exactly by {@see ServerlessAssetGarbageCollector} while
+ *    it sweeps each site's bucket prefix, and left on the site for this
+ *    roll-up to read;
+ *  - egress, read per hostname from Cloudflare by
+ *    {@see ServerlessAssetEgressReader}, deduplicated so a custom asset domain
+ *    is not billed twice.
+ *
+ * Both degrade to zero rather than failing the run, so a Cloudflare outage or
+ * an unswept bucket costs a day of asset numbers, not the compute meter.
  */
 class ServerlessUsageCollector
 {
+    public function __construct(private ?ServerlessAssetEgressReader $assetEgress = null) {}
+
     /**
      * @return array{sites: int, invocations: int, gib_seconds: int}
      */
@@ -44,12 +61,16 @@ class ServerlessUsageCollector
             ->whereIn('status', [Site::STATUS_FUNCTIONS_ACTIVE, Site::STATUS_FUNCTIONS_CONFIGURED])
             ->get(['id', 'organization_id', 'meta']);
 
+        $assetEgress = $this->assetEgressForSites($sites, $day, $dayEnd);
+
         $totalInvocations = 0;
         $totalGibSeconds = 0;
         $touched = 0;
 
         foreach ($sites as $site) {
             $usage = $this->usageForSite($site, $day, $dayEnd);
+            $assets = $assetEgress[(string) $site->id] ?? ['requests' => 0, 'bytes' => 0, 'by_hostname' => []];
+            $assetStorageBytes = $this->assetStorageBytes($site);
 
             $totalInvocations += $usage['invocations'];
             $totalGibSeconds += $usage['gib_seconds'];
@@ -71,7 +92,17 @@ class ServerlessUsageCollector
                     'period_end' => $periodEnd,
                     'invocations' => $usage['invocations'],
                     'gib_seconds' => $usage['gib_seconds'],
-                    'meta' => ['by_source' => $usage['by_source']],
+                    'asset_storage_bytes' => $assetStorageBytes,
+                    'asset_bytes_egress' => $assets['bytes'],
+                    'asset_requests' => $assets['requests'],
+                    'meta' => [
+                        'by_source' => $usage['by_source'],
+                        // Raw per-hostname numbers, kept so the billed total
+                        // stays auditable and so a change to the
+                        // double-counting rule can be recomputed from stored
+                        // data instead of re-collected.
+                        'assets_by_hostname' => $assets['by_hostname'] ?: null,
+                    ],
                 ],
             );
             $touched++;
@@ -82,6 +113,39 @@ class ServerlessUsageCollector
             'invocations' => $totalInvocations,
             'gib_seconds' => $totalGibSeconds,
         ];
+    }
+
+    /**
+     * Last measured stored bytes for a site, written by the asset garbage
+     * collector. Zero until it has swept the site once.
+     */
+    private function assetStorageBytes(Site $site): int
+    {
+        $assets = $site->serverlessConfig()['assets'] ?? [];
+
+        return is_array($assets) ? max(0, (int) ($assets['storage_bytes'] ?? 0)) : 0;
+    }
+
+    /**
+     * @param  Collection<int, Site>  $sites
+     * @return array<string, array{requests: int, bytes: int, by_hostname: array<string, array{requests: int, bytes: int}>}>
+     */
+    private function assetEgressForSites(Collection $sites, CarbonInterface $start, CarbonInterface $end): array
+    {
+        try {
+            return $this->assetEgressReader()->usageForSites($sites, $start, $end);
+        } catch (\Throwable $e) {
+            Log::warning('serverless.usage.asset_egress_failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    private function assetEgressReader(): ServerlessAssetEgressReader
+    {
+        return $this->assetEgress ?? app(ServerlessAssetEgressReader::class);
     }
 
     /**

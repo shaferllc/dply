@@ -14,6 +14,9 @@ use Illuminate\Support\Carbon;
  *                      A daily usage roll-up for a dply-managed serverless function. Mirrors
  *                      {@see EdgeUsageSnapshot}: one row per (site, day, source), summed over the
  *                      billing month to compute the metered usage charge on top of the flat fee.
+ * @property int $asset_bytes_egress
+ * @property int $asset_requests
+ * @property int $asset_storage_bytes
  * @property int $gib_seconds
  * @property int $invocations
  * @property array<string, mixed>|null $meta
@@ -45,6 +48,9 @@ class ServerlessUsageSnapshot extends Model
         'period_end',
         'invocations',
         'gib_seconds',
+        'asset_storage_bytes',
+        'asset_bytes_egress',
+        'asset_requests',
         'source',
         'meta',
     ];
@@ -57,6 +63,9 @@ class ServerlessUsageSnapshot extends Model
             'period_end' => 'date',
             'invocations' => 'integer',
             'gib_seconds' => 'integer',
+            'asset_storage_bytes' => 'integer',
+            'asset_bytes_egress' => 'integer',
+            'asset_requests' => 'integer',
             'meta' => 'array',
         ];
     }

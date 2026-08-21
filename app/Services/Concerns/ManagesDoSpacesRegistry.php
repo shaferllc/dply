@@ -26,7 +26,7 @@ trait ManagesDoSpacesRegistry
      * (`bucket: ""`, `permission: "fullaccess"`), which is what lets the key
      * create buckets and read/write objects like a console-created key.
      *
-     * @param  array<string, mixed> $grants
+     * @param  list<array{bucket: string, permission: string}> $grants
      * @return array{access_key: string, secret_key: string}
      */
     public function createSpacesKey(string $name, array $grants = []): array

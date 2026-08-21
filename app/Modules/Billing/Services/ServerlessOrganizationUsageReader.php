@@ -43,6 +43,15 @@ class ServerlessOrganizationUsageReader
             ->select([
                 DB::raw('COALESCE(SUM(invocations), 0) as invocations'),
                 DB::raw('COALESCE(SUM(gib_seconds), 0) as gib_seconds'),
+                // Storage is a level, not a flow. Rows are one per site per
+                // day, so a plain SUM would multiply the org's stored bytes by
+                // the number of days in the window. Dividing by the number of
+                // distinct days gives the average daily total across all sites
+                // — which is precisely what a per-GiB-MONTH rate prices, and
+                // it prorates correctly for a site added or removed mid-month.
+                DB::raw('COALESCE(SUM(asset_storage_bytes), 0) / GREATEST(COUNT(DISTINCT period_start), 1) as asset_storage_bytes'),
+                DB::raw('COALESCE(SUM(asset_bytes_egress), 0) as asset_bytes_egress'),
+                DB::raw('COALESCE(SUM(asset_requests), 0) as asset_requests'),
             ])
             ->first();
 
@@ -53,6 +62,9 @@ class ServerlessOrganizationUsageReader
         return self::$totalsMemo[$key] = new ServerlessUsageTotals(
             invocations: (int) $row->invocations,
             gibSeconds: (int) $row->gib_seconds,
+            assetStorageBytes: (int) $row->asset_storage_bytes,
+            assetBytesEgress: (int) $row->asset_bytes_egress,
+            assetRequests: (int) $row->asset_requests,
         );
     }
 

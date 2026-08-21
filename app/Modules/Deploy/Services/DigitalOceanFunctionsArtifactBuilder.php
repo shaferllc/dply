@@ -6,9 +6,11 @@ namespace App\Modules\Deploy\Services;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use App\Modules\Serverless\Services\ServerlessAssetPublisher;
 use App\Support\DeployLogSanitizer;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use ZipArchive;
@@ -212,6 +214,15 @@ class DigitalOceanFunctionsArtifactBuilder
                 $entrypoint = $injection['function'];
             }
             $this->progress->done($site, 'adapter', 'Injected logging shim');
+        }
+
+        // Object storage the APP writes to, wired in before the environment is
+        // prepared so its connection variables are part of the .env that gets
+        // packaged. Idempotent, so this both provisions on first deploy and
+        // re-heals a binding whose keys fell out of the managed env.
+        $appBucketLog = $this->ensureAppBucket($site);
+        if ($appBucketLog !== '') {
+            $log[] = $appBucketLog;
         }
 
         // Bundle dply's managed environment into the artifact (and mint a
@@ -604,6 +615,42 @@ class DigitalOceanFunctionsArtifactBuilder
      *
      * @return list<string>
      */
+    /**
+     * Provision (once) and inject this function's own object-storage bucket.
+     *
+     * Off by default and skipped for BYO functions, which deploy to the
+     * customer's own account and bring their own storage. A failure here is
+     * logged into the deploy output rather than aborting: the app may not use
+     * the bucket at all, and losing a whole deploy to a transient provider
+     * error would be the worse outcome. The next deploy retries, because
+     * ensure() is idempotent.
+     */
+    private function ensureAppBucket(Site $site): string
+    {
+        if (! (bool) config('serverless.assets.app_buckets.enabled', false)) {
+            return '';
+        }
+
+        if ($site->serverless_backend !== Site::SERVERLESS_BACKEND_DPLY) {
+            return '';
+        }
+
+        try {
+            $binding = app(ServerlessAppBucketProvisioner::class)->ensure($site);
+        } catch (\Throwable $e) {
+            Log::warning('serverless.app_bucket.ensure_failed', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 'Could not attach the app storage bucket: '.$e->getMessage();
+        }
+
+        $bucket = (string) (data_get($binding->config, 'bucket') ?? '');
+
+        return $bucket === '' ? '' : 'App storage bucket ready: '.$bucket;
+    }
+
     private function zipExclusions(string $workingDirectory): array
     {
         $patterns = self::DEFAULT_EXCLUSIONS;

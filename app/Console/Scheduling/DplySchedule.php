@@ -78,6 +78,8 @@ use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
 use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
+use App\Modules\Serverless\Console\SweepServerlessAssetsCommand;
+use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
@@ -204,6 +206,13 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping();
 
+        // Steady-state sizing for managed queue fleets. Not the latency path:
+        // an idle fleet is woken by the push itself, so no job waits on this.
+        $schedule->command(QueueFleetTickCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('queue-fleet-tick');
+
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         // Value-less flags must be scheduled as `--today` (not `--today => true`,
@@ -220,6 +229,15 @@ final class DplySchedule
                 ->withoutOverlapping()
                 ->onOneServer();
         }
+
+        // Reclaim superseded asset objects and re-measure per-site storage.
+        // Ordered BEFORE the usage roll-up below reads that measurement, so a
+        // day's snapshot reflects a freshly swept bucket rather than yesterday's.
+        $schedule->command(SweepServerlessAssetsCommand::class)
+            ->dailyAt('01:50')
+            ->name('serverless-assets-sweep')
+            ->withoutOverlapping()
+            ->onOneServer();
 
         $schedule->command(CollectServerlessUsageCommand::class)
             ->hourly()
