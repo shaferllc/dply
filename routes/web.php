@@ -53,6 +53,8 @@ use App\Livewire\Backups\Overview as BackupsOverview;
 use App\Livewire\Backups\Snapshots as BackupsSnapshots;
 use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Cloud\Create as CloudCreate;
+use App\Modules\Cache\Livewire\CacheShow as CachesShow;
+use App\Modules\Cache\Livewire\Caches as CachesIndex;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Cloud\DatabaseShow as CloudDatabaseShow;
@@ -633,6 +635,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:surface.queue')->group(function (): void {
         Route::livewire('/queues', QueuesIndex::class)->name('queues.index');
         Route::livewire('/queues/{queueNamespace}', QueuesShow::class)->name('queues.show');
+    });
+
+    Route::middleware('feature:surface.cache')->group(function (): void {
+        Route::livewire('/caches', CachesIndex::class)->name('caches.index');
+        Route::livewire('/caches/{managedCache}', CachesShow::class)->name('caches.show');
     });
 
     Route::middleware('feature:surface.scripts')->group(function (): void {

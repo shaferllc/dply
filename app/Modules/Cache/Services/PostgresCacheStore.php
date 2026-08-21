@@ -237,10 +237,20 @@ class PostgresCacheStore
      */
     public function flush(ManagedCache $cache): int
     {
-        return $this->connection()
+        $deleted = $this->connection()
             ->table(self::TABLE)
             ->where('cache_id', $cache->id)
             ->delete();
+
+        // The delete trigger already zeroes the counter; dropping the row as
+        // well keeps a deleted cache from leaving a usage record behind. Done
+        // after the delete, never before — the trigger would recreate it.
+        $this->connection()
+            ->table(self::USAGE_TABLE)
+            ->where('cache_id', $cache->id)
+            ->delete();
+
+        return $deleted;
     }
 
     /**

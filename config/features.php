@@ -304,6 +304,15 @@ return [
         // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
         // (docs/adr/dply-queue.md).
         'queue' => env('FEATURE_SURFACE_QUEUE', true),
+        // dply Cache — the managed cache. The shared tier's data plane is
+        // live (DynamoDB-compatible endpoint over Postgres); the dedicated
+        // tier and the Serverless fold-in are not. Runtime dials live in
+        // config/cache_service.php, per the layering rules above. Note this is
+        // `surface.cache` and is unrelated to the `cache.*` namespace below,
+        // which gates cache ENGINES offered for install on BYO servers.
+        // Exit criteria: /caches index + show, attach/detach, and the docs
+        // page (docs/adr/dply-cache.md, M2).
+        'cache' => env('FEATURE_SURFACE_CACHE', true),
     ],
 
     /*
