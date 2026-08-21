@@ -141,12 +141,17 @@ test('types survive the round trip', function () {
 test('an expired value is not returned even before it is swept', function () {
     $repo = cacheRepo(cacheCtx());
 
-    $repo->put('short', 'v', 1);
+    // A 60s TTL travelled past, rather than a 1s TTL slept through: with a
+    // one-second window the real time spent on the write's HTTPS round trip
+    // can cross the expiry before the first read, which made this flake.
+    // travel() moves the clock deterministically, so the window can be as
+    // wide as we like.
+    $repo->put('short', 'v', 60);
     expect($repo->get('short'))->toBe('v');
 
     // Nothing sweeps here. Expiry is enforced on READ, so a lagging sweeper
     // can never surface a stale value.
-    $this->travel(5)->seconds();
+    $this->travel(120)->seconds();
 
     expect($repo->get('short'))->toBeNull();
 });
@@ -214,9 +219,9 @@ test('a lock is held against a second owner and released to the next', function 
 test('a lock expires so a crashed holder cannot wedge it forever', function () {
     $repo = cacheRepo(cacheCtx());
 
-    expect($repo->lock('wedged', 1)->get())->toBeTrue();
+    expect($repo->lock('wedged', 60)->get())->toBeTrue();
 
-    $this->travel(5)->seconds();
+    $this->travel(120)->seconds();
 
     expect($repo->lock('wedged', 60)->get())->toBeTrue();
 });
@@ -312,12 +317,14 @@ test('the sweep reclaims expired items and their quota', function () {
     $ctx = cacheCtx();
     $repo = cacheRepo($ctx);
 
-    $repo->put('keep', 'v', 600);
-    $repo->put('drop', 'v', 1);
+    $repo->put('keep', 'v', 3600);
+    $repo->put('drop', 'v', 60);
 
     expect($ctx['cache']->usage()->itemCount)->toBe(2);
 
-    $this->travel(5)->seconds();
+    // Same reasoning as above: travel past a comfortable TTL rather than race
+    // a one-second one.
+    $this->travel(120)->seconds();
 
     // Already invisible to readers before anything is swept — the sweep
     // reclaims space, it does not decide correctness.
