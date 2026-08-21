@@ -9,7 +9,6 @@ use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -169,16 +168,17 @@ test('step what hides app templates for dedicated redis server purpose', functio
         ->assertSee('Localhost only')
         ->assertSee('Other servers on my network')
         ->assertSee('Provision preview')
+        // Valkey is generally available, so it renders as a selectable engine
+        // tile rather than a disabled "Soon" one. The still-gated engines are
+        // re-added as Soon tiles by dedicatedCacheEngineOptions(), so "Soon"
+        // and their labels still appear on this page — only Valkey's status
+        // changed.
         ->assertSee('Valkey')
-        ->assertSee('Soon')
         ->assertDontSee('Pick a stack template')
         ->assertDontSee('Polyglot host');
 });
 
 test('dedicated cache wizard supports engine and network access pickers', function () {
-    config(['features.cache.valkey' => true]);
-    Feature::flushCache();
-
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);

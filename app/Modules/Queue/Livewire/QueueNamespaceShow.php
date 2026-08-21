@@ -43,6 +43,16 @@ class QueueNamespaceShow extends Component
     public bool $confirmingDelete = false;
 
     /**
+     * Typed-name confirmation for the delete modal.
+     *
+     * Same gate as the queue index. Deleting throws away jobs the customer's
+     * app believes are still going to run, with no undo and no trace, so both
+     * entry points make you type the name — otherwise this page is just a way
+     * around the friction the other one enforces.
+     */
+    public string $deleteConfirmation = '';
+
+    /**
      * Plaintext secret, shown once immediately after minting.
      *
      * Held in a component property and never persisted: once it leaves this
@@ -252,18 +262,32 @@ class QueueNamespaceShow extends Component
     public function confirmDelete(): void
     {
         $this->confirmingDelete = true;
+        $this->deleteConfirmation = '';
         $this->dispatch('open-modal', 'queue-delete-modal');
     }
 
     public function cancelDelete(): void
     {
         $this->confirmingDelete = false;
+        $this->deleteConfirmation = '';
         $this->dispatch('close-modal', 'queue-delete-modal');
     }
 
+    /**
+     * Delete this queue, discarding whatever is still in it.
+     *
+     * Gated on typing the name, matching the queue index — see the note on
+     * {@see self::$deleteConfirmation}.
+     */
     public function deleteNamespace(): void
     {
         $this->authorize('delete', $this->namespace);
+
+        if (trim($this->deleteConfirmation) !== $this->namespace->name) {
+            $this->toastError(__('Type :name to confirm.', ['name' => $this->namespace->name]));
+
+            return;
+        }
 
         $this->namespace->delete();
 

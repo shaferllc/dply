@@ -95,14 +95,14 @@ class FleetAutoscaler
 
         // In-flight jobs are already holding workers. Sizing below this would
         // mean deciding to stop a worker mid-job every tick.
+        //
+        // A queue with work but no worker is the case that must never persist,
+        // and the arithmetic above already rules it out: pending >= 1 and
+        // jobSeconds > 0 make ceil() at least 1, so $forBacklog — and therefore
+        // $desired — cannot round down to zero. The only way out of here with
+        // zero is a ceiling of zero, which is the operator capping the fleet.
         $desired = max($signal->reserved, $forBacklog);
         $desired = max($floor, min($ceiling, $desired));
-
-        // A queue with work but no worker is the case that must never persist,
-        // and it is reachable whenever the arithmetic rounds to zero.
-        if ($desired === 0 && $signal->pending > 0) {
-            $desired = min(1, $ceiling);
-        }
 
         return new ScalingDecision($desired, $current, $this->explain($signal, $desired, $forBacklog, $jobSeconds, $target, $floor, $ceiling));
     }

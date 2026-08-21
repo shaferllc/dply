@@ -46,11 +46,6 @@ final readonly class QueueRequestContext
         return $this->requestsPerMinute * $multiplier;
     }
 
-    public function organizationId(): ?string
-    {
-        return $this->namespace->organization_id;
-    }
-
     /**
      * Whether the presented key may do `$scope` on *this* namespace.
      *

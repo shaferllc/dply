@@ -90,8 +90,8 @@ return [
     ],
 
     /*
-    | Cache engines offered for install on BYO servers. Redis is always
-    | available; the rest start as "coming soon" until their install +
+    | Cache engines offered for install on BYO servers. Redis and Valkey are
+    | always available; the rest start as "coming soon" until their install +
     | operate path is validated. When a flag is off the engine shows a
     | Soon badge + teaser in the Caches workspace and is filtered out of
     | the server-create cache picker. Resolved per-org by the hybrid
@@ -99,11 +99,12 @@ return [
     | from /admin/flags — same pattern as the workspace coming-soon previews.
     */
     'cache' => [
-        // All parked: Redis is the only cache engine offered. Off now means
-        // HIDDEN, not "Soon" — CacheWorkspaceViewData filters the tab strip by
-        // isAvailable() instead of badging. Engines already installed on a
-        // server stay listed so they remain manageable.
-        'valkey' => false,
+        // Valkey graduated out of this gate — it is redis-family end to end
+        // (own cli, same config format, same AUTH / memory / persistence /
+        // replication paths), so it ships alongside Redis. The rest stay
+        // parked. Off means HIDDEN, not "Soon" — CacheWorkspaceViewData filters
+        // the tab strip by isAvailable() instead of badging. Engines already
+        // installed on a server stay listed so they remain manageable.
         'memcached' => false,
         'keydb' => false,
         'dragonfly' => false,

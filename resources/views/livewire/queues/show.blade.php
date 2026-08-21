@@ -774,6 +774,24 @@
                 </x-alert>
             @endif
 
+            {{-- Typing the name, not just clicking through. This throws away
+                 jobs the customer's app believes are still going to run, with
+                 no undo and no trace — the friction is the point, and it has to
+                 match the queue index or this page is the way around it. --}}
+            <div class="mt-4">
+                <label for="delete-confirmation" class="block text-xs font-medium text-brand-moss">
+                    {{ __('Type :name to confirm', ['name' => $namespace->name]) }}
+                </label>
+                <input
+                    id="delete-confirmation"
+                    type="text"
+                    wire:model="deleteConfirmation"
+                    autocomplete="off"
+                    class="mt-1 block w-full rounded-lg border-brand-ink/15 font-mono text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                    placeholder="{{ $namespace->name }}"
+                />
+            </div>
+
             <div class="mt-5 flex justify-end gap-2">
                 <button type="button" wire:click="cancelDelete" class="rounded-lg px-3 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">
                     {{ __('Cancel') }}

@@ -135,6 +135,18 @@ class ManagedQueueFleet extends Model
      * Only fleets that can actually be at zero need waking; a fleet with a
      * floor already has a worker holding the queue open. {@see FleetAutoscaler}
      */
+    /**
+     * Seconds a worker gets to finish its current job after being asked to stop.
+     *
+     * Pro fleets get an hour because they run the long jobs people bought them
+     * for; flex gets 90s, enough for a normal job and short enough that a
+     * scale-down is not held open by one straggler.
+     */
+    public function graceSeconds(): int
+    {
+        return $this->class === self::CLASS_PRO ? 3600 : 90;
+    }
+
     public function wakesOnPush(): bool
     {
         return $this->status === self::STATUS_ACTIVE && $this->scalingFloor() === 0;

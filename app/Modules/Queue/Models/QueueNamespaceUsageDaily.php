@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -36,11 +35,5 @@ class QueueNamespaceUsageDaily extends Model
             'usage_date' => 'date',
             'jobs_pushed' => 'integer',
         ];
-    }
-
-    /** @return BelongsTo<QueueNamespace, $this> */
-    public function queueNamespace(): BelongsTo
-    {
-        return $this->belongsTo(QueueNamespace::class, 'namespace_id');
     }
 }

@@ -55,10 +55,10 @@
                             'card' => $card,
                         ])
                     @elseif (($comingSoonEngines[$engine] ?? false) && ! $row)
-                        {{-- Coming soon: engine is gated behind cache.{engine}. Redis stays
-                             installable; this engine shows a teaser instead of the install
-                             affordance until platform admin flips the flag on. The Info tab
-                             still describes the engine so operators can evaluate it now. --}}
+                        {{-- Coming soon: engine is gated behind cache.{engine}. Redis and
+                             Valkey stay installable; this engine shows a teaser instead of the
+                             install affordance until platform admin flips the flag on. The Info
+                             tab still describes the engine so operators can evaluate it now. --}}
                         <div class="{{ $card }} px-4 py-3.5 sm:px-5">
                             <div class="flex items-start gap-3">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-moss ring-1 ring-brand-ink/10">
@@ -69,7 +69,7 @@
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine support is on the way', ['engine' => $info['label']]) }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                         {{ $info['tagline'] }}
-                                        {{ __('One-click install on this server is coming soon — for now, Redis is the supported cache engine. See the Info tab for details on :engine.', ['engine' => $info['label']]) }}
+                                        {{ __('One-click install on this server is coming soon — for now, Redis and Valkey are the supported cache engines. See the Info tab for details on :engine.', ['engine' => $info['label']]) }}
                                     </p>
                                     <div class="mt-4 flex flex-wrap items-center gap-3">
                                         <button

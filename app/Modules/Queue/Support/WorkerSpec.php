@@ -39,7 +39,7 @@ final readonly class WorkerSpec
             memoryMib: $fleet->memory_mib,
             // The class *is* the grace period: flex runs on capacity that can
             // be reclaimed at any moment, pro promises long jobs finish.
-            graceSeconds: $fleet->class === ManagedQueueFleet::CLASS_PRO ? 3600 : 90,
+            graceSeconds: $fleet->graceSeconds(),
             env: $env,
         );
     }
