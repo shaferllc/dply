@@ -284,9 +284,13 @@ final class DplySchedule
         // are written absolute, so there is no separate finalize pass to run and
         // nothing to lose if a flush is missed. Ten past the hour keeps it clear
         // of the log meter above.
+        //
+        // The name must stay distinct from the queue-usage-flush event above:
+        // withoutOverlapping() derives its mutex from the event name, so sharing
+        // one would let a slow or crashed :00 flush suppress this :10 run.
         $schedule->command(MeterQueueUsageCommand::class)
             ->hourlyAt(10)
-            ->name('queue-usage-flush')
+            ->name('queue-usage-meter')
             ->withoutOverlapping();
 
         // dply Logs alerting (paid tier): evaluate enabled alert rules against the

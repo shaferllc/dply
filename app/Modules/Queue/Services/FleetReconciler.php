@@ -212,7 +212,7 @@ class FleetReconciler
             ->limit($count)
             ->get();
 
-        $grace = WorkerSpec::forFleet($fleet, 'n/a')->graceSeconds;
+        $grace = $fleet->graceSeconds();
 
         foreach ($doomed as $worker) {
             $worker->forceFill(['state' => ManagedQueueWorker::STATE_DRAINING])->save();

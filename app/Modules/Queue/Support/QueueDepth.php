@@ -31,15 +31,6 @@ final readonly class QueueDepth
         return $this->pending + $this->delayed + $this->reserved;
     }
 
-    /**
-     * What `Queue::size()` means to Laravel: work outstanding. Reserved jobs
-     * count — they are in flight, not finished.
-     */
-    public function size(): int
-    {
-        return $this->total();
-    }
-
     /** @return array<string, int> */
     public function toArray(): array
     {

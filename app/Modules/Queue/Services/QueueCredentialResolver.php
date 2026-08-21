@@ -34,8 +34,6 @@ final class QueueCredentialResolver
 {
     private const NEGATIVE_TTL_SECONDS = 10;
 
-    private const EPOCH_TTL_SECONDS = 300;
-
     /**
      * @return array{credential: QueueCredential, namespace: QueueNamespace}|null
      */
@@ -140,21 +138,6 @@ final class QueueCredentialResolver
         Cache::put($key, true, QueueCredential::LAST_USED_THROTTLE_SECONDS);
 
         $credential->forceFill(['last_used_at' => now()])->saveQuietly();
-    }
-
-    /** Invalidate the negative entry so a freshly minted key works at once. */
-    public function forgetNegative(string $accessKeyId): void
-    {
-        Cache::forget($this->negativeKey($accessKeyId));
-    }
-
-    public function namespaceEpoch(QueueNamespace $namespace): int
-    {
-        return (int) Cache::remember(
-            'dplyq:ns:epoch:'.$namespace->id,
-            self::EPOCH_TTL_SECONDS,
-            fn (): int => $namespace->credential_epoch,
-        );
     }
 
     private function negativeKey(string $accessKeyId): string

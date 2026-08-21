@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Models;
 
-use App\Models\Server;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -33,7 +32,6 @@ use Illuminate\Support\Carbon;
  * @property ?string $stop_reason
  * @property ?Carbon $stopped_at
  * @property-read ?ManagedQueueFleet $fleet
- * @property-read ?Server $hostServer
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -99,12 +97,6 @@ class ManagedQueueWorker extends Model
         return $this->belongsTo(ManagedQueueFleet::class, 'fleet_id');
     }
 
-    /** @return BelongsTo<Server, $this> */
-    public function hostServer(): BelongsTo
-    {
-        return $this->belongsTo(Server::class, 'host_server_id');
-    }
-
     /**
      * Workers that exist as far as cost and capacity are concerned.
      *
@@ -117,22 +109,5 @@ class ManagedQueueWorker extends Model
     public function scopeLive(Builder $query): Builder
     {
         return $query->whereIn('state', self::LIVE_STATES);
-    }
-
-    /**
-     * Seconds this worker has been alive — settled if it has stopped, running
-     * total if it has not.
-     */
-    public function billableSeconds(): int
-    {
-        if ($this->billed_seconds !== null) {
-            return $this->billed_seconds;
-        }
-
-        if (! $this->started_at instanceof Carbon) {
-            return 0;
-        }
-
-        return (int) $this->started_at->diffInSeconds($this->stopped_at ?? now(), absolute: true);
     }
 }

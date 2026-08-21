@@ -100,9 +100,9 @@ final class FilterServerProvisionOptionsForCreateForm
     /**
      * Drop cache + database engines that are still "coming soon" (gated behind
      * cache.* / database.* Pennant flags) from the create wizard. Redis,
-     * MySQL, PostgreSQL, and SQLite are never gated. Also drops the dedicated
-     * Valkey server role when Valkey is coming soon so it can't be provisioned
-     * out from under the gate.
+     * Valkey, MySQL, PostgreSQL, and SQLite are never gated. Also drops any
+     * dedicated cache server role whose engine is gated, so an engine can't be
+     * provisioned out from under its own flag.
      *
      * @param  array<string, list<array<string, mixed>>>  $out
      * @return array<string, list<array<string, mixed>>>
@@ -119,7 +119,7 @@ final class FilterServerProvisionOptionsForCreateForm
         if (isset($out['server_roles'])) {
             $out['server_roles'] = array_values(array_filter(
                 $out['server_roles'],
-                fn (array $row): bool => ! (($row['id'] ?? null) === 'valkey' && CacheEngineAvailability::isComingSoon('valkey')),
+                fn (array $row): bool => CacheEngineAvailability::isAvailable((string) ($row['id'] ?? '')),
             ));
         }
 

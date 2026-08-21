@@ -57,14 +57,6 @@ class QueueJobDurations
         ], self::TTL_SECONDS);
     }
 
-    /** @param  list<float>  $samples */
-    public function recordMany(QueueNamespace $namespace, string $queue, array $samples): void
-    {
-        foreach ($samples as $seconds) {
-            $this->record($namespace, $queue, $seconds);
-        }
-    }
-
     /** Mean seconds per job, or null when this queue has never been measured. */
     public function average(QueueNamespace $namespace, string $queue): ?float
     {

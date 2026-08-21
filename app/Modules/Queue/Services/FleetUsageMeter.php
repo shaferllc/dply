@@ -101,7 +101,6 @@ class FleetUsageMeter
             // pass here reports only the slice since the last watermark.
             $row->flex_mib_seconds = (int) $row->flex_mib_seconds + $amounts['flex'];
             $row->pro_mib_seconds = (int) $row->pro_mib_seconds + $amounts['pro'];
-            $row->jobs_pushed = (int) $row->jobs_pushed;
             $row->save();
         }
 

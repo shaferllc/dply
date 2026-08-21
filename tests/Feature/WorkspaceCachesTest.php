@@ -172,11 +172,6 @@ test('install refuses second redis family engine on same server', function () {
     Queue::fake();
     [$user, $server] = actingOwnerWithServer();
 
-    // Enable Valkey so the refusal under test is the redis-family coexistence
-    // rule, not the coming-soon gate.
-    config(['features.cache.valkey' => true]);
-    Feature::flushCache();
-
     ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'redis',
@@ -202,16 +197,18 @@ test('install refuses second redis family engine on same server', function () {
     ]);
 });
 test('a gated cache engine refuses to install while its flag is off', function () {
-    // Every non-Redis engine is parked: listed in GATED_ENGINES with its
+    // The still-parked engines are listed in GATED_ENGINES with their
     // `cache.{engine}` flag false, so installs are refused and the engine is
-    // hidden from the tab strip. Flip the flag on to bring one back.
+    // hidden from the tab strip. Flip the flag on to bring one back. KeyDB
+    // stands in for the gate here — Redis and Valkey have both graduated, so
+    // neither can exercise it any more.
     Queue::fake();
-    config(['features.cache.valkey' => false]);
+    config(['features.cache.keydb' => false]);
     Feature::flushCache();
     [$user, $server] = actingOwnerWithServer();
 
-    expect(CacheEngineAvailability::GATED_ENGINES)->toContain('valkey');
-    expect(CacheEngineAvailability::isComingSoon('valkey'))->toBeTrue();
+    expect(CacheEngineAvailability::GATED_ENGINES)->toContain('keydb');
+    expect(CacheEngineAvailability::isComingSoon('keydb'))->toBeTrue();
 
     $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
         $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
@@ -221,20 +218,24 @@ test('a gated cache engine refuses to install while its flag is off', function (
 
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
-        ->call('installCacheService', 'valkey');
+        ->call('installCacheService', 'keydb');
 
     Queue::assertNotPushed(InstallCacheServiceJob::class);
+});
+
+test('valkey is generally available and no longer gated', function () {
+    // Graduation guard: Valkey ships alongside Redis. If it is ever re-listed
+    // in GATED_ENGINES, the flagless config below stops offering it and this
+    // fails rather than silently hiding the engine from every workspace.
+    expect(CacheEngineAvailability::GATED_ENGINES)->not->toContain('valkey');
+    expect(CacheEngineAvailability::isAvailable('valkey'))->toBeTrue();
+    expect(config('features.cache'))->not->toHaveKey('valkey');
 });
 test('install blocks when another install is in flight', function () {
     // The new server-wide busy guard blocks even cross-engine installs while apt is
     // running on the box (dpkg lock-frontend is per-host).
     Queue::fake();
     [$user, $server] = actingOwnerWithServer();
-
-    // Enable Valkey so the in-flight busy guard is what blocks the install,
-    // not the coming-soon gate.
-    config(['features.cache.valkey' => true]);
-    Feature::flushCache();
 
     ServerCacheService::query()->create([
         'server_id' => $server->id,

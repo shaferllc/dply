@@ -159,7 +159,7 @@
 
         @if (collect($cacheEngineOptions)->contains(fn (array $row): bool => (bool) ($row['coming_soon'] ?? false)))
             <p class="mt-3 text-xs leading-relaxed text-brand-mist">
-                {{ __('Valkey, KeyDB, Dragonfly, and Memcached appear when enabled for your organization.') }}
+                {{ __('KeyDB, Dragonfly, and Memcached appear when enabled for your organization.') }}
             </p>
         @endif
     </div>

@@ -73,7 +73,7 @@ class SqsCompatibilityController extends Controller
         $decoded = json_decode($request->getContent(), true);
         $this->body = is_array($decoded) ? $decoded : [];
 
-        $action = $this->action($request);
+        $action = QueueAction::of($request);
 
         return match ($action) {
             'SendMessage' => $this->sendMessage($request, $context),
@@ -105,14 +105,16 @@ class SqsCompatibilityController extends Controller
             return $guard;
         }
 
+        $queue = $this->queueName($request);
+
         $id = $this->store->push(
             $context->namespace,
-            $this->queueName($request, $context),
+            $queue,
             $body,
             (int) $this->field('DelaySeconds', 0),
         );
 
-        $this->wakeDrainers($context, $this->queueName($request, $context));
+        $this->wakeDrainers($context, $queue);
 
         return $this->ok([
             'MessageId' => $id,
@@ -150,14 +152,16 @@ class SqsCompatibilityController extends Controller
             return $guard;
         }
 
+        $queue = $this->queueName($request);
+
         $messageIds = $this->store->pushBulk(
             $context->namespace,
-            $this->queueName($request, $context),
+            $queue,
             $bodies,
             $delay,
         );
 
-        $this->wakeDrainers($context, $this->queueName($request, $context));
+        $this->wakeDrainers($context, $queue);
 
         $successful = [];
         foreach ($messageIds as $index => $messageId) {
@@ -182,7 +186,7 @@ class SqsCompatibilityController extends Controller
 
         $claimed = $this->longPoll(
             $context,
-            $this->queueName($request, $context),
+            $this->queueName($request),
             $max,
             $visibility > 0 ? $visibility : null,
             (int) $this->field('WaitTimeSeconds', 0),
@@ -337,7 +341,7 @@ class SqsCompatibilityController extends Controller
 
     private function getQueueAttributes(Request $request, QueueRequestContext $context): JsonResponse
     {
-        $depth = $this->store->depth($context->namespace, $this->queueName($request, $context));
+        $depth = $this->store->depth($context->namespace, $this->queueName($request));
 
         return $this->ok([
             'Attributes' => [
@@ -551,7 +555,7 @@ class SqsCompatibilityController extends Controller
      * the last path segment. The namespace always comes from the credential,
      * never from here — the URL only selects which queue inside it.
      */
-    private function queueName(Request $request, QueueRequestContext $context): string
+    private function queueName(Request $request): string
     {
         // The SDK puts the queue URL in the body for most actions.
         $url = (string) $this->field('QueueUrl', '');
@@ -580,11 +584,6 @@ class SqsCompatibilityController extends Controller
     private function field(string $key, mixed $default = null): mixed
     {
         return $this->body[$key] ?? $default;
-    }
-
-    private function action(Request $request): string
-    {
-        return QueueAction::of($request);
     }
 
     /**

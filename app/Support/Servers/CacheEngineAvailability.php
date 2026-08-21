@@ -8,7 +8,7 @@ use Laravel\Pennant\Feature;
 
 /**
  * Single source of truth for which cache engines are generally available vs.
- * "coming soon". Redis is always available; Valkey, Memcached, KeyDB, and
+ * "coming soon". Redis and Valkey are always available; Memcached, KeyDB, and
  * Dragonfly are gated behind per-engine Pennant flags (`cache.{engine}`) so
  * platform admin can flip them on per-org or platform-wide — mirroring the
  * coming-soon pattern used for the workspace previews.
@@ -24,15 +24,16 @@ final class CacheEngineAvailability
      * Engines gated behind a `cache.{engine}` Pennant flag. Anything not listed
      * here is always available.
      *
-     * All non-Redis engines are parked: their `cache.{engine}` flags are false
-     * in config/features.php, and CacheWorkspaceViewData filters the tab strip
-     * by isAvailable() so they are hidden rather than badged "Soon". Redis is
-     * unlisted and therefore always available. Remove a key here (and flip its
-     * flag) to bring an engine back.
+     * Valkey graduated out of the gate — it ships alongside Redis as one of the
+     * two generally-available cache engines. The rest are parked: their
+     * `cache.{engine}` flags are false in config/features.php, and
+     * CacheWorkspaceViewData filters the tab strip by isAvailable() so they are
+     * hidden rather than badged "Soon". Remove a key here (and its flag) to
+     * bring an engine back.
      *
      * @var list<string>
      */
-    public const GATED_ENGINES = ['valkey', 'memcached', 'keydb', 'dragonfly'];
+    public const GATED_ENGINES = ['memcached', 'keydb', 'dragonfly'];
 
     public static function isComingSoon(string $engine): bool
     {
