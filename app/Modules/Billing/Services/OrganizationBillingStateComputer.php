@@ -42,6 +42,8 @@ class OrganizationBillingStateComputer
         private ServerResourceCostCalculator $serverResourceCalculator,
         private ServerLogEntitlements $serverLogEntitlements,
         private ServerLogUsageCostCalculator $serverLogUsageCostCalculator,
+        private QueueFleetUsageReader $queueFleetUsageReader,
+        private QueueFleetUsageCostCalculator $queueFleetUsageCostCalculator,
     ) {}
 
     /**
@@ -433,6 +435,20 @@ class OrganizationBillingStateComputer
         $serverlessUsageSubtotalCents = (int) $serverlessUsageEstimate['subtotal_cents']
             + $this->serverlessResourceCalculator->subtotalCents($managedServerlessSites);
 
+        // Managed queue workers: metered MiB-seconds by compute class plus job
+        // operations. Read from the daily rollup rather than the live counters
+        // so a recomputed invoice gives the same answer tomorrow.
+        [$qPeriodStart, $qPeriodEnd] = $this->queueFleetUsageReader->currentMonthWindow();
+        $queueUsageEstimate = array_merge(
+            $this->queueFleetUsageCostCalculator->estimate(
+                $this->queueFleetUsageReader->totalsForOrganization($organization, $qPeriodStart, $qPeriodEnd),
+            ),
+            [
+                'period_start' => $qPeriodStart->toDateString(),
+                'period_end' => $qPeriodEnd->toDateString(),
+            ],
+        );
+
         // The flat plan is chosen by billable BYO server count.
         // The canonical fleet bill carries the TRUE plan price (chosen by BYO
         // server count) even for beta orgs — it's what "subscribe early" charges
@@ -464,6 +480,8 @@ class OrganizationBillingStateComputer
             lookoutTierQuantities: $lookoutTierQuantities,
             queueTierQuantities: $queueTierQuantities,
             queueBillableNamespaceIds: $queueBillableNamespaceIds,
+            queueUsageSubtotalCents: (int) $queueUsageEstimate['subtotal_cents'],
+            queueUsageEstimate: $queueUsageEstimate,
             serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
             serverLogUsageEstimate: $serverLogUsageEstimate,
         );

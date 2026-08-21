@@ -11,6 +11,7 @@ use App\Modules\Queue\Support\ClaimedJob;
 use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueEntitlements;
 use App\Modules\Queue\Support\QueueRequestContext;
+use App\Modules\Queue\Services\FleetWaker;
 use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class SqsCompatibilityController extends Controller
         private readonly QueueStore $store,
         private readonly QueueEntitlements $entitlements,
         private readonly ServerlessQueuePump $pump,
+        private readonly FleetWaker $waker,
     ) {}
 
     /**
@@ -110,7 +112,7 @@ class SqsCompatibilityController extends Controller
             (int) $this->field('DelaySeconds', 0),
         );
 
-        $this->wakePump($context);
+        $this->wakeDrainers($context, $this->queueName($request, $context));
 
         return $this->ok([
             'MessageId' => $id,
@@ -155,7 +157,7 @@ class SqsCompatibilityController extends Controller
             $delay,
         );
 
-        $this->wakePump($context);
+        $this->wakeDrainers($context, $this->queueName($request, $context));
 
         $successful = [];
         foreach ($messageIds as $index => $messageId) {
@@ -474,6 +476,16 @@ class SqsCompatibilityController extends Controller
      * tell us. The serverless wake endpoint and the handler's JobQueued hook
      * exist only because, until now, dply could not see the customer's queue.
      */
+    private function wakeDrainers(QueueRequestContext $context, string $queue): void
+    {
+        // A managed fleet is dply's own worker pool for this queue; the pump
+        // is the serverless site's. A namespace can have either, and asking
+        // both is cheaper than deciding which one this namespace is.
+        $this->waker->wake($context->namespace, $queue);
+
+        $this->wakePump($context);
+    }
+
     private function wakePump(QueueRequestContext $context): void
     {
         $site = $context->namespace->site;

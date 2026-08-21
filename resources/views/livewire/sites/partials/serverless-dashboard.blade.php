@@ -134,6 +134,7 @@
     @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
     @livewire('serverless.cache-panel', ['site' => $site], key('serverless-cache-'.$site->id))
     @livewire('serverless.background-panel', ['site' => $site], key('serverless-bg-'.$site->id))
+    @livewire('serverless.assets-panel', ['site' => $site], key('serverless-assets-'.$site->id))
     @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
 
     <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">

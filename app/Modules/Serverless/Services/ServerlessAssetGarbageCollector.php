@@ -236,14 +236,13 @@ class ServerlessAssetGarbageCollector
             ->get(['id', 'organization_id', 'meta']);
     }
 
+    /**
+     * The return type does the narrowing: a driver that resolved to something
+     * other than a filesystem adapter would TypeError here rather than fail
+     * further in with a listContents() call on the wrong object.
+     */
     private function disk(): FilesystemAdapter
     {
-        $disk = Storage::disk(ServerlessAssetPublisher::DISK);
-
-        if (! $disk instanceof FilesystemAdapter) {
-            throw new \RuntimeException('Serverless asset disk is not a filesystem adapter.');
-        }
-
-        return $disk;
+        return Storage::disk(ServerlessAssetPublisher::DISK);
     }
 }

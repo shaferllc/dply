@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Queue;
 
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
+use App\Modules\Queue\Console\MeterFleetUsageCommand;
 use App\Modules\Queue\Console\MeterQueueUsageCommand;
 use App\Modules\Queue\Console\QueueDoctorCommand;
 use App\Modules\Queue\Console\QueueFleetTickCommand;
@@ -73,6 +74,8 @@ class QueueServiceProvider extends ServiceProvider
                 QueueDoctorCommand::class,
                 // Sizes managed worker fleets against real queue pressure.
                 QueueFleetTickCommand::class,
+                // Hourly roll-up of worker time into billable MiB-seconds.
+                MeterFleetUsageCommand::class,
             ]);
         }
     }

@@ -31,6 +31,7 @@ class FleetReconciler
         private readonly WorkerRuntime $runtime,
         private readonly FleetAutoscaler $autoscaler,
         private readonly FleetWorkerEnvironment $environment,
+        private readonly QueueJobDurations $durations,
     ) {}
 
     /** Reap dead workers, size the fleet, apply the difference. */
@@ -108,14 +109,26 @@ class FleetReconciler
     {
         $depth = $this->store->depth($fleet->namespace, $fleet->queue);
 
+        // Measured from real claim-to-ack times where the queue has run jobs.
+        // The mirror onto the fleet is what makes a cache flush cost accuracy
+        // instead of correctness: the estimate degrades to the last known
+        // value, then to the autoscaler's own default, never to zero — which
+        // would make every backlog look free to drain.
+        $measured = $this->durations->average($fleet->namespace, $fleet->queue);
+        $remembered = (float) ($fleet->meta['avg_job_seconds'] ?? 0.0);
+
+        if ($measured !== null && $measured !== $remembered) {
+            $meta = is_array($fleet->meta) ? $fleet->meta : [];
+            $meta['avg_job_seconds'] = $measured;
+            $meta['avg_job_samples'] = $this->durations->samples($fleet->namespace, $fleet->queue);
+            $fleet->forceFill(['meta' => $meta]);
+        }
+
         return new FleetSignal(
             pending: $depth->pending,
             reserved: $depth->reserved,
             liveWorkers: $this->liveWorkers($fleet)->count(),
-            // Measured per fleet as jobs complete. Until that lands the
-            // autoscaler falls back to its own default rather than to zero,
-            // which would make every backlog look free to drain.
-            avgJobSeconds: (float) ($fleet->meta['avg_job_seconds'] ?? 0.0),
+            avgJobSeconds: $measured ?? $remembered,
         );
     }
 

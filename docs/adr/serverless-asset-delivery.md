@@ -91,6 +91,15 @@ rules.
 The cost is that the same bytes are logged twice — once on `cdn.acme.com`, once
 on the internal hop. See metering below.
 
+A hostname becomes **billable only once Cloudflare reports it active**. A site's
+`ASSET_URL` moves to the custom hostname on its *next deploy*, so while
+validation is pending the default hostname is still the one serving. Since
+billing reads "has a custom hostname" as "the default is an internal hop",
+promoting a hostname early would drop real traffic from the meter. Pending
+hostnames therefore live in `custom_hostname_details` only, and
+`ServerlessAssetDomainProvisioner` promotes them into `custom_hostnames` on
+verification.
+
 ### Publishing is additive; GC cuts on publishes, not deploys
 
 `publishBuild()` no longer deletes. Content-hashed names make the union of

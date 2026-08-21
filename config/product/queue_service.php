@@ -220,6 +220,22 @@ return [
     'fleets' => [
         'runtime' => env('DPLY_QUEUE_FLEET_RUNTIME', 'fake'),
         'target_drain_seconds' => (int) env('DPLY_QUEUE_FLEET_TARGET_DRAIN', 20),
+
+        /*
+         * Rates, in millicents, for the two metered quantities. Millicents
+         * because a MiB-second priced in whole cents is either zero or
+         * absurd; the rollup stores raw quantities and the price is applied
+         * on read, so a rate change never rewrites history.
+         *
+         * `pro_multiplier` is the premium a Pro worker carries over the
+         * equivalent Flex size, kept as one number rather than a second rate
+         * so the two classes cannot drift apart by accident.
+         */
+        'pricing' => [
+            'flex_millicents_per_mib_second' => (float) env('DPLY_QUEUE_FLEX_RATE', 0.0000594),
+            'pro_multiplier' => (float) env('DPLY_QUEUE_PRO_MULTIPLIER', 1.20),
+            'millicents_per_million_operations' => (float) env('DPLY_QUEUE_OPS_RATE', 100_000),
+        ],
     ],
 
     'entitlements' => [

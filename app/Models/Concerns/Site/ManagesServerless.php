@@ -48,6 +48,43 @@ trait ManagesServerless
     }
 
     /**
+     * Current asset-guardrail state for this function, as last evaluated.
+     *
+     * @return array<string, mixed>
+     */
+    public function serverlessAssetGuardrail(): array
+    {
+        $assets = $this->serverlessConfig()['assets'] ?? [];
+        $guardrail = is_array($assets) ? ($assets['guardrail'] ?? []) : [];
+
+        return is_array($guardrail) ? $guardrail : [];
+    }
+
+    /**
+     * Record a freshly-evaluated asset guardrail and return the state it
+     * replaced, so the caller can fire on a TRANSITION rather than on every
+     * evaluation. Mirrors {@see ManagesEdgeHosting::updateEdgeGuardrail()}.
+     *
+     * @param  array<string, mixed>  $guardrail
+     */
+    public function updateServerlessAssetGuardrail(array $guardrail): ?string
+    {
+        $previous = $this->serverlessAssetGuardrail()['state'] ?? null;
+
+        $meta = $this->meta ?? [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $assets = is_array($serverless['assets'] ?? null) ? $serverless['assets'] : [];
+
+        $assets['guardrail'] = $guardrail;
+        $serverless['assets'] = $assets;
+        $meta['serverless'] = $serverless;
+
+        $this->update(['meta' => $meta]);
+
+        return is_string($previous) ? $previous : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serverlessConfig(): array

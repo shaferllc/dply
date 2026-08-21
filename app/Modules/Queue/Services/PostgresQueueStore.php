@@ -8,6 +8,7 @@ use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\ClaimedJob;
 use App\Modules\Queue\Support\QueueDepth;
+use App\Modules\Queue\Support\QueueOperations;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,7 @@ class PostgresQueueStore implements QueueStore
         private readonly QueuePayloadInspector $inspector,
         private readonly QueueUsageCounter $usage,
         private readonly QueueUsageMeter $meter,
+        private readonly QueueJobDurations $durations,
     ) {}
 
     public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0): string
@@ -102,6 +104,11 @@ class PostgresQueueStore implements QueueStore
         $this->usage->record($namespace, count($rows));
         $this->meter->record($namespace, count($rows));
 
+        // Dispatch is payload-bearing, so a 1 MiB job costs sixteen chunks
+        // where a small one costs one (docs/adr/managed-queue-workers.md,
+        // decision 6).
+        $this->meter->recordOperations($namespace, QueueOperations::forPayloads($payloads));
+
         return $ids;
     }
 
@@ -139,6 +146,15 @@ class PostgresQueueStore implements QueueStore
             foreach ($rows as $row) {
                 $claimed[] = $row;
             }
+        }
+
+        // Starting a job is the second of the three operations a normal job
+        // costs, and it carries the payload back to the worker, so it is
+        // chunked the same way the dispatch was.
+        if ($claimed !== []) {
+            $this->meter->recordOperations($namespace, QueueOperations::forPayloads(
+                array_map(static fn (ClaimedJob $job): string => $job->payload, $claimed),
+            ));
         }
 
         return $claimed;
@@ -242,9 +258,20 @@ class PostgresQueueStore implements QueueStore
 
     public function ack(QueueNamespace $namespace, string $jobId, string $reservationId): bool
     {
-        $deleted = $this->reserved($namespace, $jobId, $reservationId)->delete();
+        // DELETE ... RETURNING rather than a plain delete: the row is the only
+        // place that knows when this job was claimed, and once it is gone the
+        // duration is unrecoverable. One statement, not a select-then-delete.
+        $deleted = $this->connection()->select(
+            'DELETE FROM '.self::JOBS.'
+              WHERE namespace_id = ? AND id = ? AND reservation_id = ?::uuid
+          RETURNING queue, EXTRACT(EPOCH FROM (clock_timestamp() - reserved_at)) AS ran_for',
+            [$namespace->id, $jobId, $reservationId],
+        );
 
-        if ($deleted > 0) {
+        if ($deleted !== []) {
+            $this->recordDuration($namespace, $deleted);
+            $this->meter->recordOperations($namespace, count($deleted));
+
             return true;
         }
 
@@ -277,9 +304,12 @@ class PostgresQueueStore implements QueueStore
             'DELETE FROM '.self::JOBS.'
               WHERE namespace_id = ?
                 AND (id, reservation_id) IN ('.implode(', ', $tuples).')
-          RETURNING id',
+          RETURNING id, queue, EXTRACT(EPOCH FROM (clock_timestamp() - reserved_at)) AS ran_for',
             $bindings,
         );
+
+        $this->recordDuration($namespace, $deleted);
+        $this->meter->recordOperations($namespace, count($deleted));
 
         $gone = [];
         foreach ($deleted as $row) {
@@ -326,6 +356,8 @@ class PostgresQueueStore implements QueueStore
     {
         $delay = max(0, $delaySeconds);
 
+        $this->meter->recordOperations($namespace, 1);
+
         return $this->reserved($namespace, $jobId, $reservationId)->update([
             'visible_at' => DB::raw("now() + interval '{$delay} seconds'"),
             'reserved_at' => null,
@@ -365,6 +397,10 @@ class PostgresQueueStore implements QueueStore
     public function heartbeat(QueueNamespace $namespace, string $jobId, string $reservationId, ?int $visibilitySeconds = null): bool
     {
         $lease = $this->inspector->leaseSeconds(null, $visibilitySeconds);
+
+        // A long-running job records one of these periodically while it runs
+        // — the visibility extension Laravel Cloud bills for too.
+        $this->meter->recordOperations($namespace, 1);
 
         return $this->reserved($namespace, $jobId, $reservationId)->update([
             'visible_at' => DB::raw("now() + interval '{$lease} seconds'"),
@@ -420,6 +456,39 @@ class PostgresQueueStore implements QueueStore
      * conditions matter — the namespace check is the tenancy boundary and the
      * reservation check is the fencing token.
      */
+    /**
+     * Feed completed-job timings to the fleet autoscaler.
+     *
+     * The elapsed time is read with `clock_timestamp()`, not `now()`.
+     * Postgres freezes `now()` at the start of the enclosing transaction, so
+     * a duration measured with it is zero whenever the ack shares a
+     * transaction with anything else — every job would look instant and every
+     * backlog free to drain. This is the one place in the store that wants
+     * wall-clock rather than transaction time.
+     *
+     * Best-effort by construction: the job is already acked and the client is
+     * already being told so. A cache that is down must cost a measurement,
+     * never a duplicate delivery.
+     *
+     * @param  list<object>  $rows  DELETE ... RETURNING rows
+     */
+    private function recordDuration(QueueNamespace $namespace, array $rows): void
+    {
+        try {
+            foreach ($rows as $row) {
+                $ranFor = $row->ran_for ?? null;
+
+                if ($ranFor === null) {
+                    continue;
+                }
+
+                $this->durations->record($namespace, (string) ($row->queue ?? ''), (float) $ranFor);
+            }
+        } catch (\Throwable) {
+            // Intentionally swallowed — see the docblock.
+        }
+    }
+
     private function reserved(QueueNamespace $namespace, string $jobId, string $reservationId): Builder
     {
         return $this->connection()->table(self::JOBS)

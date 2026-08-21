@@ -76,6 +76,16 @@ class DesiredBillingState
         public readonly int $appliedCreditCents = 0,
         // dply Logs ingest overage — metered pass-through on top, not
         // plan-eligible. 0 until billing is enabled + a plan carries a rate (PR C).
+        /**
+         * Metered managed-queue worker time and job operations. Separate from
+         * $queueSubtotalCents, which prices namespaces by capacity tier: a
+         * tier prices a queue the customer polls themselves, and cannot price
+         * compute dply runs on their behalf (docs/adr/managed-queue-workers.md,
+         * decision 6).
+         */
+        public readonly int $queueUsageSubtotalCents = 0,
+        /** @var array<string, mixed> */
+        public readonly array $queueUsageEstimate = [],
         public readonly int $serverLogUsageSubtotalCents = 0,
         /** @var array<string, mixed> */
         public readonly array $serverLogUsageEstimate = [],
@@ -87,6 +97,7 @@ class DesiredBillingState
      * @param  array{key: string, label: string, price_cents: int, max_servers: ?int}  $plan
      * @param  array<string, mixed>  $edgeUsageEstimate
      * @param  array<string, mixed>  $realtimeTierQuantities
+     * @param  array<string, mixed>  $queueUsageEstimate
      * @param  array<string, mixed>  $queueTierQuantities
      * @param  list<string>  $queueBillableNamespaceIds
      */
@@ -117,6 +128,8 @@ class DesiredBillingState
         array $queueBillableNamespaceIds = [],
         int $serverLogUsageSubtotalCents = 0,
         array $serverLogUsageEstimate = [],
+        int $queueUsageSubtotalCents = 0,
+        array $queueUsageEstimate = [],
     ): self {
         $billableServerCount = max(0, $billableServerCount);
 
@@ -142,6 +155,8 @@ class DesiredBillingState
         $edgeUsageSubtotalCents = max(0, $edgeUsageSubtotalCents);
 
         $serverLogUsageSubtotalCents = max(0, $serverLogUsageSubtotalCents);
+
+        $queueUsageSubtotalCents = max(0, $queueUsageSubtotalCents);
 
         // Realtime: prefer per-tier quantities priced from config('realtime.tiers');
         // fall back to the legacy flat count×unit for any caller not yet migrated
@@ -211,7 +226,8 @@ class DesiredBillingState
             + $serverLogUsageSubtotalCents
             + $realtimeSubtotal
             + $lookoutSubtotal
-            + $queueSubtotal;
+            + $queueSubtotal
+            + $queueUsageSubtotalCents;
 
         return new self(
             planKey: $plan['key'],
@@ -247,6 +263,8 @@ class DesiredBillingState
             appliedCreditCents: 0,
             serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
             serverLogUsageEstimate: $serverLogUsageEstimate,
+            queueUsageSubtotalCents: $queueUsageSubtotalCents,
+            queueUsageEstimate: $queueUsageEstimate,
         );
     }
 
@@ -315,6 +333,8 @@ class DesiredBillingState
             'edge_usage_estimate' => $this->edgeUsageEstimate,
             'server_log_usage_subtotal_cents' => $this->serverLogUsageSubtotalCents,
             'server_log_usage_estimate' => $this->serverLogUsageEstimate,
+            'queue_usage_subtotal_cents' => $this->queueUsageSubtotalCents,
+            'queue_usage_estimate' => $this->queueUsageEstimate,
             'realtime_count' => $this->realtimeCount,
             'realtime_subtotal_cents' => $this->realtimeSubtotalCents,
             'realtime_tier_quantities' => $this->realtimeTierQuantities,

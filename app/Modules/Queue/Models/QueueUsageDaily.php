@@ -21,6 +21,9 @@ use Illuminate\Support\Carbon;
  * @property string $organization_id
  * @property Carbon $day
  * @property int $jobs_pushed
+ * @property int $operations
+ * @property int $flex_mib_seconds
+ * @property int $pro_mib_seconds
  * @property string $source
  * @property ?array<string, mixed> $meta
  * @property-read ?Organization $organization
@@ -44,6 +47,9 @@ class QueueUsageDaily extends Model
         'organization_id',
         'day',
         'jobs_pushed',
+        'operations',
+        'flex_mib_seconds',
+        'pro_mib_seconds',
         'source',
         'meta',
     ];
@@ -54,6 +60,9 @@ class QueueUsageDaily extends Model
         return [
             'day' => 'date',
             'jobs_pushed' => 'integer',
+            'operations' => 'integer',
+            'flex_mib_seconds' => 'integer',
+            'pro_mib_seconds' => 'integer',
             'meta' => 'array',
         ];
     }

@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  *                      are invoiced from started_at/stopped_at, so teardown settles a row rather
  *                      than deleting one.
  * @property ?Carbon $billed_at
+ * @property ?Carbon $billed_through_at
  * @property ?int $billed_seconds
  * @property string $fleet_id
  * @property ?string $host_server_id
@@ -31,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property string $state
  * @property ?string $stop_reason
  * @property ?Carbon $stopped_at
- * @property-read ManagedQueueFleet $fleet
+ * @property-read ?ManagedQueueFleet $fleet
  * @property-read ?Server $hostServer
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -72,6 +73,7 @@ class ManagedQueueWorker extends Model
         'last_seen_at',
         'billed_seconds',
         'billed_at',
+        'billed_through_at',
         'meta',
     ];
 
@@ -86,6 +88,7 @@ class ManagedQueueWorker extends Model
             'stopped_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'billed_at' => 'datetime',
+            'billed_through_at' => 'datetime',
             'meta' => 'array',
         ];
     }

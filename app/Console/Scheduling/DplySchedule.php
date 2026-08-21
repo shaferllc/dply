@@ -78,7 +78,9 @@ use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
 use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
+use App\Modules\Serverless\Console\EvaluateServerlessAssetGuardrailsCommand;
 use App\Modules\Serverless\Console\SweepServerlessAssetsCommand;
+use App\Modules\Queue\Console\MeterFleetUsageCommand;
 use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
@@ -213,6 +215,13 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('queue-fleet-tick');
 
+        // Hourly, not nightly: this advances the watermark that makes a
+        // still-running worker billable at all.
+        $schedule->command(MeterFleetUsageCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('queue-fleet-usage');
+
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         // Value-less flags must be scheduled as `--today` (not `--today => true`,
@@ -301,6 +310,14 @@ final class DplySchedule
         $schedule->command(EvaluateEdgeGuardrailsCommand::class)
             ->dailyAt('02:45')
             ->withoutOverlapping();
+
+        // After the sweep (01:50) and the usage roll-up, so the state it
+        // reports reflects today's measurements rather than yesterday's.
+        $schedule->command(EvaluateServerlessAssetGuardrailsCommand::class)
+            ->dailyAt('02:50')
+            ->name('serverless-asset-guardrails')
+            ->withoutOverlapping()
+            ->onOneServer();
 
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
 

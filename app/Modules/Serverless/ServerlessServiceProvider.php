@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless;
 
 use App\Modules\Serverless\Livewire\BackgroundPanel;
+use App\Modules\Serverless\Livewire\AssetsPanel;
 use App\Modules\Serverless\Livewire\CachePanel;
 use App\Modules\Serverless\Livewire\Create;
 use App\Modules\Serverless\Livewire\DatabasePanel;
@@ -51,6 +52,8 @@ class ServerlessServiceProvider extends ServiceProvider
                 Console\ServerlessManifestCommand::class,
                 Console\SweepServerlessAssetsCommand::class,
                 Console\BackfillServerlessAssetsCommand::class,
+                Console\EvaluateServerlessAssetGuardrailsCommand::class,
+                Console\SetupServerlessAssetBucketCommand::class,
             ]);
         }
     }
@@ -62,6 +65,7 @@ class ServerlessServiceProvider extends ServiceProvider
         Livewire::component('serverless.index', Index::class);
         Livewire::component('serverless.journey', Journey::class);
         Livewire::component('serverless.background-panel', BackgroundPanel::class);
+        Livewire::component('serverless.assets-panel', AssetsPanel::class);
         Livewire::component('serverless.cache-panel', CachePanel::class);
         Livewire::component('serverless.database-panel', DatabasePanel::class);
         Livewire::component('serverless.dns-panel', DnsPanel::class);

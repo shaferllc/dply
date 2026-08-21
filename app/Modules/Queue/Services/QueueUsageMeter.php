@@ -71,6 +71,38 @@ class QueueUsageMeter
     }
 
     /**
+     * Record billable queue operations against a namespace's organization.
+     *
+     * Same counter mechanism, same never-throws contract, and for the same
+     * reason as {@see record()}: an acked job row is deleted, so the evidence
+     * has to be counted as it happens or not at all. What differs is that
+     * operations accrue on every step of a job's life, not just the push, so
+     * this is called from the claim and ack paths too.
+     */
+    public function recordOperations(QueueNamespace $namespace, int $operations): void
+    {
+        $organizationId = (string) $namespace->organization_id;
+
+        if ($operations <= 0 || $organizationId === '') {
+            return;
+        }
+
+        try {
+            $day = now()->utc()->toDateString();
+
+            Redis::incrby($this->operationsKey($organizationId, $day), $operations);
+            Redis::expire($this->operationsKey($organizationId, $day), self::COUNTER_TTL_SECONDS);
+            Redis::sadd(self::INDEX_KEY, $organizationId.':'.$day);
+        } catch (Throwable $e) {
+            Log::warning('queue.operations_record_failed', [
+                'organization_id' => $organizationId,
+                'operations' => $operations,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Flush live counters into {@see QueueUsageDaily}.
      *
      * Idempotent — each row is written as the counter's absolute total, keyed
@@ -130,16 +162,27 @@ class QueueUsageMeter
                     continue;
                 }
 
+                $attributes = [
+                    'jobs_pushed' => $total,
+                    'meta' => ['metered_via' => 'QueueUsageMeter'],
+                ];
+
+                // Only written when the counter is still there. Coalescing a
+                // missing counter to zero would let an expired key erase a
+                // total that was already flushed correctly.
+                $operations = $this->readOperations($organizationId, $day);
+
+                if ($operations !== null) {
+                    $attributes['operations'] = $operations;
+                }
+
                 QueueUsageDaily::query()->updateOrCreate(
                     [
                         'organization_id' => $organizationId,
                         'day' => $day,
                         'source' => QueueUsageDaily::SOURCE_COUNTER,
                     ],
-                    [
-                        'jobs_pushed' => $total,
-                        'meta' => ['metered_via' => 'QueueUsageMeter'],
-                    ],
+                    $attributes,
                 );
 
                 // The row is now authoritative for a day whose counter is
@@ -167,6 +210,29 @@ class QueueUsageMeter
     private function counterKey(string $organizationId, string $day): string
     {
         return 'dplyq:usage:'.$organizationId.':'.$day;
+    }
+
+    private function operationsKey(string $organizationId, string $day): string
+    {
+        return 'dplyq:ops:'.$organizationId.':'.$day;
+    }
+
+    /**
+     * Operations counted for a day, or null when the counter is gone.
+     *
+     * A missing counter must not zero a row that already holds a flushed
+     * total — the caller coalesces to 0 only for rows being written fresh,
+     * and an absolute-total write means a late flush cannot double-count.
+     */
+    private function readOperations(string $organizationId, string $day): ?int
+    {
+        try {
+            $value = Redis::get($this->operationsKey($organizationId, $day));
+
+            return $value === null ? null : (int) $value;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /** Null when the counter has expired out from under its index entry. */

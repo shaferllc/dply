@@ -241,6 +241,14 @@ return [
                 'edge.rum.breach' => 'Real-user metric threshold breached (action required)',
             ],
         ],
+        'serverless' => [
+            'label' => 'Serverless notifications',
+            'events' => [
+                // Asset delivery never stops when a site goes over — the
+                // overage is billed and surfaced. This is the surfacing.
+                'serverless.assets.over_budget' => 'Serverless asset usage over the included allowance',
+            ],
+        ],
         'backup' => [
             'label' => 'Backup notifications',
             'events' => [
