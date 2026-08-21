@@ -26,7 +26,17 @@ class TeardownCloudSiteJob implements ShouldQueue
 
     public int $tries = 5;
 
-    public function __construct(public string $siteId) {}
+    /**
+     * @param  bool  $deleteSiteRow  True when the caller is deleting the site
+     *                               outright (workspace "Remove now" / scheduled
+     *                               deletion) rather than just tearing the
+     *                               container down. Defaults false so the
+     *                               danger-zone teardown keeps its row.
+     */
+    public function __construct(
+        public string $siteId,
+        public bool $deleteSiteRow = false,
+    ) {}
 
     public function handle(): void
     {
@@ -39,6 +49,15 @@ class TeardownCloudSiteJob implements ShouldQueue
         $credential = CloudRouter::credentialFor($site);
         if ($backend !== null && $credential !== null) {
             $backend->teardown($site, $credential);
+        }
+
+        // Asked to remove the site, not just the container: let the row go
+        // now that the backend resource is gone. Site::deleting fans out to
+        // SiteRelationPurger for the rest.
+        if ($this->deleteSiteRow) {
+            $site->delete();
+
+            return;
         }
 
         // Mark the site row inactive but don't delete it — keeps

@@ -6,6 +6,7 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Site;
+use App\Services\Sites\SiteTeardownRouter;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -31,7 +32,13 @@ trait ManagesSiteLifecycleActions
             'runtime' => $this->site->runtime,
             'git_repository_url' => $this->site->git_repository_url,
         ];
-        $this->site->delete();
+        // Cloud / Edge / Serverless sites go through their platform teardown,
+        // which owns the row delete — deleting it here would strand the DO App
+        // / Worker / Lambda namespace running and billing with nothing in dply
+        // pointing at it.
+        if (! app(SiteTeardownRouter::class)->teardown($this->site)) {
+            $this->site->delete();
+        }
 
         if ($organization) {
             audit_log(
