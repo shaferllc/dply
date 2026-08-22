@@ -14,8 +14,7 @@ use Laravel\Pennant\Feature;
 
 /**
  * Every reason a site may not be created on a server the organization owns —
- * the BYO sibling of {@see \App\Modules\Serverless\Services\ServerlessCreateGate}
- * and {@see \App\Modules\Cloud\Services\CloudCreateGate}.
+ * the BYO site-creation gate.
  *
  * Kernel rather than a module because BYO servers are the kernel's own product:
  * `Site` and `Server` are hub models and there is no Vm module to put this in.

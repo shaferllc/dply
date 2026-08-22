@@ -6,11 +6,10 @@ namespace App\Support\Sites;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\SiteSettingsHeader;
 
 /**
- * Breadcrumb items for BYO / Edge / Serverless site workspace sub-pages.
+ * Breadcrumb items for site workspace sub-pages.
  */
 final class SiteWorkspaceBreadcrumbs
 {
@@ -23,14 +22,6 @@ final class SiteWorkspaceBreadcrumbs
         string $currentLabel,
         ?string $currentIcon = null,
     ): array {
-        if ($site->usesEdgeRuntime()) {
-            return self::edgeItems($server, $site, $currentLabel, $currentIcon);
-        }
-
-        if ($site->usesFunctionsRuntime()) {
-            return self::serverlessItems($site, $currentLabel, $currentIcon);
-        }
-
         $items = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
@@ -72,56 +63,9 @@ final class SiteWorkspaceBreadcrumbs
     /**
      * @return list<array{label: string, href?: string|null, icon?: string|null}>
      */
-    private static function edgeItems(
-        Server $server,
-        Site $site,
-        string $currentLabel,
-        ?string $currentIcon,
-    ): array {
-        $items = [
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
-            [
-                'label' => $site->name,
-                'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ],
-            [
-                'label' => $currentLabel,
-                'icon' => $currentIcon ?? 'map-pin',
-            ],
-        ];
-
-        return $items;
-    }
-
     /**
      * @return list<array{label: string, href?: string|null, icon?: string|null}>
      */
-    private static function serverlessItems(
-        Site $site,
-        string $currentLabel,
-        ?string $currentIcon,
-    ): array {
-        return [
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'],
-            [
-                'label' => $site->name,
-                'href' => ServerlessWorkspaceUrl::show($site),
-                'icon' => 'bolt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ],
-            [
-                'label' => $currentLabel,
-                'icon' => $currentIcon ?? 'map-pin',
-            ],
-        ];
-    }
-
     public static function iconKeyFromSection(string $section, Site $site, Server $server): string
     {
         $header = SiteSettingsHeader::for($site, $server, $section);

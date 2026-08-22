@@ -9,7 +9,6 @@ use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\Livewire\RendersLivewirePage;
-use App\Support\Serverless\ServerlessWorkspaceUrl;
 use Illuminate\Support\Facades\Gate;
 
 class SiteWorkspaceController
@@ -18,21 +17,6 @@ class SiteWorkspaceController
     {
         abort_unless($site->server_id === $server->id, 404);
         Gate::authorize('view', $site);
-
-        // Serverless: keep never-live (or failed first-deploy) functions on the
-        // deploy journey — don't open the normal site workspace that reads as
-        // "created successfully". Mirrors Edge's provisioning shell for
-        // edge_failed / edge_provisioning before the first publish.
-        if (
-            $server->isDigitalOceanFunctionsHost()
-            && in_array($site->status, [
-                Site::STATUS_FUNCTIONS_CONFIGURED,
-                Site::STATUS_FUNCTIONS_FAILED,
-            ], true)
-            && $site->last_deploy_at === null
-        ) {
-            return redirect()->to(ServerlessWorkspaceUrl::journey($site));
-        }
 
         // Choose-app flow: a site without an application installed must pick
         // one before its workspace is usable — both freshly-created bare
@@ -86,16 +70,6 @@ class SiteWorkspaceController
         }
 
         if ($section === 'dns') {
-            $target = ServerlessWorkspaceUrl::forSitesRoute('sites.show', $site, [
-                'section' => 'routing',
-                'tab' => 'dns',
-                ...request()->query(),
-            ]);
-
-            if ($target !== null) {
-                return redirect()->to($target);
-            }
-
             return redirect()->route('sites.show', [
                 'server' => $server,
                 'site' => $site,

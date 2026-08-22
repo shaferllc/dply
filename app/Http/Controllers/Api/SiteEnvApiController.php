@@ -14,7 +14,6 @@ use Illuminate\Http\Request;
 
 /**
  * Public HTTP API for a BYO/VM site's environment variables — the VM-site
- * counterpart to {@see \App\Modules\Edge\Http\Controllers\Api\EdgeEnvController},
  * so the CLI can manage `dply site env` for VM sites, not just Edge.
  *
  * Values live in the site's encrypted env cache (`sites.env_file_content`) and

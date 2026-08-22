@@ -16,28 +16,6 @@ use Livewire\Attributes\Computed;
 trait ManagesSiteSettingsView
 {
     /**
-     * Trigger a (re)deploy of a serverless function from the General-section
-     * dashboard, then send the operator to the journey page to watch it run.
-     */
-    public function redeployServerlessFunction(): void
-    {
-        $this->authorize('update', $this->site);
-
-        if (! ($this->site->server?->isDigitalOceanFunctionsHost() ?? false)) {
-            $this->toastError(__('This site is not a serverless function.'));
-
-            return;
-        }
-
-        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
-
-        $this->redirect(
-            \App\Support\Serverless\ServerlessWorkspaceUrl::journey($this->site),
-            navigate: true,
-        );
-    }
-
-    /**
      * Recent SiteDeployment rows that carry structured phase_results
      * (i.e. went through the new DeployPhaseRunner). Used by the
      * settings.blade.php "Recent deployments" panel so the view stays

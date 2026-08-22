@@ -29,7 +29,6 @@ use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Support\Serverless\ServerlessWorkspaceUrl;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
@@ -71,16 +70,6 @@ class WorkspaceOverview extends Component
         $this->bootWorkspace($server);
 
         // A serverless function is not a server — the DO Functions namespace
-        // host is an implementation detail. Redirect to the function
-        // workspace (or deploy journey when it never went live). After the
-        // function is deleted the leftover host has no site: land on the
-        // Serverless index, never BYO Servers chrome (that used to bounce
-        // show ↔ overview on Lazy hydrate).
-        $serverlessUrl = ServerlessWorkspaceUrl::forHost($server);
-        if ($serverlessUrl !== null) {
-            return $this->redirect($serverlessUrl);
-        }
-
         // Same story for dply Edge + dply Cloud synthetic hosts — neither
         // has a VM, SSH, metrics, or anything else a "server overview"
         // would surface. Redirect to the first site's workspace (single
