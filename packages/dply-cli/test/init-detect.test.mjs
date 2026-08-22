@@ -5,6 +5,7 @@ import {
   envKeyNames,
   filterUploadPaths,
   humanBytes,
+  manifestKind,
   proposeName,
   rankKinds,
   slug,
@@ -163,4 +164,23 @@ test('humanBytes rounds to something a person can read', () => {
   assert.equal(humanBytes(2048), '2 KB');
   assert.equal(humanBytes(5 * 1024 * 1024), '5 MB');
   assert.equal(humanBytes(3 * 1024 ** 3), '3.0 GB');
+});
+
+test('manifestKind reads a declared kind from a dply manifest', () => {
+  assert.equal(manifestKind('kind: serverless\nruntime: php\n'), 'serverless');
+  assert.equal(manifestKind('runtime: php\nkind: cloud\n'), 'cloud');
+  assert.equal(manifestKind('kind: "edge"'), 'edge');
+  assert.equal(manifestKind("kind: 'vm'  # a server we own"), 'vm');
+});
+
+test('manifestKind ignores a kind that is not top-level', () => {
+  // An indented `kind:` belongs to some nested block, not to the site.
+  assert.equal(manifestKind('processes:\n  - kind: serverless\n'), null);
+});
+
+test('manifestKind ignores comments and unknown values', () => {
+  assert.equal(manifestKind('# kind: serverless\nruntime: php'), null);
+  assert.equal(manifestKind('kind: lambda'), null);
+  assert.equal(manifestKind('runtime: php'), null);
+  assert.equal(manifestKind(''), null);
 });

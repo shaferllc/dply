@@ -237,3 +237,34 @@ export function envKeyNames(contents) {
     .map((line) => line.replace(/^export\s+/, '').split('=')[0].trim())
     .filter((key) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key));
 }
+
+/**
+ * The `kind:` a repository declares in its dply manifest.
+ *
+ * Deliberately a dumb line-scan rather than a YAML parser: this only reads one
+ * top-level scalar to pre-answer a menu, the server validates the manifest
+ * properly on every deploy, and adding a YAML dependency to a package that has
+ * had none for its whole life is a poor trade for that.
+ *
+ * @param {string} contents
+ * @returns {string|null}
+ */
+export function manifestKind(contents) {
+  for (const line of String(contents).split(/\r?\n/)) {
+    // Top-level only: an indented `kind:` belongs to some nested block.
+    if (/^\s/.test(line) || line.trim().startsWith('#')) {
+      continue;
+    }
+
+    const match = /^kind\s*:\s*(.+?)\s*(?:#.*)?$/.exec(line);
+    if (! match) {
+      continue;
+    }
+
+    const value = match[1].replace(/^["']|["']$/g, '').trim().toLowerCase();
+
+    return ['vm', 'cloud', 'edge', 'serverless'].includes(value) ? value : null;
+  }
+
+  return null;
+}

@@ -22,7 +22,7 @@ import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { ApiClient } from './api.mjs';
-import { defaultBaseUrl, readGlobalConfig, readSiteLink, writeSiteLink } from './config.mjs';
+import { defaultBaseUrl, instanceKey, listInstances, readGlobalConfig, readSiteLink, writeSiteLink } from './config.mjs';
 import { followSiteDeployment } from './deploy-follow.mjs';
 import { c, info, ok, warn } from './print.mjs';
 import { isInteractive, pickRow } from './pick.mjs';
@@ -31,6 +31,7 @@ import {
   envKeyNames,
   filterUploadPaths,
   humanBytes,
+  manifestKind,
   proposeName,
   rankKinds,
 } from './init-detect.mjs';
@@ -70,16 +71,24 @@ export async function init(_args, flags) {
   const client = await requireClientForInit(flags, noPrompt);
   const baseUrl = client.baseUrl;
 
-  // Already linked? init becomes the one command you can always type.
+  // Capabilities FIRST, before a single question. An instance that cannot
+  // create anything should say so immediately — asking someone to answer
+  // prompts and only then telling them the whole thing is impossible is the
+  // worst possible ordering, and it is the one this had.
+  const capabilities = await fetchCapabilities(client, baseUrl);
+
   const linked = await readSiteLink(cwd);
   if (linked && ! flags.force) {
-    const handled = await handleLinkedFolder(client, linked, { noPrompt, flags });
+    const handled = await handleLinkedFolder(client, linked, capabilities, { noPrompt, flags });
     if (handled) {
       return;
     }
   }
 
-  const capabilities = await fetchCapabilities(client, baseUrl);
+  // Nothing here can be created — say it before the menu, not after it.
+  if (! canCreateAnything(capabilities)) {
+    return explainNoCreateHere(capabilities, client, { noPrompt });
+  }
 
   const kind = await chooseKind(cwd, capabilities, { flags, noPrompt });
   if (kind === null) {
@@ -103,6 +112,49 @@ export async function init(_args, flags) {
   }
 
   await initServerless(client, cwd, capabilities, { flags, noPrompt, assumeYes });
+}
+
+/**
+ * Every path out of "this instance cannot create anything", in one place —
+ * reached before any question is asked.
+ */
+async function explainNoCreateHere(capabilities, client, { noPrompt }) {
+  const host = instanceKey(client.baseUrl);
+
+  info('');
+  if (capabilities.unsupported) {
+    warn(`${host} is running a dply version without CLI site creation.`);
+  } else {
+    warn(`Creating sites from the CLI is switched off on ${host}.`);
+    const flag = Object.values(capabilities.kinds ?? {})
+      .map((kind) => kind?.cli_create_flag)
+      .find(Boolean);
+    if (flag) {
+      info(c.dim(`  An operator can enable it with ${c.cyan(`${flag}=true`)}, then \`php artisan config:clear\`.`));
+    }
+  }
+
+  info(c.dim(`  Create the site in the dashboard, then run ${c.cyan('dply link')} here.`));
+  info(c.dim(`  ${c.cyan('dply deploy')} works normally once linked.`));
+
+  const other = (await listInstances()).filter((row) => ! row.active);
+  if (other.length > 0) {
+    info('');
+    info(c.dim(`  Other instances you are signed in to: ${other.map((row) => row.key).join(', ')}`));
+    info(c.dim(`  Switch with ${c.cyan('dply use <name>')}.`));
+  }
+
+  if (! noPrompt && capabilities.kinds && Object.keys(capabilities.kinds).length === 0) {
+    return;
+  }
+}
+
+/**
+ * True when this instance can create nothing at all from the CLI — an older
+ * dply, or one with every create surface switched off.
+ */
+function canCreateAnything(capabilities) {
+  return Object.values(capabilities?.kinds ?? {}).some((kind) => kind?.cli_create);
 }
 
 /* ------------------------------------------------------------------ auth */
@@ -149,11 +201,11 @@ async function fetchCapabilities(client, baseUrl) {
     return response?.data ?? {};
   } catch (err) {
     if (err?.status === 404) {
-      throw exit(
-        `\`dply init\` needs a newer dply instance — ${baseUrl} does not support CLI site creation yet.\n`
-        + '`dply link` and `dply deploy` work against it as before.',
-        2,
-      );
+      // An instance older than this endpoint. Not fatal: a linked folder can
+      // still be inspected and deployed here, and creating is what degrades.
+      // Erroring outright would make `dply init` useless against every
+      // instance that has not been upgraded yet.
+      return { unsupported: true, baseUrl, kinds: {} };
     }
     if (err?.status === 403) {
       throw exit('This token cannot read instance capabilities. Run `dply auth refresh` to re-approve it.', 2);
@@ -165,10 +217,33 @@ async function fetchCapabilities(client, baseUrl) {
 
 /* ------------------------------------------------------- already linked */
 
-async function handleLinkedFolder(client, linked, { noPrompt, flags }) {
+async function handleLinkedFolder(client, linked, capabilities, { noPrompt, flags }) {
   const siteId = linked.link?.siteId;
   if (! siteId) {
     return false;
+  }
+
+  // A link records the instance its site lives on. Before blaming the site for
+  // being missing, check whether we are simply looking on the wrong one — a
+  // token is per-instance, so a folder linked on one install is invisible from
+  // another, and "no longer exists" is a badly wrong thing to tell someone
+  // whose site is fine.
+  const linkedHost = instanceKey(linked.link.baseUrl ?? client.baseUrl);
+  const activeHost = instanceKey(client.baseUrl);
+
+  if (linked.link.baseUrl && linkedHost !== activeHost) {
+    warn(`This folder is linked to a site on ${c.bold(linkedHost)}, but you are on ${c.bold(activeHost)}.`);
+    info(c.dim(`  Switch back with ${c.cyan(`dply use ${linked.link.baseUrl}`)} to deploy it.`));
+    info('');
+
+    if (noPrompt) {
+      throw exit('Pass --force to create a new site here instead.', 2);
+    }
+
+    const answer = await ask(`Create a separate site for this folder on ${activeHost}? [y/N] `);
+
+    // "no" means they wanted the other instance — nothing more to do here.
+    return ! /^y(es)?$/i.test(answer.trim());
   }
 
   let site = null;
@@ -178,9 +253,19 @@ async function handleLinkedFolder(client, linked, { noPrompt, flags }) {
     if (err?.status === 404) {
       warn('This folder is linked to a site that no longer exists (or belongs to another organization).');
       info(c.dim(`Linked id: ${siteId}`));
+
       if (noPrompt) {
         throw exit('Pass --force to create a new site here.', 2);
       }
+
+      // Only offer to create if this instance can actually create something;
+      // otherwise the answer leads nowhere and the question was a waste.
+      if (! canCreateAnything(capabilities)) {
+        info(c.dim(`${instanceKey(client.baseUrl)} cannot create sites from the CLI — use \`dply link\` to attach an existing one.`));
+
+        return true;
+      }
+
       const answer = await ask('Create a new site for this folder? [y/N] ');
 
       return ! /^y(es)?$/i.test(answer.trim());
@@ -202,14 +287,15 @@ async function handleLinkedFolder(client, linked, { noPrompt, flags }) {
     return true;
   }
 
-  const choice = await pickRow(
-    [
-      { id: 'deploy', name: 'Deploy this folder now' },
-      { id: 'open', name: 'Open it in the dashboard' },
-      { id: 'new', name: 'Create another site for this folder' },
-    ],
-    { title: 'This folder is already linked.' },
-  );
+  const options = [
+    { id: 'deploy', name: 'Deploy this folder now' },
+    { id: 'open', name: 'Open it in the dashboard' },
+  ];
+  if (canCreateAnything(capabilities)) {
+    options.push({ id: 'new', name: 'Create another site for this folder' });
+  }
+
+  const choice = await pickRow(options, { title: 'This folder is already linked.' });
 
   if (choice?.id === 'deploy') {
     const { deploy } = await import('./commands.mjs');
@@ -231,7 +317,15 @@ async function handleLinkedFolder(client, linked, { noPrompt, flags }) {
 /* -------------------------------------------------------------- the menu */
 
 async function chooseKind(cwd, capabilities, { flags, noPrompt }) {
-  const wanted = String(flags.kind ?? '').trim().toLowerCase();
+  // A repository that declares what it wants should not be asked. --kind still
+  // wins, so the manifest is a default rather than a lock.
+  const declared = declaredKind(cwd);
+  const wanted = String(flags.kind ?? declared ?? '').trim().toLowerCase();
+
+  if (declared && ! flags.kind) {
+    info(c.dim(`dply.yaml declares ${c.bold(declared)} — using that.`));
+  }
+
   if (wanted) {
     if (! ['vm', 'cloud', 'edge', 'serverless'].includes(wanted)) {
       throw exit(`Unknown --kind "${wanted}". Use vm, cloud, edge, or serverless.`, 2);
@@ -273,11 +367,15 @@ async function chooseKind(cwd, capabilities, { flags, noPrompt }) {
  */
 async function openWizardFor(kind, capabilities, cwd, { noPrompt }) {
   const capability = capabilities.kinds?.[kind] ?? {};
-  const url = capability.create_url;
+  const base = String(capabilities.baseUrl ?? capabilities.instance?.url ?? '').replace(/\/+$/, '');
+  const url = capability.create_url ?? (base ? `${base}/${kind === 'vm' ? 'servers' : kind}/create` : null);
 
   info('');
 
-  if (capability.cli_create_supported && capability.cli_create === false) {
+  if (capabilities.unsupported) {
+    warn(`${capabilities.baseUrl ?? 'This instance'} does not support creating sites from the CLI yet.`);
+    info(c.dim('  `dply link` and `dply deploy` work against it as before.'));
+  } else if (capability.cli_create_supported && capability.cli_create === false) {
     warn(`Creating ${kind} sites from the CLI is switched off on this dply instance.`);
     if (capability.cli_create_flag) {
       info(c.dim(`  An operator can enable it with ${c.cyan(`${capability.cli_create_flag}=true`)}, then \`php artisan config:clear\`.`));
@@ -1276,6 +1374,32 @@ async function offerCleanup(client, site, cwd, { noPrompt }) {
 }
 
 /* --------------------------------------------------------------- helpers */
+
+/**
+ * `kind:` from the repository's dply manifest, if it has one.
+ *
+ * @param {string} cwd
+ * @returns {string|null}
+ */
+function declaredKind(cwd) {
+  for (const name of ['dply.yaml', 'dply.yml']) {
+    const path = join(cwd, name);
+    if (! existsSync(path)) {
+      continue;
+    }
+
+    try {
+      const found = manifestKind(readFileSync(path, 'utf8'));
+      if (found) {
+        return found;
+      }
+    } catch {
+      // An unreadable manifest is the deploy's problem to report, not init's.
+    }
+  }
+
+  return null;
+}
 
 function readFolder(cwd) {
   let files = [];

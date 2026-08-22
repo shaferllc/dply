@@ -47,6 +47,24 @@ one, and `dply logout` signs out of the active instance only.
 Every approved device shows up under **CLI authentications**. **Revoke** a session to immediately invalidate that machine's token.
 
 ## Starting a project
+### Declaring the kind in `dply.yaml`
+
+A repository can say what it wants to be, and `dply init` stops asking:
+
+```yaml
+kind: serverless      # vm | cloud | edge | serverless
+runtime: php
+```
+
+`kind:` is read **only when creating** the site. A deploy never migrates an
+existing site from one product to another because a file changed — that is not
+something a config edit should be able to do silently. `--kind` on the command
+line still wins over the file.
+
+`dply deploy` in a folder that is not linked to anything now offers to run
+`dply init` rather than erroring: deploying and creating are different verbs,
+but "deploy this folder" is a reasonable thing to type before the site exists.
+
 
 `dply init` is the one command for a folder that is not on dply yet: it signs you
 in if you are not, works out what the folder is, creates the site, and follows

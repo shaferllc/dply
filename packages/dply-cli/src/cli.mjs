@@ -237,21 +237,69 @@ async function runLinkedDeploy(argv) {
       return 0;
     }
 
-    return siteCommands.siteCommand(['deploy', ...args], flags);
+    // Not via siteCommand: that path requires a BYO link and would refuse a
+    // correctly linked function with "No BYO site specified".
+    const { deployServerlessSite } = await import('./deploy-source.mjs');
+
+    return deployServerlessSite(client, ctx.siteId, flags);
   }
 
   if (flags.site) {
     return siteCommands.siteCommand(['deploy', ...args], flags);
   }
 
-  throw linkedDeployError(link);
+  return deployUnlinked(args, flags);
+}
+
+/**
+ * `dply deploy` in a folder that is not linked to anything.
+ *
+ * Deploying and creating are different verbs, but "deploy this folder" is a
+ * reasonable thing to type before a site exists — especially when the repo
+ * already declares what it wants in dply.yaml. So rather than erroring at
+ * someone who is one step away, hand them to `dply init`, which creates the
+ * site, links the folder, and deploys it.
+ */
+async function deployUnlinked(args, flags) {
+  const link = await readSiteLink();
+
+  if (link) {
+    throw linkedDeployError(link);
+  }
+
+  const noPrompt = Boolean(flags['no-prompt'] || flags.quiet || flags.json || process.env.DPLY_NO_PROMPT)
+    || ! (process.stdin.isTTY && process.stdout.isTTY);
+
+  if (noPrompt) {
+    throw linkedDeployError(null);
+  }
+
+  info('');
+  info('This folder is not linked to a dply site yet.');
+  info(c.dim('`dply init` creates one, links the folder, and deploys it.'));
+  info('');
+
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  let answer;
+  try {
+    answer = (await rl.question('Set it up now? [Y/n] ')).trim();
+  } finally {
+    rl.close();
+  }
+
+  if (/^n(o)?$/i.test(answer)) {
+    throw linkedDeployError(null);
+  }
+
+  return initCommand.init(args, flags);
 }
 
 function linkedDeployError(link) {
   const err = new Error(
     link
-      ? 'Linked site has no product type. Re-link with `dply link --byo <id>` or `dply link --edge <id>`.'
-      : 'No linked site. Run `dply link` in your repo, or `dply site deploy --site <id>` / `dply edge deploy --site <id>`.',
+      ? 'Linked site has no product type. Re-link with `dply link`.'
+      : 'No linked site. Run `dply init` to create one, `dply link` to attach an existing one, or pass --site <id>.',
   );
   err.exitCode = 2;
 
