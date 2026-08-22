@@ -121,3 +121,46 @@ test('the stored file keeps the multi-instance shape', async () => {
   assert.equal(raw.instances['dply.dev'].token, 'tok');
   assert.ok(raw.instances['dply.dev'].savedAt);
 });
+
+test('a linked folder deploys with the credential for ITS instance, not the active one', async () => {
+  const { mod, home } = await withHome({ token: 'tok-local', baseUrl: 'https://dply.test' });
+  await mod.writeGlobalConfig({ token: 'tok-live', baseUrl: 'https://dply.io' });
+
+  // Active is dply.io; the folder is linked to a site on dply.test.
+  const repo = join(home, 'repo', '.dply');
+  mkdirSync(repo, { recursive: true });
+  writeFileSync(join(repo, 'site.json'), JSON.stringify({ siteId: 's1', baseUrl: 'https://dply.test' }));
+
+  const cwd = process.cwd();
+  process.chdir(join(home, 'repo'));
+  try {
+    const ctx = await mod.resolveContext();
+
+    assert.equal(ctx.baseUrl, 'https://dply.test');
+    // Sending tok-live here is what produced a bare "Unauthorized".
+    assert.equal(ctx.token, 'tok-local');
+  } finally {
+    process.chdir(cwd);
+  }
+});
+
+test('a link to an instance you are not signed in to says so, by name', async () => {
+  const { mod, home } = await withHome({ token: 'tok-live', baseUrl: 'https://dply.io' });
+
+  const repo = join(home, 'repo', '.dply');
+  mkdirSync(repo, { recursive: true });
+  writeFileSync(join(repo, 'site.json'), JSON.stringify({ siteId: 's1', baseUrl: 'https://dply.test' }));
+
+  const cwd = process.cwd();
+  process.chdir(join(home, 'repo'));
+  try {
+    await assert.rejects(
+      () => mod.resolveContext(),
+      (err) => /linked to a site on dply\.test/.test(err.message)
+        && /currently on dply\.io/.test(err.message)
+        && /dply use https:\/\/dply\.test/.test(err.message),
+    );
+  } finally {
+    process.chdir(cwd);
+  }
+});

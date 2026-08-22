@@ -314,26 +314,52 @@ export async function writeSiteLink(link, rootDir = process.cwd()) {
  * @param {{ siteFlag?: string }} [opts]
  */
 export async function resolveContext(opts = {}) {
-  const global = await readGlobalConfig();
-  if (!global?.token) {
-    throw withCode(new Error('Not logged in. Run `dply login --token <token>` first.'), 'EAUTH', 2);
-  }
+  const store = await readInstanceStore();
+  const active = await readGlobalConfig();
 
   let siteId = opts.siteFlag || process.env.DPLY_EDGE_SITE || null;
-  let baseUrl = global.baseUrl || defaultBaseUrl();
+  let baseUrl = active?.baseUrl || defaultBaseUrl();
 
   const linkResult = await readSiteLink();
   if (linkResult) {
     siteId ??= linkResult.link.siteId;
+    // A linked folder names the instance its site lives on, which is what
+    // makes it portable: the same repo can be checked out on a machine
+    // pointed somewhere else and still deploy to the right place.
     if (linkResult.link.baseUrl) baseUrl = linkResult.link.baseUrl;
   }
 
+  // …and the credential has to follow the URL. A token is minted by one
+  // instance and rejected by every other, so pairing the ACTIVE token with the
+  // LINK's base URL — which is what this used to do — sends the wrong
+  // credential the moment those two differ, and answers "Unauthorized" without
+  // saying why.
+  const key = instanceKey(baseUrl);
+  const forBaseUrl = store.instances[key];
+  const credentials = forBaseUrl ?? (instanceKey(active?.baseUrl ?? '') === key ? active : null);
+
+  if (!credentials?.token) {
+    if (!active?.token) {
+      throw withCode(new Error('Not logged in. Run `dply login`.'), 'EAUTH', 2);
+    }
+
+    throw withCode(
+      new Error(
+        `This folder is linked to a site on ${key}, but you are not signed in to it.\n`
+        + `You are currently on ${instanceKey(active.baseUrl)}.\n`
+        + `Sign in with \`dply use ${baseUrl}\`, or re-link this folder with \`dply link\`.`,
+      ),
+      'EAUTH',
+      2,
+    );
+  }
+
   return {
-    token: global.token,
+    token: credentials.token,
     baseUrl,
     siteId,
     link: linkResult,
-    global,
+    global: credentials,
   };
 }
 

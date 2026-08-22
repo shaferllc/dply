@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Modules\Serverless\Services\ServerlessAssetPublisher;
 use App\Modules\Serverless\Services\ServerlessRoutingResolver;
+use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,9 +40,43 @@ class ServerlessFunctionProxyController extends Controller
             ->where('meta->serverless->proxy_slug', $slug)
             ->first();
 
-        abort_if($site === null, 404, 'No serverless function answers at this address.');
+        if ($site === null) {
+            return $this->noFunctionHere($request);
+        }
 
         return $this->proxyForSite($request, $site, $path);
+    }
+
+    /**
+     * A request landed on a function address nothing answers at.
+     *
+     * The generic 404 page is dply's own — app header, nav, "quick links" to
+     * Servers and Sites — which is the wrong thing to show someone who typed
+     * an app's URL and has never heard of dply. This says what actually
+     * happened, in the language of the person looking at it.
+     *
+     * Still a 404: the resource genuinely is not there, so crawlers and uptime
+     * checks are told the truth. Only the page differs.
+     */
+    private function noFunctionHere(Request $request): SymfonyResponse
+    {
+        // A JSON/API caller wants a body it can parse, not a page.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'No serverless function answers at this address.',
+                'host' => $request->getHost(),
+            ], 404);
+        }
+
+        return response()->view('errors.serverless-not-found', [
+            'host' => $request->getHost(),
+            'brand' => (string) config('app.name', 'dply'),
+            'homeUrl' => (string) config('app.url', '/'),
+            // Only hint at the dashboard when the address is one this instance
+            // hands out — on a customer's own custom domain that advice would
+            // be noise.
+            'isOwnerHint' => ServerlessTestingDomains::zoneForHost($request->getHost()) !== null,
+        ], 404);
     }
 
     /**
