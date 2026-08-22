@@ -309,22 +309,35 @@ export function parse(tokens) {
   const args = [];
   const flags = {};
 
+  // Repeated flags collect into an array — `--header 'A: 1' --header 'B: 2'`
+  // and `--param K=v --param J=w` are documented as repeatable, and last-wins
+  // dropped every value but the last without saying so.
+  const put = (name, value) => {
+    if (! Object.hasOwn(flags, name)) {
+      flags[name] = value;
+
+      return;
+    }
+
+    flags[name] = Array.isArray(flags[name]) ? [...flags[name], value] : [flags[name], value];
+  };
+
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (token.startsWith('--')) {
       const eq = token.indexOf('=');
       if (eq !== -1) {
-        flags[token.slice(2, eq)] = token.slice(eq + 1);
+        put(token.slice(2, eq), token.slice(eq + 1));
 
         continue;
       }
       const name = token.slice(2);
       const next = tokens[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
-        flags[name] = next;
+        put(name, next);
         i++;
       } else {
-        flags[name] = true;
+        put(name, true);
       }
 
       continue;
@@ -333,10 +346,10 @@ export function parse(tokens) {
       const name = token.slice(1);
       const next = tokens[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
-        flags[name] = next;
+        put(name, next);
         i++;
       } else {
-        flags[name] = true;
+        put(name, true);
       }
 
       continue;

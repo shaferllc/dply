@@ -144,3 +144,58 @@ it('404s for a site that is not a function', function () {
         ->getJson("/api/v1/serverless/sites/{$vmSite->id}/platform")
         ->assertNotFound();
 });
+
+it('reports the stored key id and whether the host accepts it', function () {
+    [$site, $token] = functionSiteWithToken();
+
+    Http::fake(['*' => Http::response([['name' => 'checkout']], 200)]);
+
+    $this->withToken($token)
+        ->getJson("/api/v1/serverless/sites/{$site->id}/credentials")
+        ->assertOk()
+        ->assertJsonPath('data.namespace', 'fn-namespace')
+        // Only the id half — the secret is the credential.
+        ->assertJsonPath('data.key_id', 'key-id')
+        ->assertJsonPath('data.ok', true)
+        ->assertJsonPath('data.actions', 1);
+});
+
+it('stores a rotated key once the host accepts it', function () {
+    [$site, $token] = functionSiteWithToken(['serverless.read', 'serverless.write']);
+
+    Http::fake(['*' => Http::response([['name' => 'checkout']], 200)]);
+
+    $this->withToken($token)
+        ->putJson("/api/v1/serverless/sites/{$site->id}/credentials", ['access_key' => 'new-id:new-secret'])
+        ->assertOk()
+        ->assertJsonPath('data.key_id', 'new-id');
+
+    expect($site->server->fresh()->meta['digitalocean_functions']['access_key'])->toBe('new-id:new-secret');
+});
+
+it('keeps the old key when the host rejects the new one', function () {
+    [$site, $token] = functionSiteWithToken(['serverless.read', 'serverless.write']);
+
+    Http::fake(['*' => Http::response(['error' => 'unauthorized'], 401)]);
+
+    $this->withToken($token)
+        ->putJson("/api/v1/serverless/sites/{$site->id}/credentials", ['access_key' => 'bad-id:bad-secret'])
+        ->assertStatus(422);
+
+    expect($site->server->fresh()->meta['digitalocean_functions']['access_key'])->toBe('key-id:key-secret');
+});
+
+it('rejects a key that is not id:secret, and needs serverless.write', function () {
+    [$site, $writeToken] = functionSiteWithToken(['serverless.read', 'serverless.write']);
+    [$readSite, $readToken] = functionSiteWithToken(['serverless.read']);
+
+    Http::fake(['*' => Http::response([], 200)]);
+
+    $this->withToken($writeToken)
+        ->putJson("/api/v1/serverless/sites/{$site->id}/credentials", ['access_key' => 'no-colon'])
+        ->assertStatus(422);
+
+    $this->withToken($readToken)
+        ->putJson("/api/v1/serverless/sites/{$readSite->id}/credentials", ['access_key' => 'a:b'])
+        ->assertForbidden();
+});

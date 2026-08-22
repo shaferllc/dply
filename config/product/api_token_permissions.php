@@ -212,6 +212,21 @@ return [
         // Invoking runs the customer's code and bills an invocation, so it is
         // its own ability rather than folded into serverless.read.
         'serverless.invoke' => 'serverless.invoke',
+        'serverless.credentials.show' => 'serverless.read',
+        // Replacing the stored namespace key is a credential write.
+        'serverless.credentials.update' => 'serverless.write',
+        'serverless.workers.show' => 'serverless.read',
+        'serverless.workers.update' => 'serverless.write',
+        // Ticking the queue runs the customer's code, so it rides the same
+        // ability as a test invocation rather than the write scope.
+        'serverless.workers.tick' => 'serverless.invoke',
+        'serverless.schedule.show' => 'serverless.read',
+        'serverless.schedule.update' => 'serverless.write',
+        'serverless.schedule.tick' => 'serverless.invoke',
+        'serverless.runtime.show' => 'serverless.read',
+        // Limits, HTTP exposure, parameters, maintenance, warm start — and
+        // rotating the endpoint secret, which breaks every existing caller.
+        'serverless.runtime.update' => 'serverless.write',
     ],
 
     'categories' => [
@@ -392,6 +407,7 @@ return [
             'permissions' => [
                 ['ability' => 'serverless.read', 'label' => 'Read functions, invocations, and logs'],
                 ['ability' => 'serverless.invoke', 'label' => 'Send test requests at a function'],
+                ['ability' => 'serverless.write', 'label' => 'Update function runtime, credentials, workers, and schedule'],
             ],
         ],
         [

@@ -14,7 +14,9 @@
         __('cold start') => $invocation->init_time_ms,
     ], fn ($ms) => $ms !== null && $ms > 0);
 @endphp
-<li class="py-1.5 first:pt-0 last:pb-0">
+{{-- data-invocation-row: a stable hook for counting rows in tests (page size,
+     pagination) without matching on the styling. --}}
+<li data-invocation-row class="py-1.5 first:pt-0 last:pb-0">
     <details>
         <summary @class([
             'flex flex-wrap items-center gap-x-2 gap-y-1 list-none',

@@ -11,12 +11,16 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
+use App\Modules\Serverless\Services\ServerlessBackgroundTasks;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * BACKGROUND > Schedule.
@@ -31,6 +35,10 @@ use Livewire\Component;
 class Schedule extends Component
 {
     use DispatchesToastNotifications;
+    use WithPagination;
+
+    /** History rows per page. A dense table in a workspace card, not a feed. */
+    private const TICKS_PER_PAGE = 15;
 
     public Server $server;
 
@@ -55,11 +63,13 @@ class Schedule extends Component
 
         $this->server = $server;
         $this->site = $site;
-        $serverless = is_array($site->meta['serverless'] ?? null) ? $site->meta['serverless'] : [];
-        // Read the dedicated `scheduler_enabled` flag; fall back to the legacy
-        // bundled `background_enabled` so sites configured before the split
-        // continue to honor the operator's previous choice.
-        $this->scheduler_enabled = (bool) ($serverless['scheduler_enabled'] ?? $serverless['background_enabled'] ?? false);
+        $this->scheduler_enabled = $this->tasks()->enabled($site, 'schedule');
+    }
+
+    /** The scheduler toggle — shared with the Workers page's queue engine. */
+    private function tasks(): ServerlessBackgroundTasks
+    {
+        return app(ServerlessBackgroundTasks::class);
     }
 
     /**
@@ -71,20 +81,7 @@ class Schedule extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-
-        // Write the new dedicated flag. Keep the legacy `background_enabled`
-        // in sync (true iff either side is on) so any caller that still reads
-        // the old bundled flag sees the correct "at least one task ticking"
-        // state. Drop the legacy fallback once nothing reads it.
-        $serverless['scheduler_enabled'] = $value;
-        $queueOn = (bool) ($serverless['queue_worker_enabled'] ?? $serverless['background_enabled'] ?? false);
-        $serverless['background_enabled'] = $value || $queueOn;
-
-        $meta['serverless'] = $serverless;
-        $this->site->update(['meta' => $meta]);
-        $this->site->refresh();
+        $this->tasks()->setEnabled($this->site, 'schedule', $value);
 
         $this->toastSuccess($value
             ? __('Scheduler enabled — dply ticks the function every minute.')
@@ -134,25 +131,34 @@ class Schedule extends Component
      */
     public function showTick(string $at): void
     {
-        $this->selectedTick = $this->tickHistory()
-            ->first(fn (array $entry): bool => (string) ($entry['at'] ?? '') === $at);
+        // Resolved by timestamp against the table, not by scanning the page
+        // being shown — the row may live on any page of the history.
+        $this->selectedTick = $this->ticksQuery()
+            ->where('created_at', Carbon::parse($at))
+            ->first()
+            ?->toTickEntry();
     }
 
     /**
-     * The site's recent `schedule` ticks, newest-first, in the legacy
-     * tick-history array shape the view consumes.
+     * Every `schedule` tick for this site, newest first.
      *
+     * @return Builder<FunctionInvocation>
      */
-    private function tickHistory(): Collection
+    private function ticksQuery(): Builder
     {
         return FunctionInvocation::query()
             ->where('site_id', $this->site->id)
             ->where('source', FunctionInvocation::SOURCE_TICK)
             ->where('task', 'schedule')
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get()
-            ->map(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
+            ->orderByDesc('created_at');
+    }
+
+    /** One page of history, in the tick-entry array shape the view consumes. */
+    private function tickHistory(): LengthAwarePaginator
+    {
+        return $this->ticksQuery()
+            ->paginate(self::TICKS_PER_PAGE, ['*'], 'tickPage')
+            ->through(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
     }
 
     public function closeTick(): void
@@ -167,6 +173,11 @@ class Schedule extends Component
         // The Schedule page only cares about scheduler-task ticks. Queue ticks
         // appear on Workers; keep the two views' histories independent.
         $scheduleHistory = $this->tickHistory();
+        // The banner + "latest output" panel describe the newest tick, which
+        // is only on page 1 — read it from the query, not from the page shown.
+        $latest = $scheduleHistory->currentPage() === 1
+            ? $scheduleHistory->first()
+            : $this->ticksQuery()->first()?->toTickEntry();
 
         return view('livewire.sites.schedule', [
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
@@ -176,11 +187,12 @@ class Schedule extends Component
             'laravel_tab' => 'commands',
             'section' => 'schedule',
             'scheduleHistory' => $scheduleHistory,
-            'lastTickAt' => $scheduleHistory->first()['at'] ?? null,
+            'latestTick' => $latest,
+            'lastTickAt' => $latest['at'] ?? null,
             // Auto-detect the "stale secret" symptom in the most recent tick so
             // the page can surface a specific remedy (redeploy) rather than
             // making the operator parse the function's error body themselves.
-            'secretMismatchDetected' => $this->detectSecretMismatch($scheduleHistory->first()),
+            'secretMismatchDetected' => $this->detectSecretMismatch($latest),
         ]);
     }
 

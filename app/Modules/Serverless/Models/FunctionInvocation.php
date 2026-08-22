@@ -161,7 +161,10 @@ class FunctionInvocation extends Model
         // Filtered on read as well as on capture: rows written before the
         // sentinel pair was recognised are already in the database, and they
         // would otherwise keep burying real output in the Runtime tab.
-        return ActivationLogLines::meaningful($this->log_lines);
+        // Null is a real state, not a bug: an async row is written before its
+        // result lands, and older rows predate the column. Every caller here
+        // wants "no lines", not a TypeError halfway through rendering a list.
+        return ActivationLogLines::meaningful($this->log_lines ?? []);
     }
 
     /**

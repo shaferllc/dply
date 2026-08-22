@@ -411,3 +411,23 @@ test('workers page shows dns provisioning failure banner', function () {
         // Remediation copy now names what to check, not where to look.
         ->assertSee('Check the zone/token in DigitalOcean, then retry.');
 });
+test('schedule wears the same merged chrome as workers', function () {
+    // The pair are twins: one outer card with hairline strips, no stacked
+    // floating cards and no hero. Schedule drifted back to stacked cards
+    // once; this pins it to whatever Workers does.
+    $user = actingOrgOwner();
+    [$server, $site] = makeFunctionsSite($user);
+
+    $html = fn (string $component): string => Livewire::actingAs($user)
+        ->test($component, ['server' => $server, 'site' => $site])
+        ->html();
+
+    $schedule = $html(Schedule::class);
+    $workers = $html(Workers::class);
+
+    expect(substr_count($schedule, 'dply-card'))
+        ->toBe(substr_count($workers, 'dply-card'), 'Schedule should render the same number of cards as Workers.')
+        ->and($schedule)->not->toContain('data-hero-card')
+        // `space-y-6` between sections is the stacked-card layout it left.
+        ->and($schedule)->not->toContain('space-y-6');
+});

@@ -51,6 +51,17 @@ Creating new tokens may require a **Pro** subscription when your instance enable
 | `GET` | `/api/v1/serverless/sites/{site}/platform` | `serverless.read` |
 | `GET` | `/api/v1/serverless/sites/{site}/platform/schedules` | `serverless.read` |
 | `POST` | `/api/v1/serverless/sites/{site}/invoke` | `serverless.invoke` |
+| `GET` | `/api/v1/serverless/sites/{site}/credentials` | `serverless.read` |
+| `PUT` | `/api/v1/serverless/sites/{site}/credentials` | `serverless.write` |
+| `GET` | `/api/v1/serverless/sites/{site}/workers` | `serverless.read` |
+| `PUT` `POST` `PATCH` `DELETE` | `/api/v1/serverless/sites/{site}/workers` | `serverless.write` |
+| `POST` | `/api/v1/serverless/sites/{site}/workers/tick` | `serverless.invoke` |
+| `GET` | `/api/v1/serverless/sites/{site}/schedule` | `serverless.read` |
+| `PUT` | `/api/v1/serverless/sites/{site}/schedule` | `serverless.write` |
+| `POST` | `/api/v1/serverless/sites/{site}/schedule/tick` | `serverless.invoke` |
+| `GET` | `/api/v1/serverless/sites/{site}/runtime` | `serverless.read` |
+| `PATCH` | `/api/v1/serverless/sites/{site}/runtime` | `serverless.write` |
+| `POST` | `/api/v1/serverless/sites/{site}/runtime/rotate-secret` | `serverless.write` |
 | `GET` | `/api/v1/servers/{server}/firewall` | `network.read` |
 | `POST` | `/api/v1/servers/{server}/firewall/apply` | `network.write` |
 | `GET` | `/api/v1/insights/summary` | `insights.read` |
@@ -83,6 +94,47 @@ function: `method`, `path`, `body`, `query`, and a `headers` object. The result
 includes the status code, duration, response excerpt, and log lines, and is
 stored as a `source=test` invocation. It runs customer code, so it sits behind
 its own `serverless.invoke` ability rather than `serverless.read`.
+
+`GET …/credentials` reports the namespace, API host, the **key id only**, and a
+live check of whether the host still accepts the stored key. `PUT` the same path
+with `{"access_key": "<key-id>:<secret>"}` to store a rotated key: it is verified
+against the host before it sticks, and the previous key is restored if the host
+rejects it.
+
+### Serverless workers
+
+`GET …/workers` returns `engine_enabled`, the last `queue` tick, and the worker
+list with each worker's derived status. `PUT` the same path with
+`{"enabled": bool}` to flip the queue engine; `POST` adds a worker
+(`name`, `command`, optional `concurrency` / `restart_policy` / `enabled`);
+`PATCH …/workers/{worker}` patches only the keys you send; `DELETE` removes one.
+A worker is addressed by id **or** by name. `POST …/workers/tick` fires one
+queue tick — it runs your code, so it needs `serverless.invoke`.
+
+### Serverless schedule
+
+`GET …/schedule` returns `enabled`, `total_ticks`, and a page of firing history
+(`?limit=`, `?failed=1`). `PUT` it with `{"enabled": bool}` to flip dply's
+minute-cadence scheduler tick; `POST …/schedule/tick` fires one now
+(`serverless.invoke` — it runs your code). The functions host's own cron
+triggers are a separate surface: `GET …/platform/schedules`.
+
+### Serverless runtime
+
+`GET …/runtime` returns the Runtime tab as data: `limits` (with
+`pending_redeploy`), `http` (web mode, secured, CORS), `parameters`,
+`log_forwarding` (provider + `token_set`, never the token), `maintenance`, and
+`keep_warm`. `PATCH` the same path with any subset of `memory_mb`,
+`timeout_ms`, `concurrency`, `logs_kb`, `web_mode`, `secured`,
+`provide_api_key`, `cors`, `parameters`, `parameters_final`, `log_forwarding`,
+`maintenance`, `keep_warm` — anything absent is left alone, except
+`parameters`, which replaces the map whole. Limits apply on the next deploy;
+HTTP settings are pushed to the live action, and the response's `applied` says
+which happened. `POST …/runtime/rotate-secret` replaces the endpoint secret
+(every existing caller starts getting 401s).
+
+A function's environment variables are not here — they are the shared site
+surface, `/api/v1/sites/{site}/env`.
 
 ### Notifications
 

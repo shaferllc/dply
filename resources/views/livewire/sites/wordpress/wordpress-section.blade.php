@@ -1,11 +1,15 @@
 <div class="space-y-6">
 
-    <x-hero-card
-        :eyebrow="__('Site')"
-        :title="__('WordPress')"
-        :description="__('Manage this WordPress install — run wp-cli commands, update plugins, themes and core, take database snapshots, switch the cron handler, and apply hardening defaults.')"
-        icon="globe-alt"
-    />
+    {{-- Identity header for the section: one card, sand strip, no floating hero
+         (the workspace shell no longer renders one for this section either). --}}
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-globe-alt"
+            :title="__('WordPress')"
+            :note="__('Run wp-cli commands, update plugins, themes and core, take database snapshots, switch the cron handler, and apply hardening defaults.')"
+        />
+    </section>
 
     @if (! $site->isWordPressDetected())
         <section class="dply-card overflow-hidden">

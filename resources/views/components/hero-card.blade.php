@@ -41,7 +41,10 @@
     $hasActions = trim(preg_replace('/<!--.*?-->/s', '', (string) $slot) ?? '') !== '';
 @endphp
 
-<section {{ $attributes->class(['dply-card overflow-hidden']) }}>
+{{-- data-hero-card marks the pre-merged-chrome layout: a floating hero above
+     the panel. Converted sections render one outer card instead, and tests
+     assert on this hook to catch a section slipping back out. --}}
+<section data-hero-card {{ $attributes->class(['dply-card overflow-hidden']) }}>
     <div @class([
         'p-4 sm:p-5' => ! $compact,
         'px-4 py-3 sm:px-5 sm:py-3.5' => $compact,

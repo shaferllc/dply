@@ -34,8 +34,6 @@ Thumbs.db
 .env.worker
 .env.*.local
 
-storage/blaze/traces/
-
 # refactor helper (local only)
 .dply-extract.py
 .defract-worktrees
@@ -48,7 +46,7 @@ storage/app/vultr-control-plane*.json
 frankenphp
 frankenphp-worker.php
 
-storage/blaze/traces/
+storage/blaze/
 storage/framework/lookout/
 
 # Coverage report from `composer test:coverage:clover`

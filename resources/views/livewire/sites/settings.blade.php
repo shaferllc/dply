@@ -1,5 +1,5 @@
 @php
-    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'logs', 'notifications', 'basic-auth', 'danger', 'worker-fleet'];
+    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'rails-stack', 'wordpress', 'logs', 'notifications', 'platform', 'backends', 'deploy', 'basic-auth', 'danger', 'worker-fleet'];
     $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>
@@ -185,15 +185,20 @@
                         @if ($functionsHost)
                             @include('livewire.sites.settings.partials.deploy-recipe')
                         @else
-                            @php
-                                $deployRedirect = route('sites.deployments.index', [$server, $site]);
-                            @endphp
-                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-6 text-sm text-brand-moss">
-                                {{ __('Deploy settings moved to Deployments, Repository, and Pipeline.') }}
-                                <a href="{{ $deployRedirect }}" wire:navigate class="ml-1 font-semibold text-brand-forest hover:underline">{{ __('Open Deployments') }}</a>
-                                <span class="text-brand-mist" aria-hidden="true"> · </span>
-                                <a href="{{ route('sites.pipeline', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Open Pipeline') }}</a>
-                            </div>
+                            <section class="dply-card min-w-0 overflow-hidden p-0">
+                                <x-workspace-panel-head
+                                    class="border-b border-brand-ink/10"
+                                    :icon="$sectionHeader['icon']"
+                                    :title="$sectionHeader['title']"
+                                    :note="$sectionDescription"
+                                />
+                                <div class="px-5 py-4 text-sm text-brand-moss sm:px-6">
+                                    {{ __('Deploy settings moved to Deployments, Repository, and Pipeline.') }}
+                                    <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="ml-1 font-semibold text-brand-forest hover:underline">{{ __('Open Deployments') }}</a>
+                                    <span class="text-brand-mist" aria-hidden="true"> · </span>
+                                    <a href="{{ route('sites.pipeline', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Open Pipeline') }}</a>
+                                </div>
+                            </section>
                         @endif
                     @elseif ($section === 'runtime')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
@@ -305,8 +310,6 @@
                                 <x-cli-snippet tone="stub" />
                             </div>
                         </section>
-                    @elseif ($section === 'environment')
-                        @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
                             <x-workspace-panel-head

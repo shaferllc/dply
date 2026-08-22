@@ -193,6 +193,18 @@ class Settings extends Show
             return;
         }
 
+        // The environment partial reads methods from ManagesSiteEnvironment,
+        // which lives on the SiteEnvironment component, not here — this section
+        // router can never render it. Send the URL where it actually works.
+        if ($section === 'environment') {
+            $this->redirect(route('sites.environment', [
+                'server' => $server,
+                'site' => $site,
+            ]), navigate: true);
+
+            return;
+        }
+
         // Serverless workspaces use the dedicated `sites.repository` Livewire
         // page (file browser, branch picker, connection panel) instead of
         // the legacy section-router config form. Catch back-compat links

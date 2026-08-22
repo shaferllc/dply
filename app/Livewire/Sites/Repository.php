@@ -265,6 +265,9 @@ class Repository extends Component
             // owns this site (held for env/resources, scanning, or scan failure).
             // It disappears the moment the first deploy lands.
             'showSetupTab' => $this->site->isInFirstDeploySetup() || $this->site->needsFirstDeploySetup(),
+            // Resolved up front: the no-repo branch below returns early, and the
+            // view reads $activeTab on every path (tablist + CLI footer).
+            'activeTab' => $this->activeTab(),
         ];
 
         // Embedded/locked hosts (the Deployments page) render eagerly — they
@@ -280,8 +283,7 @@ class Repository extends Component
             return view('livewire.sites.repository', $payload + $this->renderConnectionPayload($browser, $user));
         }
 
-        $activeTab = $this->activeTab();
-        $payload['activeTab'] = $activeTab;
+        $activeTab = $payload['activeTab'];
 
         if (! $lazyHost && ($activeTab === 'connection' || $activeTab === 'webhook')) {
             $this->primeConnectionRepositories();

@@ -1,6 +1,6 @@
 {{-- Standalone Workers page — merged chrome (no floating hero / stacked cards). --}}
 @php
-    $latestQueue = $queueHistory->first();
+    $latestQueue = $latestTick;
     $workerCommandPlaceholder = $site->isLaravelFrameworkDetected()
         ? 'php artisan queue:work'
         : ($site->isRailsFrameworkDetected() ? 'bundle exec sidekiq' : 'node worker.js');
@@ -165,10 +165,10 @@
                             {{ __('Firing history') }}
                         </h3>
                         <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Last 50 queue ticks. Newest first. Click a row for full output.') }}">
-                            {{ __('Last 50 queue ticks · click a row for detail') }}
+                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ __('Every queue tick. Newest first. Click a row for full output.') }}">
+                            {{ __('Every queue tick · click a row for detail') }}
                         </p>
-                        <span class="shrink-0 text-xs tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count tick|[2,*] :count ticks', $queueHistory->count(), ['count' => $queueHistory->count()]) }}</span>
+                        <span class="shrink-0 text-xs tabular-nums text-brand-moss">{{ trans_choice('{0} none|{1} :count tick|[2,*] :count ticks', $queueHistory->total(), ['count' => $queueHistory->total()]) }}</span>
                     </div>
 
                     @if ($queueHistory->isEmpty())
@@ -227,6 +227,8 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        <x-table-pager :paginator="$queueHistory" page-name="tickPage" :noun="__('ticks')" class="border-t border-brand-ink/10 px-3 py-2 sm:px-4" />
                     @endif
                 </div>
 
@@ -312,8 +314,11 @@
 
                 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
                     <x-cli-snippet :commands="[
-                        ['label' => __('List workers'), 'command' => 'dply sites:workers '.$site->slug],
-                        ['label' => __('Restart all'), 'command' => 'dply sites:workers:restart '.$site->slug],
+                        ['label' => __('Engine state + worker list'), 'command' => 'dply serverless workers '.$site->slug],
+                        ['label' => __('Turn the queue engine on / off'), 'command' => 'dply serverless workers '.$site->slug.' --enable'],
+                        ['label' => __('Fire one queue tick now'), 'command' => 'dply serverless workers '.$site->slug.' --tick'],
+                        ['label' => __('Define a worker'), 'command' => 'dply serverless workers '.$site->slug.' --add queue-default --command \''.$workerCommandPlaceholder.'\''],
+                        ['label' => __('Stop / start / remove one'), 'command' => 'dply serverless workers '.$site->slug.' --stop queue-default'],
                     ]" />
                 </div>
             </section>

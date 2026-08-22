@@ -257,12 +257,65 @@ dply serverless platform checkout --json
 dply serverless invoke checkout                              # a real GET /
 dply serverless invoke checkout --method POST --path /health --body '{"ping":1}'
 dply serverless invoke checkout --header 'X-Token: secret'
+
+dply serverless credentials checkout                  # which key dply holds
+dply serverless credentials checkout --set <id>:<secret>   # store a rotated one
 ```
 
 `invoke` runs your code and is recorded as a `source=test` invocation (it shows
 up in `dply serverless invocations --source test`), so it needs the
 **`serverless.invoke`** scope rather than `serverless.read`. It exits 1 when the
 function answers with a failure.
+
+```bash
+dply serverless workers checkout                    # engine + worker table
+dply serverless workers checkout --enable           # process queue jobs
+dply serverless workers checkout --tick             # one queue tick, now
+dply serverless workers checkout --add queue-default --command 'php artisan queue:work'
+dply serverless workers checkout --stop queue-default
+dply serverless workers checkout --remove queue-default
+```
+
+```bash
+dply serverless schedule checkout                   # switch + recent ticks
+dply serverless schedule checkout --enable          # run the scheduler tick
+dply serverless schedule checkout --tick            # fire one now
+dply serverless schedule checkout --failed --limit 50
+```
+
+```bash
+dply serverless env checkout list                   # keys (values are write-only)
+dply serverless env checkout set STRIPE_KEY=sk_live_x
+dply serverless env checkout rm OLD_KEY
+dply serverless env checkout push --file .env       # upsert each key
+dply serverless env checkout pull --values > .env   # needs sites.write
+
+dply serverless runtime checkout                    # limits, HTTP, toggles
+dply serverless runtime checkout --memory 512 --timeout 60000
+dply serverless runtime checkout --web-mode web --secure --cors on --cors-origins https://app.test
+dply serverless runtime checkout --param STRIPE_MODE=live --rm-param OLD
+dply serverless runtime checkout --maintenance on --keep-warm on
+dply serverless runtime checkout --rotate-secret
+```
+
+`env` edits the same store as the Environment tab; new values reach the
+function on its next deploy. `runtime` is the Runtime tab — every flag maps to
+one field of a single PATCH, so several settings change in one call. Resource
+limits apply on the next deploy; HTTP settings are pushed to the live function.
+
+`schedule` is dply's own minute-cadence scheduler tick and its firing history;
+it exits 1 when a listed tick failed. The functions host's cron triggers are a
+different surface — `dply serverless platform <site> --schedules`.
+
+`workers` is the Workers tab: the queue engine (one switch driving the
+minute-cadence tick) and the named worker definitions. Workers are addressed by
+name or id. Writes need **`serverless.write`**; `--tick` runs your code, so it
+needs **`serverless.invoke`** and exits 1 when the tick reports a failure.
+
+`credentials` reads the namespace key dply stores for the function and checks the
+host still accepts it (only the key id is ever shown). `--set` replaces it after
+you rotate on the host — the new key is verified before it sticks, and the old
+one stays in place if the host rejects it. Writing needs **`serverless.write`**.
 
 ### Errors
 

@@ -6,7 +6,7 @@
         'deploy' => __('Deploy logs'),
     ];
     $tabCounts = [
-        'activations' => $activations->count(),
+        'activations' => $activations->total(),
         'visits' => $visits->count(),
         'runtime' => count($runtimeLines),
         'deploy' => $deployments->count(),
@@ -143,6 +143,13 @@
                     @include('livewire.serverless.partials._invocation-row', ['invocation' => $invocation])
                 @endforeach
             </ul>
+
+            <x-table-pager
+                :paginator="$activations"
+                page-name="activationsPage"
+                :noun="__('activations')"
+                class="border-t border-brand-ink/10 pt-2.5"
+            />
         @endif
 
     {{-- ── Visits ──────────────────────────────────────────────────────── --}}
@@ -325,5 +332,39 @@
             </ul>
         @endif
     @endif
+    </div>
+
+    @php
+        $cliSite = $site->slug;
+        $cliCommands = match ($tab) {
+            'visits' => [
+                ['label' => __('Organic requests'), 'command' => 'dply serverless invocations '.$cliSite.' --source web'],
+                ['label' => __('Only the failed ones'), 'command' => 'dply serverless errors '.$cliSite],
+                ['label' => __('Raw payload for scripts'), 'command' => 'dply serverless invocations '.$cliSite.' --source web --json'],
+            ],
+            'runtime' => [
+                ['label' => __('Application log drain'), 'command' => 'dply serverless logs '.$cliSite],
+                ['label' => __('Follow it'), 'command' => 'dply serverless logs '.$cliSite.' --follow'],
+                ['label' => __('Errors only, last 24h'), 'command' => 'dply serverless logs '.$cliSite.' --level error --window 86400'],
+                ['label' => __('One invocation with its lines'), 'command' => 'dply serverless invocation <id> --site '.$cliSite],
+            ],
+            'deploy' => [
+                ['label' => __('Deploy history'), 'command' => 'dply sites:deployments '.$cliSite],
+                ['label' => __('Latest deploy log'), 'command' => 'dply site logs '.$cliSite],
+                ['label' => __('Deploy now, following the log'), 'command' => 'dply deploy --site '.$cliSite.' --follow'],
+            ],
+            default => [
+                ['label' => __('Recent invocations'), 'command' => 'dply serverless invocations '.$cliSite],
+                ['label' => __('Background ticks only'), 'command' => 'dply serverless invocations '.$cliSite.' --source tick'],
+                ['label' => __('Test requests you sent'), 'command' => 'dply serverless invocations '.$cliSite.' --source test'],
+                ['label' => __('Failed invocations (exits 1 when any)'), 'command' => 'dply serverless errors '.$cliSite],
+                ['label' => __('Send a test request'), 'command' => 'dply serverless invoke '.$cliSite],
+                ['label' => __('One invocation with its log lines'), 'command' => 'dply serverless invocation <id> --site '.$cliSite],
+            ],
+        };
+    @endphp
+
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+        <x-cli-snippet :commands="$cliCommands" />
     </div>
 </div>

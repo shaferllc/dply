@@ -12,15 +12,19 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Serverless\Services\InvokeFunctionTick;
+use App\Modules\Serverless\Services\ServerlessBackgroundTasks;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Services\SiteWorkerRegistry;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * BACKGROUND > Workers.
@@ -40,9 +44,13 @@ class Workers extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use WithPagination;
+
+    /** History rows per page — matches Schedule, the other half of this pair. */
+    private const TICKS_PER_PAGE = 15;
 
     /** Restart policies a worker definition may declare. */
-    public const RESTART_POLICIES = ['always', 'on-failure', 'never'];
+    public const RESTART_POLICIES = SiteWorkerRegistry::RESTART_POLICIES;
 
     public Server $server;
 
@@ -90,45 +98,20 @@ class Workers extends Component
 
         $this->server = $server;
         $this->site = $site;
-        $serverless = is_array($site->meta['serverless'] ?? null) ? $site->meta['serverless'] : [];
-        // Read the dedicated `queue_worker_enabled` flag; fall back to the
-        // legacy bundled `background_enabled` so sites configured before the
-        // split (when one toggle drove both tasks) keep their previous state.
-        $this->queue_worker_enabled = (bool) ($serverless['queue_worker_enabled'] ?? $serverless['background_enabled'] ?? false);
-        $this->workers = $this->normalizeWorkers($serverless['workers'] ?? null);
+        $this->queue_worker_enabled = $this->tasks()->enabled($site, 'queue');
+        $this->workers = $this->registry()->all($site);
     }
 
-    /**
-     * Coerce the stored worker list into a clean, fully-shaped list — drops
-     * malformed entries and back-fills missing keys with safe defaults.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function normalizeWorkers(mixed $raw): array
+    /** Reads and writes of worker state are shared with the HTTP API. */
+    private function registry(): SiteWorkerRegistry
     {
-        if (! is_array($raw)) {
-            return [];
-        }
+        return app(SiteWorkerRegistry::class);
+    }
 
-        $workers = [];
-        foreach ($raw as $entry) {
-            if (! is_array($entry) || trim((string) ($entry['id'] ?? '')) === '') {
-                continue;
-            }
-
-            $policy = (string) ($entry['restart_policy'] ?? 'on-failure');
-
-            $workers[] = [
-                'id' => (string) $entry['id'],
-                'name' => (string) ($entry['name'] ?? 'worker'),
-                'command' => (string) ($entry['command'] ?? ''),
-                'concurrency' => max(1, (int) ($entry['concurrency'] ?? 1)),
-                'restart_policy' => in_array($policy, self::RESTART_POLICIES, true) ? $policy : 'on-failure',
-                'enabled' => (bool) ($entry['enabled'] ?? false),
-            ];
-        }
-
-        return $workers;
+    /** The queue-engine toggle — shared with Schedule's scheduler toggle. */
+    private function tasks(): ServerlessBackgroundTasks
+    {
+        return app(ServerlessBackgroundTasks::class);
     }
 
     /**
@@ -139,19 +122,7 @@ class Workers extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-
-        // Write the dedicated flag; keep the legacy bundled flag in sync (true
-        // iff either side is on) so callers that still read the old key see
-        // the right "at least one task ticking" state.
-        $serverless['queue_worker_enabled'] = $value;
-        $schedulerOn = (bool) ($serverless['scheduler_enabled'] ?? $serverless['background_enabled'] ?? false);
-        $serverless['background_enabled'] = $value || $schedulerOn;
-
-        $meta['serverless'] = $serverless;
-        $this->site->update(['meta' => $meta]);
-        $this->site->refresh();
+        $this->tasks()->setEnabled($this->site, 'queue', $value);
 
         $this->toastSuccess($value
             ? __('Queue worker enabled — dply processes jobs in background ticks.')
@@ -244,34 +215,22 @@ class Workers extends Component
             'workerRestartPolicy' => ['required', Rule::in(self::RESTART_POLICIES)],
         ]);
 
-        if ($this->editingWorkerId !== null) {
-            $this->workers = array_map(function (array $worker): array {
-                if ($worker['id'] !== $this->editingWorkerId) {
-                    return $worker;
-                }
+        $attributes = [
+            'name' => $this->workerName,
+            'command' => $this->workerCommand,
+            'concurrency' => $this->workerConcurrency,
+            'restart_policy' => $this->workerRestartPolicy,
+        ];
 
-                return [
-                    ...$worker,
-                    'name' => $this->workerName,
-                    'command' => $this->workerCommand,
-                    'concurrency' => $this->workerConcurrency,
-                    'restart_policy' => $this->workerRestartPolicy,
-                ];
-            }, $this->workers);
+        if ($this->editingWorkerId !== null) {
+            $this->registry()->update($this->site, $this->editingWorkerId, $attributes);
             $message = __('Worker ":name" updated.', ['name' => $this->workerName]);
         } else {
-            $this->workers[] = [
-                'id' => (string) Str::ulid(),
-                'name' => $this->workerName,
-                'command' => $this->workerCommand,
-                'concurrency' => $this->workerConcurrency,
-                'restart_policy' => $this->workerRestartPolicy,
-                'enabled' => true,
-            ];
+            $this->registry()->add($this->site, $attributes);
             $message = __('Worker ":name" added.', ['name' => $this->workerName]);
         }
 
-        $this->persistWorkers();
+        $this->workers = $this->registry()->all($this->site);
         $this->resetWorkerForm();
         $this->showWorkerForm = false;
         $this->toastSuccess($message);
@@ -281,11 +240,8 @@ class Workers extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $this->workers = array_values(array_filter(
-            $this->workers,
-            fn (array $worker): bool => $worker['id'] !== $id,
-        ));
-        $this->persistWorkers();
+        $this->registry()->remove($this->site, $id);
+        $this->workers = $this->registry()->all($this->site);
         $this->toastSuccess(__('Worker removed.'));
     }
 
@@ -294,13 +250,12 @@ class Workers extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $this->workers = array_map(
-            fn (array $worker): array => $worker['id'] === $id
-                ? [...$worker, 'enabled' => ! ($worker['enabled'] ?? false)]
-                : $worker,
-            $this->workers,
-        );
-        $this->persistWorkers();
+        $worker = collect($this->workers)->firstWhere('id', $id);
+
+        if ($worker !== null) {
+            $this->registry()->update($this->site, $id, ['enabled' => ! ($worker['enabled'] ?? false)]);
+            $this->workers = $this->registry()->all($this->site);
+        }
     }
 
     /**
@@ -340,43 +295,6 @@ class Workers extends Component
         $this->resetValidation();
     }
 
-    /** Write the worker list back to the site's serverless meta. */
-    private function persistWorkers(): void
-    {
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $serverless['workers'] = $this->workers;
-        $meta['serverless'] = $serverless;
-
-        $this->site->update(['meta' => $meta]);
-        $this->site->refresh();
-    }
-
-    /**
-     * Resolve a worker's live status. v1 has no per-worker process, so the
-     * status is derived: a disabled worker is Stopped; an enabled worker with
-     * the engine off is idle; otherwise it mirrors the most recent queue tick.
-     *
-     * @param  array<string, mixed>  $worker
-     * @return array{0: string, 1: string}
-     */
-    private function workerStatus(array $worker, bool $engineOn, ?string $lastTickStatus): array
-    {
-        if (! ($worker['enabled'] ?? false)) {
-            return ['stopped', __('Stopped')];
-        }
-
-        if (! $engineOn) {
-            return ['idle', __('Engine off')];
-        }
-
-        return match ($lastTickStatus) {
-            'ok' => ['running', __('Running')],
-            'failed' => ['erroring', __('Erroring')],
-            default => ['pending', __('Pending')],
-        };
-    }
-
     /**
      * Open the detail modal for one history entry. Resolved fresh by its `at`
      * timestamp (unique per task — one tick per minute) so the 15s polling
@@ -384,25 +302,34 @@ class Workers extends Component
      */
     public function showTick(string $at): void
     {
-        $this->selectedTick = $this->tickHistory()
-            ->first(fn (array $entry): bool => (string) ($entry['at'] ?? '') === $at);
+        // Resolved by timestamp against the table, not by scanning the page
+        // being shown — the row may live on any page of the history.
+        $this->selectedTick = $this->ticksQuery()
+            ->where('created_at', Carbon::parse($at))
+            ->first()
+            ?->toTickEntry();
     }
 
     /**
-     * The site's recent `queue` ticks, newest-first, in the legacy
-     * tick-history array shape the view consumes.
+     * Every `queue` tick for this site, newest first.
      *
+     * @return Builder<FunctionInvocation>
      */
-    private function tickHistory(): Collection
+    private function ticksQuery(): Builder
     {
         return FunctionInvocation::query()
             ->where('site_id', $this->site->id)
             ->where('source', FunctionInvocation::SOURCE_TICK)
             ->where('task', 'queue')
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get()
-            ->map(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
+            ->orderByDesc('created_at');
+    }
+
+    /** One page of history, in the tick-entry array shape the view consumes. */
+    private function tickHistory(): LengthAwarePaginator
+    {
+        return $this->ticksQuery()
+            ->paginate(self::TICKS_PER_PAGE, ['*'], 'tickPage')
+            ->through(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
     }
 
     public function closeTick(): void
@@ -415,18 +342,27 @@ class Workers extends Component
         $runtimeMode = $this->site->runtimeTargetMode();
 
         $this->site->refresh();
+        // Re-read on every render (the page polls every 15s) so a change made
+        // out of band — `dply serverless workers …`, the HTTP API — shows up
+        // without a reload.
+        $this->queue_worker_enabled = $this->tasks()->enabled($this->site, 'queue');
+        $this->workers = $this->registry()->all($this->site);
         $serverless = is_array($this->site->meta['serverless'] ?? null) ? $this->site->meta['serverless'] : [];
         // Workers cares only about queue-task ticks; the Schedule page shows
         // the scheduler half. Each ServerlessTickCommand pass records one row
         // per task type.
         $queueHistory = $this->tickHistory();
 
-        $latestQueue = $queueHistory->first();
+        // The status strip and the worker rows describe the newest tick, which
+        // only lives on page 1 — read it from the query, not the page shown.
+        $latestQueue = $queueHistory->currentPage() === 1
+            ? $queueHistory->first()
+            : $this->ticksQuery()->first()?->toTickEntry();
         $lastQueueStatus = is_array($latestQueue) ? ($latestQueue['status'] ?? null) : null;
 
         // Decorate each worker with its derived live status for the table.
         $workerRows = array_map(function (array $worker) use ($lastQueueStatus): array {
-            [$state, $label] = $this->workerStatus($worker, $this->queue_worker_enabled, $lastQueueStatus);
+            [$state, $label] = $this->registry()->status($worker, $this->queue_worker_enabled, $lastQueueStatus);
 
             return [...$worker, 'status' => $state, 'status_label' => $label];
         }, $this->workers);
@@ -439,8 +375,9 @@ class Workers extends Component
             'laravel_tab' => 'commands',
             'section' => 'workers',
             'queueHistory' => $queueHistory,
-            'lastTickAt' => $queueHistory->first()['at'] ?? null,
-            'secretMismatchDetected' => $this->detectSecretMismatch($queueHistory->first()),
+            'latestTick' => $latestQueue,
+            'lastTickAt' => $latestQueue['at'] ?? null,
+            'secretMismatchDetected' => $this->detectSecretMismatch($latestQueue),
             'dns' => is_array($serverless['dns'] ?? null) ? $serverless['dns'] : [],
             'workerRows' => $workerRows,
             'restartPolicies' => self::RESTART_POLICIES,

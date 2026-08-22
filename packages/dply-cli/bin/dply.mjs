@@ -19,6 +19,13 @@ run(process.argv.slice(2)).then(
   (err) => {
     const message = err?.message ?? String(err);
     process.stderr.write(`dply: ${message}\n`);
+
+    // A token minted before a scope existed fails with a bare "Forbidden".
+    // The interactive shell offers the refresh; one-shot runs need the hint.
+    if (err?.status === 403) {
+      process.stderr.write('Your token may not carry the scope for that — run `dply auth refresh` to approve more.\n');
+    }
+
     exitAfterFlush(err?.exitCode ?? 1);
   },
 );

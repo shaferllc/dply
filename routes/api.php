@@ -37,7 +37,10 @@ use App\Modules\Queue\Http\Controllers\QueueFailedJobController;
 use App\Modules\Queue\Http\Controllers\SqsCompatibilityController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessInvocationApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessLogApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessRuntimeApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessScheduleApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessPlatformApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessWorkersApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessSiteApiController;
 use Illuminate\Support\Facades\Route;
 
@@ -356,6 +359,47 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware('ability:'.$apiAbilities['serverless.platform.schedules']);
             Route::post('/sites/{site}/invoke', [ServerlessPlatformApiController::class, 'invoke'])
                 ->middleware('ability:'.$apiAbilities['serverless.invoke']);
+            Route::get('/sites/{site}/credentials', [ServerlessPlatformApiController::class, 'credentials'])
+                ->middleware('ability:'.$apiAbilities['serverless.credentials.show']);
+            Route::put('/sites/{site}/credentials', [ServerlessPlatformApiController::class, 'updateCredentials'])
+                ->middleware('ability:'.$apiAbilities['serverless.credentials.update']);
+
+            // The workspace Workers tab: the queue engine, the named worker
+            // definitions, and a tick fired by hand. `/workers/tick` is
+            // registered before `{worker}` so the verb isn't read as an id.
+            Route::get('/sites/{site}/workers', [ServerlessWorkersApiController::class, 'index'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.show']);
+            Route::put('/sites/{site}/workers', [ServerlessWorkersApiController::class, 'updateEngine'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.update']);
+            Route::post('/sites/{site}/workers/tick', [ServerlessWorkersApiController::class, 'tick'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.tick']);
+            Route::post('/sites/{site}/workers', [ServerlessWorkersApiController::class, 'store'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.update']);
+            Route::patch('/sites/{site}/workers/{worker}', [ServerlessWorkersApiController::class, 'update'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.update']);
+            Route::delete('/sites/{site}/workers/{worker}', [ServerlessWorkersApiController::class, 'destroy'])
+                ->middleware('ability:'.$apiAbilities['serverless.workers.update']);
+
+            // The workspace Schedule tab: dply's own minute-cadence scheduler
+            // tick and its firing history. The functions host's cron triggers
+            // are a different surface — see /platform/schedules above.
+            Route::get('/sites/{site}/schedule', [ServerlessScheduleApiController::class, 'show'])
+                ->middleware('ability:'.$apiAbilities['serverless.schedule.show']);
+            Route::put('/sites/{site}/schedule', [ServerlessScheduleApiController::class, 'update'])
+                ->middleware('ability:'.$apiAbilities['serverless.schedule.update']);
+            Route::post('/sites/{site}/schedule/tick', [ServerlessScheduleApiController::class, 'tick'])
+                ->middleware('ability:'.$apiAbilities['serverless.schedule.tick']);
+
+            // The workspace Runtime tab: limits, HTTP exposure, bound
+            // parameters, log forwarding, maintenance, warm start. Env vars
+            // are not here — a function's .env is the shared site surface,
+            // /sites/{site}/env.
+            Route::get('/sites/{site}/runtime', [ServerlessRuntimeApiController::class, 'show'])
+                ->middleware('ability:'.$apiAbilities['serverless.runtime.show']);
+            Route::patch('/sites/{site}/runtime', [ServerlessRuntimeApiController::class, 'update'])
+                ->middleware('ability:'.$apiAbilities['serverless.runtime.update']);
+            Route::post('/sites/{site}/runtime/rotate-secret', [ServerlessRuntimeApiController::class, 'rotateSecret'])
+                ->middleware('ability:'.$apiAbilities['serverless.runtime.update']);
         });
     });
 });

@@ -135,6 +135,108 @@ class ServerlessPlatformApiController extends ServerlessApiController
     }
 
     /**
+     * The namespace credential dply uses to reach this function: what is stored,
+     * and whether the host still accepts it. Only the key id is ever returned —
+     * the secret half is the credential.
+     */
+    public function credentials(Request $request, string $site): JsonResponse
+    {
+        $found = $this->findFunctionSite($request, $site);
+
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        $config = $this->hostConfig($found);
+        $check = (new OpenWhiskClient($found->server))->actions();
+
+        return response()->json([
+            'data' => [
+                'namespace' => (string) ($config['namespace'] ?? ''),
+                'api_host' => (string) ($config['api_host'] ?? ''),
+                'key_id' => $this->keyId((string) ($config['access_key'] ?? '')),
+                'ok' => (bool) $check['ok'],
+                'error' => $check['ok'] ? null : (string) ($check['error'] ?? 'The namespace rejected the key.'),
+                'actions' => $check['ok'] && is_array($check['data']) ? count($check['data']) : 0,
+            ],
+        ]);
+    }
+
+    /**
+     * Store a rotated namespace key. Minting and revoking happen on the
+     * functions host — dply has no API for that — but the key dply *stores* is
+     * dply's own record, so replacing it after a rotation belongs here rather
+     * than in a provider CLI.
+     */
+    public function updateCredentials(Request $request, string $site): JsonResponse
+    {
+        $found = $this->findFunctionSite($request, $site);
+
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        $data = $request->validate([
+            'access_key' => ['required', 'string', 'max:512', 'regex:/^[^:\s]+:[^\s]+$/'],
+        ]);
+
+        $server = $found->server;
+
+        if ($server === null) {
+            return response()->json(['message' => 'This function has no host record.'], 422);
+        }
+
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $config = is_array($meta['digitalocean_functions'] ?? null) ? $meta['digitalocean_functions'] : [];
+        $previous = (string) ($config['access_key'] ?? '');
+
+        $config['access_key'] = (string) $data['access_key'];
+        $meta['digitalocean_functions'] = $config;
+        $server->meta = $meta;
+        $server->save();
+
+        // Prove the new key before reporting success — a stored key that the
+        // host rejects is worse than the old one, so roll back on failure.
+        $check = (new OpenWhiskClient($server->fresh()))->actions();
+
+        if (! $check['ok']) {
+            $config['access_key'] = $previous;
+            $meta['digitalocean_functions'] = $config;
+            $server->meta = $meta;
+            $server->save();
+
+            return response()->json([
+                'message' => 'The host rejected that key — the previous one is still in place.',
+                'error' => (string) ($check['error'] ?? ''),
+            ], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'key_id' => $this->keyId((string) $config['access_key']),
+                'ok' => true,
+                'actions' => is_array($check['data']) ? count($check['data']) : 0,
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function hostConfig(Site $site): array
+    {
+        $meta = $site->server->meta ?? [];
+        $config = $meta['digitalocean_functions'] ?? [];
+
+        return is_array($config) ? $config : [];
+    }
+
+    private function keyId(string $accessKey): string
+    {
+        return str_contains($accessKey, ':') ? explode(':', $accessKey, 2)[0] : '';
+    }
+
+    /**
      * @param  array<string, mixed>  $result  an OpenWhisk {ok, error, data} envelope
      * @return list<string>
      */

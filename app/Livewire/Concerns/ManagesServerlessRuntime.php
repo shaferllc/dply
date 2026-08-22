@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\Site;
-use App\Modules\Serverless\Services\ServerlessFunctionConfigurator;
-use App\Modules\Serverless\Services\ServerlessMaintenance;
+use App\Modules\Serverless\Services\ServerlessRuntimeSettings;
 use App\Modules\Serverless\Support\FunctionConfiguration;
 use App\Modules\Serverless\Support\FunctionCorsPolicy;
 use App\Modules\Serverless\Support\FunctionLogForwarding;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -30,7 +28,9 @@ use Illuminate\Validation\Rule;
  * been deployed.
  *
  * The host component (Sites\Show and its subclasses) provides $site,
- * authorize(), validate(), and the toast helpers.
+ * authorize(), validate(), and the toast helpers. The writes themselves live
+ * in {@see ServerlessRuntimeSettings}, shared with the HTTP API so the CLI
+ * cannot drift from this tab.
  */
 trait ManagesServerlessRuntime
 {
@@ -133,6 +133,12 @@ trait ManagesServerlessRuntime
         }
     }
 
+    /** Reads and writes of runtime settings are shared with the HTTP API. */
+    private function runtimeSettings(): ServerlessRuntimeSettings
+    {
+        return app(ServerlessRuntimeSettings::class);
+    }
+
     public function addServerlessParameter(): void
     {
         $this->serverless_parameters[] = ['key' => '', 'value' => ''];
@@ -182,67 +188,28 @@ trait ManagesServerlessRuntime
             'serverless_cors_max_age' => __('preflight cache'),
         ]);
 
-        $meta = $this->site->meta;
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $web = is_array($serverless['web'] ?? null) ? $serverless['web'] : [];
-
-        // Mint the endpoint secret the first time the operator secures the
-        // function, and keep it across saves — rotating is a separate,
-        // explicit action, because every existing caller breaks on rotation.
-        $secret = trim((string) ($web['auth_secret'] ?? ''));
-        if ($this->serverless_secured && $secret === '') {
-            $secret = Str::random(48);
-        }
-
-        $serverless['web'] = [
-            'mode' => $this->serverless_web_mode,
+        $result = $this->runtimeSettings()->saveHttpConfig($this->site, [
+            'web_mode' => $this->serverless_web_mode,
             'secured' => $this->serverless_secured,
-            'auth_secret' => $secret !== '' ? $secret : null,
             'provide_api_key' => $this->serverless_provide_api_key,
-            'cors' => FunctionCorsPolicy::fromArray([
+            'cors' => [
                 'enabled' => $this->serverless_cors_enabled,
                 'allow_origins' => $this->serverless_cors_origins,
                 'allow_methods' => $this->serverless_cors_methods,
                 'allow_headers' => $this->serverless_cors_headers,
                 'allow_credentials' => $this->serverless_cors_credentials,
                 'max_age' => trim($this->serverless_cors_max_age) === '' ? null : (int) $this->serverless_cors_max_age,
-            ])->toArray(),
-        ];
-
-        $parameters = [];
-        foreach ($this->serverless_parameters as $row) {
-            $key = trim((string) $row['key']);
-            if ($key === '') {
-                continue;
-            }
-            $parameters[$key] = (string) $row['value'];
-        }
-
-        $serverless['parameters'] = $parameters;
-        $serverless['parameters_final'] = $this->serverless_parameters_final;
-
-        // Datadog is the only destination with a host to point at, and it has
-        // a default — so an empty endpoint means "use the default", not
-        // "misconfigured".
-        $endpoint = trim($this->serverless_log_endpoint);
-        if ($this->serverless_log_provider !== FunctionLogForwarding::PROVIDER_DATADOG) {
-            $endpoint = '';
-        }
-
-        $serverless['log_forwarding'] = FunctionLogForwarding::fromArray([
-            'provider' => $this->serverless_log_provider,
-            'token' => trim($this->serverless_log_token),
-            'endpoint' => $endpoint,
-        ])->toArray();
-
-        $meta['serverless'] = $serverless;
-
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->site->setAttribute('meta', $meta);
+            ],
+            'parameters' => $this->serverless_parameters,
+            'parameters_final' => $this->serverless_parameters_final,
+            'log_forwarding' => [
+                'provider' => $this->serverless_log_provider,
+                'token' => $this->serverless_log_token,
+                'endpoint' => $this->serverless_log_endpoint,
+            ],
+        ]);
 
         $this->syncServerlessRuntimeFromSite();
-
-        $result = app(ServerlessFunctionConfigurator::class)->apply($this->site);
 
         if (! $result['ok']) {
             $this->toastError((string) ($result['error'] ?? __('The host rejected the configuration.')));
@@ -264,24 +231,7 @@ trait ManagesServerlessRuntime
     {
         $this->authorize('update', $this->site);
 
-        $meta = $this->site->meta;
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $web = is_array($serverless['web'] ?? null) ? $serverless['web'] : [];
-
-        if (! ($web['secured'] ?? false)) {
-            $this->toastError(__('Secure the endpoint before rotating its secret.'));
-
-            return;
-        }
-
-        $web['auth_secret'] = Str::random(48);
-        $serverless['web'] = $web;
-        $meta['serverless'] = $serverless;
-
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->site->setAttribute('meta', $meta);
-
-        $result = app(ServerlessFunctionConfigurator::class)->apply($this->site);
+        $result = $this->runtimeSettings()->rotateEndpointSecret($this->site);
 
         if (! $result['ok']) {
             $this->toastError((string) ($result['error'] ?? __('The host rejected the new secret.')));
@@ -316,18 +266,12 @@ trait ManagesServerlessRuntime
             'serverless_logs_kb' => __('log capture'),
         ]);
 
-        $meta = $this->site->meta;
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $serverless['limits'] = [
-            'memory' => $this->serverless_memory,
-            'timeout' => $this->serverless_timeout_ms,
+        $this->runtimeSettings()->saveLimits($this->site, [
+            'memory_mb' => $this->serverless_memory,
+            'timeout_ms' => $this->serverless_timeout_ms,
             'concurrency' => $this->serverless_concurrency,
-            'logs' => $this->serverless_logs_kb,
-        ];
-        $meta['serverless'] = $serverless;
-
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->site->setAttribute('meta', $meta);
+            'logs_kb' => $this->serverless_logs_kb,
+        ]);
 
         $this->toastSuccess(__('Resource limits saved — they apply on the next deploy.'));
     }
@@ -342,10 +286,8 @@ trait ManagesServerlessRuntime
             return;
         }
 
-        $result = app(ServerlessMaintenance::class)
-            ->setEnabled($this->site, $this->serverless_maintenance);
+        $result = $this->runtimeSettings()->setMaintenance($this->site, $this->serverless_maintenance);
 
-        $this->site->refresh();
         $this->syncServerlessRuntimeFromSite();
 
         if (! $result['ok']) {
@@ -376,7 +318,8 @@ trait ManagesServerlessRuntime
             return;
         }
 
-        $enabled = $this->site->setServerlessKeepWarm(! $this->site->serverlessKeepWarmEnabled());
+        $settings = $this->runtimeSettings();
+        $enabled = $settings->setKeepWarm($this->site, ! $this->site->serverlessKeepWarmEnabled());
         $this->site->setAttribute('meta', $this->site->meta);
 
         if ($enabled && $this->site->serverlessBackgroundProcessingEnabled()) {

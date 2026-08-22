@@ -65,3 +65,16 @@ it('swaps the commands for the tab you are on', function () {
         // The inspector-only rows are gone.
         ->assertDontSee("dply sites:errors {$site->slug}");
 });
+
+it('offers dply commands for the namespace key, not a provider CLI', function () {
+    [$user, $site] = platformFixture();
+
+    Livewire::actingAs($user)
+        ->test(PlatformPanel::class, ['site' => $site])
+        ->call('setTab', 'credentials')
+        ->assertSee("dply serverless credentials {$site->slug}")
+        ->assertSee("dply serverless credentials {$site->slug} --set &lt;key-id&gt;:&lt;secret&gt;", false)
+        // The tab used to hand out `doctl` — provider internals stay out of
+        // customer copy, and one CLI disclosure per card, not two.
+        ->assertDontSee('doctl');
+});

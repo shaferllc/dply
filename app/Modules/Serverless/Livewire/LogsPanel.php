@@ -18,6 +18,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The Logs workspace for a serverless (DigitalOcean Functions) site.
@@ -41,6 +42,13 @@ use Livewire\Component;
 class LogsPanel extends Component
 {
     use DispatchesToastNotifications;
+    use WithPagination;
+
+    /** Activations per page. The tab is a scan-for-the-bad-one list, not a feed. */
+    private const ACTIVATIONS_PER_PAGE = 25;
+
+    /** How far back the health counters look, regardless of the page shown. */
+    private const METRICS_WINDOW = 50;
 
     public string $siteId = '';
 
@@ -221,11 +229,21 @@ class LogsPanel extends Component
         $site = Site::with('server')->findOrFail($this->siteId);
         $this->authorize('view', $site);
 
+        // Paginated: a busy function racks up hundreds of ticks, and the old
+        // limit(50) silently hid everything older with no way to reach it.
         $activations = FunctionInvocation::query()
             ->where('site_id', $this->siteId)
             ->operational()
             ->orderByDesc('created_at')
-            ->limit(50)
+            ->paginate(self::ACTIVATIONS_PER_PAGE, ['*'], 'activationsPage');
+
+        // Counters describe the recent window, not the page being read — paging
+        // back through history must not change what "24h health" says.
+        $recentActivations = FunctionInvocation::query()
+            ->where('site_id', $this->siteId)
+            ->operational()
+            ->orderByDesc('created_at')
+            ->limit(self::METRICS_WINDOW)
             ->get();
 
         $visits = FunctionInvocation::query()
@@ -280,7 +298,7 @@ class LogsPanel extends Component
 
         // Metrics describe finished invocations only — an in-flight async row
         // has no duration and no outcome to average in.
-        $settled = $activations->reject(fn (FunctionInvocation $i): bool => $i->isPending());
+        $settled = $recentActivations->reject(fn (FunctionInvocation $i): bool => $i->isPending());
         $errors = $settled->filter(fn (FunctionInvocation $i): bool => ! $i->success)->count();
         $total = $settled->count();
 
@@ -295,7 +313,7 @@ class LogsPanel extends Component
             // In-flight async invocations keep the page polling until they
             // land; without this the row would sit at "running" until the
             // operator refreshed by hand.
-            'pendingActivations' => $activations
+            'pendingActivations' => $recentActivations
                 ->filter(fn (FunctionInvocation $i): bool => $i->state === FunctionInvocation::STATE_PENDING)
                 ->count(),
             'activations' => $activations,

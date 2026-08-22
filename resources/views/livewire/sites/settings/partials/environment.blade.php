@@ -372,13 +372,21 @@
     <div @class([
         'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => $envMergedChrome,
     ])>
+        @php
+            // Functions get the serverless namespace; VM/BYO sites keep the
+            // `site` one. Both drive the same env store over the same API.
+            $envCli = $site->usesFunctionsRuntime()
+                ? 'dply serverless env '.$site->slug
+                : 'dply site env '.$site->slug;
+        @endphp
         <x-cli-snippet
             :intro="__('Manage env via CLI when you have many keys at once:')"
             :commands="[
-                ['label' => __('Set one'), 'command' => 'dply sites:env:set '.$site->slug.' KEY=value'],
-                ['label' => __('Bulk import from .env'), 'command' => 'dply sites:env:import '.$site->slug.' --file=.env'],
-                ['label' => __('Export current as .env'), 'command' => 'dply sites:env:export '.$site->slug.' --to=.env'],
-                ['label' => __('Diff cache vs server'), 'command' => 'dply sites:env:diff '.$site->slug],
+                ['label' => __('List the keys'), 'command' => $envCli.' list'],
+                ['label' => __('Set one (or several)'), 'command' => $envCli.' set KEY=value'],
+                ['label' => __('Remove one'), 'command' => $envCli.' rm KEY'],
+                ['label' => __('Bulk import from .env'), 'command' => $envCli.' push --file .env'],
+                ['label' => __('Export current as .env'), 'command' => $envCli.' pull --values > .env'],
             ]"
         />
     </div>

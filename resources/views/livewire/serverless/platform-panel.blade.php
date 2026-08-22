@@ -453,18 +453,15 @@
                     </div>
                 @endif
 
-                {{-- DigitalOcean exposes no REST API for minting or revoking
-                     namespace keys, so these are the real path — dply cannot
-                     do it on the operator's behalf and shouldn't pretend to. --}}
+                {{-- Minting and revoking a namespace key happens on the
+                     functions host — no API for it — but the key dply *stores*
+                     is dply's own record, so rotating it is `dply serverless
+                     credentials --set`. The commands live in the card's shared
+                     CLI footer; a second disclosure here would just stack. --}}
                 <div class="border-t border-brand-ink/10 pt-3">
-                    <p class="mb-2 text-2xs text-brand-moss">
-                        {{ __('Keys are created and revoked on the functions host. After rotating, update the host credentials in dply.') }}
+                    <p class="text-2xs text-brand-moss">
+                        {{ __('Keys are created and revoked on the functions host. After rotating, store the new key in dply with the CLI below.') }}
                     </p>
-                    <x-cli-snippet :commands="[
-                        ['label' => __('List keys'), 'command' => 'doctl serverless key list'.($namespace ? ' --namespace '.$namespace : '')],
-                        ['label' => __('Create a key'), 'command' => 'doctl serverless key create --name dply'.($namespace ? ' --namespace '.$namespace : '')],
-                        ['label' => __('Revoke a key'), 'command' => 'doctl serverless key delete <key-id>'.($namespace ? ' --namespace '.$namespace : '')],
-                    ]" />
                 </div>
             </div>
         </div>
@@ -488,8 +485,10 @@
                 ['label' => __('One invocation with its logs'), 'command' => 'dply serverless invocation <id> --site '.$cliSite],
             ],
             'credentials' => [
-                ['label' => __('Check the host answers with this key'), 'command' => 'dply serverless platform '.$cliSite],
-                ['label' => __('Function status + 24h health'), 'command' => 'dply serverless status '.$cliSite],
+                ['label' => __('Which key dply holds, and whether the host accepts it'), 'command' => 'dply serverless credentials '.$cliSite],
+                ['label' => __('Store a rotated key'), 'command' => 'dply serverless credentials '.$cliSite.' --set <key-id>:<secret>'],
+                ['label' => __('Raw payload for scripts'), 'command' => 'dply serverless credentials '.$cliSite.' --json'],
+                ['label' => __('What is deployed on the host'), 'command' => 'dply serverless platform '.$cliSite],
             ],
             default => [
                 ['label' => __('Deployed action + namespace inventory'), 'command' => 'dply serverless platform '.$cliSite],
