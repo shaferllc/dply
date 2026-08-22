@@ -41,10 +41,6 @@ parameters:
         - app/Actions/Concerns/AsFeatureFlagged.php
         - app/Actions/Concerns/WithAttributes.php
 
-        # Edge action facade — workspace sections compose the leaf traits
-        # directly; nothing uses this bundle today.
-        - app/Livewire/Concerns/ManagesEdgeSite.php
-
         # Demo/example scripts that extend base classes which don't exist in the
         # codebase (BaseTask, EnhancedTask, Dply\Tasks\BaseTask) — non-runnable
         # samples. Paths corrected for the modular-monolith move: these used to
