@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Actions\Sites\ScheduleSiteDeploy;
-use App\Contracts\AwsLambdaGateway;
 use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
@@ -49,11 +48,8 @@ use App\Modules\Certificates\Services\ImportedCertificateInstaller;
 use App\Modules\Certificates\Services\LetsEncryptDnsCertificateEngine;
 use App\Modules\Certificates\Services\LetsEncryptHttpCertificateEngine;
 use App\Modules\Certificates\Services\ZeroSslHttpCertificateEngine;
-use App\Modules\Deploy\Services\AwsLambdaDeployEngine;
 use App\Modules\Deploy\Services\ByoServerDeployEngine;
 use App\Modules\Deploy\Services\DeployEngineResolver;
-use App\Modules\Deploy\Services\DigitalOceanFunctionsActionDeployer;
-use App\Modules\Deploy\Services\DigitalOceanFunctionsDeployEngine;
 use App\Modules\Deploy\Services\DockerDeployEngine;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialContext;
 use App\Modules\Deploy\Services\KubernetesDeployEngine;
@@ -66,15 +62,8 @@ use App\Modules\Deploy\Services\RuntimeDetection\PythonRuntimeDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\RubyRuntimeDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\RuntimeDetectionEngine;
 use App\Modules\Deploy\Services\RuntimeDetection\StaticRuntimeDetector;
-use App\Modules\Deploy\Services\ServerlessProvisionerFactory;
 use App\Modules\Deploy\Services\SiteResourceBindingResolver;
 use App\Modules\Docs\Services\DocsManifest;
-use App\Modules\Edge\Services\CloudflareEdgeDelivery;
-use App\Modules\Edge\Services\EdgeArtifactPublisher;
-use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
-use App\Modules\Edge\Services\EdgeHostMapPublisher;
-use App\Modules\Edge\Support\EdgeFilesystemRegistrar;
-use App\Modules\Edge\Support\EdgePlatformCredentials;
 use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
 use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
@@ -266,8 +255,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(GitIdentityResolver::class);
 
         $this->app->singleton(ByoServerDeployEngine::class);
-        $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
-        $this->app->singleton(ServerlessProvisionerFactory::class);
         $this->app->singleton(CertificateEngineResolver::class, function ($app) {
             return new CertificateEngineResolver($app->tagged('site.certificate.engines'));
         });
@@ -275,8 +262,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
             return new DeployEngineResolver(
                 $app->make(ByoServerDeployEngine::class),
-                $app->make(DigitalOceanFunctionsDeployEngine::class),
-                $app->make(AwsLambdaDeployEngine::class),
                 $app->make(DockerDeployEngine::class),
                 $app->make(KubernetesDeployEngine::class),
             );
@@ -351,11 +336,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(GitCloner::class, ProcessGitCloner::class);
 
-        $this->app->singleton(EdgeArtifactPublisher::class);
-        $this->app->singleton(EdgeHostMapPublisher::class);
-        $this->app->singleton(EdgeDeliveryContextResolver::class);
-        $this->app->singleton(CloudflareEdgeDelivery::class);
-        $this->app->singleton(EdgeFilesystemRegistrar::class);
     }
 
     /**
@@ -373,8 +353,6 @@ class AppServiceProvider extends ServiceProvider
         DevCommands::artisan('schedule:work');
 
         $this->registerCustomPulseCards();
-
-        $this->registerEdgeR2FilesystemDisk();
 
         $this->discardCorruptedViteHotFile();
 
@@ -599,13 +577,8 @@ class AppServiceProvider extends ServiceProvider
                 report: false,
             );
             $site->previewDomains()->delete();
-            if ($site->server?->isDigitalOceanFunctionsHost()) {
-                rescue(
-                    fn () => app(DigitalOceanFunctionsActionDeployer::class)->delete($site),
-                    report: false,
-                );
-            } elseif ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
-                // Non-DO serverless targets do not have remote SSH artifacts to clean up here.
+            if ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
+                // Function targets have no remote SSH artifacts to clean up here.
             } else {
                 // Compute systemd unit names from the live site so the
                 // cleanup job (which runs after the row is gone) can
@@ -649,17 +622,6 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($token ? 'api:'.$token->id : $request->ip());
         });
 
-        // Edge surface gets a higher ceiling — log tailing + ad-hoc
-        // deploys are chatty by design, and a typical CI run can fire
-        // 20–30 calls in quick succession (lint + deploy + poll). Keyed
-        // by token id so one chatty token can't starve another's
-        // budget. Falls back to IP when called pre-auth (shouldn't
-        // happen post-`auth.api` but defensive).
-        RateLimiter::for('edge-api', function (Request $request) {
-            $token = $request->attributes->get('api_token');
-
-            return Limit::perMinute(600)->by($token ? 'edge-api:'.$token->id : 'edge-api-ip:'.$request->ip());
-        });
 
         // Creating and tearing down sites that provision infrastructure —
         // functions and container apps alike. Keyed by ORGANIZATION rather
@@ -871,26 +833,4 @@ class AppServiceProvider extends ServiceProvider
         Livewire::component('pulse.worker-servers', WorkerServersCard::class);
     }
 
-    private function registerEdgeR2FilesystemDisk(): void
-    {
-        $cfg = config('edge.r2');
-        $bucket = is_string($cfg['bucket'] ?? null) ? trim($cfg['bucket']) : '';
-        if ($bucket === '') {
-            return;
-        }
-
-        config([
-            'filesystems.disks.edge_r2' => [
-                'driver' => 's3',
-                'key' => $cfg['key'],
-                'secret' => $cfg['secret'],
-                'region' => $cfg['region'],
-                'bucket' => $bucket,
-                'endpoint' => EdgePlatformCredentials::r2Endpoint(),
-                'use_path_style_endpoint' => $cfg['use_path_style_endpoint'],
-                'throw' => false,
-                'report' => false,
-            ],
-        ]);
-    }
 }

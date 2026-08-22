@@ -19,7 +19,7 @@ use App\Modules\Providers\Services\OracleComputeService;
 use App\Modules\Providers\Services\OvhService;
 use App\Modules\Providers\Services\UpCloudService;
 use App\Modules\Providers\Services\VultrService;
-use App\Support\Cloud\GcpAccessToken;
+use App\Support\Providers\GcpAccessToken;
 use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Services\Providers\ProviderCredentialHealth;
 use App\Support\ServerProviderGate;
