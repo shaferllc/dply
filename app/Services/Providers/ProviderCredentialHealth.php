@@ -6,7 +6,6 @@ namespace App\Services\Providers;
 
 use App\Models\ProviderCredential;
 use App\Modules\Providers\Cloudflare\CloudflareDnsService;
-use App\Modules\Providers\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Modules\Providers\Services\AwsEc2Service;
 use App\Modules\Providers\Services\AzureComputeService;
 use App\Modules\Providers\Services\DigitalOceanService;
@@ -17,7 +16,6 @@ use App\Modules\Providers\Services\OracleComputeService;
 use App\Modules\Providers\Services\OvhService;
 use App\Modules\Providers\Services\UpCloudService;
 use App\Modules\Providers\Services\VultrService;
-use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Modules\Imports\Services\Forge\ForgeImportDriver;
 use App\Modules\Imports\Services\Ploi\PloiImportDriver;
 use App\Support\Providers\ProviderAuthFailure;
@@ -105,9 +103,7 @@ class ProviderCredentialHealth
     {
         match ($credential->provider) {
             'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
-            'cloudflare' => EdgeOrgCredentialConfig::isBootstrapped($credential)
-                ? (new CloudflareEdgeCredentialValidator)->validate($credential)
-                : (new CloudflareDnsService($credential))->verifyToken(),
+            'cloudflare' => (new CloudflareDnsService($credential))->verifyToken(),
             'hetzner' => (new HetznerService($credential))->validateToken(),
             'linode' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),

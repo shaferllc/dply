@@ -8,7 +8,6 @@ use App\Modules\Providers\Services\AwsEc2Service;
 use App\Modules\Providers\Services\AwsEc2ServiceFactory;
 use App\Modules\Providers\Services\AzureComputeService;
 use App\Modules\Providers\Cloudflare\CloudflareDnsService;
-use App\Modules\Providers\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Providers\Services\GcpDnsService;
 use App\Modules\Providers\Services\HetznerService;
@@ -20,7 +19,6 @@ use App\Modules\Providers\Services\OvhService;
 use App\Modules\Providers\Services\UpCloudService;
 use App\Modules\Providers\Services\VultrService;
 use App\Support\Providers\GcpAccessToken;
-use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Services\Providers\ProviderCredentialHealth;
 use App\Support\ServerProviderGate;
 
@@ -810,10 +808,6 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
-                if (($this->capability ?? null) === 'cdn') {
-                    $accountId = (new CloudflareEdgeCredentialValidator)->validate($credential);
-                    EdgeOrgCredentialConfig::merge($credential, ['account_id' => $accountId]);
-                }
             } elseif ($provider === 'ploi') {
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {

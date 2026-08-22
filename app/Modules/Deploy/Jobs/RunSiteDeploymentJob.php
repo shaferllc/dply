@@ -18,7 +18,6 @@ use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
-use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Jobs\RunSiteInsightsJob;
@@ -26,7 +25,6 @@ use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
-use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
@@ -355,14 +353,6 @@ class RunSiteDeploymentJob implements ShouldQueue
                         // Re-throw → the catch below marks the deployment FAILED
                         // with the diagnostic and does NOT advance last_deploy_at.
                         throw $healthError;
-                    }
-                }
-
-                if ($this->site->usesFunctionsRuntime()) {
-                    $progress = app(ServerlessDeployProgress::class);
-                    $progress->checkpoint($this->site);
-                    if ($deployment->fresh()?->status === SiteDeployment::STATUS_FAILED) {
-                        throw new ServerlessDeployCancelledException('Deploy cancelled by operator.');
                     }
                 }
 
