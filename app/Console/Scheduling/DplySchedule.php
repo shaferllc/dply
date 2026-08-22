@@ -51,18 +51,11 @@ use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
-use App\Modules\Cloud\Console\CloudPollStatusCommand;
 use App\Modules\Database\Console\ReapExpiredTrustedSourcesCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
 use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
 use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
-use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
-use App\Modules\Edge\Console\CollectEdgeUsageCommand;
-use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
-use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
-use App\Modules\Edge\Console\WarmEdgeBuildImagesCommand;
-use App\Modules\Edge\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
 use App\Modules\Insights\Console\DispatchServerInsightsCommand;
@@ -78,13 +71,8 @@ use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
-use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
-use App\Modules\Serverless\Console\EvaluateServerlessAssetGuardrailsCommand;
-use App\Modules\Serverless\Console\SweepServerlessAssetsCommand;
 use App\Modules\Queue\Console\MeterFleetUsageCommand;
 use App\Modules\Queue\Console\QueueFleetTickCommand;
-use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
-use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
 use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
 use App\Support\DplyRuntime;
@@ -168,8 +156,6 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('reconcile-tenant-dns');
 
-        $schedule->command(CloudPollStatusCommand::class)->everyMinute();
-
         $schedule->command(RunDueDeploymentSchedulesCommand::class)
             ->everyMinute()
             ->withoutOverlapping()
@@ -205,10 +191,6 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('worker-pools-member-health');
 
-        $schedule->command(ServerlessTickCommand::class)
-            ->everyMinute()
-            ->withoutOverlapping();
-
         // Steady-state sizing for managed queue fleets. Not the latency path:
         // an idle fleet is woken by the push itself, so no job waits on this.
         $schedule->command(QueueFleetTickCommand::class)
@@ -224,34 +206,6 @@ final class DplySchedule
             ->name('queue-fleet-usage');
 
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
-
-        // Value-less flags must be scheduled as `--today` (not `--today => true`,
-        // which becomes `--today=1` and Symfony rejects). That bug left MTD at 0.
-        $schedule->command(CollectEdgeUsageCommand::class, ['--today'])
-            ->hourly()
-            ->name('edge-usage-today');
-
-        // Keep Node build images warm on workers so Edge deploys skip cold pulls.
-        if ((bool) config('edge.build.warm_images_on_schedule', true)) {
-            $schedule->command(WarmEdgeBuildImagesCommand::class)
-                ->everySixHours()
-                ->name('edge-warm-build-images')
-                ->withoutOverlapping()
-                ->onOneServer();
-        }
-
-        // Reclaim superseded asset objects and re-measure per-site storage.
-        // Ordered BEFORE the usage roll-up below reads that measurement, so a
-        // day's snapshot reflects a freshly swept bucket rather than yesterday's.
-        $schedule->command(SweepServerlessAssetsCommand::class)
-            ->dailyAt('01:50')
-            ->name('serverless-assets-sweep')
-            ->withoutOverlapping()
-            ->onOneServer();
-
-        $schedule->command(CollectServerlessUsageCommand::class)
-            ->hourly()
-            ->name('serverless-usage-today');
 
         $schedule->command(CollectRealtimeUsageCommand::class)
             ->hourly()
@@ -310,19 +264,8 @@ final class DplySchedule
             ->name('server-log-policy-sync')
             ->withoutOverlapping();
 
-        $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
-
-        $schedule->command(EvaluateEdgeGuardrailsCommand::class)
-            ->dailyAt('02:45')
-            ->withoutOverlapping();
-
         // After the sweep (01:50) and the usage roll-up, so the state it
         // reports reflects today's measurements rather than yesterday's.
-        $schedule->command(EvaluateServerlessAssetGuardrailsCommand::class)
-            ->dailyAt('02:50')
-            ->name('serverless-asset-guardrails')
-            ->withoutOverlapping()
-            ->onOneServer();
 
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
 
@@ -337,8 +280,6 @@ final class DplySchedule
             ->dailyAt('03:05')
             ->name('bundle-entitlements-purge')
             ->withoutOverlapping();
-
-        $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
 
         // Capture failed operations into the dedicated error stream, then cap
         // its growth nightly. The sweeper polls the source tables (failures are
@@ -393,7 +334,6 @@ final class DplySchedule
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');
-        $schedule->command(CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(RenewServerWildcardCertificatesCommand::class)
@@ -426,7 +366,6 @@ final class DplySchedule
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->name('prune-quick-downloads');
-        $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneFeedbackAttachmentsCommand::class)->dailyAt('04:25');
 
         // Safety net for orphaned site relations (errors/logs/polymorphic links)
@@ -436,8 +375,8 @@ final class DplySchedule
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();
 
-        // Local control-plane build scratch (serverless artifacts / repo caches /
-        // task-runner temp). Local filesystem work, so it runs in the background
+        // Local control-plane build scratch (task-runner temp). Local
+        // filesystem work, so it runs in the background
         // rather than blocking the scheduler tick. Per-box files — see the
         // onOneServer caveat in the class docblock for split deployments.
         $schedule->command(PruneLocalWorkspaceArtifactsCommand::class)

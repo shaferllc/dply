@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Edge\Support\EdgeBuildDockerBootstrap;
 use App\Support\DplyRuntime;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -36,18 +35,6 @@ class DplyRuntimeCheckCommand extends Command
             if ($horizonExit !== self::SUCCESS) {
                 $issues[] = 'Horizon is not running on this worker node.';
                 $this->error(trim(Artisan::output()) !== '' ? trim(Artisan::output()) : 'Horizon is not running on this worker node.');
-            }
-        }
-
-        // Workers drain Edge builds — Docker must be reachable as www-data.
-        if (DplyRuntime::expectsHorizon() && ! EdgeBuildDockerBootstrap::isLocalDesktopEnvironment()) {
-            if (! EdgeBuildDockerBootstrap::daemonReachable()) {
-                $msg = 'Docker daemon not reachable for Edge builds ('
-                    .EdgeBuildDockerBootstrap::probeDetail()
-                    .'). Run: sudo php artisan dply:edge:ensure-build-docker --user='
-                    .EdgeBuildDockerBootstrap::queueUser();
-                $issues[] = $msg;
-                $this->error($msg);
             }
         }
 

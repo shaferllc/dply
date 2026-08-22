@@ -219,11 +219,6 @@ class Organization extends Model
      * noise. Deliberately an exists() rather than a count — the caller only
      * needs the boolean.
      */
-    public function hasCloudApps(): bool
-    {
-        return $this->sites()->cloudApps()->exists();
-    }
-
     /** The org's secret-residency encryption key (per-org age keypair), if minted. *
      * @return HasOne<OrgSecretKey, $this>
      */
