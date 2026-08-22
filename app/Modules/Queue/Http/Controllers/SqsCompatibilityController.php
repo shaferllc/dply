@@ -12,7 +12,6 @@ use App\Modules\Queue\Support\QueueAction;
 use App\Modules\Queue\Support\QueueEntitlements;
 use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Queue\Services\FleetWaker;
-use App\Modules\Serverless\Services\ServerlessQueuePump;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -46,7 +45,6 @@ class SqsCompatibilityController extends Controller
     public function __construct(
         private readonly QueueStore $store,
         private readonly QueueEntitlements $entitlements,
-        private readonly ServerlessQueuePump $pump,
         private readonly FleetWaker $waker,
     ) {}
 
@@ -477,37 +475,11 @@ class SqsCompatibilityController extends Controller
      *
      * This is the payoff of hosting the store: dply knows a job arrived the
      * moment it lands, so there is nothing to poll and nothing for the app to
-     * tell us. The serverless wake endpoint and the handler's JobQueued hook
-     * exist only because, until now, dply could not see the customer's queue.
+     * tell us.
      */
     private function wakeDrainers(QueueRequestContext $context, string $queue): void
     {
-        // A managed fleet is dply's own worker pool for this queue; the pump
-        // is the serverless site's. A namespace can have either, and asking
-        // both is cheaper than deciding which one this namespace is.
         $this->waker->wake($context->namespace, $queue);
-
-        $this->wakePump($context);
-    }
-
-    private function wakePump(QueueRequestContext $context): void
-    {
-        $site = $context->namespace->site;
-
-        if ($site === null) {
-            return;
-        }
-
-        try {
-            $this->pump->wake($site);
-        } catch (Throwable $e) {
-            // Never fail a push because draining could not be kicked off; the
-            // safety-net tick still picks it up.
-            Log::warning('queue.pump_wake_failed', [
-                'namespace_id' => $context->namespaceId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**

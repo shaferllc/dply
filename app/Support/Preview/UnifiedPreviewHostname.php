@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Support\Preview;
 
 use App\Models\Site;
-use App\Modules\Edge\Support\EdgeTestingDomains;
 use Illuminate\Support\Str;
 
 /**
@@ -49,24 +48,24 @@ final class UnifiedPreviewHostname
     public function preferredApex(): string
     {
         if ((bool) config('preview.prefer_on_dply_apex', true)) {
-            foreach ($this->sharedTestingPool() as $domain) {
-                if ($domain === EdgeTestingDomains::defaultApex()) {
+            foreach (self::sharedTestingPool() as $domain) {
+                if ($domain === self::preferredOnDplyApex()) {
                     return $domain;
                 }
             }
 
-            foreach ($this->sharedTestingPool() as $domain) {
-                if (EdgeTestingDomains::isOnDplyDomain($domain)) {
+            foreach (self::sharedTestingPool() as $domain) {
+                if (self::isOnDplyDomain($domain)) {
                     return $domain;
                 }
             }
         }
 
-        if ($this->sharedTestingPool() !== []) {
-            return $this->sharedTestingPool()[0];
+        if (self::sharedTestingPool() !== []) {
+            return self::sharedTestingPool()[0];
         }
 
-        return EdgeTestingDomains::defaultApex();
+        return self::preferredOnDplyApex();
     }
 
     /**
@@ -149,14 +148,14 @@ final class UnifiedPreviewHostname
 
         $onDply = array_values(array_filter(
             $pool,
-            static fn (string $domain): bool => EdgeTestingDomains::isOnDplyDomain($domain),
+            static fn (string $domain): bool => self::isOnDplyDomain($domain),
         ));
 
         if ($onDply === []) {
             return $pool;
         }
 
-        $preferred = EdgeTestingDomains::defaultApex();
+        $preferred = self::preferredOnDplyApex();
         $ordered = in_array($preferred, $onDply, true) ? [$preferred] : [];
         foreach ($onDply as $domain) {
             if (! in_array($domain, $ordered, true)) {
@@ -187,8 +186,44 @@ final class UnifiedPreviewHostname
     /**
      * @return list<string>
      */
-    private function sharedTestingPool(): array
+    private static function sharedTestingPool(): array
     {
-        return EdgeTestingDomains::sharedTestingPool();
+        return array_values(array_filter(array_map(
+            static fn (string $value): string => strtolower(trim($value)),
+            (array) config('services.digitalocean.testing_domains', []),
+        )));
+    }
+
+    /**
+     * Managed-preview hostnames live on the on-dply.* pool. This preference
+     * used to sit in the Edge module's testing-domain helper; previews are the
+     * only consumer left, so it lives here now.
+     */
+    private const PREFERRED_APEX = 'on-dply.site';
+
+    private static function preferredOnDplyApex(): string
+    {
+        $pool = self::sharedTestingPool();
+
+        foreach ([self::PREFERRED_APEX, 'on-dply.cloud'] as $candidate) {
+            if (in_array($candidate, $pool, true)) {
+                return $candidate;
+            }
+        }
+
+        foreach ($pool as $domain) {
+            if (self::isOnDplyDomain($domain)) {
+                return $domain;
+            }
+        }
+
+        return $pool[0] ?? self::PREFERRED_APEX;
+    }
+
+    private static function isOnDplyDomain(string $domain): bool
+    {
+        $domain = strtolower(trim($domain));
+
+        return str_starts_with($domain, 'on-dply.') || str_starts_with($domain, 'ondply.');
     }
 }

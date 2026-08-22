@@ -10,7 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRedirect;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
-use App\Modules\Edge\Services\Config\EdgeRepoConfig;
+use App\Services\Sites\RepoConfig\RepoConfig;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
@@ -126,7 +126,7 @@ final class ByoRepoConfigSync
         return null;
     }
 
-    private function syncRedirects(Site $site, EdgeRepoConfig $config): int
+    private function syncRedirects(Site $site, RepoConfig $config): int
     {
         SiteRedirect::query()
             ->where('site_id', $site->id)
