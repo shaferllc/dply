@@ -9,6 +9,8 @@ import * as uptimeCommands from './uptime-commands.mjs';
 import * as notificationsCommands from './notifications-commands.mjs';
 import * as updateCommands from './update-command.mjs';
 import * as serverlessCommands from './serverless-commands.mjs';
+import * as initCommand from './init-command.mjs';
+import * as instanceCommands from './instance-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
 import { readSiteLink } from './config.mjs';
 import { linkedSiteProduct } from './site-context.mjs';
@@ -25,7 +27,9 @@ const TOP_LEVEL = {
   account: { handler: runAccount, summary: 'Profile, orgs, CLI sessions (show, orgs, sessions, revoke).' },
   project: { handler: runProject, summary: 'Org projects — group servers/sites, deploy, health, members.' },
   billing: { handler: runBilling, summary: 'Plan estimate, breakdown, invoices (org admin).' },
-  link: { handler: commands.link, summary: 'Link this repo to a BYO or Edge site (.dply/site.json).' },
+  init: { handler: initCommand.init, summary: 'Set this folder up on dply — pick a kind, create the site, deploy it.' },
+  use: { handler: instanceCommands.useCommand, summary: 'Switch which dply instance the CLI talks to (list, <name>, <url>, forget).' },
+  link: { handler: commands.link, summary: 'Link this folder to a site that already exists (.dply/site.json).' },
   sites: { handler: commands.sites, summary: 'List every site — VM, Edge, serverless (--kind, name filter).' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
   errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
@@ -214,6 +218,28 @@ async function runLinkedDeploy(argv) {
   }
 
   const link = await readSiteLink();
+
+  // A folder set up by `dply init` links a serverless site. For an uploaded
+  // source "deploy" means "send this folder again" — there is no remote to
+  // push to — and for a git one it means confirming that what dply will build
+  // is what the user thinks it is.
+  if (product === 'serverless' || link?.link?.kind === 'serverless') {
+    const { resolveContext } = await import('./config.mjs');
+    const { ApiClient } = await import('./api.mjs');
+    const { prepareServerlessSource } = await import('./deploy-source.mjs');
+
+    const ctx = await resolveContext({ siteFlag: flags.site });
+    const client = new ApiClient({ baseUrl: ctx.baseUrl, token: ctx.token });
+    const { handled } = await prepareServerlessSource(client, ctx.siteId, flags);
+    if (handled) {
+      info(c.dim('Uploaded — deploying.'));
+
+      return 0;
+    }
+
+    return siteCommands.siteCommand(['deploy', ...args], flags);
+  }
+
   if (flags.site) {
     return siteCommands.siteCommand(['deploy', ...args], flags);
   }
@@ -450,6 +476,8 @@ export function allCommandLines() {
     'help',
     'guide',
     'update',
+    'init',
+    'use',
     'link',
     'sites',
     'account',
@@ -553,7 +581,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
   }
 
   if (!normalized || normalized === 'account') {

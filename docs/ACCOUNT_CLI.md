@@ -27,9 +27,107 @@ The CLI is hosted by **this dply instance — not npm**. The install script down
 
 Run `dply login` — your browser opens here, you approve the device once, and the terminal drops into `dply shell`. Each approval creates a **session** listed on this page. If you need more scopes later, run `dply auth refresh` (same browser approval, new token on that machine).
 
+## Working with more than one instance
+
+A CLI token belongs to the instance that minted it, so pointing the CLI at a
+second dply install is a swap of both URL and credential. `dply use` keeps them
+side by side:
+
+- `dply use` — pick from the instances you are signed in to.
+- `dply use list` — show them, with the active one marked.
+- `dply use <host>` — switch to a saved one (`dply use dply.io`).
+- `dply use <url>` — add one; it signs you in and leaves the others saved.
+- `dply use forget <host>` — drop a saved session.
+
+`dply login --base-url <url>` adds an instance rather than replacing the current
+one, and `dply logout` signs out of the active instance only.
+
 ## Sessions
 
 Every approved device shows up under **CLI authentications**. **Revoke** a session to immediately invalidate that machine's token.
+
+## Starting a project
+
+`dply init` is the one command for a folder that is not on dply yet: it signs you
+in if you are not, works out what the folder is, creates the site, and follows
+the deploy to a live URL.
+
+```
+cd ~/work/acme/checkout
+dply init
+```
+
+What it does, and why:
+
+- **Not signed in?** It runs the device-flow approval inline and carries on — no
+  restart, no second command.
+- **Picks a kind.** All four are listed, best fit first, and an option that does
+  not suit the folder still says why ("Edge — no static build output found")
+  rather than disappearing. Kinds the CLI cannot create yet open the dashboard
+  wizard prefilled.
+- **Picks a source.** A folder with a reachable git remote deploys from git and
+  gets push-to-deploy. A folder with no remote — or one dply cannot clone — is
+  **uploaded**, and deploys exactly the same way afterwards. Both are fully
+  supported; the only thing an uploaded source cannot have is push-to-deploy,
+  because there is no remote to push to.
+- **Tells you what will actually deploy.** dply builds `origin/<branch>`, not
+  your working folder. If you have unpushed commits it says so and offers to
+  push, deploy the remote as it stands, or upload the folder as-is.
+- **Handles a monorepo.** Run it in `apps/api` and that subdirectory is what gets
+  built.
+- **Asks before secrets leave the machine.** A `.env` is offered by **key name
+  only** — values are never printed — and goes straight into the site's encrypted
+  environment rather than riding the upload.
+- **Confirms once.** Everything it inferred is shown as one block (name, source,
+  detected runtime, region, whose account it runs in, and where it lands against
+  your plan's function quota) behind a single `[Y/n]`.
+
+Useful flags — every prompt has one, so init works in a pipeline:
+`--kind`, `--name`, `--region`, `--source git|upload`, `--delivery managed|byo`,
+`--runtime`, `--template node|php|python`, `--exclude <path>`, `--env-file` /
+`--no-env-file`, `--no-deploy`, `--yes`. Non-interactive without enough flags
+exits 2 naming what is missing.
+
+Re-running `dply init` in a folder that is already linked shows the site's status
+and offers to deploy, open it, or create another — so it is always a safe thing
+to type. Creating functions from the CLI needs the **`serverless.create`** scope;
+if your session predates it, init offers to re-approve inline.
+
+`dply link` remains the way to attach a folder to a site that **already exists**,
+and now lists all four kinds rather than just BYO and Edge.
+
+### Cloud apps
+
+`dply init --kind cloud` creates a managed container app from the same folder.
+It works the same way, with one structural difference: the container backend
+clones and builds your repository itself, so **a cloud app needs a git remote**.
+There is no upload path to fall back on, and init says so plainly rather than
+failing at provision time — if you want to deploy a folder that has no remote,
+that is what serverless is for.
+
+init resolves the backend (DigitalOcean App Platform or AWS App Runner) from
+your connected credentials, validates the region against that backend, and shows
+the size tier, instance count and port before creating anything. Flags:
+`--backend`, `--region`, `--size`, `--instances`, `--port`, `--dockerfile`.
+
+### Sites on your own servers
+
+`dply init --kind vm` creates a site on a server you already own. A site has to
+live somewhere, so init lists your ready servers and asks which one — it will
+**not** provision a server for you, since that is a bigger decision than a folder
+should trigger. An organization with no servers is pointed at the dashboard (or
+at serverless, which needs no server at all).
+
+It infers the site type from the folder (composer.json → php, package.json →
+node, index.html → static) and shows the document root it will use —
+`/home/dply/<hostname-or-slug>`, plus `/public` for PHP — before creating
+anything. Flags: `--server`, `--type`, `--hostname`, `--document-root`, `--port`.
+
+Ordinary webserver hosts only for now. A Docker, Kubernetes, functions, or
+headless server says so and points at the dashboard, where the host-specific
+options live.
+
+
 
 ## Deploying
 

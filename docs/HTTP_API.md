@@ -79,6 +79,146 @@ behind their own abilities, and return the extra fields those products have.
 
 `{site}` accepts either the slug or the ULID.
 
+### Instance capabilities
+
+`GET /api/v1/capabilities` reports what this instance actually offers: which
+surfaces are enabled, which kinds the CLI can create, the serverless region
+list, whether dply-managed delivery is available, the upload size cap, and the
+organization's function quota. `dply init` reads it before showing anything, so
+the CLI hardcodes none of it — a self-hosted instance with Edge switched off
+simply does not offer Edge. An instance that predates this endpoint 404s, and
+the CLI reports that by name rather than failing obscurely.
+
+### Creating a serverless function
+
+`POST /api/v1/serverless/sites` creates a function and starts its first deploy.
+This is the only endpoint in the API that provisions billable infrastructure, so
+it carries its own **`serverless.create`** ability — `serverless.write`
+reconfigures a function that exists and deliberately does not extend to making
+one — plus a per-organization rate limit and a feature flag operators enable per
+instance.
+
+| field | notes |
+| --- | --- |
+| `name` | required |
+| `source_kind` | `git` (default) or `upload` |
+| `repo`, `branch`, `git_ref_kind` | required for `source_kind=git`; `owner/name` shorthand is accepted |
+| `repository_subdirectory` | build from a subdirectory of the repo (monorepos) |
+| `region` | one of the regions `GET /capabilities` lists; defaults to the instance default |
+| `delivery_mode` | `managed` (dply's platform) or `byo` (your DigitalOcean account) |
+| `provider_credential_id` | optional — the organization's preferred healthy DigitalOcean credential is used when omitted |
+| `runtime` | `auto` (default) leaves it to deploy-time detection |
+| `env_file_content` | written straight to the site's **encrypted** environment; never logged or echoed back |
+| `source_handle` | a handle from the upload endpoint, for `source_kind=upload` |
+| `enable_push_to_deploy` | default true; registers the git webhook for a git source |
+
+Send `"dry_run": true` to run every gate and the real runtime detection **without
+side effects**. The response carries the detected plan (framework, runtime,
+entrypoint, build command, and long-running signals like Horizon) plus the
+organization's function quota. Detection is the same detector the deploy runs —
+for a git source it clones a throwaway preview workspace, for an upload it
+inspects the posted archive — so what the dry run reports is what the deploy will
+decide.
+
+When a precondition fails, the response is `422` with a typed **blocker** rather
+than a message to parse:
+
+```json
+{"blocker": {
+  "code": "no_provider_credential",
+  "message": "This organization has no DigitalOcean credential…",
+  "resolve_url": "https://dply.io/credentials",
+  "resolve_command": null
+}}
+```
+
+Codes: `surface_disabled`, `cli_create_disabled`, `forbidden`, `quota_exceeded`,
+`trial_paused`, `managed_unavailable`, `no_provider_credential`,
+`credential_unhealthy`, `invalid_region`, `source_required`. Codes are added,
+never renamed. A `403` on this endpoint means the token predates the
+`serverless.create` ability — re-approve it with `dply auth refresh`.
+
+Send an **`Idempotency-Key`** header. A create whose response is lost otherwise
+means a retry provisions a second billable namespace; with the key the original
+create is replayed (`200`, `"replayed": true`) instead.
+
+`POST /api/v1/serverless/sites/source` accepts a `.tar.gz` of a project folder as
+`archive` and returns a `source_handle` for a create that has not happened yet.
+`POST /api/v1/serverless/sites/{site}/source` replaces an existing function's
+source and redeploys — for an upload-source site that *is* the deploy, since
+there is no remote to push to. Archives are rejected server-side if they contain
+absolute paths, `..` components, symlinks, hard links or device nodes, or if they
+exceed the instance's size, entry-count, or uncompressed-size caps.
+
+`DELETE /api/v1/serverless/sites/{site}` is the CLI's **undo**, not a general
+delete: it refuses (`409`) any function that has ever deployed successfully, so a
+token cannot destroy something that served a request. Deleting a live function
+stays a dashboard action. The response reports `remote_error` / `bucket_error`
+separately, because a namespace or bucket dply could not reach keeps billing.
+
+### Creating a site on a server you own
+
+`POST /api/v1/servers/{server}/sites` creates a site on a BYO server, behind the
+**`sites.create`** ability and the `surface.vm_cli_create` flag. Same contract as
+the other two creates — `dry_run`, typed blockers, `Idempotency-Key`, shared
+create limiter.
+
+Fields: `name` (required), `type` (`php` | `static` | `node`), `document_root`,
+`primary_hostname`, `git_repository_url`, `git_branch`, `runtime`,
+`runtime_version`, `build_command`, `start_command`, `app_port`, `framework`,
+`env_file_content`.
+
+`document_root` is optional: it defaults to `/home/dply/<hostname-or-slug>`,
+following the same convention as `Site::conventionalRepositoryPath()`, with
+`/public` appended for PHP. The dry run returns the path it would use, so the
+caller can show it before committing.
+
+**Narrower than the managed creates, deliberately.** It creates on ordinary
+webserver hosts only. A functions, Docker, Kubernetes, or headless
+(`webserver=none`) host returns a `host_unsupported` blocker pointing at the
+dashboard, because sites on those need host-specific configuration — internal
+port allocation, runtime targets, container registries — that the create wizard
+builds from capability-specific form state. Additional blocker code:
+`server_not_ready`, since a site created against a half-built server would sit
+pending with the reason recorded on the server rather than the site.
+
+### Creating a cloud app
+
+`POST /api/v1/cloud/sites` creates a managed container app. Same shape as the
+serverless create — own **`cloud.create`** ability, own feature flag, the shared
+per-organization create limiter, `Idempotency-Key`, typed blockers on `422`, and
+a `dry_run` that runs the whole gate chain with no side effects.
+
+| field | notes |
+| --- | --- |
+| `name` | required |
+| `mode` | `source` (default, builds from a repo) or `image` (prebuilt) |
+| `repo`, `branch`, `dockerfile_path` | source mode |
+| `image` | image mode |
+| `port`, `instances`, `size_tier` | defaults `8080`, `1`, `small` |
+| `region` | validated against the resolved backend's region list |
+| `backend` | `auto` (default), `digitalocean_app_platform`, or `aws_app_runner` |
+| `env_file_content` | the app's environment; never logged or echoed back |
+| `deploy_on_push` | default true |
+
+The dry run returns the **resolved backend**, its regions, the size tiers, and
+the organization's cloud quota — the backend is what decides which regions are
+even valid, so it has to be resolved before a region can be checked.
+
+**A cloud app has no uploaded-source mode.** The container backend clones and
+builds the repository itself, so dply never holds the source: a folder with no
+reachable git remote genuinely cannot become a cloud app, and
+`GET /api/v1/capabilities` reports this as `kinds.cloud.requires_git = true`.
+That is the one structural difference from a function, which can be deployed
+from a folder as-is.
+
+Blocker codes add `no_backend` (no container credentials connected),
+`source_unsupported` (App Runner source builds need an authorized GitHub
+connection on the credential), and `spec_rejected` (the provider refused the
+app spec). Note the web wizard additionally pre-flights the spec against the
+provider before creating; that path lives in the shell, so over HTTP a spec
+rejection surfaces on the real create rather than on the dry run.
+
 ### Serverless platform
 
 `GET /api/v1/serverless/sites/{site}/platform` reads the function host live and

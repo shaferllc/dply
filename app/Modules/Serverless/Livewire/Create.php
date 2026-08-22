@@ -14,6 +14,8 @@ use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 use App\Modules\Serverless\Actions\CreateServerlessFunction;
 use App\Modules\Serverless\Livewire\Concerns\ManagesServerlessCreateGit;
 use App\Modules\Serverless\Services\ServerlessCostEstimator;
+use App\Modules\Serverless\Services\ServerlessCreateGate;
+use App\Support\SiteCreateBlocker;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Serverless\ServerlessWorkspaceUrl;
@@ -322,7 +324,7 @@ class Create extends Component
         }
     }
 
-    public function create(CreateServerlessFunction $action): mixed
+    public function create(CreateServerlessFunction $action, ServerlessCreateGate $gate): mixed
     {
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
@@ -332,31 +334,43 @@ class Create extends Component
         }
         $this->authorize('update', $org);
 
-        if (! $org->canCreateSite()) {
-            $this->toastError($org->siteLimitMessage());
-
-            return null;
-        }
-
-        // Creating a function is only half the act — the create chain
-        // immediately provisions a real (billable) DO Functions namespace and
-        // then hands off to RunSiteDeploymentJob, which drops the deploy for a
-        // pause-blocked org. Letting the create through would leave a namespace
-        // standing and a function that can never go live, so stop at the door.
-        if (! $org->canDeploy()) {
-            $this->dispatch('billing-paused');
-            $this->toastError(__('Deploys are paused — add a payment method before creating a serverless app.'));
-
-            return null;
-        }
-
         // A stray "managed" pick when the option isn't actually available
-        // would fail downstream — coerce it back to BYO so validation reflects
-        // what the user can really do.
+        // would fail downstream — coerce it back to BYO so the gate and the
+        // validation below both reflect what the user can really do.
         if ($this->delivery_mode === 'managed' && ! $this->managedAvailable()) {
             $this->delivery_mode = 'byo';
         }
         $managed = $this->delivery_mode === 'managed';
+
+        // Every create precondition — surface flag, role, function quota,
+        // billing pause, region, credential health — lives in one gate that
+        // the API create and its dry run call too, so the two surfaces cannot
+        // disagree about who may provision billable infrastructure.
+        $blocker = $gate->check(auth()->user(), $org, [
+            'delivery_mode' => $this->delivery_mode,
+            'provider_credential_id' => $this->provider_credential_id,
+            'region' => $this->region,
+        ], ServerlessCreateGate::CONTEXT_WEB);
+
+        if ($blocker !== null) {
+            if ($blocker->code === SiteCreateBlocker::TRIAL_PAUSED) {
+                $this->dispatch('billing-paused');
+            }
+
+            // Credential problems belong on the field, not in a toast.
+            if (in_array($blocker->code, [
+                SiteCreateBlocker::NO_PROVIDER_CREDENTIAL,
+                SiteCreateBlocker::CREDENTIAL_UNHEALTHY,
+            ], true)) {
+                $this->addError('provider_credential_id', $blocker->message);
+
+                return null;
+            }
+
+            $this->toastError($blocker->message);
+
+            return null;
+        }
 
         // Validate the credential by row, scoped to org + provider. The action
         // re-checks the same constraint as defense-in-depth (in case a future

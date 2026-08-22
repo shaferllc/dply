@@ -102,6 +102,92 @@ dply site list       # BYO VM sites
 dply shell           # re-open the interactive shell anytime
 ```
 
+## Switch instances (`dply use`)
+
+A dply token is minted by, and valid only for, one instance — so moving between
+a local install and the hosted one is a swap of URL *and* credential. The CLI
+keeps several signed-in instances and switches between them:
+
+```sh
+dply use                      # pick from the ones you are signed in to
+dply use list                 # show them, active one marked
+dply use dply.io             # switch to a saved instance
+dply use https://dply.io     # add one — signs you in, keeps the others
+dply use live                 # shorthand for the hosted instance
+dply use forget dply.test     # drop a saved session
+```
+
+Instances are keyed by hostname, so there is no alias to invent or remember.
+`dply login --base-url <url>` now *adds* an instance instead of replacing the
+one you were already using, and `dply logout` signs you out of the active
+instance only.
+
+Config lives at `~/.dply/config.json`. A config written by an older CLI is
+adopted on first use — it becomes an instance named after its own host and stays
+active, so upgrading logs nobody out.
+
+## Start a project (`dply init`)
+
+One command from a folder to a live URL:
+
+```sh
+cd ~/work/acme/checkout
+dply init
+```
+
+It signs you in if you are not, works out what the folder is, creates the site,
+and follows the deploy until the URL answers.
+
+**The kind menu never hides a path.** All four kinds are listed, best fit first,
+and one that does not suit the folder still says why — `Edge — no static build
+output found` — rather than vanishing. Kinds the CLI cannot create yet open the
+dashboard wizard, prefilled.
+
+**Git or upload, whichever the folder is.** A reachable remote deploys from git
+and gets push-to-deploy. No remote — or one dply cannot clone — uploads the
+folder instead, and that is a fully supported source, not a fallback: it gets the
+same framework detection, build hooks, adapters, asset publishing and rollback.
+The one thing it cannot have is push-to-deploy, because there is no remote to
+push to. `dply deploy` re-uploads.
+
+**It says what will actually deploy.** dply builds `origin/<branch>`, not your
+working folder. With unpushed commits it offers to push, deploy the remote as it
+stands, or upload the folder as-is — rather than letting you find out from the
+deployed site. `dply deploy` keeps a lighter version of that check.
+
+**Monorepos work.** Run it in `apps/api` and that subdirectory is what builds.
+
+**Secrets are asked for, never assumed.** A `.env` is offered by key name only —
+values are never printed — and goes into the site's encrypted environment rather
+than riding the upload.
+
+**One confirmation.** Name, source, detected runtime, region, whose account it
+runs in, and where it lands against your plan's function quota, behind a single
+`[Y/n]`.
+
+Empty folder? It offers to write a hello-world (`--template node|php|python`)
+and deploys that.
+
+Flags — every prompt has one, so init runs in a pipeline:
+
+```
+--kind <vm|cloud|edge|serverless>   --name <name>        --region <slug>
+--source <git|upload>               --delivery <managed|byo>
+--runtime <auto|nodejs:20|php:8.4>  --template <node|php|python>
+--exclude <path>                    --env-file <path> / --no-env-file
+--no-deploy                         --yes
+```
+
+Non-interactive without enough flags exits 2 naming what is missing. Re-running
+`dply init` in a linked folder shows the site and offers to deploy, open, or
+create another — it is always safe to type.
+
+Creating functions needs the **`serverless.create`** scope; a session older than
+that is offered an inline re-approval.
+
+`dply link` still attaches a folder to a site that **already exists**, and now
+lists all four kinds rather than only BYO and Edge.
+
 ## Deploy a BYO site (hero workflow)
 
 From your app repo:

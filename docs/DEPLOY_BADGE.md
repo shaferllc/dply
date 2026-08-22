@@ -15,11 +15,11 @@ repo URL pre-filled.
 ## Markdown snippet
 
 ```markdown
-[![Deploy to dply](https://dply.dev/images/deploy-to-dply.svg)](https://dply.dev/deploy?repo=OWNER/REPO)
+[![Deploy to dply](https://dply.io/images/deploy-to-dply.svg)](https://dply.io/deploy?repo=OWNER/REPO)
 ```
 
 Replace `OWNER/REPO` with the GitHub / GitLab / Bitbucket path of your
-template. The short-link accepts full clone URLs too — `https://dply.dev/deploy?repo=https://github.com/owner/repo`.
+template. The short-link accepts full clone URLs too — `https://dply.io/deploy?repo=https://github.com/owner/repo`.
 
 ## Pre-filling more than the repo
 

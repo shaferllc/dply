@@ -247,6 +247,15 @@ return [
                 // Asset delivery never stops when a site goes over — the
                 // overage is billed and surfaced. This is the surfacing.
                 'serverless.assets.over_budget' => 'Serverless asset usage over the included allowance',
+
+                // Account-scoped (routed to org admins directly, not via a
+                // server/site subscription target) because the subject is a
+                // site that did not exist a moment before the event — nobody
+                // could have subscribed to it. Fires only when an API token is
+                // the actor; a person creating one in the dashboard was there
+                // for it.
+                'account.serverless.function_created' => 'Function created from the CLI (provisions billable infrastructure)',
+                'account.cloud.site_created' => 'Cloud app created from the CLI (provisions billable infrastructure)',
             ],
         ],
         'backup' => [

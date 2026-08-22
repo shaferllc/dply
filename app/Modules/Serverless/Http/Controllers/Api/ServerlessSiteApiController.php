@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Http\Controllers\Api;
 
+use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use Illuminate\Http\JsonResponse;
@@ -54,8 +55,36 @@ class ServerlessSiteApiController extends ServerlessApiController
                 'action_name' => $found->serverlessActionName(),
                 'namespace' => isset($config['namespace']) ? (string) $config['namespace'] : null,
                 'health' => $this->health($found),
+                // `dply init` follows two phases, and only the second one has
+                // a SiteDeployment to poll. Namespace provisioning lives on
+                // the host Server, so without this a bad DigitalOcean
+                // credential — the likeliest first-run failure — would show up
+                // as an endless wait for a deployment that never gets
+                // dispatched.
+                'provision' => $this->provisionState($found),
+                'source_kind' => $found->serverlessConfig()['source_kind'] ?? 'git',
             ],
         ]);
+    }
+
+    /**
+     * @return array{status: string, ready: bool, failed: bool, error: ?string}
+     */
+    private function provisionState(Site $site): array
+    {
+        $server = $site->server;
+        $status = (string) ($server?->status ?? '');
+        $meta = is_array($server?->meta) ? $server->meta : [];
+        $error = trim((string) ($meta['provision_error'] ?? ''));
+
+        return [
+            'status' => $status,
+            'ready' => $server !== null && $status === Server::STATUS_READY,
+            'failed' => $status === Server::STATUS_ERROR,
+            // Already redacted where it is written (DeployLogRedactor +
+            // ServerlessCustomerCopy), so it is safe to hand back.
+            'error' => $error !== '' ? $error : null,
+        ];
     }
 
     /**

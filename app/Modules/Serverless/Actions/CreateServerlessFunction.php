@@ -40,8 +40,18 @@ class CreateServerlessFunction
         $name = trim((string) ($payload['name'] ?? ''));
         $slug = Str::slug($name) ?: 'fn-'.Str::lower(Str::random(6));
 
+        // Where the code comes from. `git` clones a remote at deploy time;
+        // `upload` builds from a tarball the CLI posted, which is how a folder
+        // with no reachable remote reaches the same pipeline. Everything past
+        // the checkout is identical — see
+        // docs/adr/cli-init-and-site-creation.md.
+        $sourceKind = trim((string) ($payload['source_kind'] ?? 'git'));
+        if (! in_array($sourceKind, ['git', 'upload'], true)) {
+            $sourceKind = 'git';
+        }
+
         $repo = $this->normalizeRepo((string) ($payload['repo'] ?? ''));
-        if ($repo === '') {
+        if ($repo === '' && $sourceKind === 'git') {
             throw new InvalidArgumentException('A Git repository is required.');
         }
 
@@ -141,6 +151,12 @@ class CreateServerlessFunction
             'serverless_backend' => $managed ? Site::SERVERLESS_BACKEND_DPLY : Site::SERVERLESS_BACKEND_BYO,
             'serverless_provider_credential_id' => $credential?->id,
             'webhook_secret' => Str::random(48),
+            // `dply init` may hand over an approved local .env. It goes
+            // straight into the encrypted column rather than riding the source
+            // tarball, so the secrets are never written to disk in the clear;
+            // ServerlessEnvironmentPreparer then finds managed env already
+            // populated and skips its repo-seeding branch.
+            'env_file_content' => ($env = trim((string) ($payload['env_file_content'] ?? ''))) !== '' ? $env : null,
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',
                 'git_ref_kind' => $refKind,
@@ -154,6 +170,11 @@ class CreateServerlessFunction
                     'entrypoint' => 'main',
                     'function_name' => $slug,
                     'repo_source' => $repoSource,
+                    'source_kind' => $sourceKind,
+                    // `dply init` in a monorepo subdirectory records it here;
+                    // the checkout and the detector both build from it. The
+                    // web wizard never sets it (it always passes the root).
+                    'repository_subdirectory' => trim((string) ($payload['repository_subdirectory'] ?? ''), '/'),
                     'source_control_account_id' => $sourceControlAccountId !== '' ? $sourceControlAccountId : null,
                     // Public sites pay 8–10s on a cold boot. A minute ping
                     // is the same invoke meter (~43k/mo vs 1M included).

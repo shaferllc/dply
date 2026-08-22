@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Site;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use App\Modules\Serverless\Services\ServerlessSourceStash;
 
 /**
  * Reclaims disk on the control plane by pruning build scratch under
@@ -60,6 +61,12 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
         [$f, $r] = $this->pruneDirectories(storage_path('app/serverless-repositories'), $repositoriesCutoff, $dry, gitAware: true);
         $freed += $f;
         $removed += $r;
+
+        // serverless-uploads/stash-*.tar.gz — project folders uploaded for a
+        // `dply init` dry run that was then abandoned. A site's own source
+        // (site-<id>.tar.gz) is what its next redeploy rebuilds from, so the
+        // stash sweeper leaves it alone regardless of age.
+        $removed += app(ServerlessSourceStash::class)->sweepExpired();
 
         // task-runner/temp/* — short-lived scratch.
         [$f, $r] = $this->pruneDirectories(storage_path('app/task-runner/temp'), $taskRunnerCutoff, $dry, gitAware: false);

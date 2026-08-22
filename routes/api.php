@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\CapabilitiesApiController;
+use App\Http\Controllers\Api\VmSiteCreateApiController;
 use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
 use App\Http\Controllers\Api\BundleEntitlementsController;
@@ -40,6 +42,8 @@ use App\Modules\Serverless\Http\Controllers\Api\ServerlessLogApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessRuntimeApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessScheduleApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessPlatformApiController;
+use App\Modules\Cloud\Http\Controllers\Api\CloudSiteCreateApiController;
+use App\Modules\Serverless\Http\Controllers\Api\ServerlessSiteCreateApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessWorkersApiController;
 use App\Modules\Serverless\Http\Controllers\Api\ServerlessSiteApiController;
 use Illuminate\Support\Facades\Route;
@@ -92,6 +96,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/account', [AccountApiController::class, 'show'])
             ->middleware('ability:'.$apiAbilities['account.show']);
         Route::get('/account/organizations', [AccountApiController::class, 'organizations'])
+            ->middleware('ability:'.$apiAbilities['account.organizations']);
+
+        // What this instance offers — surfaces, creatable kinds, serverless
+        // regions and upload limits. `dply init` reads it before showing
+        // anything, so the CLI hardcodes none of it and an older instance
+        // (404 here) degrades to a named message instead of a mystery.
+        Route::get('/capabilities', [CapabilitiesApiController::class, 'show'])
             ->middleware('ability:'.$apiAbilities['account.organizations']);
         Route::get('/account/projects', [AccountApiController::class, 'projects'])
             ->middleware('ability:'.$apiAbilities['account.projects']);
@@ -204,6 +215,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/servers/{server}/firewall/templates/{template}', [ServerFirewallController::class, 'applyTemplate'])->middleware('ability:'.$apiAbilities['firewall.template_apply']);
 
         Route::get('/sites', [SiteController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.index']);
+        // Creating a site on a server the org owns. Ordinary webserver hosts
+        // only — a container/Kubernetes/functions/headless host returns a
+        // typed blocker pointing at the dashboard, where its host-specific
+        // options live.
+        Route::post('/servers/{server}/sites', [VmSiteCreateApiController::class, 'store'])
+            ->middleware(['ability:'.$apiAbilities['sites.store'], 'throttle:site-create']);
+
         Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->middleware('ability:'.$apiAbilities['sites.deploy']);
         Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments'])->middleware('ability:'.$apiAbilities['sites.deployments']);
         Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment'])->middleware('ability:'.$apiAbilities['sites.deployment_show']);
@@ -332,12 +350,44 @@ Route::prefix('v1')->group(function (): void {
                 ->where('key', '[A-Z][A-Z0-9_]{0,127}');
         });
 
+        // Cloud surface. Only creation lives here so far — the rest of a
+        // container app is still driven from the workspace — so there is no
+        // group-wide throttle to pick yet; the create carries its own.
+        Route::prefix('cloud')->group(function () use ($apiAbilities): void {
+            Route::post('/sites', [CloudSiteCreateApiController::class, 'store'])
+                ->middleware(['ability:'.$apiAbilities['cloud.sites.store'], 'throttle:site-create']);
+        });
+
         // Serverless surface. Shares the edge-api throttle for the same
         // reason: `serverless logs --follow` and `serverless errors --watch`
         // poll on a timer, and the default v1 limit is sized for one-shot calls.
         Route::prefix('serverless')->middleware('throttle:edge-api')->group(function () use ($apiAbilities): void {
             Route::get('/sites', [ServerlessSiteApiController::class, 'index'])
                 ->middleware('ability:'.$apiAbilities['serverless.sites.index']);
+
+            // Creating a function from the CLI (`dply init`). The first API
+            // surface that provisions anything, so it carries its own ability,
+            // its own feature flag (checked inside ServerlessCreateGate), and
+            // its own per-organization limiter rather than the polling-shaped
+            // edge-api one. `dry_run: true` runs the whole gate chain and the
+            // real runtime detection with no side effects.
+            Route::post('/sites', [ServerlessSiteCreateApiController::class, 'store'])
+                ->middleware(['ability:'.$apiAbilities['serverless.sites.store'], 'throttle:site-create']);
+
+            // Uploaded project folder. Without {site} it stashes for a create
+            // that has not happened yet; with one it replaces the source and
+            // redeploys — an upload site's equivalent of a git push.
+            Route::post('/sites/source', [ServerlessSiteCreateApiController::class, 'source'])
+                ->middleware('ability:'.$apiAbilities['serverless.sites.source']);
+            Route::post('/sites/{site}/source', [ServerlessSiteCreateApiController::class, 'source'])
+                ->middleware('ability:'.$apiAbilities['serverless.sites.source']);
+
+            // `dply init`'s undo, and only that: refuses any function that has
+            // ever deployed successfully, so a token cannot destroy something
+            // that served a request. Deleting a live function stays a
+            // dashboard action with its name-typing confirmation.
+            Route::delete('/sites/{site}', [ServerlessSiteCreateApiController::class, 'destroy'])
+                ->middleware(['ability:'.$apiAbilities['serverless.sites.destroy'], 'throttle:site-create']);
             Route::get('/sites/{site}', [ServerlessSiteApiController::class, 'show'])
                 ->middleware('ability:'.$apiAbilities['serverless.sites.show']);
 

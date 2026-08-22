@@ -25,6 +25,18 @@
 | at /admin/flags/all) → config/env default here. Change globals from the
 | admin UI, or via env + config:clear (tests: config([...]) + flush cache).
 |
+| GOTCHA — changing a default here may do nothing. Pennant's store is the
+| database, so the FIRST time a flag is checked it WRITES the resolved value
+| to the `features` table, and that row then outranks this file forever. So a
+| flag that shipped `false`, was checked once, and is later flipped to `true`
+| here keeps answering false — including for scopes nobody deliberately
+| overrode. After changing a default, purge the stored rows:
+|
+|     php artisan pennant:purge surface.<leaf>
+|
+| (Seen for real: surface.*_cli_create shipped default-off, was resolved once
+| by `dply init`, and stayed off through a config change and a config:clear.)
+|
 | Namespaces in this file:
 |   surface.*   — whole product routes (Cloud, Edge, Fleet, …)
 |   workspace.* — server-workspace pages + *_preview teasers
@@ -288,9 +300,27 @@ return [
         | scheduled jobs stay live regardless — see the note above.
         */
         'cloud' => env('FEATURE_SURFACE_CLOUD', true),
+
+        // Creating a container app from the CLI (`dply init --kind cloud`).
+        // Sibling of surface.serverless_cli_create, and on for the same
+        // reason — the flag is the kill switch, not the rollout gate.
+        'cloud_cli_create' => env('FEATURE_SURFACE_CLOUD_CLI_CREATE', true),
+
+        // Creating a site on a BYO server from the CLI (`dply init --kind vm`).
+        // Narrower in scope than its siblings: ordinary webserver hosts only —
+        // see App\Services\Sites\CreateVmSite.
+        'vm_cli_create' => env('FEATURE_SURFACE_VM_CLI_CREATE', true),
         'edge' => false,
         'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
         'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
+
+        // Creating a serverless site from the CLI (`dply init`). On by
+        // default; the flag remains the kill switch for an operator who wants
+        // the product without the write endpoint. Checked inside
+        // ServerlessCreateGate, so turning it off makes a dry run report a
+        // typed blocker and /api/capabilities report the kind uncreatable —
+        // the CLI then says "switched off here", not "not built yet".
+        'serverless_cli_create' => env('FEATURE_SURFACE_SERVERLESS_CLI_CREATE', true),
 
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
         'projects' => env('FEATURE_SURFACE_PROJECTS', true),

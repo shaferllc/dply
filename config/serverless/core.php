@@ -22,6 +22,69 @@ return [
         'region' => env('DPLY_SERVERLESS_DO_REGION', 'nyc1'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Regions a function may be created in
+    |--------------------------------------------------------------------------
+    |
+    | One list, read by the create wizard, the API create endpoint, and
+    | GET /api/capabilities — which is how `dply init` learns them. The CLI
+    | deliberately bakes in no copy of this.
+    */
+    'regions' => [
+        'nyc1' => 'New York',
+        'sfo3' => 'San Francisco',
+        'ams3' => 'Amsterdam',
+        'fra1' => 'Frankfurt',
+        'syd1' => 'Sydney',
+    ],
+
+    'default_region' => env('DPLY_SERVERLESS_DEFAULT_REGION', 'nyc1'),
+
+    // Create/delete attempts per organization per minute — see the
+    // `serverless-create` limiter in AppServiceProvider.
+    'create_max_per_minute' => (int) env('DPLY_SERVERLESS_CREATE_PER_MINUTE', 10),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Git hosts that may be cloned from
+    |--------------------------------------------------------------------------
+    |
+    | Empty means "public hosts only" — GitCloneUrl::assertClonable() refuses
+    | loopback, private, link-local and carrier-NAT addresses. An operator
+    | running an internal git host lists it here; a leading dot allows a whole
+    | domain (".git.internal").
+    */
+    'git_clone' => [
+        'allowed_hosts' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('DPLY_GIT_CLONE_ALLOWED_HOSTS', ''))
+        ))),
+
+        // Bare filesystem paths as clone targets. Off in production — that is
+        // the shape a caller uses to read the control plane's own disk. The
+        // test suite turns it on (phpunit.xml) because it clones from local
+        // fixture repositories.
+        'allow_local_paths' => filter_var(env('DPLY_GIT_CLONE_ALLOW_LOCAL_PATHS', false), FILTER_VALIDATE_BOOL),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Uploaded source (`dply init` in a folder with no reachable remote)
+    |--------------------------------------------------------------------------
+    |
+    | Enforced server-side. The CLI reads the same numbers from
+    | /api/capabilities so it can fail before spending the upload rather than
+    | after, and the uncompressed/entry caps are what stop a decompression
+    | bomb — the byte cap alone does not.
+    */
+    'upload' => [
+        'max_bytes' => (int) env('DPLY_SERVERLESS_UPLOAD_MAX_BYTES', 100 * 1024 * 1024),
+        'max_uncompressed_bytes' => (int) env('DPLY_SERVERLESS_UPLOAD_MAX_UNCOMPRESSED_BYTES', 400 * 1024 * 1024),
+        'max_entries' => (int) env('DPLY_SERVERLESS_UPLOAD_MAX_ENTRIES', 20000),
+        'stash_ttl_minutes' => (int) env('DPLY_SERVERLESS_UPLOAD_STASH_TTL', 60),
+    ],
+
     'aws' => [
         'use_real_sdk' => filter_var(env('SERVERLESS_AWS_USE_REAL_SDK', false), FILTER_VALIDATE_BOOL),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),

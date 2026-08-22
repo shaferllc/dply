@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Cloud;
 
 use App\Enums\QuotaSurface;
+use App\Modules\Cloud\Services\CloudCreateGate;
+use App\Support\SiteCreateBlocker;
 use App\Livewire\Cloud\Concerns\ManagesCloudCostBackend;
 use App\Livewire\Cloud\Concerns\ManagesCloudRepository;
 use App\Livewire\Cloud\Concerns\ManagesCloudResources;
@@ -327,8 +329,21 @@ class Create extends Component
 
         $this->validate();
 
-        if (! $org->canCreateOnSurface(QuotaSurface::Cloud)) {
-            $this->toastError($org->quotaLimitMessage(QuotaSurface::Cloud));
+        // One gate, shared with the API create and its dry run, so the two
+        // surfaces cannot disagree about who may provision billable
+        // infrastructure. This also adds a billing-pause check the form never
+        // had: a paused org could previously stand up a container app it was
+        // not allowed to deploy to.
+        $blocker = app(CloudCreateGate::class)->check(auth()->user(), $org, [
+            'mode' => $this->mode,
+            'backend' => $this->backend,
+        ], CloudCreateGate::CONTEXT_WEB);
+
+        if ($blocker !== null) {
+            if ($blocker->code === SiteCreateBlocker::TRIAL_PAUSED) {
+                $this->dispatch('billing-paused');
+            }
+            $this->toastError($blocker->message);
 
             return;
         }

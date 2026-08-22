@@ -48,6 +48,17 @@ final class ServerlessRepositoryCheckout
             throw new \RuntimeException('Choose a repository before continuing.');
         }
 
+        // Every serverless clone funnels through here — the create wizard's
+        // preview detection, the deploy build, and the API create — so this is
+        // the one place the target has to be checked. A clone is an outbound
+        // fetch this host performs against a caller-supplied URL, and its
+        // stderr comes back to the caller in the deploy log.
+        GitCloneUrl::assertClonable(
+            $repositoryUrl,
+            (array) config('serverless.git_clone.allowed_hosts', []),
+            (bool) config('serverless.git_clone.allow_local_paths', false),
+        );
+
         $workspacePath = storage_path('app/serverless-repositories/'.$workspaceKey);
         $repositoryPath = $workspacePath.'/repo';
         File::ensureDirectoryExists($workspacePath);

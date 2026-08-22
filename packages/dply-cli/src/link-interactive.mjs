@@ -1,7 +1,20 @@
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { writeSiteLink } from './config.mjs';
+import { fetchAllSites } from './site-index.mjs';
 import { c, info, ok, warn } from './print.mjs';
+
+/**
+ * Tag shown against each row. `site-index.mjs` is the one list of sites
+ * whatever kind they are — this used to hand-roll /sites + /edge/sites, which
+ * meant a serverless or cloud site could not be linked to a folder at all.
+ */
+const KIND_TAGS = {
+  vm: () => c.cyan('BYO'),
+  cloud: () => c.yellow('Cloud'),
+  edge: () => c.magenta('Edge'),
+  serverless: () => c.green('Function'),
+};
 
 /**
  * @param {import('./api.mjs').ApiClient} api
@@ -14,38 +27,18 @@ export async function interactiveLinkSite(api, ctx, productFilter = null) {
     return false;
   }
 
-  const [byoSites, edgeSites] = await Promise.all([
-    productFilter === 'edge' ? Promise.resolve([]) : api.get('/sites').then((r) => r?.data ?? []).catch(() => []),
-    productFilter === 'byo' ? Promise.resolve([]) : api.get('/edge/sites').then((r) => r?.data ?? []).catch(() => []),
-  ]);
+  const wanted = productFilter === 'byo' ? 'vm' : productFilter;
+  const rows = await fetchAllSites(api, wanted ? { kind: wanted } : {}).catch(() => []);
 
-  /** @type {Array<{ index: number, product: 'byo' | 'edge', id: string, label: string, hint: string, row: Record<string, unknown> }>} */
-  const choices = [];
-  let index = 1;
-
-  for (const row of byoSites) {
-    choices.push({
-      index,
-      product: 'byo',
-      id: String(row.id),
-      label: String(row.name ?? row.id),
-      hint: [row.server_name, row.status].filter(Boolean).join(' · '),
-      row,
-    });
-    index++;
-  }
-
-  for (const row of edgeSites) {
-    choices.push({
-      index,
-      product: 'edge',
-      id: String(row.id),
-      label: String(row.name ?? row.id),
-      hint: [row.hostname, row.status].filter(Boolean).join(' · '),
-      row,
-    });
-    index++;
-  }
+  /** @type {Array<{ index: number, kind: string, id: string, label: string, hint: string, row: Record<string, unknown> }>} */
+  const choices = rows.map((row, i) => ({
+    index: i + 1,
+    kind: String(row.kind ?? 'vm'),
+    id: String(row.id),
+    label: String(row.name ?? row.id),
+    hint: [row.url, row.status].filter(Boolean).join(' · '),
+    row: row.raw ?? row,
+  }));
 
   if (choices.length === 0) {
     return false;
@@ -57,7 +50,7 @@ export async function interactiveLinkSite(api, ctx, productFilter = null) {
   info('');
 
   for (const choice of choices) {
-    const tag = choice.product === 'byo' ? c.cyan('BYO') : c.magenta('Edge');
+    const tag = (KIND_TAGS[choice.kind] ?? KIND_TAGS.vm)();
     const hint = choice.hint ? c.dim(` — ${choice.hint}`) : '';
     info(`  ${c.cyan(String(choice.index).padStart(2, ' '))}  ${tag}  ${choice.label}${hint}`);
   }
@@ -82,7 +75,7 @@ export async function interactiveLinkSite(api, ctx, productFilter = null) {
       return true;
     }
 
-    await writeLinkRecord(ctx, picked.product, picked.row);
+    await writeLinkRecord(ctx, picked.kind, picked.row);
   } finally {
     rl.close();
   }
@@ -92,11 +85,40 @@ export async function interactiveLinkSite(api, ctx, productFilter = null) {
 
 /**
  * @param {{ baseUrl: string }} ctx
- * @param {'byo' | 'edge'} product
+ * @param {'byo' | 'vm' | 'edge' | 'cloud' | 'serverless'} kind
  * @param {Record<string, unknown>} site
  */
-export async function writeLinkRecord(ctx, product, site) {
-  if (product === 'byo') {
+export async function writeLinkRecord(ctx, kind, site) {
+  if (kind === 'edge') {
+    const path = await writeSiteLink({
+      siteId: String(site.id),
+      siteName: String(site.name ?? site.id),
+      baseUrl: ctx.baseUrl,
+      organizationId: site.organization_id != null ? String(site.organization_id) : undefined,
+      product: 'edge',
+      kind: 'edge',
+    });
+    ok(`Linked Edge site ${c.cyan(String(site.name ?? site.id))} (${site.id}) → ${c.dim(path)}`);
+    info(c.dim('Deploy: `dply deploy` · Edge: `dply edge deploy`'));
+
+    return path;
+  }
+
+  if (kind === 'serverless' || kind === 'cloud') {
+    const path = await writeSiteLink({
+      siteId: String(site.id),
+      siteName: String(site.name ?? site.id),
+      baseUrl: ctx.baseUrl,
+      product: kind,
+      kind,
+    });
+    ok(`Linked ${kind} site ${c.cyan(String(site.name ?? site.id))} (${site.id}) → ${c.dim(path)}`);
+    info(c.dim('Deploy: `dply deploy`'));
+
+    return path;
+  }
+
+  {
     const path = await writeSiteLink({
       siteId: String(site.id),
       siteName: String(site.name ?? site.id),
@@ -111,15 +133,4 @@ export async function writeLinkRecord(ctx, product, site) {
     return path;
   }
 
-  const path = await writeSiteLink({
-    siteId: String(site.id),
-    siteName: String(site.name ?? site.id),
-    baseUrl: ctx.baseUrl,
-    organizationId: site.organization_id != null ? String(site.organization_id) : undefined,
-    product: 'edge',
-  });
-  ok(`Linked Edge site ${c.cyan(String(site.name ?? site.id))} (${site.id}) → ${c.dim(path)}`);
-  info(c.dim('Deploy: `dply deploy` · Edge: `dply edge deploy`'));
-
-  return path;
 }

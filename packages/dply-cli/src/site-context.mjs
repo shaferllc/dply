@@ -208,8 +208,16 @@ export async function linkedSiteProduct() {
     return null;
   }
 
-  if (link.link.product === 'byo') {
+  if (link.link.product === 'byo' || link.link.kind === 'vm') {
     return 'byo';
+  }
+
+  // `dply init` links serverless and cloud sites too. Before it existed every
+  // non-BYO link was an Edge one, and falling through to 'edge' for a function
+  // would send its deploy down the Edge path.
+  const kind = link.link.kind ?? link.link.product;
+  if (kind === 'serverless' || kind === 'cloud') {
+    return kind;
   }
 
   return 'edge';

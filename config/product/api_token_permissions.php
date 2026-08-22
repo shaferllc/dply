@@ -85,6 +85,7 @@ return [
         'servers.log_shipping.disable' => 'commands.run',
         'sites.index' => 'sites.read',
         'sites.show' => 'sites.read',
+        'sites.store' => 'sites.create',
         'sites.update' => 'sites.write',
         'sites.env.index' => 'sites.read',
         'sites.env.content' => 'sites.write',
@@ -227,6 +228,15 @@ return [
         // Limits, HTTP exposure, parameters, maintenance, warm start — and
         // rotating the endpoint secret, which breaks every existing caller.
         'serverless.runtime.update' => 'serverless.write',
+
+        // Creation is a separate authority from `serverless.write`: write
+        // reconfigures a function that exists, create provisions a namespace
+        // that bills. Destroy shares it because it is only ever init's undo —
+        // the endpoint refuses any site that has deployed successfully.
+        'cloud.sites.store' => 'cloud.create',
+        'serverless.sites.store' => 'serverless.create',
+        'serverless.sites.source' => 'serverless.create',
+        'serverless.sites.destroy' => 'serverless.create',
     ],
 
     'categories' => [
@@ -402,12 +412,27 @@ return [
             ],
         ],
         [
+            'id' => 'vm_sites',
+            'label' => 'Server sites',
+            'permissions' => [
+                ['ability' => 'sites.create', 'label' => 'Create sites on servers you own'],
+            ],
+        ],
+        [
+            'id' => 'cloud',
+            'label' => 'Cloud apps',
+            'permissions' => [
+                ['ability' => 'cloud.create', 'label' => 'Create container apps (provisions billable infrastructure)'],
+            ],
+        ],
+        [
             'id' => 'serverless',
             'label' => 'Serverless',
             'permissions' => [
                 ['ability' => 'serverless.read', 'label' => 'Read functions, invocations, and logs'],
                 ['ability' => 'serverless.invoke', 'label' => 'Send test requests at a function'],
                 ['ability' => 'serverless.write', 'label' => 'Update function runtime, credentials, workers, and schedule'],
+                ['ability' => 'serverless.create', 'label' => 'Create and tear down functions (provisions billable infrastructure)'],
             ],
         ],
         [

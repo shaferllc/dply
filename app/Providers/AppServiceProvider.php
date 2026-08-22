@@ -661,6 +661,22 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(600)->by($token ? 'edge-api:'.$token->id : 'edge-api-ip:'.$request->ip());
         });
 
+        // Creating and tearing down sites that provision infrastructure —
+        // functions and container apps alike. Keyed by ORGANIZATION rather
+        // than token: quota bounds how many functions can exist, but it does
+        // not bound churn — a failed create consumes no quota while still
+        // calling DigitalOcean, and a create/delete loop stays under the
+        // ceiling forever. Deliberately not on `edge-api`, which is sized for
+        // log polling and is the wrong shape for provisioning.
+        RateLimiter::for('site-create', function (Request $request) {
+            $organization = $request->attributes->get('api_organization');
+            $key = $organization !== null
+                ? 'site-create:'.$organization->id
+                : 'site-create-ip:'.$request->ip();
+
+            return Limit::perMinute((int) config('serverless.create_max_per_minute', 10))->by($key);
+        });
+
         RateLimiter::for('site-webhook', function (Request $request) {
             $site = $request->route('site');
             $key = $site instanceof Site ? 'wh:'.$site->id : 'wh-ip:'.$request->ip();

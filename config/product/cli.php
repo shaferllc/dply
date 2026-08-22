@@ -31,7 +31,7 @@ return [
     | DPLY_CLI_DEFAULT_BASE_URL; otherwise APP_URL.
     |
     */
-    'default_base_url' => rtrim((string) env('DPLY_CLI_DEFAULT_BASE_URL', env('APP_URL', 'https://dply.dev')), '/'),
+    'default_base_url' => rtrim((string) env('DPLY_CLI_DEFAULT_BASE_URL', env('APP_URL', 'https://dply.io')), '/'),
 
     /*
     |--------------------------------------------------------------------------

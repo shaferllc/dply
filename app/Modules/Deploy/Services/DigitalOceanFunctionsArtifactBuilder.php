@@ -19,7 +19,7 @@ use ZipArchive;
 class DigitalOceanFunctionsArtifactBuilder
 {
     public function __construct(
-        private readonly ServerlessRepositoryCheckout $repositoryCheckout,
+        private readonly ServerlessSourceResolver $sourceResolver,
         private readonly ServerlessRuntimeDetector $runtimeDetector,
         private readonly ServerlessTargetCapabilityResolver $capabilityResolver,
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
@@ -45,30 +45,36 @@ class DigitalOceanFunctionsArtifactBuilder
     {
         $site->loadMissing('server');
 
-        $repositoryUrl = trim((string) $site->git_repository_url);
-        if ($repositoryUrl === '') {
-            throw new \RuntimeException('Choose a repository before deploying this serverless site.');
-        }
-
         $resolvedConfig = $this->deploymentConfigResolver->resolve($site);
 
-        $this->progress->active($site, 'checkout', 'Checking out the repository', $repositoryUrl);
-        $checkout = $this->repositoryCheckout->checkout(
+        // Git clone or uploaded tarball — the only step of this pipeline that
+        // differs between them. Everything below takes a directory.
+        $isUpload = $this->sourceResolver->sourceKindFor($site) === 'upload';
+        $sourceLabel = $isUpload
+            ? 'the uploaded project folder'
+            : trim((string) $site->git_repository_url);
+
+        $this->progress->active(
+            $site,
+            'checkout',
+            $isUpload ? 'Unpacking the uploaded folder' : 'Checking out the repository',
+            $sourceLabel,
+        );
+        $checkout = $this->sourceResolver->resolve(
+            $site,
             'build-'.$site->id,
-            $repositoryUrl,
-            (string) ($site->git_branch ?: 'main'),
             (string) $resolvedConfig['repository_subdirectory'],
-            $site->user_id,
-            isset($resolvedConfig['source_control_account_id'])
-                ? $resolvedConfig['source_control_account_id']
-                : null,
-            $site->gitRefKind(),
+            $resolvedConfig['source_control_account_id'] ?? null,
             function (string $chunk) use ($site): void {
                 $this->progress->appendLog($site, $chunk);
             },
         );
         $this->progress->flushLog($site);
-        $this->progress->done($site, 'checkout', 'Checked out the repository');
+        $this->progress->done(
+            $site,
+            'checkout',
+            $isUpload ? 'Unpacked the uploaded folder' : 'Checked out the repository',
+        );
 
         // before_clone hooks — operator shell that runs after checkout but
         // before the build (e.g. `npm ci && npm run build`).
