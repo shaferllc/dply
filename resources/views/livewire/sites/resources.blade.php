@@ -193,48 +193,6 @@
         @endif
     </div>
 
-    {{-- Workers + scheduler --}}
-    <div class="{{ $card }}">
-        <div class="flex items-baseline justify-between gap-3">
-            <div>
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Background processes') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Queue workers and the Laravel scheduler. Each becomes a long-running App Platform component built from the same source as the web service.') }}</p>
-            </div>
-            <div class="flex gap-2">
-                <x-secondary-button size="sm" type="button" wire:click="openAttach('worker')">+ {{ __('Worker') }}</x-secondary-button>
-                <x-secondary-button size="sm" type="button" wire:click="openAttach('scheduler')" @disabled($this->hasScheduler())>+ {{ __('Scheduler') }}</x-secondary-button>
-            </div>
-        </div>
-
-        @if ($this->workers->isEmpty())
-            <p class="mt-4 text-xs italic text-brand-moss">{{ __('No background processes yet.') }}</p>
-        @else
-            <ul class="mt-4 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
-                @foreach ($this->workers as $worker)
-                    <li class="px-4 py-3">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-sm text-brand-ink">{{ $worker->name }}</span>
-                                    <span class="rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusColors[$worker->status] ?? 'bg-slate-200 text-slate-700' }}">{{ $worker->status }}</span>
-                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-mono text-slate-700">{{ $worker->type }}</span>
-                                    <span class="text-2xs text-brand-moss">{{ $worker->size }} · ×{{ $worker->effectiveInstanceCount() }}</span>
-                                </div>
-                                <div class="mt-1 font-mono text-xs text-brand-ink break-all">{{ $worker->effectiveCommand() }}</div>
-                            </div>
-                            <button type="button"
-                                wire:click="detachWorker('{{ $worker->id }}')"
-                                wire:confirm="{{ __('Remove :name?', ['name' => $worker->name]) }}"
-                                class="text-xs font-semibold text-rose-700 hover:underline">
-                                {{ __('Remove') }}
-                            </button>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </div>
-
     {{-- Attach modal --}}
     @if ($modal !== '')
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/40 p-4" wire:click.self="closeModal">
@@ -245,8 +203,6 @@
                             @case('attach') {{ __('Attach a resource') }} @break
                             @case('database-existing') {{ __('Attach existing database') }} @break
                             @case('database-new') {{ __('Create new database') }} @break
-                            @case('worker') {{ __('Add queue worker') }} @break
-                            @case('scheduler') {{ __('Add scheduler') }} @break
                         @endswitch
                     </h3>
                     <button type="button" wire:click="closeModal" class="text-brand-mist hover:text-brand-ink">✕</button>
@@ -265,17 +221,6 @@
                             <button type="button" wire:click="openAttach('database-new')" class="rounded-lg border border-brand-ink/10 p-4 text-left hover:bg-brand-sand/30">
                                 <div class="text-sm font-semibold text-brand-ink">{{ __('Database (create new)') }}</div>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Provision a fresh Postgres / MySQL / Redis cluster, attach on activation.') }}</p>
-                            </button>
-                            <button type="button" wire:click="openAttach('worker')" class="rounded-lg border border-brand-ink/10 p-4 text-left hover:bg-brand-sand/30">
-                                <div class="text-sm font-semibold text-brand-ink">{{ __('Queue worker') }}</div>
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('Long-running App Platform component running a custom command.') }}</p>
-                            </button>
-                            <button type="button" wire:click="openAttach('scheduler')" class="rounded-lg border border-brand-ink/10 p-4 text-left hover:bg-brand-sand/30" @disabled($this->hasScheduler())>
-                                <div class="text-sm font-semibold text-brand-ink">{{ __('Scheduler') }}</div>
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('Runs `php artisan schedule:work` on a single pinned instance.') }}</p>
-                                @if ($this->hasScheduler())
-                                    <p class="mt-2 text-2xs uppercase tracking-wide text-brand-mist">{{ __('Already attached') }}</p>
-                                @endif
                             </button>
                         </div>
 
@@ -329,47 +274,6 @@
                             </div>
                         </form>
 
-                    @elseif ($modal === 'worker')
-                        <form wire:submit.prevent="attachWorker('worker')" class="space-y-4">
-                            <div>
-                                <label class="{{ $labelCls }}" for="worker_name">{{ __('Name') }}</label>
-                                <input id="worker_name" type="text" wire:model="worker_name" class="{{ $inputCls }}" placeholder="queue-redis" required>
-                                @error('worker_name') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label class="{{ $labelCls }}" for="worker_command">{{ __('Command') }}</label>
-                                <input id="worker_command" type="text" wire:model="worker_command" class="{{ $inputCls }} font-mono" required>
-                                @error('worker_command') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="{{ $labelCls }}" for="worker_size">{{ __('Size') }}</label>
-                                    <select id="worker_size" wire:model="worker_size" class="{{ $inputCls }}">
-                                        <option value="small">small</option>
-                                        <option value="medium">medium</option>
-                                        <option value="large">large</option>
-                                        <option value="xlarge">xlarge</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="{{ $labelCls }}" for="worker_instance_count">{{ __('Instances') }}</label>
-                                    <input id="worker_instance_count" type="number" min="1" max="50" wire:model="worker_instance_count" class="{{ $inputCls }}">
-                                </div>
-                            </div>
-                            <div class="flex justify-end gap-2">
-                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
-                                <x-primary-button size="sm" type="submit">{{ __('Add worker') }}</x-primary-button>
-                            </div>
-                        </form>
-
-                    @elseif ($modal === 'scheduler')
-                        <form wire:submit.prevent="attachWorker('scheduler')" class="space-y-4">
-                            <p class="text-sm text-brand-ink">{{ __('The scheduler runs `php artisan schedule:work` on a single pinned instance — App Platform has no native cron, so this is how Laravel\'s scheduled tasks fire.') }}</p>
-                            <div class="flex justify-end gap-2">
-                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
-                                <x-primary-button size="sm" type="submit">{{ __('Add scheduler') }}</x-primary-button>
-                            </div>
-                        </form>
                     @endif
                 </div>
             </div>

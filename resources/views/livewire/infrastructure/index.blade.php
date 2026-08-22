@@ -240,13 +240,7 @@
                             'route' => 'infrastructure.previews',
                             'icon' => 'heroicon-o-link',
                             'title' => __('Previews'),
-                            'desc' => __('Managed preview hostnames across BYO and Edge in one place.'),
-                        ],
-                        [
-                            'route' => 'infrastructure.deploy-contracts',
-                            'icon' => 'heroicon-o-clipboard-document-check',
-                            'title' => __('Contracts'),
-                            'desc' => __('Deploy-contract policy runs and waivers gating Edge promotes.'),
+                            'desc' => __('Managed preview hostnames in one place.'),
                         ],
                     ];
 

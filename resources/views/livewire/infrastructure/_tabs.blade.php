@@ -9,7 +9,6 @@
         ['name' => 'infrastructure.intelligence', 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
         ['name' => 'infrastructure.blast-radius', 'label' => __('Blast radius'), 'icon' => 'heroicon-o-share'],
         ['name' => 'infrastructure.previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-link'],
-        ['name' => 'infrastructure.deploy-contracts', 'label' => __('Contracts'), 'icon' => 'heroicon-o-clipboard-document-check'],
     ];
     if (ops_copilot_active()) {
         $tabs[] = ['name' => 'infrastructure.copilot', 'label' => __('Copilot'), 'icon' => 'heroicon-o-sparkles'];

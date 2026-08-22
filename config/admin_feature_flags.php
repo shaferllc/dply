@@ -178,9 +178,6 @@ return [
                 'Launch' => [
                     'launch.standby_blueprint' => 'Standby failover blueprints',
                 ],
-                'Deploy' => [
-                    'global.deploy_contract' => 'Deploy contract (promote gate)',
-                ],
             ],
         ],
     ],

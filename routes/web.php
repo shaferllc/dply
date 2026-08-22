@@ -24,7 +24,6 @@ use App\Http\Controllers\Sites\DatabaseConnectLinkController;
 use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
-use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
 use App\Jobs\RunSetupScriptJob;
@@ -54,7 +53,6 @@ use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Infrastructure\BlastRadius as InfrastructureBlastRadius;
-use App\Livewire\Infrastructure\DeployContracts as InfrastructureDeployContracts;
 use App\Livewire\Infrastructure\Deploys as InfrastructureDeploys;
 use App\Livewire\Infrastructure\Domains as InfrastructureDomains;
 use App\Livewire\Infrastructure\EnvDrift as InfrastructureEnvDrift;
@@ -341,7 +339,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('/deploys', InfrastructureDeploys::class)->name('deploys');
         Route::livewire('/blast-radius', InfrastructureBlastRadius::class)->name('blast-radius');
         Route::livewire('/previews', InfrastructurePreviews::class)->name('previews');
-        Route::livewire('/deploy-contracts', InfrastructureDeployContracts::class)->name('deploy-contracts');
         Route::livewire('/copilot', InfrastructureOpsCopilot::class)
             ->middleware('feature:global.ops_copilot')
             ->name('copilot');
@@ -351,7 +348,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::redirect('/fleet', '/infrastructure');
     foreach ([
         'health', 'domains', 'env-search', 'env-drift', 'intelligence',
-        'deploys', 'blast-radius', 'previews', 'deploy-contracts', 'copilot',
+        'deploys', 'blast-radius', 'previews', 'copilot',
     ] as $legacyFleetPath) {
         Route::redirect("/fleet/{$legacyFleetPath}", "/infrastructure/{$legacyFleetPath}");
     }
@@ -660,9 +657,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // BACKGROUND group for container/serverless workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
-    // Site-kind dispatch: VM → WorkspaceSchedule, container → Schedule
-    // (see SiteScheduleController). One canonical /schedule URL for any site.
-    Route::get('servers/{server}/sites/{site}/schedule', SiteScheduleController::class)->name('sites.schedule');
+    Route::livewire('servers/{server}/sites/{site}/schedule', WorkspaceSchedule::class)->name('sites.schedule');
     // Unified Resources surface. Routes through the site workspace controller
     // on the `resources` section: the site's bindings hub, inside the normal
     // workspace, at one canonical /resources URL.

@@ -5,7 +5,6 @@ namespace App\Livewire\Sites;
 use App\Enums\DeploymentMethod;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Livewire\Concerns\OptimizesPipeline;
@@ -49,7 +48,6 @@ class Show extends Component
     use DispatchesToastNotifications;
     use HandlesSiteRemovalFlow;
     use InteractsWithScaffoldJourney;
-    use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
     use ManagesSiteDeployExecution;
     use ManagesSiteDeployHooks;

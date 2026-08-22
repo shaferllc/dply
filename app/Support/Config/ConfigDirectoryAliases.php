@@ -124,7 +124,6 @@ final class ConfigDirectoryAliases
         'notification_channels' => 'notifications.channels',
         'notification_events' => 'notifications.events',
         'deploy' => 'deploy.core',
-        'deploy_contract' => 'deploy.contract',
         'deploy_templates' => 'deploy.templates',
         'serverless' => 'serverless.core',
         'serverless_glue' => 'serverless.glue',
