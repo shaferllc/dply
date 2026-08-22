@@ -7,7 +7,7 @@ namespace App\Modules\Edge\Services;
 use App\Models\EdgeDeployment;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
 use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use App\Modules\Notifications\Services\NotificationPublisher;

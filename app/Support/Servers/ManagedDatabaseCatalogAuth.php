@@ -7,7 +7,7 @@ namespace App\Support\Servers;
 use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 
 /**
  * Tokens to try for the managed-database catalog. Prefer the app

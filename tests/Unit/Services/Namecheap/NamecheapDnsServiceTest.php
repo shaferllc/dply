@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Namecheap\NamecheapDnsServiceTest;
 
-use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Providers\Namecheap\NamecheapDnsService;
 use Illuminate\Support\Facades\Http;
 
 function namecheapXml(string $hosts): string

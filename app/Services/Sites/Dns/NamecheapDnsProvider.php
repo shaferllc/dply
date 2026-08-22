@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Providers\Namecheap\NamecheapDnsService;
 
 class NamecheapDnsProvider implements DnsProvider
 {

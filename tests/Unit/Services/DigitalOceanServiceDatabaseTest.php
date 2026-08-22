@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDatabaseTest;
 
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 

@@ -5,7 +5,7 @@ namespace App\Modules\Certificates\Services;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Models\ServerWildcardCertificate;
-use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Providers\Namecheap\NamecheapDnsService;
 use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\SshConnection;
 use App\Support\Acme\AcmeDnsHook;

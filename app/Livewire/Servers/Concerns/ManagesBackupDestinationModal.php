@@ -8,7 +8,7 @@ use App\Models\ObjectStorageCredential;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Aws\S3\S3Client;
 use Illuminate\Support\Collection;

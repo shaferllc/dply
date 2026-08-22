@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Serverless\Support\ServerlessAssetHost;
 use App\Services\Storage\ObjectStorageBucketProvisioner;

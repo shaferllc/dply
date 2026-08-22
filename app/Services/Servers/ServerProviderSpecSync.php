@@ -6,9 +6,9 @@ namespace App\Services\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Modules\Cloud\Services\AwsEc2Service;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\AwsEc2Service;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
 
 /**
  * Re-reads a server's hardware facts (size slug, memory, vCPUs, disk, region)

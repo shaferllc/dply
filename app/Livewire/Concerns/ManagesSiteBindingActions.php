@@ -28,7 +28,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\ServerManageAction;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
 use App\Modules\Database\Actions\CreateDedicatedDockerDatabaseVm;
 use App\Modules\Database\Actions\CreateDedicatedRedisVm;

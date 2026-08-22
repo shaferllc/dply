@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 
 class HetznerDnsProvider implements DnsProvider
 {

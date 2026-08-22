@@ -8,7 +8,7 @@ use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
 use InvalidArgumentException;
 use RuntimeException;

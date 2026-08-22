@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Console;
 
 use App\Models\ProviderCredential;
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
 use App\Modules\Edge\Support\EdgeDeliveryContext;
 use App\Modules\Edge\Support\EdgePlatformCredentials;

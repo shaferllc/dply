@@ -3,15 +3,15 @@
 namespace App\Services\Sites\Dns;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
-use App\Modules\Cloud\Namecheap\NamecheapDnsService;
-use App\Modules\Cloud\Services\AzureDnsService;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\GcpDnsService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\Route53Service;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Namecheap\NamecheapDnsService;
+use App\Modules\Providers\Services\AzureDnsService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\GcpDnsService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\Route53Service;
+use App\Modules\Providers\Services\VultrService;
 
 final class SiteDnsProviderFactory
 {

@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
 
 class CloudflareDnsProvider implements DnsProvider
 {

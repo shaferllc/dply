@@ -7,7 +7,7 @@ namespace App\Modules\Database\Backends;
 use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
 use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Support\Facades\Log;

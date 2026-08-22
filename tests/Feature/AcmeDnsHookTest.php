@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AcmeDnsHookController;
-use App\Modules\Cloud\Namecheap\NamecheapDnsService;
+use App\Modules\Providers\Namecheap\NamecheapDnsService;
 use Illuminate\Support\Facades\Http;
 
 test('acme dns hook rejects a bad signature', function () {

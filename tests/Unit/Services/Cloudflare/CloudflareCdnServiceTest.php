@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Cloudflare\CloudflareCdnServiceTest;
 
-use App\Modules\Cloud\Cloudflare\CloudflareCdnService;
+use App\Modules\Providers\Cloudflare\CloudflareCdnService;
 use Illuminate\Support\Facades\Http;
 
 test('rejects empty token', function () {

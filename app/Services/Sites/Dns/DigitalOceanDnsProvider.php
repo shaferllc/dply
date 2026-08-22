@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 
 class DigitalOceanDnsProvider implements DnsProvider
 {

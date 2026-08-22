@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Services;
+namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
 use Aws\AppRunner\AppRunnerClient;

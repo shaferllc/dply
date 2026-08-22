@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;

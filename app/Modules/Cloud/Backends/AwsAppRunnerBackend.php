@@ -6,7 +6,7 @@ namespace App\Modules\Cloud\Backends;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Modules\Cloud\Services\AwsAppRunnerService;
+use App\Modules\Providers\Services\AwsAppRunnerService;
 use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Support\Facades\Cache;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Modules\Cloud\Cloudflare\CloudflareGuidedMailProvider;
+use App\Modules\Providers\Cloudflare\CloudflareGuidedMailProvider;
 use App\Support\Mail\Guided\GuidedMailGate;
 use App\Support\Mail\Guided\GuidedMailStep;
 use Illuminate\Support\Facades\Gate;

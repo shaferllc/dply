@@ -3,8 +3,8 @@
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;

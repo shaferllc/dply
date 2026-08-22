@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDomain;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 
 class TestingHostnameRecordPruner
 {

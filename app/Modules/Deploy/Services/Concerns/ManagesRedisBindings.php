@@ -9,7 +9,7 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;

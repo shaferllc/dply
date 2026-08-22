@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\LinodeServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Providers\Services\LinodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

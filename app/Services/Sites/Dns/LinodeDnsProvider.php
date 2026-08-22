@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Providers\Services\LinodeService;
 
 class LinodeDnsProvider implements DnsProvider
 {

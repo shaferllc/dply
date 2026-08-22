@@ -13,7 +13,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionDockerDatabaseJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;

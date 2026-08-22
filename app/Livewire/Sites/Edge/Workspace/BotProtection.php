@@ -10,7 +10,7 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Concerns\Edge\PublishesEdgeHostMap;
 use App\Models\Server;
 use App\Models\Site;
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use App\Modules\Edge\Support\EdgeTestingDomains;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use App\Support\Sites\EdgeSiteViewData;

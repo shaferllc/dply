@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Database\Services;
 
 use App\Models\CloudDatabase;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\DatabaseConnectionTarget;
 use Illuminate\Support\Str;
 use RuntimeException;

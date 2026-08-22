@@ -6,7 +6,7 @@ namespace App\Support\Servers;
 
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 
 /**
  * Live managed-database regions for the server's provider account.

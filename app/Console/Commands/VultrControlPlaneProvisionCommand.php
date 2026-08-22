@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Throwable;

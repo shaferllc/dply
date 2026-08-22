@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Realtime\Services;
 
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;

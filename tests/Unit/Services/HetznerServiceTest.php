@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\HetznerServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

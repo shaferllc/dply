@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Edge\EdgeCloudflareTurnstileTest;
 
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use Illuminate\Support\Facades\Http;
 
 test('edge cloudflare client creates turnstile widgets', function () {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Jobs;
 
 use App\Models\Site;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use App\Modules\Serverless\Services\ServerlessNetworkService;
 use Illuminate\Contracts\Queue\ShouldQueue;

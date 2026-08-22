@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\GcpDnsService;
+use App\Modules\Providers\Services\GcpDnsService;
 
 class GcpDnsProvider implements DnsProvider
 {

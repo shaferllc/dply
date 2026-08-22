@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Modules\Cloud\Services\OracleComputeService;
+use App\Modules\Providers\Services\OracleComputeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ProviderResourceTags;

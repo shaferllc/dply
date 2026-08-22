@@ -9,10 +9,10 @@ use App\Jobs\CloneServerOnDigitalOceanJob;
 use App\Jobs\CreateServerImageJob;
 use App\Jobs\RefreshServerPrivateIpJob;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\VultrService;
 use Carbon\Carbon;
 
 /**

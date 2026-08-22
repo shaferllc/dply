@@ -106,6 +106,43 @@ and Realtime. Backups and Notifications reference each other.
     kept for months as the authoritative pre-split copy. Everything is fixed
     forward; the frozen copy exists to reconstruct records, not to revert to.
 
+## Step 1 executed (2026-08-22): extract the provider layer
+
+The first fork was going to be "clone, then delete the other products." Measuring
+the dependency closure first showed that does not work: **Serverless transitively
+required 18 of 33 modules, including Edge and Cloud**, through cycles
+(`Cloud → Edge → Billing → Queue → Serverless → Cloud`). Deleting the other
+products would have broken Serverless.
+
+The cause was misfiling, not real coupling. `app/Modules/Cloud` held two things:
+the container-app product, and a provider layer everything depends on —
+15 provider SDK wrappers (AWS EC2/EKS/AppRunner, Azure, GCP, Hetzner, Linode,
+Vultr, UpCloud, OVH, Oracle, Route53, DigitalOcean), `Cloudflare/` and
+`Namecheap/`. Hetzner and Linode are *VM* providers; `DigitalOceanService` is a
+114-line wrapper over `api.digitalocean.com/v2` that the **kernel itself** used
+(`app/Jobs`, `app/Actions/Servers`, `app/Services/Servers`, `app/Livewire/Servers`)
+— the ADR's own `feature → platform → kernel, never upward` rule, violated in
+reverse. `Edge\Services\EdgeCloudflareClient` was the same mistake one module over.
+
+So step 1 was not a fork at all. `App\Modules\Providers` now holds that layer
+(22 files moved, 153 files rewritten, behaviour-zero):
+
+| edge | before | after |
+|---|---|---|
+| Serverless → Cloud (real code) | 10 files | **0** |
+| Serverless → Edge (real code) | 11 files | **2** |
+
+The two that remain are `EdgeTestingDomains` (shared testing-domain logic, wants
+to be kernel or platform) and `EdgeSiteCanceller` (genuine product-logic reuse —
+a real decision, not a misfiling). Everything else that looked like
+cross-product coupling was docblock `{@see}` references, which carry no runtime
+dependency and which `ModuleBoundaryTest` already ignores.
+
+**Lesson for the remaining forks:** measure the transitive closure before
+deleting anything, and expect most apparent coupling to be platform code filed
+under a product. Verified by: app boots, `ModuleBoundaryTest` green, and
+`--group=serverless` at its pre-existing baseline (3 failures, 570 passing).
+
 ## Known tensions
 
 These are unresolved conflicts between decisions, recorded rather than smoothed

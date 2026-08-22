@@ -16,7 +16,7 @@ use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
 use App\Models\Server;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;

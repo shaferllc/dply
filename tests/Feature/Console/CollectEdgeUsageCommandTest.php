@@ -10,7 +10,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Billing\Services\EdgeUsageTotals;
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use App\Modules\Edge\Services\EdgeUsageCollector;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;

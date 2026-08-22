@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Cloudflare;
+namespace App\Modules\Providers\Cloudflare;
 
 use Illuminate\Support\Facades\Http;
 

@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 
 class VultrDnsProvider implements DnsProvider
 {

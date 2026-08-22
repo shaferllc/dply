@@ -40,7 +40,7 @@ final class TestingDomains
 
         foreach ($tokens as $token) {
             try {
-                if ((new \App\Modules\Cloud\Cloudflare\CloudflareDnsService($token))->zoneExists($zone)) {
+                if ((new \App\Modules\Providers\Cloudflare\CloudflareDnsService($token))->zoneExists($zone)) {
                     return $token;
                 }
             } catch (\Throwable) {

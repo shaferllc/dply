@@ -6,8 +6,8 @@ namespace App\Support\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Organization;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\VultrService;
 use RuntimeException;
 
 /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Providers\Cloudflare\EdgeCloudflareClient;
 use App\Modules\Serverless\Support\ServerlessAssetHost;
 use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use Illuminate\Support\Facades\Log;

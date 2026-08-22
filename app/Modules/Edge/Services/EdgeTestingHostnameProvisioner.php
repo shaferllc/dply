@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\Site;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Modules\Edge\Support\EdgeTestingDomains;
 use App\Modules\Edge\Support\FakeEdgeProvision;

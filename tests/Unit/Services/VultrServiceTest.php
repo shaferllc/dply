@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\VultrServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

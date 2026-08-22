@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
 
 test('managed redis regions come from the database options catalog', function (): void {

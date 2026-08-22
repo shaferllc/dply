@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Cloud\Jobs;
 
 use App\Models\CloudDatabase;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

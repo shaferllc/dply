@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\ProviderResourceTags;

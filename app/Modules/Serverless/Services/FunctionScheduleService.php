@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Services;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Closure;
 use Throwable;
 

@@ -7,7 +7,7 @@ namespace App\Modules\Database\Backends;
 use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
 use App\Modules\Database\Backends\Concerns\SupportsNoManagedOperations;
 use Illuminate\Support\Facades\Log;

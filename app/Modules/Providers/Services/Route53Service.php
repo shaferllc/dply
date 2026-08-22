@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Cloud\Services;
+namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
 use Aws\Route53\Route53Client;

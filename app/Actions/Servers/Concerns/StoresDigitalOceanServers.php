@@ -12,7 +12,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;

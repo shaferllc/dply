@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceInspectDropletPresenceTest;
 
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
 
 test('inspect reports gone on 404', function () {

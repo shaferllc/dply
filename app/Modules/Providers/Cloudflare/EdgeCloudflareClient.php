@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Edge\Services;
+namespace App\Modules\Providers\Cloudflare;
 
 use App\Modules\Billing\Services\EdgeUsageTotals;
 use Carbon\CarbonInterface;

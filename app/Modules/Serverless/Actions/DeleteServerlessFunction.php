@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Actions;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Serverless\Services\ServerlessAppBucketProvisioner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

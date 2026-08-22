@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Namecheap;
+namespace App\Modules\Providers\Namecheap;
 
 use App\Models\ProviderCredential;
 use Illuminate\Http\Client\Response;

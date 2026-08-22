@@ -7,7 +7,7 @@ use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\PrivateNetwork;
 use App\Models\Server;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use App\Services\Servers\ServerPrivateNetworkRecorder;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
