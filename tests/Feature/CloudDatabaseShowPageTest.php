@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseShowPageTest;
 
-use App\Livewire\Cloud\DatabaseShow as CloudDatabaseShow;
+use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\User;

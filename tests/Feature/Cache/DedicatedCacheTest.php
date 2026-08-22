@@ -191,7 +191,7 @@ test('adoption does not grandfather, because these clusters were already billed'
 });
 
 test('the cloud database create form no longer offers redis', function () {
-    $reflection = new \ReflectionClass(\App\Livewire\Cloud\DatabaseCreate::class);
+    $reflection = new \ReflectionClass(\App\Livewire\Databases\DatabaseCreate::class);
     $engines = $reflection->getConstant('ENGINES');
 
     expect($engines)->not->toContain(CloudDatabase::ENGINE_REDIS);

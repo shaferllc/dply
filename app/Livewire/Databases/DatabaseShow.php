@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Cloud;
+namespace App\Livewire\Databases;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseBackend;
@@ -312,7 +312,7 @@ class DatabaseShow extends Component
 
         $capabilities = $this->capabilities($router);
 
-        return view('livewire.cloud.database-show', [
+        return view('livewire.databases.database-show', [
             'capabilities' => $capabilities,
             'canManageNetwork' => $sources->supports($this->database),
             'trustedSources' => $sources->supports($this->database)

@@ -3,7 +3,7 @@
 @endphp
 
 @if (! $capabilities[DatabaseBackend::CAP_BACKUPS])
-    @include('livewire.cloud.partials.database._unavailable', [
+    @include('livewire.databases.partials._unavailable', [
         'title' => __('Backups are not managed here'),
         'reason' => __('This backend does not expose its backups to dply. Restore from the provider\'s own console.'),
     ])

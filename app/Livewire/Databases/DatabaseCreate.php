@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Cloud;
+namespace App\Livewire\Databases;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
@@ -140,7 +140,7 @@ class DatabaseCreate extends Component
         $hasDoCredential = $org !== null && $this->digitalOceanCredential() !== null;
         $catalog = $this->liveCatalog();
 
-        return view('livewire.cloud.database-create', [
+        return view('livewire.databases.database-create', [
             'engineVersions' => [$this->engine => $catalog['versions']],
             'regions' => $catalog['regions'],
             'sizeTiers' => $catalog['sizes'],

@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Jobs;
+namespace App\Modules\Database\Jobs;
 
 use App\Models\CloudDatabase;
 use App\Models\Site;
-use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,12 +13,11 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Attaches (or detaches) a managed database to a Cloud site.
+ * Attaches (or detaches) a managed database to a site.
  *
- * On attach, the database's connection env vars (DB_* / REDIS_*) are
- * merged into the site's `env_file_content`, the env is pushed to the
- * backend, and a redeploy is queued so the new connection takes effect.
- * On detach, exactly those keys are removed and the site is redeployed.
+ * On attach, the database's connection env vars (DB_* / REDIS_*) are merged
+ * into the site's `env_file_content`; on detach, exactly those keys are
+ * removed. The site picks the change up on its next deploy.
  *
  * Idempotent — re-running an attach overwrites the same keys; re-running
  * a detach is a no-op once the keys are gone.
@@ -81,17 +79,9 @@ class AttachCloudDatabaseJob implements ShouldQueue
 
         $site->update(['env_file_content' => $this->serializeEnvLines($vars)]);
 
-        // Push the new env to the backend, then roll a deploy so the
-        // container picks it up. updateEnvVars + redeploy both no-op
-        // gracefully when the site has not been provisioned yet.
-        $fresh = $site->fresh() ?? $site;
-        $backend = CloudRouter::backendFor($fresh);
-        $credential = CloudRouter::credentialFor($fresh);
-        if ($backend !== null && $credential !== null) {
-            $backend->updateEnvVars($fresh, $credential);
-        }
-
-        RedeployCloudSiteJob::dispatch($site->id);
+        // The env file is the contract: whatever runs the site picks the new
+        // keys up on its next deploy. Pushing env to a managed backend used to
+        // happen here for Cloud sites; that product moved out of this app.
     }
 
     /**

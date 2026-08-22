@@ -1,5 +1,5 @@
 @if (! $canManageNetwork)
-    @include('livewire.cloud.partials.database._unavailable', [
+    @include('livewire.databases.partials._unavailable', [
         'title' => __('Network access is not managed here'),
         'reason' => __('This backend has no allowlist dply can write to. Its cluster is reachable per the provider\'s own settings.'),
     ])

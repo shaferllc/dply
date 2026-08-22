@@ -72,20 +72,20 @@
     </nav>
 
     @if ($tab === 'overview')
-        @include('livewire.cloud.partials.database.overview')
+        @include('livewire.databases.partials.overview')
     @elseif ($tab === 'sites')
-        @include('livewire.cloud.partials.database.sites')
+        @include('livewire.databases.partials.sites')
     @elseif ($tab === 'users')
-        @include('livewire.cloud.partials.database.users')
+        @include('livewire.databases.partials.users')
     @elseif ($tab === 'network')
-        @include('livewire.cloud.partials.database.network')
+        @include('livewire.databases.partials.network')
     @elseif ($tab === 'scale')
-        @include('livewire.cloud.partials.database.scale')
+        @include('livewire.databases.partials.scale')
     @elseif ($tab === 'metrics')
-        @include('livewire.cloud.partials.database.metrics')
+        @include('livewire.databases.partials.metrics')
     @elseif ($tab === 'backups')
-        @include('livewire.cloud.partials.database.backups')
+        @include('livewire.databases.partials.backups')
     @elseif ($tab === 'danger')
-        @include('livewire.cloud.partials.database.danger')
+        @include('livewire.databases.partials.danger')
     @endif
 </div>

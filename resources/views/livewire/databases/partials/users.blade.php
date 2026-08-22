@@ -3,7 +3,7 @@
 @endphp
 
 @if (! $capabilities[DatabaseBackend::CAP_USERS])
-    @include('livewire.cloud.partials.database._unavailable', [
+    @include('livewire.databases.partials._unavailable', [
         'title' => __('Users are not managed here'),
         'reason' => $database->engine === \App\Models\CloudDatabase::ENGINE_REDIS
             ? __('Valkey authenticates with a single cluster credential — there are no additional users to create.')

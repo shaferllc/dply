@@ -3,7 +3,7 @@
 @endphp
 
 @if (! $capabilities[DatabaseBackend::CAP_METRICS])
-    @include('livewire.cloud.partials.database._unavailable', [
+    @include('livewire.databases.partials._unavailable', [
         'title' => __('No metrics for this database'),
         'reason' => __('Its backend does not report cluster time series to dply. The provider\'s own dashboard has them.'),
     ])

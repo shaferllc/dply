@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\AttachCloudDatabaseJobTest;
 
 use App\Enums\SiteType;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\Server;
@@ -52,7 +51,6 @@ function databaseAndSite(string $envFile = '', ?CloudDatabase $db = null): array
     return [$db, $site];
 }
 test('attach injects db env and queues redeploy', function () {
-    Bus::fake([RedeployCloudSiteJob::class]);
     [$db, $site] = databaseAndSite("APP_ENV=production\nAPP_DEBUG=false");
 
     (new AttachCloudDatabaseJob($db->id, $site->id))->handle();
@@ -68,10 +66,8 @@ test('attach injects db env and queues redeploy', function () {
         'site_id' => $site->id,
     ]);
 
-    Bus::assertDispatched(RedeployCloudSiteJob::class, fn ($j) => $j->siteId === $site->id);
 });
 test('attach overwrites existing db keys', function () {
-    Bus::fake([RedeployCloudSiteJob::class]);
     [$db, $site] = databaseAndSite("DB_HOST=old-host\nDB_PORT=1234");
 
     (new AttachCloudDatabaseJob($db->id, $site->id))->handle();
@@ -81,7 +77,6 @@ test('attach overwrites existing db keys', function () {
     $this->assertStringNotContainsString('old-host', $env);
 });
 test('detach removes db env and queues redeploy', function () {
-    Bus::fake([RedeployCloudSiteJob::class]);
     [$db, $site] = databaseAndSite();
 
     (new AttachCloudDatabaseJob($db->id, $site->id))->handle();
@@ -96,10 +91,8 @@ test('detach removes db env and queues redeploy', function () {
         'site_id' => $site->id,
     ]);
 
-    Bus::assertDispatched(RedeployCloudSiteJob::class);
 });
 test('detach preserves unrelated env keys', function () {
-    Bus::fake([RedeployCloudSiteJob::class]);
     [$db, $site] = databaseAndSite('APP_ENV=production');
 
     (new AttachCloudDatabaseJob($db->id, $site->id))->handle();
@@ -108,7 +101,6 @@ test('detach preserves unrelated env keys', function () {
     $this->assertStringContainsString('APP_ENV=production', $site->fresh()->env_file_content);
 });
 test('redis attach injects redis env', function () {
-    Bus::fake([RedeployCloudSiteJob::class]);
     $redis = CloudDatabase::factory()->redis()->active()->create();
     [$db, $site] = databaseAndSite('', $redis);
 

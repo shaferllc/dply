@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
 use App\Modules\Cloud\Actions\ConfigureCloudHealthCheck;
 use App\Modules\Cloud\Actions\CreateCloudWorker;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;

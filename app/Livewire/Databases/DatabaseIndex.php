@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Cloud;
+namespace App\Livewire\Databases;
 
 use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -84,7 +84,7 @@ class DatabaseIndex extends Component
             )
             ->values();
 
-        return view('livewire.cloud.database-index', [
+        return view('livewire.databases.database-index', [
             'org' => $org,
             'databases' => $databases,
             'totals' => [

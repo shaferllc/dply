@@ -7,7 +7,7 @@
 @endphp
 
 @if (! $capabilities[DatabaseBackend::CAP_RESIZE])
-    @include('livewire.cloud.partials.database._unavailable', [
+    @include('livewire.databases.partials._unavailable', [
         'title' => __('This database cannot be resized from dply'),
         'reason' => __('Its backend has no in-place resize API. Scale it from the provider\'s own console, or restore into a larger database.'),
     ])
