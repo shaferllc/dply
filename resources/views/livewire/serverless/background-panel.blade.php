@@ -7,9 +7,11 @@
     <x-workspace-panel-head
         dense
         icon="heroicon-o-clock"
-        :title="__('Scheduler & queue')"
+        :title="$mode === 'queue' ? __('Queue backend') : __('Scheduler & queue')"
         :count="$enabled ? __('on') : __('off')"
-        :note="__('A function has no long-running process. dply runs the Laravel scheduler on a one-minute cron, and drains queued jobs with concurrent invocations as work arrives.')"
+        :note="$mode === 'queue'
+            ? __('Where queued jobs live, and how many drains dply may run at once. A function drains its queue with concurrent invocations, so the store has to be reachable from all of them.')
+            : __('A function has no long-running process. dply runs the Laravel scheduler on a one-minute cron, and drains queued jobs with concurrent invocations as work arrives.')"
     />
 
     <div class="space-y-3 px-3 py-3 sm:px-4">
@@ -123,17 +125,19 @@
             </div>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Background processing') }}</p>
-                <p class="mt-0.5 text-xs text-brand-moss">
-                    {{ __('Runs schedule:run every minute and drains queued jobs. Set QUEUE_CONNECTION to database or redis in the Environment panel.') }}
-                </p>
+        @if ($mode !== 'queue')
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Background processing') }}</p>
+                    <p class="mt-0.5 text-xs text-brand-moss">
+                        {{ __('Runs schedule:run every minute and drains queued jobs. Set QUEUE_CONNECTION to database or redis in the Environment panel.') }}
+                    </p>
+                </div>
+                <button type="button" wire:click="toggle" wire:loading.attr="disabled" class="{{ $btnOutline }} shrink-0">
+                    {{ $enabled ? __('Disable') : __('Enable') }}
+                </button>
             </div>
-            <button type="button" wire:click="toggle" wire:loading.attr="disabled" class="{{ $btnOutline }} shrink-0">
-                {{ $enabled ? __('Disable') : __('Enable') }}
-            </button>
-        </div>
+        @endif
 
         {{-- Concurrency — the throughput dial. Only meaningful while queue
              processing is on, so it stays hidden until then. --}}
@@ -181,35 +185,37 @@
             </div>
         @endif
 
-        {{-- Warming is invisible by construction: the pings leave the control
-             plane on a cron and nothing about the toggle proves they landed. The
-             last-tick line below is that proof, and it is the only place a
-             stopped scheduler shows up in the UI. Polled so it stays true while
-             the tab is open — .visible keeps the panel's queries off-screen. --}}
-        <div class="border-t border-brand-ink/10 pt-3" @if ($keepWarm || $enabled) wire:poll.60s.visible @endif>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="min-w-0">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Warm start') }}</p>
-                    <p class="mt-0.5 text-xs text-brand-moss">
-                        @if ($enabled)
-                            {{ __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.') }}
-                        @elseif ($keepWarm)
-                            {{ __('A minute ping holds the function warm so visitors do not pay a cold start. No redeploy needed.') }}
-                        @else
-                            {{ __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.') }}
-                        @endif
-                    </p>
+        @if ($mode !== 'queue')
+            {{-- Warming is invisible by construction: the pings leave the control
+                 plane on a cron and nothing about the toggle proves they landed. The
+                 last-tick line below is that proof, and it is the only place a
+                 stopped scheduler shows up in the UI. Polled so it stays true while
+                 the tab is open — .visible keeps the panel's queries off-screen. --}}
+            <div class="border-t border-brand-ink/10 pt-3" @if ($keepWarm || $enabled) wire:poll.60s.visible @endif>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Warm start') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">
+                            @if ($enabled)
+                                {{ __('Background processing already pings every minute, which holds the function warm. dply will not send a second warm-start request.') }}
+                            @elseif ($keepWarm)
+                                {{ __('A minute ping holds the function warm so visitors do not pay a cold start. No redeploy needed.') }}
+                            @else
+                                {{ __('After idle, the first visitor waits for the function to boot. Turn this on for public sites.') }}
+                            @endif
+                        </p>
+                    </div>
+                    <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" wire:target="toggleKeepWarm" class="{{ $btnOutline }} shrink-0">
+                        <span wire:loading.remove wire:target="toggleKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
+                        <span wire:loading wire:target="toggleKeepWarm">{{ __('Saving…') }}</span>
+                    </button>
                 </div>
-                <button type="button" wire:click="toggleKeepWarm" wire:loading.attr="disabled" wire:target="toggleKeepWarm" class="{{ $btnOutline }} shrink-0">
-                    <span wire:loading.remove wire:target="toggleKeepWarm">{{ $keepWarm ? __('Disable') : __('Enable') }}</span>
-                    <span wire:loading wire:target="toggleKeepWarm">{{ __('Saving…') }}</span>
-                </button>
-            </div>
 
-            @if ($keepWarm || $enabled)
-                <x-warm-start-status :status="$this->lastTick" class="mt-2" />
-            @endif
-        </div>
+                @if ($keepWarm || $enabled)
+                    <x-warm-start-status :status="$this->lastTick" class="mt-2" />
+                @endif
+            </div>
+        @endif
     </div>
 
     {{-- Failed jobs. A function has no CLI, so `queue:failed` can never be

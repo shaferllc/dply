@@ -264,7 +264,7 @@ class DeploymentsList extends Component
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = self::TAB_DEPLOY;
         }
-        if ($this->tab === self::TAB_RELEASES && $site->deploy_strategy !== 'atomic') {
+        if ($this->tab === self::TAB_RELEASES && ! $this->isFunctionsDeployHub($site) && $site->deploy_strategy !== 'atomic') {
             $this->tab = self::TAB_DEPLOY;
         }
         if ($this->tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys($site)) {
@@ -351,7 +351,12 @@ class DeploymentsList extends Component
             self::TAB_PIPELINE => $isVmDeployHub,
             // Rollout folded into Pipeline as a subtab.
             self::TAB_ROLLOUT => false,
-            self::TAB_RELEASES => $isVmDeployHub && $site->deploy_strategy === 'atomic',
+            // On a VM these are atomic release folders; on a function they are
+            // the host's stored revisions. Both answer "roll back to what?", so
+            // they share the tab rather than the function panel living on
+            // Overview as a sixth stacked card.
+            self::TAB_RELEASES => ($isVmDeployHub && $site->deploy_strategy === 'atomic')
+                || $this->isFunctionsDeployHub($site),
             self::TAB_HISTORY => true,
             // Settings consolidated up into Webhook + Hooks tabs.
             self::TAB_SETTINGS => false,
@@ -363,7 +368,7 @@ class DeploymentsList extends Component
         if (! in_array($tab, self::TABS, true)) {
             return;
         }
-        if ($tab === self::TAB_RELEASES && $this->site->deploy_strategy !== 'atomic') {
+        if ($tab === self::TAB_RELEASES && ! $this->isFunctionsDeployHub() && $this->site->deploy_strategy !== 'atomic') {
             return;
         }
         if ($tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys()) {

@@ -88,6 +88,10 @@
                         @include('livewire.sites.partials.deployments._pipeline-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_ROLLOUT)
                         @include('livewire.sites.partials.deployments._rollout-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_RELEASES && ($isFunctionsDeployHub ?? false))
+                        {{-- A function's releases are the host's stored
+                             revisions — same question, different substrate. --}}
+                        @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_RELEASES && $atomicReleases)
                         @include('livewire.sites.partials.deployments._releases-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HISTORY)
@@ -122,7 +126,7 @@
                 <x-cli-snippet :commands="$isFunctionsDeployHub ?? false
                     ? [
                         ['label' => __('Deploy'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
-                        ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                        ['label' => __('List deployments'), 'command' => 'dply site deployments '.$site->slug],
                     ]
                     : [
                         ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],

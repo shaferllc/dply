@@ -41,13 +41,21 @@ class BackgroundPanel extends Component
 
     public string $siteId = '';
 
+    /**
+     * `overview` renders the whole surface. `queue` drops the strips another
+     * page now owns — the enable switch (Workers) and warm start (Runtime) —
+     * leaving the queue backend, the concurrency dial, and failed jobs.
+     */
+    public string $mode = 'overview';
+
     /** Bound to the concurrency input. */
     public int $max_concurrency = ServerlessQueuePump::DEFAULT_MAX_CONCURRENCY;
 
-    public function mount(Site $site, ServerlessQueuePump $pump): void
+    public function mount(Site $site, ServerlessQueuePump $pump, string $mode = 'overview'): void
     {
         $this->authorize('view', $site);
         $this->siteId = $site->id;
+        $this->mode = $mode === 'queue' ? 'queue' : 'overview';
         $this->max_concurrency = $pump->config($site)['max_concurrency'];
     }
 

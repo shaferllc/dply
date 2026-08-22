@@ -62,6 +62,10 @@ final class SiteSettingsSidebar
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
+                // Access is Routing's sibling: Routing is where the function
+                // lives, Access is who may call it (exposure, shared secret,
+                // CORS, bound parameters). Split out of Runtime.
+                ['id' => 'access', 'label' => __('Access'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
                 // Deployments owns the deploy tab strip (Overview / Deploy /
                 // Releases / History / Settings). Pipeline + Repository live
                 // under Settings; the old standalone routes redirect there.
@@ -69,6 +73,10 @@ final class SiteSettingsSidebar
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.repository'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.environment'],
+                // Data and Assets used to be two of the five panels stacked on
+                // Overview. Each is a page's worth of controls on its own.
+                ['id' => 'data', 'label' => __('Data'), 'icon' => 'heroicon-o-circle-stack', 'group' => 'runtime'],
+                ['id' => 'assets', 'label' => __('Assets'), 'icon' => 'heroicon-o-photo', 'group' => 'runtime'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
                 ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
@@ -116,10 +124,12 @@ final class SiteSettingsSidebar
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
 
-        // The Platform tab is the OpenWhisk inspector — it only applies to
-        // DigitalOcean Functions hosts, not docker / kubernetes containers.
+        // Platform (the OpenWhisk inspector), Access, Data, and Assets only
+        // apply to DigitalOcean Functions hosts, not docker / kubernetes
+        // containers, which share this branch.
         if (! $site->usesFunctionsRuntime()) {
-            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
+            $functionsOnly = ['platform', 'access', 'data', 'assets'];
+            $base = array_values(array_filter($base, fn (array $item): bool => ! in_array($item['id'], $functionsOnly, true)));
         }
 
         // Serverless keeps a dedicated Workers page; the Resources Livewire

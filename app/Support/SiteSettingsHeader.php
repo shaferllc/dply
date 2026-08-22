@@ -72,6 +72,21 @@ final class SiteSettingsHeader
                     },
                 'icon' => 'heroicon-o-cube-transparent',
             ],
+            'access' => [
+                'title' => __('Access'),
+                'description' => __('Whether this function answers HTTP, who may call it, and what parameters are bound to it. Applied to the live function on save.'),
+                'icon' => 'heroicon-o-globe-alt',
+            ],
+            'data' => [
+                'title' => __('Data'),
+                'description' => __('The stores this function talks to: its managed database, and the private network around it.'),
+                'icon' => 'heroicon-o-circle-stack',
+            ],
+            'assets' => [
+                'title' => __('Assets'),
+                'description' => __('Published front-end files, the allowance they draw on, and the domain they are served from.'),
+                'icon' => 'heroicon-o-photo',
+            ],
             'system-user' => [
                 'title' => __('System user'),
                 'description' => __('The Linux user that owns this :resource on the server, plus permissions and sudo controls.', ['resource' => $resourceNoun]),

@@ -23,6 +23,10 @@ return [
         'rails-stack' => ['label' => 'Rails'],
         'wordpress' => ['label' => 'WordPress'],
         'environment' => ['label' => 'Environment'],
+        // Serverless-only leaves split out of Runtime and Overview.
+        'access' => ['label' => 'Access'],
+        'data' => ['label' => 'Data'],
+        'assets' => ['label' => 'Assets'],
         'resources' => ['label' => 'Resources'],
         'logs' => ['label' => 'Logs'],
         'platform' => ['label' => 'Platform'],

@@ -237,8 +237,10 @@ test('skeleton and loaded tab rows agree for a functions site', function () {
 
     expect($skeleton)->not->toContain(DeploymentsList::TAB_PIPELINE);
     expect($skeleton)->not->toContain(DeploymentsList::TAB_SCHEDULE);
-    expect($skeleton)->not->toContain(DeploymentsList::TAB_RELEASES);
-    expect($skeleton)->toContain(DeploymentsList::TAB_DEPLOY);
+    expect($skeleton)->toContain(DeploymentsList::TAB_DEPLOY)
+        // Releases carries the function's stored revisions (the rollback panel
+        // that used to sit on Overview), so it shows here too.
+        ->and($skeleton)->toContain(DeploymentsList::TAB_RELEASES);
 });
 
 test('vm atomic site keeps pipeline and releases in both rows', function () {
@@ -370,3 +372,27 @@ function seedDeploy(Site $site, string $status, \DateTimeInterface $startedAt, s
         'finished_at' => $startedAt,
     ]);
 }
+
+test('a function opens Releases and gets its revision rollback panel', function () {
+    // Releases is the rollback surface. For a function that means the host's
+    // stored revisions, which used to be a sixth stacked card on Overview.
+    [$user, $server, $site] = makeFunctionsSite();
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('setTab', DeploymentsList::TAB_RELEASES)
+        ->assertSet('tab', DeploymentsList::TAB_RELEASES)
+        ->assertSeeLivewire('serverless.rollback-panel');
+});
+
+test('a function deep-linked to ?tab=releases renders', function () {
+    [$user, $server, $site] = makeFunctionsSite();
+
+    Livewire::withoutLazyLoading();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => DeploymentsList::TAB_RELEASES])
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSet('tab', DeploymentsList::TAB_RELEASES)
+        ->assertSeeLivewire('serverless.rollback-panel');
+});

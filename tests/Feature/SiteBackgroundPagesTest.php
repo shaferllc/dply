@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\SiteBackgroundPagesTest;
 
 use App\Livewire\Sites\Schedule;
+use App\Livewire\Sites\Settings;
 use App\Livewire\Sites\Workers;
 use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Organization;
@@ -430,4 +431,31 @@ test('schedule wears the same merged chrome as workers', function () {
         ->and($schedule)->not->toContain('data-hero-card')
         // `space-y-6` between sections is the stacked-card layout it left.
         ->and($schedule)->not->toContain('space-y-6');
+});
+
+test('the sections split out of Runtime and Overview wear the merged chrome', function () {
+    // Access, Data, and Assets were carved off two overloaded pages. Each is
+    // one card with a sand identity header and hairline strips — no floating
+    // hero, no stack of separate cards (Data hosts two panels).
+    $user = actingOrgOwner();
+    [$server, $site] = makeFunctionsSite($user);
+
+    Livewire::withoutLazyLoading();
+
+    // Workers is the reference: sidebar card + one content card, nothing else.
+    $cards = fn (string $html): int => substr_count($html, 'dply-card');
+    $reference = $cards(Livewire::actingAs($user)
+        ->test(Workers::class, ['server' => $server, 'site' => $site])
+        ->html());
+
+    foreach (['access', 'data', 'assets'] as $section) {
+        $html = Livewire::actingAs($user)
+            ->test(Settings::class, ['server' => $server, 'site' => $site, 'section' => $section])
+            ->html();
+
+        expect($html)->not->toContain('data-hero-card', "section [{$section}] renders a floating hero")
+            ->and($cards($html))->toBe($reference, "section [{$section}] stacks more cards than Workers")
+            // The shared sand CLI footer belongs on every one of these.
+            ->and($html)->toContain('data-cli-snippet');
+    }
 });

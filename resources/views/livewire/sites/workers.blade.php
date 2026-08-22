@@ -312,6 +312,11 @@
                     @endif
                 </div>
 
+                {{-- Queue backend, concurrency, and failed jobs — moved off the
+                     Overview dump. `mode=queue` drops the strips this page and
+                     Runtime already own (the engine switch, warm start). --}}
+                @livewire('serverless.background-panel', ['site' => $site, 'mode' => 'queue'], key('serverless-bg-queue-'.$site->id))
+
                 <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
                     <x-cli-snippet :commands="[
                         ['label' => __('Engine state + worker list'), 'command' => 'dply serverless workers '.$site->slug],

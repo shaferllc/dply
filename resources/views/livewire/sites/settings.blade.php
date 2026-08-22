@@ -1,5 +1,5 @@
 @php
-    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'rails-stack', 'wordpress', 'logs', 'notifications', 'platform', 'backends', 'deploy', 'basic-auth', 'danger', 'worker-fleet'];
+    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'rails-stack', 'wordpress', 'logs', 'notifications', 'platform', 'backends', 'deploy', 'basic-auth', 'danger', 'worker-fleet', 'access', 'data', 'assets'];
     $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>
@@ -222,6 +222,64 @@
                                 @include('livewire.sites.settings.partials.runtime-workspace')
                             @endif
                         </section>
+                    @elseif ($section === 'access' && $site->usesFunctionsRuntime())
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            @include('livewire.sites.settings.partials.access-serverless')
+                        </section>
+                    @elseif ($section === 'data' && $site->usesFunctionsRuntime())
+                        {{-- Both panels are hairline strips (they were built to
+                             sit inside the Overview card), so they continue one
+                             card here rather than floating as two. The network
+                             exists to serve the database privately — one page. --}}
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <x-workspace-panel-head
+                                dense
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
+
+                            @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
+                            @livewire('serverless.network-panel', ['site' => $site], key('serverless-network-'.$site->id))
+
+                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+                                <x-cli-snippet
+                                    :intro="__('The connection lands in the function\'s environment on the next deploy:')"
+                                    :commands="[
+                                        ['label' => __('Connection variables'), 'command' => 'dply serverless env '.$site->slug.' list'],
+                                        ['label' => __('Function status'), 'command' => 'dply serverless status '.$site->slug],
+                                    ]"
+                                />
+                            </div>
+                        </section>
+                    @elseif ($section === 'assets' && $site->usesFunctionsRuntime())
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <x-workspace-panel-head
+                                dense
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
+
+                            @livewire('serverless.assets-panel', ['site' => $site], key('serverless-assets-'.$site->id))
+
+                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+                                {{-- Assets are published by the deploy; there is
+                                     no CLI verb of their own yet, so the footer
+                                     says so rather than inventing one. --}}
+                                <x-cli-snippet tone="stub" />
+                            </div>
+                        </section>
                     @elseif ($section === 'system-user')
                         @if (workspace_surface_coming_soon('site_system_user'))
                             <x-workspace-coming-soon
@@ -358,7 +416,13 @@
                                 ]"
                             />
                         @elseif ($site->usesFunctionsRuntime())
-                            @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
+                            <div class="min-w-0 space-y-6">
+                                @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
+
+                                <section class="dply-card min-w-0 overflow-hidden p-0">
+                                    @include('livewire.sites.settings.partials.logging-drain-serverless')
+                                </section>
+                            </div>
                         @else
                             <section class="dply-card min-w-0 overflow-hidden p-0">
                                 <x-workspace-panel-head

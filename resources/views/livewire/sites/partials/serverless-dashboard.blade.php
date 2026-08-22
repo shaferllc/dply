@@ -129,17 +129,12 @@
         </p>
     </div>
 
-    {{-- Resource panels render their own hairline strips (embedded chrome), so
-         they continue the card rather than stacking four more floating cards. --}}
-    @livewire('serverless.network-panel', ['site' => $site], key('serverless-network-'.$site->id))
-    @livewire('serverless.database-panel', ['site' => $site], key('serverless-db-'.$site->id))
-    {{-- The per-function cache panel is retired. A cache is an org-owned
-         resource at /caches now, not a JSON blob on this site, and a function
-         gets a shared one wired automatically on deploy — see
-         docs/adr/dply-cache.md, decision 10. --}}
-    @livewire('serverless.background-panel', ['site' => $site], key('serverless-bg-'.$site->id))
-    @livewire('serverless.assets-panel', ['site' => $site], key('serverless-assets-'.$site->id))
-    @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
+    {{-- Overview is a glance, not a console. The panels that used to stack
+         here each own a page now: Data (database + network), Assets, Workers
+         (queue backend, concurrency, failed jobs), and Deployments (rollback).
+         The per-function cache panel is retired — a cache is an org-owned
+         resource at /caches, wired automatically on deploy (see
+         docs/adr/dply-cache.md, decision 10). --}}
 
     <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
         @if ($isActive)
