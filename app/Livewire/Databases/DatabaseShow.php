@@ -84,7 +84,7 @@ class DatabaseShow extends Component
 
     public function mount(CloudDatabase $cloudDatabase): void
     {
-        abort_unless(Feature::active('surface.cloud'), 404);
+        abort_unless(Feature::active('surface.databases'), 404);
 
         $organization = auth()->user()?->currentOrganization();
         abort_if($organization === null, 403);

@@ -8,7 +8,7 @@
 | product_lines: admin UI + org override tabs grouped by product line.
 | global_groups: cross-cutting app-wide kill switches on /admin/flags/global.
 |
-| Emergency keys (global.vm_enabled, global.edge_delivery_enabled) appear
+| Emergency keys (global.vm_enabled) appear
 | on their product-line pages; orgs cannot override them.
 |
 */
@@ -147,37 +147,12 @@ return [
                 ],
             ],
         ],
-        'cloud' => [
-            'title' => 'Cloud',
-            'description' => 'Managed container apps (DO App Platform, App Runner, dply Cloud).',
+        'databases' => [
+            'title' => 'Databases',
+            'description' => 'Managed database clusters (DigitalOcean, Vultr, Neon, PlanetScale, Supabase, Upstash).',
             'groups' => [
                 'Surface' => [
-                    'surface.cloud' => 'Cloud apps',
-                ],
-            ],
-        ],
-        'edge' => [
-            'title' => 'Edge',
-            'description' => 'Static/SSG Edge delivery, previews, and CDN pipeline.',
-            'emergency' => [
-                'global.edge_delivery_enabled' => 'Emergency: pause Edge delivery pipeline',
-            ],
-            'groups' => [
-                'Edge surface' => [
-                    'surface.edge' => 'Edge',
-                ],
-                'Delivery' => [
-                    'global.edge_deploy_replay' => 'Edge shadow replay',
-                    'global.deploy_contract' => 'Deploy contract (promote gate)',
-                ],
-            ],
-        ],
-        'serverless' => [
-            'title' => 'Serverless',
-            'description' => 'Functions and serverless runtimes.',
-            'groups' => [
-                'Surface' => [
-                    'surface.serverless' => 'Serverless',
+                    'surface.databases' => 'Managed databases',
                 ],
             ],
         ],
@@ -201,8 +176,10 @@ return [
                     'surface.status_pages' => 'Status pages',
                 ],
                 'Launch' => [
-                    'launch.full_stack_wizard' => 'Full-stack launch wizard',
                     'launch.standby_blueprint' => 'Standby failover blueprints',
+                ],
+                'Deploy' => [
+                    'global.deploy_contract' => 'Deploy contract (promote gate)',
                 ],
             ],
         ],

@@ -9,16 +9,12 @@ use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Http\Middleware\RedirectServerlessByoWorkspace;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\StampDebugReference;
 use App\Http\Middleware\ValidateBundleServiceToken;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
-use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
-use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
-use App\Modules\Serverless\Http\Middleware\SkipSessionCookiesForServerlessAssets;
 use App\Support\Debug\DebugExceptionDetail;
 use App\Support\DplyRuntime;
 use App\Support\Http\ScannerProbePaths;
@@ -91,9 +87,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToGroup('web', [
             // Outermost: strip session cookies after StartSession so hashed
             // /build files stay CDN-cacheable on function hostnames.
-            SkipSessionCookiesForServerlessAssets::class,
-            ResolveServerlessCustomDomain::class,
-            ResolveEdgeCustomDomain::class,
         ]);
 
         $middleware->appendToGroup('web', [
@@ -103,7 +96,6 @@ return Application::configure(basePath: dirname(__DIR__))
             // Function / leftover FaaS hosts must leave /servers/{id}/… before
             // the tag/role workspace gate 404s a deep link (or Lazy overview
             // paints Servers chrome). Address bar stays on /serverless/….
-            RedirectServerlessByoWorkspace::class,
             // Workspace deep-link guard: 404s requests for workspace routes the
             // bound server can't reach (tag-gated rows that lack the required
             // installed-service tag; role-gated rows hidden by role_nav_keys).

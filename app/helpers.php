@@ -752,59 +752,6 @@ if (! function_exists('workspace_shared_host_active')) {
     }
 }
 
-if (! function_exists('multi_surface_active')) {
-    /**
-     * True when the current org has at least one non-VM product surface
-     * enabled (Cloud / Edge / Serverless). Used to gate the Infrastructure
-     * dashboard and the Launchpad — those screens are designed to triage
-     * across multiple surfaces and become noise when only Servers exist.
-     *
-     * Optional $organization scopes the check to a specific org (admin
-     * tooling); omit to use Pennant's default scope (current org).
-     */
-    function multi_surface_active(?Organization $organization = null): bool
-    {
-        foreach (['surface.cloud', 'surface.edge', 'surface.serverless'] as $flag) {
-            $active = $organization === null
-                ? Feature::active($flag)
-                : Feature::for($organization)->active($flag);
-            if ($active) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-}
-
-if (! function_exists('full_stack_wizard_active')) {
-    /**
-     * True when the Tier B full-stack launch wizard should be available:
-     * flag on, launchpad surfaces active, and both Cloud + Edge enabled.
-     */
-    function full_stack_wizard_active(?Organization $organization = null): bool
-    {
-        $flagActive = $organization === null
-            ? Feature::active('launch.full_stack_wizard')
-            : Feature::for($organization)->active('launch.full_stack_wizard');
-
-        if (! $flagActive || ! multi_surface_active($organization)) {
-            return false;
-        }
-
-        foreach (['surface.cloud', 'surface.edge'] as $required) {
-            $active = $organization === null
-                ? Feature::active($required)
-                : Feature::for($organization)->active($required);
-            if (! $active) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
 if (! function_exists('standby_blueprint_active')) {
     /**
      * True when the Tier C standby failover blueprint wizard is available.

@@ -5,13 +5,10 @@ use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\CliInstallController;
-use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\BackupStorageOAuthController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\EnvoyAdminProxyController;
-use App\Http\Controllers\FunctionLogIngestController;
-use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\Notifications\DiscordOAuthController;
 use App\Http\Controllers\Notifications\SlackOAuthController;
@@ -20,8 +17,6 @@ use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\OrgScopedRedirectController;
 use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\ServerCredentialShareController;
-use App\Http\Controllers\ServerlessQueueWakeController;
-use App\Http\Controllers\ServerlessWorkspaceController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\Sites\DatabaseConnectionUriController;
@@ -32,7 +27,6 @@ use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
-use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
@@ -52,14 +46,11 @@ use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Backups\Overview as BackupsOverview;
 use App\Livewire\Backups\Snapshots as BackupsSnapshots;
 use App\Livewire\Backups\Storage as BackupsStorage;
-use App\Livewire\Cloud\Create as CloudCreate;
 use App\Modules\Cache\Livewire\CacheShow as CachesShow;
 use App\Modules\Cache\Livewire\Caches as CachesIndex;
 use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Databases\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
-use App\Livewire\Cloud\DeployDetail;
-use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Infrastructure\BlastRadius as InfrastructureBlastRadius;
@@ -172,8 +163,6 @@ use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\DeploySyncGroups;
-use App\Livewire\Sites\EdgeDeploymentDetail;
-use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
@@ -182,13 +171,11 @@ use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\ScaffoldJourney;
-use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\SiteEnvironment;
 use App\Livewire\Sites\SitePromote as SitesPromote;
 use App\Livewire\Sites\SiteSetup as SitesSetupWizard;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
-use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Sites\WorkspaceSystemd;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
@@ -203,31 +190,12 @@ use App\Modules\Billing\Livewire\Analytics as BillingAnalytics;
 use App\Modules\Billing\Livewire\Invoices as BillingInvoices;
 use App\Modules\Billing\Livewire\Show as BillingShow;
 use App\Modules\Docs\Http\Controllers\DocsController;
-use App\Modules\Edge\Http\Controllers\EdgeAuditLogExportController;
-use App\Modules\Edge\Http\Controllers\EdgeDeployHookController;
-use App\Modules\Edge\Http\Controllers\EdgeFormIngestController;
-use App\Modules\Edge\Http\Controllers\EdgeLiveAccessLogPollController;
-use App\Modules\Edge\Http\Controllers\EdgeLogCsvDownloadController;
-use App\Modules\Edge\Http\Controllers\EdgeLogIngestController;
-use App\Modules\Edge\Http\Controllers\EdgeLogpushIngestController;
-use App\Modules\Edge\Http\Controllers\EdgePreviewAccessController;
-use App\Modules\Edge\Http\Controllers\EdgePreviewCommentsController;
-use App\Modules\Edge\Http\Controllers\EdgeRepoConfigYamlDownloadController;
-use App\Modules\Edge\Http\Controllers\EdgeVitalsIngestController;
-use App\Modules\Edge\Http\Controllers\GithubEdgeWebhookController;
-use App\Modules\Edge\Livewire\Create as EdgeCreate;
-use App\Modules\Edge\Livewire\Import;
-use App\Modules\Edge\Livewire\Index as EdgeIndex;
-use App\Modules\Edge\Livewire\Templates;
-use App\Modules\Edge\Livewire\Usage;
 use App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController;
 use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
 use App\Modules\Imports\Livewire\Forge\Inventory;
 use App\Modules\Imports\Livewire\Parity as ImportParity;
 use App\Modules\Imports\Livewire\Ploi\Inventory as PloiInventory;
 use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
-use App\Modules\Launch\Livewire\Create as LaunchesCreate;
-use App\Modules\Launch\Livewire\FullStack as LaunchesFullStack;
 use App\Modules\Launch\Livewire\Path as LaunchesPath;
 use App\Modules\Launch\Livewire\StandbyBlueprint as LaunchesStandbyBlueprint;
 use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
@@ -246,16 +214,7 @@ use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
 use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
-use App\Modules\Serverless\Http\Controllers\ServerlessAssetController;
-use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
-use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
-use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
-use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
-use App\Modules\Serverless\Support\ServerlessTestingDomains;
 use App\Support\Admin\AdminFeatureFlags;
-use App\Support\Serverless\ServerlessWorkspaceUrl;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -282,18 +241,6 @@ Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhoo
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
-Route::match(['post', 'options'], '/hooks/cloud/{site}/redeploy', CloudDeployWebhookController::class)
-    ->middleware(['throttle:site-webhook'])
-    ->name('hooks.cloud.redeploy');
-
-Route::match(['post', 'options'], '/hooks/cloud/{site}/github', GithubCloudWebhookController::class)
-    ->middleware(['throttle:site-webhook'])
-    ->name('hooks.cloud.github');
-
-Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
-    ->middleware(['throttle:site-webhook'])
-    ->name('hooks.edge.github');
-
 // Telegram bot updates. Under /hooks/* so MachineCallbackPaths exempts it from
 // CSRF and the guest gates in one place. Authenticated by the secret-token
 // header Telegram echoes, checked inside the controller.
@@ -302,87 +249,9 @@ Route::post('/hooks/telegram', TelegramWebhookController::class)
     ->name('hooks.telegram');
 
 // Per-request log records POSTed by a deployed serverless function's handler
-// — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
-// inside the controller; high throttle since it fires once per app request.
-Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.functions.log');
-
-// Queue-pump wake, called by the first-party Laravel package when the app
-// dispatches a job — this is what makes serverless queue latency a
-// round-trip instead of a cron interval. Shares the log-ingest throttle:
-// both fire from app traffic at similar rates, and the pump is idempotent
-// and ceiling-bounded, so a flood costs nothing beyond the request.
-Route::post('/hooks/functions/{site}/queue/wake', ServerlessQueueWakeController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.functions.queue.wake');
-
-Route::get('/serverless-assets/{site}/{path}', ServerlessAssetController::class)
-    ->where('path', '.*')
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('serverless.assets');
-
-Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.log');
-
-Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.vitals');
-
-Route::post('/hooks/edge/{site}/forms', EdgeFormIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.forms');
-
-Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.logpush');
-
 Route::post('/hooks/acme-dns', AcmeDnsHookController::class)
     ->middleware(['throttle:60,1'])
     ->name('hooks.acme-dns');
-
-// Per-site deploy hooks (P10b). Match POST + GET so CMSes that only
-// emit GET pings (Sanity, some Webflow integrations) still work.
-// Rate-limit by IP via the cheap default throttle to slow brute-force.
-Route::match(['get', 'post'], '/hooks/edge/deploy/{token}', EdgeDeployHookController::class)
-    ->middleware(['throttle:60,1'])
-    ->where('token', '[A-Za-z0-9]{16,64}')
-    ->name('hooks.edge.deploy');
-
-// Preview-comment widget REST endpoints. Public (no Laravel session);
-// auth is per-parent widget token in X-Dply-Preview-Widget. CORS is
-// echoed for testing-domain origins.
-Route::match(['options'], '/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'options']);
-Route::get('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'index'])
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('api.edge.preview-comments.index');
-Route::post('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'store'])
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('api.edge.preview-comments.store');
-
-// Friendly public URL for a serverless function — dply proxies it through
-// to the function's raw DigitalOcean Functions invocation URL.
-Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
-    ->where('path', '.*')
-    ->name('serverless.proxy');
-
-// Live function hostnames: a deployed function answers at
-// {slug}-{idHash8}.dply-serverless.cloud (or a previously allocated name-only
-// slug). Each routable apex gets a wildcard-subdomain route that proxies to
-// the function — the serverless apex plus the legacy DPLY_TESTING_DOMAINS
-// pool, so functions minted before the dedicated apex existed keep answering
-// on their old hostnames. (Production needs *.{domain} DNS + TLS pointed at
-// the dply app for these to resolve.)
-foreach (ServerlessTestingDomains::routable() as $functionDomain) {
-    Route::domain('{slug}.'.$functionDomain)
-        ->any('/{path?}', ServerlessFunctionProxyController::class)
-        ->where('path', '.*')
-        ->withoutMiddleware([
-            ValidateCsrfToken::class,
-            RedirectGuestsToComingSoon::class,
-        ]);
-}
 
 Route::get('/', function () {
     // The animated homepage is THE homepage — no classic/animated switching.
@@ -410,16 +279,6 @@ Route::get('/migrate', function () {
         'sources' => config('migration_sources', []),
     ]);
 })->name('migrate.index');
-
-Route::get('/deploy', function (Request $request) {
-    $allowed = ['repo', 'branch', 'name', 'runtime_mode', 'build_command', 'output_dir'];
-    $query = array_filter(
-        $request->only($allowed),
-        static fn ($v): bool => is_string($v) && $v !== '',
-    );
-
-    return redirect()->route('edge.create', $query);
-})->name('deploy.shortlink');
 
 Route::get('/migrate/{slug}', function (string $slug) {
     $source = config('migration_sources.'.$slug);
@@ -469,8 +328,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // confirms scopes + org, and we mint an ApiToken that the polling
     // CLI picks up exactly once via /api/v1/auth/device/poll.
     Route::livewire('/auth/device', AuthDeviceApproval::class)->name('auth.device.show');
-    Route::get('/edge/sites/{site}/preview-access', EdgePreviewAccessController::class)
-        ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     // Cross-product operations views over every server and site in the org.
     // These sit under /infrastructure alongside the compute hub — there is no
@@ -514,9 +371,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
-            Route::livewire('/flags/cloud', AdminProductLineFlags::class)->defaults('line', 'cloud')->name('flags.cloud');
-            Route::livewire('/flags/edge', AdminProductLineFlags::class)->defaults('line', 'edge')->name('flags.edge');
-            Route::livewire('/flags/serverless', AdminProductLineFlags::class)->defaults('line', 'serverless')->name('flags.serverless');
+            Route::livewire('/flags/databases', AdminProductLineFlags::class)->defaults('line', 'databases')->name('flags.databases');
             Route::livewire('/flags/platform', AdminProductLineFlags::class)->defaults('line', 'platform')->name('flags.platform');
             Route::get('/flags/defaults/{group}', function (string $group) {
                 $target = AdminFeatureFlags::legacyDefaultGroupRedirectTarget($group);
@@ -651,64 +506,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
 
-    Route::middleware('feature:surface.cloud')->group(function (): void {
-        Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
-        Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');
+    Route::middleware('feature:surface.databases')->group(function (): void {
         Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
         // Registered after the literal /create leaf so the wizard is not swallowed
         // by the {cloudDatabase} binding.
         Route::livewire('cloud/databases/{cloudDatabase}', CloudDatabaseShow::class)->name('cloud.databases.show');
-    });
-    Route::middleware('feature:surface.edge')->group(function (): void {
-        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
-        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
-        Route::livewire('edge/import', Import::class)->name('edge.import');
-        Route::livewire('edge/templates', Templates::class)->name('edge.templates');
-        Route::livewire('edge/usage', Usage::class)->name('edge.usage');
-    });
-    Route::middleware('feature:surface.serverless')->group(function (): void {
-        Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
-        Route::livewire('serverless/glue', ServerlessGlue::class)->name('serverless.glue');
-        Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
-
-        // Product-line workspace URLs — site-centric, not under /servers.
-        // Literal leaves are registered before the `{section?}` catch-all.
-        Route::get('serverless/{site}/deploying', [ServerlessWorkspaceController::class, 'journey'])
-            ->name('serverless.journey');
-        Route::get('serverless/{site}/proxy-routing', [ServerlessWorkspaceController::class, 'routing'])
-            ->name('serverless.routing');
-        Route::get('serverless/{site}/deployments/{deployment}', [ServerlessWorkspaceController::class, 'deploymentShow'])
-            ->name('serverless.deployments.show');
-        Route::get('serverless/{site}/deployments', [ServerlessWorkspaceController::class, 'deployments'])
-            ->name('serverless.deployments');
-        Route::get('serverless/{site}/repository', [ServerlessWorkspaceController::class, 'repository'])
-            ->name('serverless.repository');
-        Route::get('serverless/{site}/resources', [ServerlessWorkspaceController::class, 'resources'])
-            ->name('serverless.resources');
-        Route::get('serverless/{site}/schedule', [ServerlessWorkspaceController::class, 'schedule'])
-            ->name('serverless.schedule');
-        Route::get('serverless/{site}/workers', [ServerlessWorkspaceController::class, 'workers'])
-            ->name('serverless.workers');
-        Route::get('serverless/{site}/environment', [ServerlessWorkspaceController::class, 'environment'])
-            ->name('serverless.environment');
-        Route::get('serverless/{site}/monitor', [ServerlessWorkspaceController::class, 'monitor'])
-            ->name('serverless.monitor');
-        Route::get('serverless/{site}/errors', [ServerlessWorkspaceController::class, 'errors'])
-            ->name('serverless.errors');
-        Route::get('serverless/{site}/logs', [ServerlessWorkspaceController::class, 'logs'])
-            ->name('serverless.logs');
-        Route::get('serverless/{site}/{section?}', [ServerlessWorkspaceController::class, 'show'])
-            ->where('section', '[a-z0-9-]+')
-            ->defaults('section', 'general')
-            ->name('serverless.show');
-
-        // Legacy BYO deploy-journey bookmark → product URL.
-        Route::get('servers/{server}/sites/{site}/deploying', function (Server $server, Site $site) {
-            abort_unless($site->server_id === $server->id, 404);
-
-            return redirect()->to(ServerlessWorkspaceUrl::journey($site));
-        })->name('serverless.journey.legacy');
     });
     Route::livewire('imports/parity', ImportParity::class)->name('imports.parity');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
@@ -727,10 +530,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
         Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     });
-    Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
-    Route::middleware('feature:launch.full_stack_wizard')->group(function (): void {
-        Route::livewire('launches/full-stack', LaunchesFullStack::class)->name('launches.full-stack');
-    });
     Route::middleware('feature:launch.standby_blueprint')->group(function (): void {
         Route::livewire('launches/standby', LaunchesStandbyBlueprint::class)->name('launches.standby');
     });
@@ -739,9 +538,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // container via /servers/{id}/sites/create container mode). This route is kept for
     // one release as a 302 to the wizard so external bookmarks don't 404.
     Route::redirect('launches/containers/create', '/servers/create?host_target=docker', 302)->name('launches.containers.create');
-    Route::middleware('feature:surface.serverless')->group(function (): void {
-        Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
-    });
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
 
@@ -769,15 +565,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         // overview.
         if (($server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES) {
             return redirect()->route('servers.cluster', $server);
-        }
-
-        // A serverless function is not a server — the DO Functions namespace
-        // is an implementation detail. Send the operator straight to the
-        // function workspace (or /serverless when the leftover host has no
-        // function). Never fall through to servers.overview.
-        $serverlessUrl = ServerlessWorkspaceUrl::forHost($server);
-        if ($serverlessUrl !== null) {
-            return redirect()->to($serverlessUrl);
         }
 
         // Journey page is SSH/VM-shaped — only VM hosts have a provision task
@@ -851,9 +638,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('sites.pipeline');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
-    Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
-    Route::livewire('servers/{server}/sites/{site}/cloud/deploys/{deploy}', DeployDetail::class)
-        ->name('sites.cloud.deploys.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
@@ -867,7 +651,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Site-level crontab management was removed — cron is a host-level concern,
     // managed on the server Cron page (servers.cron, filterable by ?site=).
     // Site scheduling lives on Schedule (framework scheduler) + Workers (daemons).
-    Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
     Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
@@ -877,43 +660,17 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // BACKGROUND group for container/serverless workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
-    // Site-kind dispatch: VM → WorkspaceSchedule, container/serverless → Schedule
+    // Site-kind dispatch: VM → WorkspaceSchedule, container → Schedule
     // (see SiteScheduleController). One canonical /schedule URL for any site.
     Route::get('servers/{server}/sites/{site}/schedule', SiteScheduleController::class)->name('sites.schedule');
-    Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
     // Unified Resources surface. Routes through the site workspace controller
-    // (same chrome + Settings/EdgeSettings dispatch as sites.show) on the
-    // `resources` section: VM sites render the new bindings hub, container sites
-    // render the Cloud resources panel — both inside the normal workspace, at
-    // one canonical /resources URL. (Was a standalone Cloud-only component.)
+    // on the `resources` section: the site's bindings hub, inside the normal
+    // workspace, at one canonical /resources URL.
     Route::get('servers/{server}/sites/{site}/resources', SiteWorkspaceController::class)
         ->defaults('section', 'resources')
         ->name('sites.resources');
     // Standalone Environment page — first-class, no longer a Deployments-hub tab.
     Route::livewire('servers/{server}/sites/{site}/environment', SiteEnvironment::class)->name('sites.environment');
-    // NETWORKING group for serverless / container workspaces — manages the dply
-    // edge proxy (hostname/DNS, custom domains, redirects, headers + CORS,
-    // invocation URLs). MUST live on its own path: the generic VM routing surface
-    // is `sites.show` section=routing → `/sites/{site}/routing`. Sharing that path
-    // let this literal route shadow the wildcard for *every* site, so a VM site's
-    // /routing hit ServerlessRouting, which redirects VM sites back to
-    // section=routing → the same URL → an infinite redirect loop.
-    //
-    // Path is `/proxy-routing` (not `/edge-routing`): Edge product sites use
-    // `sites.show` section=edge-routing → `/…/edge-routing` for redirects /
-    // rewrites / headers in EdgeSettings. Reusing `/edge-routing` for this
-    // serverless surface stole that URL and redirected Edge sites to BYO
-    // `/routing` (404). Route name stays `sites.routing`.
-    Route::livewire('servers/{server}/sites/{site}/proxy-routing', ServerlessRouting::class)->name('sites.routing');
-    // Legacy serverless bookmark: `/edge-routing` → proxy routing. Edge sites
-    // fall through to the sites.show wildcard below (section=edge-routing).
-    Route::get('servers/{server}/sites/{site}/edge-routing', function (Server $server, Site $site) {
-        if ($site->usesEdgeRuntime()) {
-            return app(SiteWorkspaceController::class)($server, $site, 'edge-routing');
-        }
-
-        return redirect()->route('sites.routing', ['server' => $server, 'site' => $site]);
-    })->name('sites.routing.legacy-edge-path');
     // Repository now lives as the top-level "Repository" tab on the
     // Deployments page (it used to be the "Settings → Repository" section,
     // but Settings was split into the Webhook/Hooks tabs and Repository was
@@ -995,26 +752,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ]);
     })->name('sites.settings');
 
-    // Edge access log CSV download — session-authed (Gate view-checked
-    // inside the controller) so the dashboard "Download CSV" button
-    // works without minting an API token. Stays out of the section
-    // dispatcher because the .csv extension wouldn't match.
-    Route::get('servers/{server}/sites/{site}/edge/logs.csv', EdgeLogCsvDownloadController::class)
-        ->name('sites.edge.logs.csv');
-
-    Route::get('servers/{server}/sites/{site}/edge/logs/live.json', EdgeLiveAccessLogPollController::class)
-        ->name('sites.edge.logs.live');
-
-    // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
-    // mirrors the on-screen Audit log panel filters.
-    Route::get('servers/{server}/sites/{site}/edge/audit.export', EdgeAuditLogExportController::class)
-        ->name('sites.edge.audit.export');
-
-    // Generate dply.yaml from the site's current declarative config
-    // (redirects / rewrites / headers / crons). Lets a user export
-    // dashboard-managed state to a repo-checked file.
-    Route::get('servers/{server}/sites/{site}/edge/dply.yaml', EdgeRepoConfigYamlDownloadController::class)
-        ->name('sites.edge.dply-yaml');
 
     Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)
         ->where('section', '[a-z0-9-]+')

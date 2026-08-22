@@ -60,7 +60,7 @@ class DatabaseCreate extends Component
 
     public function mount(): void
     {
-        abort_unless(Feature::active('surface.cloud'), 404);
+        abort_unless(Feature::active('surface.databases'), 404);
         $this->syncCatalogDefaults();
     }
 

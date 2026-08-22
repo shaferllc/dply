@@ -5,11 +5,9 @@ use App\Modules\Billing\BillingServiceProvider;
 use App\Modules\Blog\BlogServiceProvider;
 use App\Modules\Cache\CacheServiceProvider;
 use App\Modules\Certificates\CertificatesServiceProvider;
-use App\Modules\Cloud\CloudServiceProvider;
 use App\Modules\Database\DatabaseServiceProvider;
 use App\Modules\Deploy\DeployServiceProvider;
 use App\Modules\Docs\DocsServiceProvider;
-use App\Modules\Edge\EdgeServiceProvider;
 use App\Modules\Feedback\FeedbackServiceProvider;
 use App\Modules\Imports\ImportsServiceProvider;
 use App\Modules\Insights\InsightsServiceProvider;
@@ -24,7 +22,6 @@ use App\Modules\Realtime\RealtimeServiceProvider;
 use App\Modules\Referrals\ReferralsServiceProvider;
 use App\Modules\Roadmap\RoadmapServiceProvider;
 use App\Modules\Secrets\SecretVaultServiceProvider;
-use App\Modules\Serverless\ServerlessServiceProvider;
 use App\Modules\Snapshots\SnapshotsServiceProvider;
 use App\Modules\TaskRunner\TaskServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -39,14 +36,12 @@ return [
     BillingServiceProvider::class,
     CertificatesServiceProvider::class,
     CacheServiceProvider::class,
-    CloudServiceProvider::class,
     DatabaseServiceProvider::class,
     DeployServiceProvider::class,
     LogsServiceProvider::class,
     SnapshotsServiceProvider::class,
     BlogServiceProvider::class,
     DocsServiceProvider::class,
-    EdgeServiceProvider::class,
     FeedbackServiceProvider::class,
     ImportsServiceProvider::class,
     InsightsServiceProvider::class,
@@ -58,7 +53,6 @@ return [
     QueueServiceProvider::class,
     RealtimeServiceProvider::class,
     ReferralsServiceProvider::class,
-    ServerlessServiceProvider::class,
     RoadmapServiceProvider::class,
     AppServiceProvider::class,
     BundleSsoServiceProvider::class,
