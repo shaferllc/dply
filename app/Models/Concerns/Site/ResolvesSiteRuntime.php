@@ -484,12 +484,7 @@ trait ResolvesSiteRuntime
 
     public function usesContainerRuntime(): bool
     {
-        return $this->type === SiteType::Container
-            || in_array($this->container_backend, [
-                'digitalocean_app_platform',
-                'aws_app_runner',
-                'dply_cloud',
-            ], true);
+        return $this->type === SiteType::Container;
     }
 
     public function usesEdgeRuntime(): bool

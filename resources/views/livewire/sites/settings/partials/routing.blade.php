@@ -1254,7 +1254,6 @@
                             @php
                                 $wireModel = match ($row['key']) {
                                     'reissue_cert' => 'rename_reissue_cert',
-                                    'cycle_backend' => 'rename_cycle_backend',
                                     default => null,
                                 };
                             @endphp

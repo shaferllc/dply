@@ -6,8 +6,6 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteDnsRecordsJob;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
-use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Models\ServerWildcardCertificate;
@@ -57,7 +55,6 @@ trait ManagesSiteDomainsRouting
     public bool $rename_reissue_cert = false;
 
     /** Opt-in: detach old + attach new on the site's container backend during rename confirmation. */
-    public bool $rename_cycle_backend = false;
 
     public string $editing_domain_hostname = '';
 
@@ -231,7 +228,6 @@ trait ManagesSiteDomainsRouting
 
         $this->rename_plan = $plan;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('open-modal', 'primary-hostname-rename-modal');
     }
 
@@ -266,7 +262,6 @@ trait ManagesSiteDomainsRouting
         $optInKeys = array_map(fn (array $row) => $row['key'], $freshPlan['optIn']);
 
         $reissueCert = $this->rename_reissue_cert && in_array('reissue_cert', $optInKeys, true);
-        $cycleBackend = $this->rename_cycle_backend && in_array('cycle_backend', $optInKeys, true);
         $rewriteDnsZone = collect($freshPlan['auto'])->contains(fn (array $row) => $row['key'] === 'dns_zone');
 
         $primaryDomain->forceFill(['hostname' => $new])->save();
@@ -282,17 +277,11 @@ trait ManagesSiteDomainsRouting
             $cascadeKeys[] = 'reissue_cert';
             $this->dispatchCertReissue($freshPlan);
         }
-        if ($cycleBackend) {
-            $cascadeKeys[] = 'cycle_backend';
-            DetachCloudDomainJob::dispatch($this->site->id, $old);
-            AttachCloudDomainJob::dispatch($this->site->id, $new);
-        }
 
         $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);
 
         $this->rename_plan = null;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('close-modal', 'primary-hostname-rename-modal');
         $this->cancelEditDomain();
         $this->finalizeRoutingMutation('Primary hostname renamed.');
@@ -306,7 +295,6 @@ trait ManagesSiteDomainsRouting
     {
         $this->rename_plan = null;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('close-modal', 'primary-hostname-rename-modal');
     }
 
