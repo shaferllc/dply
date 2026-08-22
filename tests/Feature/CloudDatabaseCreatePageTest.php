@@ -9,7 +9,7 @@ use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;

@@ -17,8 +17,6 @@ use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
  */
 trait ProvisionsDoAppPlatform
 {
-
-
     /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
@@ -96,7 +94,7 @@ trait ProvisionsDoAppPlatform
      */
     private function applyAlertDestinations(DigitalOceanAppPlatformService $service, array $result, Site $site): void
     {
-        $alerts = ($result['alerts'] );
+        $alerts = ($result['alerts']);
         if ($alerts === []) {
             return;
         }

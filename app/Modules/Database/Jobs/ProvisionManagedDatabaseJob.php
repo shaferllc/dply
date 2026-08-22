@@ -10,7 +10,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Support\Sites\ManagedDatabaseProvisionConsole;
 use Illuminate\Bus\Queueable;

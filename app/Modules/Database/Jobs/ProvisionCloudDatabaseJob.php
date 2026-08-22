@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Jobs;
+namespace App\Modules\Database\Jobs;
 
 use App\Models\CloudDatabase;
 use App\Modules\Providers\Services\DigitalOceanService;

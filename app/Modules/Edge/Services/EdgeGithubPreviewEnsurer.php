@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
-use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Site;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 
 /**

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Backends\Concerns;
 
+use App\Contracts\CloudBackend;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Modules\Cloud\Backends\CloudBackend;
 use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Http;
  */
 trait ReadsDoAppState
 {
-
-
     public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

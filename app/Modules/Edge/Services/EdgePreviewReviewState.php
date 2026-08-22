@@ -94,12 +94,12 @@ final class EdgePreviewReviewState
     }
 
     /**
-     * @param  array<string, mixed> $review
+     * @param  array<string, mixed>  $review
      * @return list<array{label: string, value: string, mono?: bool}>
      */
     /**
+     * @param  array<string, mixed>  $review
      * @return array<int, array<string, string>>
-     * @param  array<string, mixed> $review
      */
     public function confirmModalRows(array $review): array
     {
@@ -135,7 +135,7 @@ final class EdgePreviewReviewState
     }
 
     /**
-     * @param  array<string, mixed> $review
+     * @param  array<string, mixed>  $review
      */
     public function promoteBlockedMessage(array $review): ?string
     {

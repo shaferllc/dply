@@ -8,7 +8,7 @@ use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Modules\Cache\Models\ManagedCache;
 use App\Modules\Cache\Support\CacheEntitlements;
-use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Database\Actions\CreateCloudDatabase;
 use Illuminate\Support\Str;
 use RuntimeException;
 

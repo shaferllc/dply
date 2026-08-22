@@ -29,7 +29,7 @@ class EdgeDashboardBindingProvisioner
 
     /**
      * @param  string  $kind  one of EdgeEffectiveBindings::KINDS
-     * @param  string  $label the Cloudflare-side resource name to create/adopt
+     * @param  string  $label  the Cloudflare-side resource name to create/adopt
      * @return string the identifier to store as the binding value
      */
     public function create(Site $site, string $kind, string $label): string

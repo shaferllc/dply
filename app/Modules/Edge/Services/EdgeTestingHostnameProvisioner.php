@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\Site;
-use App\Modules\Providers\Services\DigitalOceanService;
-use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Modules\Edge\Support\EdgeTestingDomains;
 use App\Modules\Edge\Support\FakeEdgeProvision;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -167,7 +167,7 @@ final class EdgeTestingHostnameProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function store(Site $site, array $payload): void
     {

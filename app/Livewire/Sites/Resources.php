@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Database\Actions\CreateCloudDatabase;
 use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;

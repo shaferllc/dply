@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
+use App\Contracts\EdgeBackend;
 use App\Models\Site;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 

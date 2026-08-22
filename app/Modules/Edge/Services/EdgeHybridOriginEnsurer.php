@@ -108,7 +108,7 @@ class EdgeHybridOriginEnsurer
     }
 
     /**
-     * @param  array<string, mixed> $origin
+     * @param  array<string, mixed>  $origin
      * @return array<string, mixed>
      */
     private function normalizeOrigin(array $origin): array

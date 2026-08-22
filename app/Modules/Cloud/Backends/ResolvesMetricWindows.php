@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Backends;
 
+use App\Contracts\CloudBackend;
 use App\Models\Site;
 
 /**

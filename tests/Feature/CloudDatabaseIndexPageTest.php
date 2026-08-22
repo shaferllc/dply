@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseIndexPageTest;
 
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
 use App\Models\CloudDatabase;
 use App\Models\Organization;

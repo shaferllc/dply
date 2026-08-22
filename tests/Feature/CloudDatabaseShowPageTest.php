@@ -8,7 +8,7 @@ use App\Livewire\Cloud\DatabaseShow as CloudDatabaseShow;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\User;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Modules\Database\Jobs\ResizeManagedDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;

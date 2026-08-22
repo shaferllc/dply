@@ -157,7 +157,7 @@ class EdgeDeliveryFeaturesEnsurer
     }
 
     /**
-     * @param  array<string, mixed> $edgeMeta
+     * @param  array<string, mixed>  $edgeMeta
      * @return list<string>
      */
     private function defaultImageAllowedHosts(Site $site, string $edgeHostname, array $edgeMeta): array

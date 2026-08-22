@@ -127,7 +127,7 @@ class CloudScalingConfig
      * Validate and normalize an autoscaling config payload.
      * Throws InvalidArgumentException on any out-of-range value.
      *
-     * @param  array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return array{enabled: bool, min_instances: int, max_instances: int, cpu_percent: int}
      */
     public static function validateAutoscaling(array $input): array
@@ -162,7 +162,7 @@ class CloudScalingConfig
      * Validate and normalize a health-check config payload.
      * Throws InvalidArgumentException on any invalid value.
      *
-     * @param  array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return array{enabled: bool, http_path: string, initial_delay_seconds: int, period_seconds: int, timeout_seconds: int, success_threshold: int, failure_threshold: int}
      */
     public static function validateHealthCheck(array $input): array

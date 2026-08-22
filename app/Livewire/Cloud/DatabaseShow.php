@@ -7,7 +7,7 @@ namespace App\Livewire\Cloud;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseBackend;
 use App\Modules\Database\Backends\DatabaseRouter;

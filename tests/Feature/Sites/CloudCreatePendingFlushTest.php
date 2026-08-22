@@ -8,7 +8,7 @@ use App\Enums\SiteType;
 use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Jobs\PollCloudStatusJob;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

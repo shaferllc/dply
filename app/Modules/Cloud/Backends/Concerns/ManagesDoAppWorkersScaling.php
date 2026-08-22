@@ -18,8 +18,6 @@ use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
  */
 trait ManagesDoAppWorkersScaling
 {
-
-
     public function supportsAutoscaling(): bool
     {
         // App Platform supports both an `autoscaling` block and a
@@ -103,7 +101,7 @@ trait ManagesDoAppWorkersScaling
      * `instance_count` from the site's meta. Health-check is set or
      * removed independently.
      *
-     * @param  array<string, mixed> $spec
+     * @param  array<string, mixed>  $spec
      * @return array<string, mixed>
      */
     private function applyScalingToSpec(array $spec, Site $site): array
@@ -139,7 +137,7 @@ trait ManagesDoAppWorkersScaling
      * code as the web process. When there are no workers the key is
      * removed entirely (DO rejects an empty workers array).
      *
-     * @param  array<string, mixed> $spec
+     * @param  array<string, mixed>  $spec
      * @return array<string, mixed>
      */
     private function applyWorkersToSpec(array $spec, Site $site): array
@@ -178,8 +176,8 @@ trait ManagesDoAppWorkersScaling
      * from $sourceSpec (source mode) when present, otherwise from the
      * site's container_image (image mode).
      *
-     * @param  array<string, mixed> $env
-     * @param  array<string, mixed> $buildEnv
+     * @param  array<string, mixed>  $env
+     * @param  array<string, mixed>  $buildEnv
      * @param  array{repo: string, branch: string, dockerfile_path: ?string, deploy_on_push: bool}|null  $sourceSpec
      * @return list<array<string, mixed>>
      */
@@ -211,9 +209,9 @@ trait ManagesDoAppWorkersScaling
      * site's runtime/build env vars (workers need the same config as
      * the web process — DB creds, queue connection, app key, etc.).
      *
-     * @param  array<string, mixed> $sourceBlock
-     * @param  array<string, mixed> $env
-     * @param  array<string, mixed> $buildEnv
+     * @param  array<string, mixed>  $sourceBlock
+     * @param  array<string, mixed>  $env
+     * @param  array<string, mixed>  $buildEnv
      * @return list<array<string, mixed>>
      */
     private function buildWorkerComponents(Site $site, array $env, array $buildEnv, array $sourceBlock): array
@@ -258,7 +256,7 @@ trait ManagesDoAppWorkersScaling
     /**
      * A DO-safe, app-unique component name for a worker row.
      *
-     * @param  array<string, mixed> $used
+     * @param  array<string, mixed>  $used
      */
     private function workerComponentName(CloudWorker $worker, array $used): string
     {
@@ -283,8 +281,8 @@ trait ManagesDoAppWorkersScaling
      * worker pair but emits `kind` (PRE_DEPLOY / POST_DEPLOY /
      * FAILED_DEPLOY / MANUAL) instead of a long-running instance count.
      *
-     * @param  array<string, mixed> $env
-     * @param  array<string, mixed> $buildEnv
+     * @param  array<string, mixed>  $env
+     * @param  array<string, mixed>  $buildEnv
      * @param  array{repo: string, branch: string, dockerfile_path: ?string, deploy_on_push: bool}|null  $sourceSpec
      * @return list<array<string, mixed>>
      */
@@ -345,7 +343,7 @@ trait ManagesDoAppWorkersScaling
     /**
      * A DO-safe, app-unique component name for a job row.
      *
-     * @param  array<string, mixed> $used
+     * @param  array<string, mixed>  $used
      */
     private function jobComponentName(CloudDeployTask $task, array $used): string
     {

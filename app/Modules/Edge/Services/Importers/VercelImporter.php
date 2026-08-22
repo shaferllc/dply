@@ -164,7 +164,7 @@ class VercelImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $link
+     * @param  array<string, mixed>  $link
      */
     private function repoFromLink(array $link): ?string
     {
@@ -185,7 +185,7 @@ class VercelImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $project
+     * @param  array<string, mixed>  $project
      */
     private function liveUrlFromProject(array $project): ?string
     {

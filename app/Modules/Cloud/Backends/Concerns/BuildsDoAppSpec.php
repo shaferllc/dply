@@ -15,8 +15,6 @@ use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
  */
 trait BuildsDoAppSpec
 {
-
-
     /**
      * Resolve `username:token` for the registry credential attached to
      * the site (if any), so DO can pull private images at deploy time.

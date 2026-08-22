@@ -6,7 +6,7 @@ namespace App\Modules\Cloud\Console;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Modules\Cloud\Backends\CloudBackend;
+use App\Contracts\CloudBackend;
 use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Console\Command;
 

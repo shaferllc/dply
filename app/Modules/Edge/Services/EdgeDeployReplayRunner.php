@@ -16,7 +16,7 @@ use RuntimeException;
 final class EdgeDeployReplayRunner
 {
     /**
-     * @param  array<string, mixed> $samples
+     * @param  array<string, mixed>  $samples
      * @return array{results: list<array<string, mixed>>, summary: array<string, mixed>}
      */
     public function run(Site $previewSite, array $samples): array

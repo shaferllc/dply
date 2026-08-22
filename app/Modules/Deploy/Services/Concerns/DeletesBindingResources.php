@@ -9,7 +9,7 @@ use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Services\Servers\DockerDatabaseProvisioner;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Facades\Auth;

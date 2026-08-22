@@ -33,7 +33,7 @@ final class EdgeAccessTokenIssuer
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function encode(array $payload, string $secret): string
     {

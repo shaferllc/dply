@@ -16,10 +16,10 @@ namespace App\Modules\Edge\Services\Frameworks;
 final class EdgeFrameworkPreset
 {
     /**
-     * @param  list<string> $packageDependencies  Detect-hints — any of these in package.json maps the repo to this preset.
-     * @param  list<string> $marquerFiles  File-presence hints (e.g. `astro.config.mjs`).
-     * @param  list<string> $cachePaths  Additional cache directories on top of node_modules.
-     * @param  list<string> $previewOriginRoutes  Default origin-proxy patterns for hybrid mode.
+     * @param  list<string>  $packageDependencies  Detect-hints — any of these in package.json maps the repo to this preset.
+     * @param  list<string>  $marquerFiles  File-presence hints (e.g. `astro.config.mjs`).
+     * @param  list<string>  $cachePaths  Additional cache directories on top of node_modules.
+     * @param  list<string>  $previewOriginRoutes  Default origin-proxy patterns for hybrid mode.
      */
     public function __construct(
         public readonly string $slug,

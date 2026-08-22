@@ -132,7 +132,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $site
+     * @param  array<string, mixed>  $site
      */
     private function fetchEnvVars(array $site): array
     {
@@ -197,7 +197,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $site
+     * @param  array<string, mixed>  $site
      * @return list<string>
      */
     private function customDomainsFromSite(array $site): array
@@ -217,7 +217,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $site
+     * @param  array<string, mixed>  $site
      */
     private function repoFromSite(array $site): ?string
     {
@@ -234,7 +234,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $site
+     * @param  array<string, mixed>  $site
      */
     private function frameworkFromSite(array $site): ?string
     {
@@ -253,7 +253,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed> $build
+     * @param  array<string, mixed>  $build
      */
     private function branchFromBuildSettings(array $build): ?string
     {

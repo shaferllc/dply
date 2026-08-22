@@ -25,8 +25,8 @@ class EdgeDeployDurationRegression
 {
     /**
      * @return array{duration_ms: int, p50_ms: int, ratio: float, samples: int}|null
-     *         Null when disabled, when there is not enough history, or when the
-     *         deploy was not slower than the threshold.
+     *                                                                               Null when disabled, when there is not enough history, or when the
+     *                                                                               deploy was not slower than the threshold.
      */
     public function evaluate(EdgeDeployment $deployment): ?array
     {

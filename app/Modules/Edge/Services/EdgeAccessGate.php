@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
-use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Models\EdgeDeployment;
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class EdgeAccessGate
 {
     /**
-     * @param  list<string> $allowedEmails
+     * @param  list<string>  $allowedEmails
      */
     public function sync(
         Site $site,
@@ -219,13 +219,13 @@ final class EdgeAccessGate
     }
 
     /**
-     * @param  list<string> $allowedEmails
+     * @param  list<string>  $allowedEmails
      * @return list<string>
      */
     private function normalizeEmails(array $allowedEmails): array
     {
         return array_values(array_unique(array_filter(array_map(
-            static fn ($email): string => (strtolower(trim($email)) ),
+            static fn ($email): string => (strtolower(trim($email))),
             $allowedEmails,
         ))));
     }

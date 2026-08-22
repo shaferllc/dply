@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Actions;
+namespace App\Modules\Database\Actions;
 
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\ProviderManagedDatabaseRegion;
 use InvalidArgumentException;

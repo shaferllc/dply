@@ -15,7 +15,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionDedicatedRedisVmJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;

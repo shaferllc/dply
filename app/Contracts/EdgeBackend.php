@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Edge\Services;
+namespace App\Contracts;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;

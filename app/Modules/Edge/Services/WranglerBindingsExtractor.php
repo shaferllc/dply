@@ -177,7 +177,7 @@ class WranglerBindingsExtractor
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @return array<string, array<string, string>>
      */
     private function normalize(array $parsed): array

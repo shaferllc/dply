@@ -7,14 +7,13 @@ namespace App\Modules\Serverless\Services;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Deploy\Services\ServerlessDeployProgress;
-use App\Modules\Edge\Services\EdgeSiteCanceller;
 use App\Modules\Serverless\Actions\DeleteServerlessFunction;
 use App\Services\Sites\SiteProvisioningCanceller;
 
 /**
  * Cancel an in-progress serverless provision or deploy.
  *
- * Mirrors {@see EdgeSiteCanceller} and
+ * Mirrors {@see \App\Modules\Edge\Services\EdgeSiteCanceller} and
  * {@see SiteProvisioningCanceller}: stop the in-flight
  * work, then tear down a function that never went live so it cannot keep
  * looking successful. A live function only aborts the current deploy.

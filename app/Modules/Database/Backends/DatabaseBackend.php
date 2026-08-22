@@ -6,7 +6,7 @@ namespace App\Modules\Database\Backends;
 
 use App\Models\CloudDatabase;
 use App\Models\Server;
-use App\Modules\Cloud\Backends\CloudBackend;
+use App\Contracts\CloudBackend;
 
 /**
  * A managed-database backend — a hosted provider dply can provision a

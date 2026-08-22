@@ -7,7 +7,7 @@ namespace App\Livewire\Cloud;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Database\Actions\CreateCloudDatabase;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\ManagedDatabaseSizeCatalog;
 use App\Support\Servers\ProviderManagedDatabaseRegion;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Realtime\Services;
 
-use App\Modules\Edge\Services\EdgeBackend;
+use App\Contracts\EdgeBackend;
 use App\Modules\Realtime\Models\RealtimeApp;
 
 /**

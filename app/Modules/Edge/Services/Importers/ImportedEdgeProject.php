@@ -13,10 +13,10 @@ namespace App\Modules\Edge\Services\Importers;
 final class ImportedEdgeProject
 {
     /**
-     * @param  array<string, mixed> $envVars  Plain text env vars to copy onto the site.
-     * @param  array<string, mixed> $redirects
+     * @param  array<string, mixed>  $envVars  Plain text env vars to copy onto the site.
+     * @param  array<string, mixed>  $redirects
      * @param  list<array{for: string, values: array<string, string>}>  $headers
-     * @param  list<string> $customDomains
+     * @param  list<string>  $customDomains
      */
     public function __construct(
         public readonly string $sourceProvider,

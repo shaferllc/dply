@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Cloud\Backends;
+namespace App\Contracts;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;

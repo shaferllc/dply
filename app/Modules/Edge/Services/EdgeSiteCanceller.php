@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
-use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 
 class EdgeSiteCanceller
 {
