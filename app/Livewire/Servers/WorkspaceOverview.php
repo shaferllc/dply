@@ -75,19 +75,6 @@ class WorkspaceOverview extends Component
         // would surface. Redirect to the first site's workspace (single
         // app per synthetic server in the common case) or fall back to
         // the product index when this server has no sites yet.
-        if ($server->isDplyEdgeHost() || $server->isDplyCloudHost()) {
-            $site = $server->sites()->orderBy('created_at')->first();
-            if ($site !== null) {
-                return $this->redirect(
-                    route('sites.show', ['server' => $server, 'site' => $site]),
-                );
-            }
-
-            return $this->redirect(
-                $server->isDplyEdgeHost() ? route('edge.index') : route('cloud.index'),
-            );
-        }
-
         $this->kickClusterPollIfStale();
 
         return null;

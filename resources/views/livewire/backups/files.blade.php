@@ -250,17 +250,10 @@
                             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No sites yet.') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Create a server and add a site to enable file backups.') }}</p>
                             <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-                                @if (multi_surface_active())
-                                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
-                                        {{ __('Open launchpad') }}
-                                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
-                                    </a>
-                                @else
                                     <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
                                         {{ __('Add a server') }}
                                         <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
                                     </a>
-                                @endif
                                 <a href="{{ route('sites.index') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                                     {{ __('View sites') }}
                                 </a>

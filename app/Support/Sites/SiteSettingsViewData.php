@@ -618,30 +618,6 @@ final class SiteSettingsViewData
      */
     private static function breadcrumbs(Server $server, Site $site, string $section, array $sectionHeader): array
     {
-        if ($site->usesEdgeRuntime()) {
-            $items = [
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
-            ];
-
-            $items[] = [
-                'label' => $site->name,
-                'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-
-            if ($section !== 'general') {
-                $items[] = [
-                    'label' => $sectionHeader['title'],
-                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
-                ];
-            }
-
-            return $items;
-        }
-
         $items = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],

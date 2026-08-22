@@ -10,26 +10,14 @@ use App\Models\Site;
 /**
  * The product surfaces that carry their own plan ceiling.
  *
- * Every managed thing dply runs is a `Site` row, but they are not
- * interchangeable units of value: a VM site consumes a machine the customer
- * already pays a plan tier for, while Edge apps, Cloud apps and functions are
- * billed a la carte per app (see `edge_cents` / `cloud_cents` /
- * `serverless_cents` in config/product/subscription.php).
- *
- * They used to share ONE org-wide ceiling, so a Free org with two Edge static
- * sites and one function was locked out of its first VM site and read a
- * "3 / 1" limit on a server showing "No sites yet". Each surface now counts and
- * blocks independently.
- *
- * `Site` deliberately covers container (Docker/Kubernetes) apps too — those
- * live on a real machine host, so they belong to the machine-site ceiling.
+ * Every managed thing dply runs is a `Site` row and counts against one
+ * ceiling. The Edge, Cloud and Serverless surfaces lived here until those
+ * products moved to their own app; `Site` covers container (Docker/Kubernetes)
+ * apps too, since those live on a real machine host.
  */
 enum QuotaSurface: string
 {
     case Site = 'site';
-    case Edge = 'edge';
-    case Cloud = 'cloud';
-    case Serverless = 'serverless';
 
     /**
      * Which surface a site's usage counts against, decided by the host row.
@@ -41,7 +29,7 @@ enum QuotaSurface: string
         $server = $site->server;
 
         if ($server === null) {
-            return $site->isCloudContainerSite() ? self::Cloud : self::Site;
+            return self::Site;
         }
 
         // Driven off hostKinds() rather than a parallel match, so a surface
@@ -85,9 +73,6 @@ enum QuotaSurface: string
     {
         return match ($this) {
             self::Site => 'max_sites',
-            self::Edge => 'max_edge_apps',
-            self::Cloud => 'max_cloud_apps',
-            self::Serverless => 'max_functions',
         };
     }
 
@@ -99,9 +84,6 @@ enum QuotaSurface: string
     {
         return match ($this) {
             self::Site => 'sites',
-            self::Edge => 'edge_apps',
-            self::Cloud => 'cloud_apps',
-            self::Serverless => 'functions',
         };
     }
 
@@ -112,22 +94,16 @@ enum QuotaSurface: string
     {
         return match ($this) {
             self::Site => 25,
-            self::Edge => 25,
-            self::Cloud => 10,
-            self::Serverless => 25,
         };
     }
 
     /**
-     * `singular|plural` for trans_choice, e.g. "2 Edge apps".
+     * `singular|plural` for trans_choice, e.g. "2 sites".
      */
     public function nounKey(): string
     {
         return match ($this) {
             self::Site => 'site|sites',
-            self::Edge => 'Edge app|Edge apps',
-            self::Cloud => 'Cloud app|Cloud apps',
-            self::Serverless => 'function|functions',
         };
     }
 
@@ -137,15 +113,12 @@ enum QuotaSurface: string
     }
 
     /**
-     * How the surface is named in headings, e.g. "Edge app limit reached".
+     * How the surface is named in headings, e.g. "site limit reached".
      */
     public function label(): string
     {
         return match ($this) {
             self::Site => 'site',
-            self::Edge => 'Edge app',
-            self::Cloud => 'Cloud app',
-            self::Serverless => 'function',
         };
     }
 
@@ -156,9 +129,6 @@ enum QuotaSurface: string
     {
         return match ($this) {
             self::Site => 'sites.index',
-            self::Edge => 'edge.index',
-            self::Cloud => 'cloud.index',
-            self::Serverless => 'serverless.index',
         };
     }
 
@@ -169,7 +139,7 @@ enum QuotaSurface: string
      */
     public static function ordered(): array
     {
-        return [self::Site, self::Cloud, self::Edge, self::Serverless];
+        return [self::Site];
     }
 
     /**
@@ -183,16 +153,6 @@ enum QuotaSurface: string
     {
         return match ($this) {
             self::Site => null,
-            self::Edge => [Server::HOST_KIND_DPLY_EDGE],
-            self::Cloud => [
-                Server::HOST_KIND_DPLY_CLOUD,
-                Server::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
-                Server::HOST_KIND_AWS_APP_RUNNER,
-            ],
-            self::Serverless => [
-                Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-                Server::HOST_KIND_AWS_LAMBDA,
-            ],
         };
     }
 }

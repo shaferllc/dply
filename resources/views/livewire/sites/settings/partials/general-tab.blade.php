@@ -295,17 +295,6 @@
                 <x-ops-copilot-callout :site="$site" compact :show="true" />
             </div>
         @endif
-
-        {{-- Cloud-eligible promo: this renders on ordinary BYO node/static sites,
-             so it has to follow surface.cloud — otherwise a parked product keeps
-             marketing itself from a live workspace. --}}
-        @if (in_array($site->runtime, ['node', 'static'], true) && feature('surface.cloud'))
-            <div class="mt-2 rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-2.5 py-1.5 text-xs text-brand-ink">
-                <span class="font-semibold text-brand-forest">{{ __('Cloud-eligible') }}</span> —
-                <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply cloud — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
-                <a href="{{ route('cloud.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply cloud') }} →</a>
-            </div>
-        @endif
     </div>
 </div>
 

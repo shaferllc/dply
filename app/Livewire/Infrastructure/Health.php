@@ -46,7 +46,6 @@ class Health extends Component
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
         $mostActive = $this->computeMostActive($sites);
         $cloudUpsell = $this->computeCloudUpsell($sites);
-        $cloudSummary = $this->computeCloudSummary($org->id);
 
         return view('livewire.infrastructure.health', [
             'org' => $org,
@@ -57,61 +56,7 @@ class Health extends Component
             'deploys' => $deploys,
             'mostActive' => $mostActive,
             'cloudUpsell' => $cloudUpsell,
-            'cloudSummary' => $cloudSummary,
         ])->layout('layouts.app');
-    }
-
-    /**
-     * Aggregate stats for cloud container sites in the org. Returns
-     * null when the org has no cloud sites — the view falls through
-     * to the generic Fly upsell in that case.
-     *
-     * @return array{
-     *     total: int,
-     *     by_backend: array<string, int>,
-     *     by_status: array<string, int>,
-     *     by_mode: array<string, int>,
-     *     previews: int,
-     *     failed_sites: list<array{name: string, server_id: ?string, container_image: ?string}>
-     * }|null
-     */
-    private function computeCloudSummary(string $organizationId): ?array
-    {
-        $sites = Site::query()
-            ->where('organization_id', $organizationId)
-            ->whereNotNull('container_backend')
-            ->get(['id', 'name', 'server_id', 'container_backend', 'container_image', 'status', 'meta']);
-
-        if ($sites->isEmpty()) {
-            return null;
-        }
-
-        $byBackend = $sites->groupBy('container_backend')->map->count()->all();
-        $byStatus = $sites->groupBy('status')->map->count()->all();
-        $byMode = $sites
-            ->groupBy(fn (Site $s) => is_array($s->meta['container']['source'] ?? null) ? 'source' : 'image')
-            ->map->count()
-            ->all();
-        $previews = $sites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
-
-        $failedSites = $sites
-            ->filter(fn (Site $s) => $s->status === Site::STATUS_CONTAINER_FAILED)
-            ->map(fn (Site $s) => [
-                'name' => $s->name,
-                'server_id' => $s->server_id,
-                'container_image' => $s->container_image,
-            ])
-            ->values()
-            ->all();
-
-        return [
-            'total' => $sites->count(),
-            'by_backend' => $byBackend,
-            'by_status' => $byStatus,
-            'by_mode' => $byMode,
-            'previews' => $previews,
-            'failed_sites' => $failedSites,
-        ];
     }
 
     /**

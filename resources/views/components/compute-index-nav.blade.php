@@ -8,12 +8,6 @@
         // row. Cross-product ops views live under /infrastructure.
         // Backups moved to the Services row — it is a managed capability,
         // not compute (docs/adr/managed-services-tier.md, decision 1).
-        // These carry a `feature` key because their routes stay registered
-        // while the surface is parked — only the feature middleware rejects
-        // — so Route::has() alone would keep linking them into a 400.
-        ['route' => 'edge.index', 'match' => 'edge.*', 'label' => __('Edge'), 'icon' => 'bolt', 'feature' => 'surface.edge'],
-        ['route' => 'cloud.index', 'match' => 'cloud.*', 'label' => __('Cloud'), 'icon' => 'cloud', 'feature' => 'surface.cloud'],
-        ['route' => 'serverless.index', 'match' => 'serverless.*', 'label' => __('Serverless'), 'icon' => 'cpu-chip', 'feature' => 'surface.serverless'],
     ];
 @endphp
 

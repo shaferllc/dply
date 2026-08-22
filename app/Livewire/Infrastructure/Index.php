@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Infrastructure;
 
-use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -38,35 +37,6 @@ class Index extends Component
         $serverTotal = (clone $serversQuery)->count();
         $serverReady = (clone $serversQuery)->where('status', Server::STATUS_READY)->count();
 
-        $cloudQuery = Site::query()
-            ->where('organization_id', $org->id)
-            ->where(function (Builder $q): void {
-                $q->where('type', SiteType::Container)
-                    ->orWhereNotNull('container_backend');
-            });
-
-        $cloudTotal = (clone $cloudQuery)->count();
-        $cloudActive = (clone $cloudQuery)
-            ->where('status', Site::STATUS_CONTAINER_ACTIVE)
-            ->count();
-
-        $serverlessTotal = Site::query()
-            ->where('organization_id', $org->id)
-            ->whereIn('meta->runtime_profile', ['digitalocean_functions_web', 'aws_lambda_bref_web'])
-            ->count();
-
-        $edgeQuery = Site::query()
-            ->where('organization_id', $org->id)
-            ->where(function (Builder $q): void {
-                $q->whereNotNull('edge_backend')
-                    ->orWhere('meta->runtime_profile', 'edge_web');
-            });
-
-        $edgeTotal = (clone $edgeQuery)->count();
-        $edgeActive = (clone $edgeQuery)
-            ->where('status', Site::STATUS_EDGE_ACTIVE)
-            ->count();
-
         return view('livewire.infrastructure.index', [
             'org' => $org,
             'counts' => [
@@ -74,21 +44,7 @@ class Index extends Component
                     'ready' => $serverReady,
                     'total' => $serverTotal,
                 ],
-                'cloud' => [
-                    'active' => $cloudActive,
-                    'total' => $cloudTotal,
-                ],
-                'serverless' => [
-                    'total' => $serverlessTotal,
-                ],
-                'edge' => [
-                    'active' => $edgeActive,
-                    'total' => $edgeTotal,
-                ],
             ],
-            'cloudEnabled' => Feature::active('surface.cloud'),
-            'edgeEnabled' => Feature::active('surface.edge'),
-            'serverlessEnabled' => Feature::active('surface.serverless'),
             'runningDeploys' => $this->runningDeployCount($org->id),
             'successRate' => $this->deploySuccessRate($org->id),
         ]);

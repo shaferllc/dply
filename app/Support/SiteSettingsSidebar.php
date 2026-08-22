@@ -47,16 +47,10 @@ final class SiteSettingsSidebar
         // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
         // so the page reads: configure → run → observe → destroy.
         //
-        // The `routing` item below is DIFFERENT from the VM `routing` (which
-        // edits nginx server blocks). Here it manages dply's edge proxy:
-        // hostname & DNS, custom domains pointed at the function, path
-        // redirects, response headers + CORS, the invocation URL. Same group
-        // key ("networking"), different surface.
         $base = $isContainerWorkspace
             ? [
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
-                ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
                 // Access is Routing's sibling: Routing is where the function
                 // lives, Access is who may call it (exposure, shared secret,
                 // CORS, bound parameters). Split out of Runtime.
@@ -74,7 +68,6 @@ final class SiteSettingsSidebar
                 ['id' => 'assets', 'label' => __('Assets'), 'icon' => 'heroicon-o-photo', 'group' => 'runtime'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
-                ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],

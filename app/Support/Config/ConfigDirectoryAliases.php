@@ -42,7 +42,6 @@ final class ConfigDirectoryAliases
         'cron_workspace' => 'product.cron_workspace',
         'docs' => 'product.docs',
         'dply' => 'product.dply',
-        'edge' => 'product.edge',
         'kubernetes' => 'product.kubernetes',
         'laravel_site_console' => 'product.laravel_site_console',
         'log_drains' => 'product.log_drains',
@@ -125,9 +124,6 @@ final class ConfigDirectoryAliases
         'notification_events' => 'notifications.events',
         'deploy' => 'deploy.core',
         'deploy_templates' => 'deploy.templates',
-        'serverless' => 'serverless.core',
-        'serverless_glue' => 'serverless.glue',
-        'serverless_pricing' => 'serverless.pricing',
         'script_marketplace' => 'marketplace.scripts',
         'script_marketplace_tags' => 'marketplace.tags',
     ];

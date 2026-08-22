@@ -437,7 +437,7 @@ final class StandbyBlueprintPlanner
             return [$cloud['href'] ?? null, __('Open Cloud app')];
         }
 
-        return [route('cloud.index'), __('Browse Cloud apps')];
+        return [route('servers.index'), __('Browse servers')];
     }
 
     /**

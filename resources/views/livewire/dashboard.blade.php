@@ -77,8 +77,8 @@
         ],
     ];
 
-    $primaryHref = multi_surface_active() ? route('launches.create') : route('servers.create');
-    $primaryLabel = multi_surface_active() ? __('Open launchpad') : __('Add a server');
+    $primaryHref = route('servers.create');
+    $primaryLabel = __('Add a server');
     $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights');
     $shellDescription = __('Run infrastructure, track health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
     // Sized for the dense one-line panel head, and matching the Marketplace /

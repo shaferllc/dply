@@ -11,9 +11,6 @@
     // @feature directive below issues its own SELECT against `features`.
     if ($authed && auth()->user()->currentOrganization()) {
         \Laravel\Pennant\Feature::loadMissing([
-            'surface.cloud',
-            'surface.edge',
-            'surface.serverless',
             'surface.projects',
             'surface.status_pages',
             'surface.marketplace',
@@ -29,7 +26,7 @@
     $hi      = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
     $browseActive = $req->routeIs(
-        'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
+        'infrastructure.*', 'servers.*', 'cloud.databases.*',
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'backups.*',
     );
     $moreMenuActive = $featuresActive
@@ -206,51 +203,6 @@
                                                 </x-slot>
                                                 {{ __('Networking') }}
                                             </x-dropdown-link>
-                                            @feature('surface.cloud')
-                                                <x-dropdown-link :href="route('cloud.index')" :description="__('Managed container apps')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-cube class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Cloud apps') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Managed container apps')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-cube class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Cloud apps') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.serverless')
-                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Laravel apps, no servers')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Serverless') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Laravel apps, no servers')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Serverless') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.edge')
-                                                <x-dropdown-link :href="route('edge.index')" :description="__('Deploy to the global edge')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Edge') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Deploy to the global edge')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Edge') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
 
                                             {{-- Services sits under Compute here for the same reason
                                                  <x-services-index-nav> sits under <x-compute-index-nav>:
@@ -547,51 +499,6 @@
                     </x-slot>
                     {{ __('Servers') }}
                 </x-responsive-nav-link>
-                @feature('surface.cloud')
-                    <x-responsive-nav-link :href="route('cloud.index')" :active="request()->routeIs('cloud.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-cube class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Cloud apps') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-cube class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Cloud apps') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
-                @feature('surface.serverless')
-                    <x-responsive-nav-link :href="route('serverless.index')" :active="request()->routeIs('serverless.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-bolt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Serverless') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-bolt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Serverless') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
-                @feature('surface.edge')
-                    <x-responsive-nav-link :href="route('edge.index')" :active="request()->routeIs('edge.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Edge') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Edge') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
                 {{-- Mirrors the desktop dropdown's Services group and
                      <x-services-index-nav>; keep all three in step. --}}
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Services') }}</p>
