@@ -44,7 +44,6 @@ use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Backups\Overview as BackupsOverview;
 use App\Livewire\Backups\Snapshots as BackupsSnapshots;
-use App\Livewire\Backups\Storage as BackupsStorage;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
@@ -142,7 +141,6 @@ use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
-use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -180,6 +178,7 @@ use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
@@ -396,6 +395,22 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->where('slug', '[a-z0-9-]+')
         ->name('docs.markdown');
 
+    // Legacy homes for backup destinations (/backups/storage, the two /profile
+    // paths, and the short-lived org page) all land on the organization's
+    // Credentials table, filtered to storage. Destinations ARE credentials —
+    // a bucket key is a secret handed to a third party — and Credentials already
+    // listed every one of them, so a second page was the same rows twice.
+    // Shared closure so the legacy routes cannot drift apart.
+    $backupDestinationsRedirect = function () {
+        $organization = auth()->user()?->currentOrganization();
+        abort_unless($organization !== null, 404);
+
+        return redirect()->route('organizations.credentials', [
+            'organization' => $organization,
+            'filter' => 'storage',
+        ]);
+    };
+
     Route::redirect('/settings', '/settings/profile')->name('settings.index');
     Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
     Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
@@ -408,20 +423,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/profile/ssh-keys', SettingsSshKeys::class)->name('profile.ssh-keys');
     Route::livewire('/profile/api-keys', SettingsApiKeys::class)->name('profile.api-keys');
     Route::livewire('/profile/cli', SettingsCliAuthentications::class)->name('profile.cli');
-    // Destinations live in the product they configure (/backups/storage, see
-    // docs/adr/backups-as-a-product.md decision 13) — that page keeps the usage
-    // console. This settings surface is the same rows and the same modal without
-    // the analytics, so the settings nav has somewhere to land instead of
-    // bouncing the user out to the Backups product.
-    //
-    // Served from /profile/backup-destinations, NOT the old
-    // /profile/backup-configurations: that path shipped a 301 to /backups/storage
-    // for a while, and browsers cache permanent redirects indefinitely — anyone
-    // who loaded it then never reaches the server again. The old path keeps its
-    // route name (so existing route() calls resolve) and now 302s — temporary,
-    // so we don't poison caches a second time.
-    Route::livewire('/profile/backup-destinations', SettingsBackupConfigurations::class)->name('profile.backup-destinations');
-    Route::redirect('/profile/backup-configurations', '/profile/backup-destinations')->name('profile.backup-configurations');
+    // A BackupConfiguration is a secret handed to a third party, like every
+    // other row on the org Credentials page — that is where destinations are
+    // managed. Both personal paths keep their route names so existing route()
+    // calls resolve.
+    Route::get('/profile/backup-destinations', $backupDestinationsRedirect)->name('profile.backup-destinations');
+    Route::get('/profile/backup-configurations', $backupDestinationsRedirect)->name('profile.backup-configurations');
     Route::livewire('/profile/notification-channels', SettingsNotificationChannels::class)->name('profile.notification-channels');
     Route::livewire('/profile/notification-channels/bulk-assign', BulkNotificationAssignments::class)->name('profile.notification-channels.bulk-assign');
     Route::livewire('/profile/delete-account', ProfileDeleteAccount::class)->name('profile.delete-account');
@@ -467,6 +474,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('organizations/{organization}/queues/{queueNamespace}', [OrgScopedRedirectController::class, 'queueNamespace'])
         ->name('organizations.queues.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
+    Route::get('organizations/{organization}/backup-destinations', function (Organization $organization) {
+        // Keeps the org from the URL rather than the session: an org-B bookmark
+        // must not open org A's credentials. Credentials::mount() authorizes it.
+        return redirect()->route('organizations.credentials', [
+            'organization' => $organization,
+            'filter' => 'storage',
+        ]);
+    })->name('organizations.backup-destinations');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
@@ -476,7 +491,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
     Route::livewire('/backups/snapshots', BackupsSnapshots::class)->name('backups.snapshots');
-    Route::livewire('/backups/storage', BackupsStorage::class)->name('backups.storage');
+    // Destinations are managed on the org Credentials page. This name stays
+    // because ~10 views across the Backups product link to it. 302, never 301:
+    // /profile/backup-configurations shipped a permanent redirect once and
+    // browsers cache those forever.
+    Route::get('/backups/storage', $backupDestinationsRedirect)->name('backups.storage');
 
     // Managed services — session-scoped like every other product surface.
     Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');

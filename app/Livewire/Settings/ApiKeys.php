@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\PaginatesSettingsLists;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
@@ -18,6 +19,7 @@ use Livewire\Component;
 class ApiKeys extends Component
 {
     use ConfirmsActionWithModal;
+    use PaginatesSettingsLists;
 
     public string $token_name = '';
 
@@ -34,11 +36,19 @@ class ApiKeys extends Component
 
     public string $token_list_search = '';
 
+    public int $token_page = 1;
+
+
     public ?string $organization_id = null;
 
     public ?string $new_token_plaintext = null;
 
     public ?string $new_token_name = null;
+
+    /** Token whose scopes are open in the edit modal. */
+    public ?string $editing_token_id = null;
+
+    public ?string $editing_token_name = null;
 
     public function mount(): void
     {
@@ -168,6 +178,12 @@ class ApiKeys extends Component
         $this->dispatch('close-modal', 'create-api-token-modal');
     }
 
+    public function updatedTokenListSearch(): void
+    {
+        // A search that lands you on page 3 of the old list looks empty.
+        $this->token_page = 1;
+    }
+
     public function openCreateApiTokenModal(): void
     {
         if ($this->adminOrganizations()->isEmpty()) {
@@ -196,6 +212,107 @@ class ApiKeys extends Component
         $this->selected_abilities = [];
         $this->expanded_categories = [];
         $this->dispatch('close-modal', 'create-api-token-modal');
+    }
+
+    /**
+     * Open the scope editor for an existing token. Same picker as create —
+     * abilities are stored on the token, so changing them is an update, not a
+     * revoke-and-reissue.
+     */
+    public function openEditTokenAbilitiesModal(int|string $apiTokenId): void
+    {
+        $token = $this->ownedToken($apiTokenId);
+        if (! $token) {
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->editing_token_id = (string) $token->id;
+        $this->editing_token_name = $token->name;
+        $this->selected_abilities = $token->abilities ?? [];
+        $this->expanded_categories = [];
+        $this->dispatch('open-modal', 'edit-api-token-abilities-modal');
+    }
+
+    public function closeEditTokenAbilitiesModal(): void
+    {
+        $this->resetErrorBag();
+        $this->editing_token_id = null;
+        $this->editing_token_name = null;
+        $this->selected_abilities = [];
+        $this->expanded_categories = [];
+        $this->dispatch('close-modal', 'edit-api-token-abilities-modal');
+    }
+
+    public function updateTokenAbilities(): void
+    {
+        $token = $this->editing_token_id ? $this->ownedToken($this->editing_token_id) : null;
+        if (! $token) {
+            return;
+        }
+
+        if ($this->selected_abilities === []) {
+            $this->addError('selected_abilities', __('Select at least one permission.'));
+
+            return;
+        }
+
+        try {
+            ApiToken::assertAbilitiesValidForStorage($this->selected_abilities);
+        } catch (InvalidArgumentException $e) {
+            $this->addError('selected_abilities', $e->getMessage());
+
+            return;
+        }
+
+        $org = $token->organization;
+        $user = Auth::user();
+
+        // Same cap as issuance: a deployer must not be able to widen a token
+        // past the role's allowlist by editing it after the fact.
+        $abilities = $this->applyDeployerAbilityCap($org, $user, $this->selected_abilities);
+
+        if ($abilities === []) {
+            $this->addError('selected_abilities', __('Your organization role does not allow these permissions.'));
+
+            return;
+        }
+
+        $before = $token->abilities ?? [];
+
+        if ($abilities === $before) {
+            $this->closeEditTokenAbilitiesModal();
+
+            return;
+        }
+
+        $token->update(['abilities' => $abilities]);
+
+        audit_log($org, $user, 'api_token.abilities_updated', $token,
+            ['abilities' => $before],
+            ['abilities' => $abilities],
+        );
+
+        $this->closeEditTokenAbilitiesModal();
+    }
+
+    /**
+     * The caller's own token in the selected organization — the same scoping
+     * revokeToken() uses, so neither path can reach someone else's token.
+     */
+    protected function ownedToken(int|string $apiTokenId): ?ApiToken
+    {
+        $org = $this->resolvedOrganization();
+        if (! $org) {
+            return null;
+        }
+
+        $this->authorize('update', $org);
+
+        return ApiToken::query()
+            ->where('organization_id', $org->id)
+            ->where('user_id', Auth::id())
+            ->find($apiTokenId);
     }
 
     public function clearNewToken(): void
@@ -299,10 +416,14 @@ class ApiKeys extends Component
             $tokens = $q->get();
         }
 
+        $paged = $this->paginateSettingsList($tokens, 'token_page');
+
         return view('livewire.settings.api-keys', [
             'adminOrganizations' => $orgs,
             'organization' => $org,
             'tokens' => $tokens,
+            'pagedTokens' => $paged['rows'],
+            'tokenPageState' => $paged,
             'permissionCategories' => config('api_token_permissions.categories', []),
             'isDeployerRole' => $org ? $org->userIsDeployer(Auth::user()) : false,
             'requiresPaidPlan' => (bool) config('dply.api_tokens_require_paid_plan', false),

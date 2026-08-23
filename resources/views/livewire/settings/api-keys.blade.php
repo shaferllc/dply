@@ -8,6 +8,11 @@
     $createDisabled = $requiresPaidPlan && $organization && ! $orgHasProPlan;
     // Header Add only when the list already has items — empty state owns the CTA.
     $showShellAdd = $canCreate && $totalTokens > 0;
+    $summaryLine = collect([
+        trans_choice(':count token|:count tokens', $totalTokens, ['count' => $totalTokens]),
+        $totalTokens !== $activeTokens ? __(':count active', ['count' => $activeTokens]) : null,
+        $expiringSoon > 0 ? __(':count expiring soon', ['count' => $expiringSoon]) : null,
+    ])->filter()->implode(' · ');
 @endphp
 
 <div>
@@ -22,7 +27,7 @@
     <x-profile-shell
         dense
         :title="__('API keys')"
-        :description="__('Personal access tokens for the dply HTTP API — scoped to an organization, with explicit permissions and an optional IP allow-list.')"
+        :description="$totalTokens > 0 ? $summaryLine : __('Personal access tokens for the dply HTTP API.')"
         icon="heroicon-o-bolt"
     >
         {{-- No "Back to profile": the breadcrumb already covers it. --}}
@@ -39,38 +44,6 @@
                 </button>
             </x-slot:actions>
         @endif
-
-        <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('API tokens at a glance') }}">
-                <div class="bg-white px-3 py-2">
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalTokens }}</span>
-                        <span class="truncate text-xs text-brand-moss">
-                            {{ $totalTokens !== $activeTokens ? __(':n active', ['n' => $activeTokens]) : __('all active') }}
-                        </span>
-                    </dd>
-                </div>
-                <div @class([
-                    'px-3 py-2',
-                    'bg-amber-50' => $expiringSoon > 0,
-                    'bg-white' => $expiringSoon === 0,
-                ])>
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Expiring') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $expiringSoon }}</span>
-                        <span class="truncate text-xs text-brand-moss">{{ __('within 14 days') }}</span>
-                    </dd>
-                </div>
-                <div class="bg-white px-3 py-2">
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
-                        <span class="truncate text-xs text-brand-moss">{{ trans_choice('org you can issue against|orgs you can issue against', $orgCount) }}</span>
-                    </dd>
-                </div>
-            </dl>
-        </x-slot:stats>
 
         @if ($errors->isNotEmpty())
             <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
@@ -186,65 +159,108 @@
                     <button type="button" wire:click="$set('token_list_search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
                 </div>
             @else
-                <ul class="divide-y divide-brand-ink/10">
-                    @foreach ($tokens as $t)
-                        @php
-                            $expired = $t->expires_at !== null && $t->expires_at->isPast();
-                            $expiringSoonRow = $t->expires_at !== null && $t->expires_at->isFuture() && $t->expires_at->diffInDays(now()) <= 14;
-                        @endphp
-                        <li wire:key="api-token-{{ $t->id }}" class="flex flex-col gap-1.5 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
-                            <div class="min-w-0 flex-1">
-                                {{-- Name, state, masked value and metadata share one
-                                     wrapping line; abilities keep their own so a
-                                     long scope list can't push the row open. --}}
-                                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span class="truncate text-sm font-semibold text-brand-ink">{{ $t->name }}</span>
-                                    @if ($expired)
-                                        <span class="inline-flex shrink-0 items-center gap-0.5 rounded border border-red-200 bg-red-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-red-700">
-                                            <x-heroicon-m-no-symbol class="h-3 w-3" aria-hidden="true" />
-                                            {{ __('Expired') }}
+                @php $th = 'px-3 py-2 text-start text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-4'; @endphp
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[44rem] border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-brand-ink/10">
+                                <th scope="col" class="{{ $th }}">{{ __('Name') }}</th>
+                                <th scope="col" class="{{ $th }}">{{ __('Token') }}</th>
+                                <th scope="col" class="{{ $th }}">{{ __('Permissions') }}</th>
+                                <th scope="col" class="{{ $th }} hidden sm:table-cell">{{ __('Last used') }}</th>
+                                <th scope="col" class="{{ $th }}">{{ __('Expires') }}</th>
+                                <th scope="col" class="{{ $th }}"><span class="sr-only">{{ __('Actions') }}</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($pagedTokens as $t)
+                                @php
+                                    $expired = $t->expires_at !== null && $t->expires_at->isPast();
+                                    $expiringSoonRow = $t->expires_at !== null && $t->expires_at->isFuture() && $t->expires_at->diffInDays(now()) <= 14;
+                                    $abilityCount = count($t->abilities ?? []);
+                                @endphp
+                                {{-- One row per token. The full scope list and the IP
+                                     allow-list ride the row's title attributes — six
+                                     ability chips per row is what made this page loud. --}}
+                                <tr wire:key="api-token-{{ $t->id }}" class="group border-b border-brand-ink/10 transition-colors last:border-b-0 hover:bg-brand-sand/15">
+                                    <td class="max-w-[14rem] px-3 py-2 sm:px-4">
+                                        <span class="flex min-w-0 items-center gap-1.5">
+                                            <span @class(['h-1.5 w-1.5 shrink-0 rounded-full', 'bg-red-600' => $expired, 'bg-brand-gold' => ! $expired && $expiringSoonRow, 'bg-brand-sage' => ! $expired && ! $expiringSoonRow]) aria-hidden="true"></span>
+                                            <span @class(['min-w-0 truncate font-semibold', 'text-brand-mist' => $expired, 'text-brand-ink' => ! $expired]) title="{{ $t->name }}">{{ $t->name }}</span>
+                                            @if ($t->allowed_ips)
+                                                <x-heroicon-m-globe-alt
+                                                    class="h-3.5 w-3.5 shrink-0 text-brand-mist"
+                                                    title="{{ __('Allowed IPs: :ips', ['ips' => implode(', ', $t->allowed_ips)]) }}"
+                                                />
+                                            @endif
                                         </span>
-                                    @elseif ($expiringSoonRow)
-                                        <span class="inline-flex shrink-0 items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-amber-900">
-                                            <x-heroicon-m-clock class="h-3 w-3" aria-hidden="true" />
-                                            {{ __('Expiring') }}
-                                        </span>
-                                    @endif
-                                    <span class="truncate font-mono text-xs text-brand-mist">{{ $t->masked_display }}</span>
-                                    <span class="truncate text-xs text-brand-moss">
-                                        {{ $t->last_used_at
-                                            ? __('used :time', ['time' => $t->last_used_at->diffForHumans()])
-                                            : __('never used') }}@if ($t->expires_at) · {{ __('expires :date', ['date' => $t->expires_at->format('M j, Y')]) }}@endif
-                                    </span>
-                                    @if ($t->allowed_ips)
-                                        <span class="inline-flex shrink-0 items-center gap-1 text-xs text-brand-moss">
-                                            <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span class="font-mono">{{ implode(', ', $t->allowed_ips) }}</span>
-                                        </span>
-                                    @endif
-                                </div>
-                                @if ($t->abilities)
-                                    <p class="mt-0.5 flex flex-wrap gap-1">
-                                        @foreach (array_slice($t->abilities, 0, 6) as $ability)
-                                            <code class="inline-flex items-center rounded bg-brand-sand/55 px-1 py-px font-mono text-2xs text-brand-moss">{{ $ability }}</code>
-                                        @endforeach
-                                        @if (count($t->abilities) > 6)
-                                            <span class="inline-flex items-center rounded bg-brand-sand/55 px-1 py-px font-mono text-2xs text-brand-moss">+{{ count($t->abilities) - 6 }}</span>
+                                    </td>
+
+                                    <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-brand-moss sm:px-4">{{ $t->masked_display }}</td>
+
+                                    <td class="whitespace-nowrap px-3 py-2 text-xs sm:px-4">
+                                        <button
+                                            type="button"
+                                            wire:click="openEditTokenAbilitiesModal(@js((string) $t->id))"
+                                            class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-brand-moss underline decoration-dotted underline-offset-4 transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
+                                            title="{{ $abilityCount > 0 ? implode(', ', $t->abilities) : __('No scopes') }}"
+                                        >
+                                            {{ trans_choice(':count scope|:count scopes', $abilityCount, ['count' => $abilityCount]) }}
+                                            <x-heroicon-m-pencil-square class="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
+                                        </button>
+                                    </td>
+
+                                    <td class="hidden whitespace-nowrap px-3 py-2 text-xs text-brand-mist sm:table-cell sm:px-4">
+                                        @if ($t->last_used_at)
+                                            <span title="{{ $t->last_used_at }}">{{ $t->last_used_at->diffForHumans(short: true) }}</span>
+                                        @else
+                                            {{ __('never') }}
                                         @endif
-                                    </p>
-                                @endif
-                            </div>
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
-                                class="inline-flex h-6 shrink-0 items-center gap-1 self-start rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 sm:self-auto"
-                            >
-                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Revoke') }}
-                            </button>
-                        </li>
-                    @endforeach
-                </ul>
+                                    </td>
+
+                                    <td class="whitespace-nowrap px-3 py-2 text-xs sm:px-4">
+                                        @if ($expired)
+                                            <span class="inline-flex items-center gap-0.5 rounded border border-red-200 bg-red-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-red-700">
+                                                <x-heroicon-m-no-symbol class="h-3 w-3" aria-hidden="true" />
+                                                {{ __('Expired') }}
+                                            </span>
+                                        @elseif ($expiringSoonRow)
+                                            <span class="inline-flex items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-amber-900">
+                                                <x-heroicon-m-clock class="h-3 w-3" aria-hidden="true" />
+                                                {{ __('in :time', ['time' => $t->expires_at->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true)]) }}
+                                            </span>
+                                        @elseif ($t->expires_at)
+                                            <span class="text-brand-moss">{{ $t->expires_at->format('M j, Y') }}</span>
+                                        @else
+                                            <span class="text-brand-mist">{{ __('never') }}</span>
+                                        @endif
+                                    </td>
+
+                                    <td class="px-3 py-2 sm:px-4">
+                                        <div class="flex items-center justify-end transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                                            <button
+                                                type="button"
+                                                wire:click="openConfirmActionModal('revokeToken', [@js((string) $t->id)], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
+                                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                            >
+                                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                {{ __('Revoke') }}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+            <x-list-pager
+                :page="$tokenPageState['page']"
+                :pages="$tokenPageState['pages']"
+                :total="$tokenPageState['total']"
+                property="token_page"
+                :label="__('tokens')"
+            />
             @endif
 
             <x-modal
@@ -320,81 +336,7 @@
                             <x-input-error :messages="$errors->get('token_allowed_ips_text')" class="mt-2" />
                         </div>
 
-                        <div>
-                            <div class="flex items-baseline justify-between gap-3">
-                                <p class="text-sm font-semibold text-brand-ink">{{ __('Permissions') }}</p>
-                                <button
-                                    type="button"
-                                    wire:click="toggleAllPermissions"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Toggle all') }}
-                                </button>
-                            </div>
-                            @if (count($selected_abilities) === 0)
-                                <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-                                    <span class="inline-flex items-center gap-1.5 font-semibold">
-                                        <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                        {{ __('No permissions selected') }}
-                                    </span>
-                                    <p class="mt-1 leading-relaxed">{{ __('Pick at least one permission so the token can do something with the API.') }}</p>
-                                </div>
-                            @endif
-                            <x-input-error :messages="$errors->get('selected_abilities')" class="mt-2" />
-
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                @foreach ($permissionCategories as $cat)
-                                    @php
-                                        $catId = $cat['id'];
-                                        $perms = $cat['permissions'] ?? [];
-                                        $abilityList = collect($perms)->pluck('ability')->all();
-                                        $selectedInCat = count(array_intersect($selected_abilities, $abilityList));
-                                        $totalInCat = count($abilityList);
-                                        $expanded = in_array($catId, $expanded_categories, true);
-                                        $allSelected = $totalInCat > 0 && $selectedInCat === $totalInCat;
-                                    @endphp
-                                    <div class="overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
-                                        <button
-                                            type="button"
-                                            wire:click="toggleCategoryExpand('{{ $catId }}')"
-                                            @class([
-                                                'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-semibold transition',
-                                                'bg-brand-sage/8 text-brand-forest' => $allSelected,
-                                                'bg-brand-cream/40 text-brand-ink hover:bg-brand-sand/40' => ! $allSelected,
-                                            ])
-                                            aria-expanded="{{ $expanded ? 'true' : 'false' }}"
-                                        >
-                                            <span>{{ $cat['label'] }}</span>
-                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-moss">
-                                                <span @class([
-                                                    'rounded-full px-1.5 py-0.5 tabular-nums',
-                                                    'bg-brand-sage/20 text-brand-forest' => $selectedInCat > 0,
-                                                    'bg-brand-sand/60 text-brand-mist' => $selectedInCat === 0,
-                                                ])>{{ $selectedInCat }}/{{ $totalInCat }}</span>
-                                                <x-heroicon-m-chevron-down class="h-4 w-4 transition-transform {{ $expanded ? 'rotate-180' : '' }}" aria-hidden="true" />
-                                            </span>
-                                        </button>
-                                        @if ($expanded)
-                                            <div class="space-y-1.5 border-t border-brand-ink/10 bg-white px-3 py-3">
-                                                @foreach ($perms as $p)
-                                                    @php $ab = $p['ability']; @endphp
-                                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-sm text-brand-moss hover:bg-brand-sand/30">
-                                                        <input
-                                                            type="checkbox"
-                                                            wire:click.prevent="toggleAbility('{{ $ab }}')"
-                                                            @checked(in_array($ab, $selected_abilities, true))
-                                                            class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest"
-                                                        />
-                                                        <span class="text-brand-ink">{{ $p['label'] }}</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                        @include('livewire.settings.partials.api-token-permission-picker')
                     </div>
 
                     <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
@@ -415,6 +357,69 @@
                             <span wire:loading wire:target="createToken" class="inline-flex items-center gap-2">
                                 <x-spinner variant="cream" size="sm" />
                                 {{ __('Creating…') }}
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </x-modal>
+
+            {{-- Scope editor: the same picker against an existing token. Name,
+                 expiry, and IPs are deliberately not editable here — widening
+                 or narrowing what a live token can do is the one change worth
+                 making without reissuing it. --}}
+            <x-modal
+                name="edit-api-token-abilities-modal"
+                :show="false"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
+                focusable
+            >
+                <form wire:submit="updateTokenAbilities" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <x-icon-badge>
+                            <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Permissions') }}</p>
+                            <h2 class="mt-1 truncate text-lg font-semibold text-brand-ink">{{ $editing_token_name ?? __('Edit scopes') }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                {{ __('Changes apply to the existing token immediately — the token value does not change.') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                        @if ($isDeployerRole)
+                            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                                <span class="inline-flex items-center gap-1.5 font-semibold">
+                                    <x-heroicon-m-information-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Deploy-only role') }}
+                                </span>
+                                <p class="mt-1 text-xs leading-relaxed">{{ __('Tokens can only include server and site read + deploy permissions, matching organization policy.') }}</p>
+                            </div>
+                        @endif
+
+                        @include('livewire.settings.partials.api-token-permission-picker')
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                        <x-secondary-button type="button" wire:click="closeEditTokenAbilitiesModal">
+                            {{ __('Cancel') }}
+                        </x-secondary-button>
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="updateTokenAbilities"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="updateTokenAbilities" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Save scopes') }}
+                            </span>
+                            <span wire:loading wire:target="updateTokenAbilities" class="inline-flex items-center gap-2">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Saving…') }}
                             </span>
                         </button>
                     </div>

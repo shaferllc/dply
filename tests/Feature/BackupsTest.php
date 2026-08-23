@@ -36,22 +36,21 @@ test('guest cannot view backups', function () {
     $this->get('/backups')->assertRedirect();
     $this->get('/backups/databases')->assertRedirect();
     $this->get('/backups/snapshots')->assertRedirect();
-    $this->get('/backups/storage')->assertRedirect();
     $this->get('/backups/files')->assertRedirect();
 });
 
 test('every backups tab renders', function () {
     $user = userWithOrganization();
 
-    // The five-tab product surface (docs/adr/backups-as-a-product.md, decision 1).
-    // A tab that 500s is invisible until someone clicks it, so each one is a route
-    // assertion rather than a manual check.
+    // The product surface (docs/adr/backups-as-a-product.md, decision 1), minus
+    // destinations — those are org-owned credentials and moved to the
+    // organization. A tab that 500s is invisible until someone clicks it, so each
+    // one is a route assertion rather than a manual check.
     foreach ([
         'backups.overview' => 'Backups',
         'backups.databases' => 'Databases',
         'backups.files' => 'File backups',
         'backups.snapshots' => 'Snapshots',
-        'backups.storage' => 'Backup destinations',
     ] as $route => $heading) {
         $this->actingAs($user)
             ->get(route($route))
@@ -60,12 +59,15 @@ test('every backups tab renders', function () {
     }
 });
 
-test('the old destinations URL redirects into the Storage tab', function () {
+test('the legacy destinations URLs redirect to the org credentials page', function () {
     $user = userWithOrganization();
+    $credentialsUrl = route('organizations.credentials', [
+        'organization' => $user->currentOrganization(),
+        'filter' => 'storage',
+    ]);
 
-    $this->actingAs($user)
-        ->get('/profile/backup-configurations')
-        ->assertRedirect('/backups/storage');
+    $this->actingAs($user)->get('/profile/backup-configurations')->assertRedirect($credentialsUrl);
+    $this->actingAs($user)->get('/backups/storage')->assertRedirect($credentialsUrl);
 });
 
 test('authenticated user can view the backups overview', function () {
@@ -155,7 +157,7 @@ test('the databases tab shows its dumps and the storage tab its destinations', f
         ->assertSee('app_db', false);
 
     $this->actingAs($user)
-        ->get(route('backups.storage'))
+        ->get(route('organizations.credentials', ['organization' => $user->currentOrganization()]))
         ->assertOk()
         ->assertSee('Primary S3', false);
 });

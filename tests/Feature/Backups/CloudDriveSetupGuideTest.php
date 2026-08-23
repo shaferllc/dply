@@ -1,5 +1,5 @@
 <?php
-use App\Livewire\Backups\Storage as BackupsStorage;
+use App\Livewire\Credentials\Index as BackupsStorage;
 use App\Models\BackupConfiguration;
 use App\Models\Organization;
 use App\Models\User;
@@ -18,10 +18,10 @@ function cloudGuideUser(): array
 }
 
 test('the add-destination modal opens and renders dropbox fields', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
 
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->assertSet('showDestinationModal', true)
         ->assertSet('destination_create_mode', 'connect')
@@ -35,10 +35,10 @@ test('the add-destination modal opens and renders dropbox fields', function () {
 });
 
 test('the authorize url appears once an app key is entered', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
 
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->set('destinationForm.dropbox.app_key', 'abc123key')
@@ -47,14 +47,14 @@ test('the authorize url appears once an app key is entered', function () {
 });
 
 test('the oauth button only appears when the deployment has a dropbox app', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
 
     // Not configured: the manual guide must still stand on its own, so a
     // self-hoster without a Dropbox app is never blocked.
     config(['services.dropbox.client_id' => null, 'services.dropbox.client_secret' => null]);
 
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->assertDontSee('Continue with Dropbox', false)
@@ -63,7 +63,7 @@ test('the oauth button only appears when the deployment has a dropbox app', func
     config(['services.dropbox.client_id' => 'appkey', 'services.dropbox.client_secret' => 'appsecret']);
 
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->assertSee('Continue with Dropbox', false);
@@ -99,13 +99,13 @@ test('the oauth redirect is refused when no dropbox app is configured', function
 });
 
 test('the oauth panel warns about the permissions tab before you click', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
     config(['services.dropbox.client_id' => 'appkey', 'services.dropbox.client_secret' => 'appsecret']);
 
     // Dropbox rejects scope_not_granted on its OWN error page, so the callback
     // never fires and there is no server-side moment left to explain it.
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->assertSee('files.content.write', false)
@@ -113,11 +113,11 @@ test('the oauth panel warns about the permissions tab before you click', functio
 });
 
 test('google drive offers one-click connect when configured', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
 
     config(['services.google_drive.client_id' => null, 'services.google_drive.client_secret' => null]);
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_GOOGLE_DRIVE)
         ->assertDontSee('Continue with Google', false)
@@ -125,7 +125,7 @@ test('google drive offers one-click connect when configured', function () {
 
     config(['services.google_drive.client_id' => 'gid', 'services.google_drive.client_secret' => 'gsecret']);
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_GOOGLE_DRIVE)
         ->assertSee('Continue with Google', false)
@@ -150,13 +150,13 @@ test('the google redirect forces consent so a refresh token always comes back', 
 });
 
 test('the google panel warns that testing mode expires refresh tokens', function () {
-    [$user] = cloudGuideUser();
+    [$user, $org] = cloudGuideUser();
     config(['services.google_drive.client_id' => 'gid', 'services.google_drive.client_secret' => 'gsecret']);
 
     // A destination connected from a Testing-mode app works, then dies 7 days
     // later with nothing in dply's own config having changed.
     Livewire::actingAs($user)
-        ->test(BackupsStorage::class)
+        ->test(BackupsStorage::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_GOOGLE_DRIVE)
         ->assertSee('7 days', false)

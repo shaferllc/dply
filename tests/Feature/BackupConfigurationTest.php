@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\BackupConfigurationTest;
 
-use App\Livewire\Backups\Storage as BackupConfigurations;
+use App\Livewire\Credentials\Index as BackupConfigurations;
 use App\Models\BackupConfiguration;
 use App\Models\Organization;
 use App\Models\User;
@@ -30,25 +30,28 @@ test('guest cannot view backup configurations', function () {
 });
 
 test('authenticated user can view backup destinations page', function () {
-    [$user] = userInNewOrg();
+    [$user, $org] = userInNewOrg();
 
-    // The page moved into the product it configures; the old profile URL keeps
-    // its route name and redirects (docs/adr/backups-as-a-product.md, decision 13).
-    $this->actingAs($user)
-        ->get(route('profile.backup-configurations'))
-        ->assertRedirect(route('backups.storage'));
+    // Destinations are credentials — they live in the org Credentials table.
+    // Every legacy URL keeps its route name and redirects there, storage first.
+    $credentialsUrl = route('organizations.credentials', ['organization' => $org, 'filter' => 'storage']);
+
+    $this->actingAs($user)->get(route('profile.backup-configurations'))->assertRedirect($credentialsUrl);
+    $this->actingAs($user)->get(route('profile.backup-destinations'))->assertRedirect($credentialsUrl);
+    $this->actingAs($user)->get(route('backups.storage'))->assertRedirect($credentialsUrl);
+    $this->actingAs($user)->get(route('organizations.backup-destinations', ['organization' => $org]))->assertRedirect($credentialsUrl);
 
     $this->actingAs($user)
-        ->get(route('backups.storage'))
+        ->get(route('organizations.credentials', ['organization' => $org]))
         ->assertOk()
-        ->assertSee('Backup destinations', false);
+        ->assertSee('Credentials', false);
 });
 
 test('user can create custom s3 backup destination under their org', function () {
     [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Staging bucket')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_CUSTOM_S3)
         ->set('destinationForm.s3.access_key', 'AKIAEXAMPLE')
@@ -75,10 +78,10 @@ test('user can create custom s3 backup destination under their org', function ()
 });
 
 test('local provider is no longer accepted by the form', function () {
-    [$user] = userInNewOrg();
+    [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Should be rejected')
         ->set('destinationForm.provider', 'local')
         ->call('saveDestination')
@@ -87,16 +90,22 @@ test('local provider is no longer accepted by the form', function () {
     $this->assertDatabaseCount('backup_configurations', 0);
 });
 
-test('search filters destinations by name', function () {
+test('the storage filter narrows the credentials table to destinations', function () {
     [$user, $org] = userInNewOrg();
     BackupConfiguration::factory()->forOrganization($org)->create(['name' => 'Alpha backups']);
-    BackupConfiguration::factory()->forOrganization($org)->create(['name' => 'Beta archive']);
+    \App\Models\ProviderCredential::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'Hetzner token',
+    ]);
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
-        ->set('search', 'Beta')
-        ->assertSee('Beta archive', false)
-        ->assertDontSee('Alpha backups', false);
+        ->test(BackupConfigurations::class, ['organization' => $org])
+        ->assertSee('Alpha backups', false)
+        ->assertSee('Hetzner token', false)
+        ->call('setFilter', 'storage')
+        ->assertSee('Alpha backups', false)
+        ->assertDontSee('Hetzner token', false);
 });
 
 test('teammates can view and edit each others destinations', function () {
@@ -111,31 +120,37 @@ test('teammates can view and edit each others destinations', function () {
 
     // Bob sees what Alice created.
     Livewire::actingAs($bob)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->assertSee('Shared bucket', false);
 
     // Bob can rename it — destinations are org-shared, not creator-owned.
     Livewire::actingAs($bob)
-        ->test(BackupConfigurations::class)
-        ->call('startEdit', $config->id)
-        ->set('editForm.name', 'Renamed by Bob')
-        ->call('updateConfiguration')
+        ->test(BackupConfigurations::class, ['organization' => $org])
+        ->call('editDestination', $config->id)
+        ->set('destinationForm.name', 'Renamed by Bob')
+        ->call('saveDestination')
         ->assertHasNoErrors();
 
     expect($config->fresh()->name)->toBe('Renamed by Bob');
 });
 
-test('user in different org cannot delete destination', function () {
+test('user in different org cannot reach that org\'s destinations', function () {
     [, $ownerOrg] = userInNewOrg();
     $config = BackupConfiguration::factory()->forOrganization($ownerOrg)->create();
 
-    [$outsider] = userInNewOrg();
+    [$outsider, $outsiderOrg] = userInNewOrg();
 
-    // membership in a brand-new org
+    // The page is org-scoped, so mounting someone else's org is the wall.
     Livewire::actingAs($outsider)
-        ->test(BackupConfigurations::class)
-        ->call('deleteConfiguration', $config->id)
+        ->test(BackupConfigurations::class, ['organization' => $ownerOrg])
         ->assertForbidden();
+
+    // And their own org's page cannot touch a row belonging to another org:
+    // the lookup is scoped, so a guessed id is simply not found.
+    expect(fn () => Livewire::actingAs($outsider)
+        ->test(BackupConfigurations::class, ['organization' => $outsiderOrg])
+        ->call('deleteDestination', $config->id)
+    )->toThrow(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
     $this->assertDatabaseHas('backup_configurations', ['id' => $config->id]);
 });
@@ -144,7 +159,7 @@ test('sftp ftp and rclone destinations can be created', function (string $provid
     [$user, $org] = userInNewOrg();
 
     $component = Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Offsite '.$provider)
         ->set('destinationForm.provider', $provider);
 
@@ -175,10 +190,10 @@ test('sftp ftp and rclone destinations can be created', function (string $provid
 ]);
 
 test('sftp requires either a password or a private key', function () {
-    [$user] = userInNewOrg();
+    [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Keyless')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_SFTP)
         ->set('destinationForm.sftp.host', 'h.example')
@@ -193,7 +208,7 @@ test('dropbox and google drive destinations can be created', function (string $p
     [$user, $org] = userInNewOrg();
 
     $component = Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Cloud '.$provider)
         ->set('destinationForm.provider', $provider);
 
@@ -231,10 +246,10 @@ test('every advertised provider is accepted by the form', function () {
 });
 
 test('providers with no transport are still rejected', function (string $provider) {
-    [$user] = userInNewOrg();
+    [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Not wired up')
         ->set('destinationForm.provider', $provider)
         ->call('saveDestination')
@@ -247,10 +262,10 @@ test('providers with no transport are still rejected', function (string $provide
 ]);
 
 test('a dropbox destination needs either a refresh token or an access token', function () {
-    [$user] = userInNewOrg();
+    [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Credential-less')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->set('destinationForm.dropbox.path', '/backups')
@@ -264,7 +279,7 @@ test('a dropbox destination can be created with the durable refresh shape', func
     [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->set('destinationForm.name', 'Dropbox nightly')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_DROPBOX)
         ->set('destinationForm.dropbox.app_key', 'akey')
@@ -282,7 +297,7 @@ test('gzip compression is stored per destination and defaults off', function () 
     [$user, $org] = userInNewOrg();
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->call('openDestinationModal')
         ->set('destinationForm.name', 'Compressed bucket')
         ->set('destinationForm.provider', BackupConfiguration::PROVIDER_CUSTOM_S3)
@@ -308,7 +323,7 @@ test('an existing destination round-trips its compression setting into the edit 
     ]);
 
     Livewire::actingAs($user)
-        ->test(BackupConfigurations::class)
+        ->test(BackupConfigurations::class, ['organization' => $org])
         ->call('editDestination', $row->id)
         ->assertSet('destinationForm.compress', true);
 });

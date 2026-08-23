@@ -9,6 +9,7 @@
         ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-globe-alt'],
         ['id' => 'cdn', 'label' => __('CDN'), 'icon' => 'heroicon-o-bolt'],
         ['id' => 'storage', 'label' => __('Storage'), 'icon' => 'heroicon-o-circle-stack'],
+        ['id' => 'git', 'label' => __('Git'), 'icon' => 'heroicon-o-code-bracket'],
         ['id' => 'attention', 'label' => __('Needs attention'), 'tone' => 'alert', 'icon' => 'heroicon-o-exclamation-triangle'],
     ];
 
@@ -140,7 +141,13 @@
                                 <span class="truncate text-brand-ink">{{ $row['providerLabel'] }}</span>
                             </span>
                         </td>
-                        <td class="{{ $td }} font-medium text-brand-ink">{{ $row['name'] }}</td>
+                        <td class="{{ $td }} font-medium text-brand-ink">
+                            {{ $row['name'] }}
+                            {{-- Storage rows carry it; a token row's is null. --}}
+                            @if ($row['lastWrite'] ?? null)
+                                <span class="mt-0.5 block text-xs font-normal text-brand-mist">{{ $row['lastWrite'] }}</span>
+                            @endif
+                        </td>
                         <td class="{{ $td }} text-xs text-brand-moss">{{ $row['usedFor'] }}</td>
                         <td class="{{ $td }}">
                             <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold {{ $statusChip($row['status']) }}">
@@ -189,6 +196,18 @@
                                         <x-heroicon-o-trash class="{{ $actIcon }}" aria-hidden="true" />
                                         {{ __('Remove') }}
                                     </button>
+                                @elseif ($row['kind'] === 'git')
+                                    {{-- Shared Git token: no edit, because the value is
+                                         write-once — replacing it means adding a new one,
+                                         which is also how you rotate at the provider. --}}
+                                    <button
+                                        type="button"
+                                        wire:click="promptDeleteGitToken('{{ $row['id'] }}')"
+                                        class="{{ $actDanger }}"
+                                    >
+                                        <x-heroicon-o-trash class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Remove') }}
+                                    </button>
                                 @else
                                     <button
                                         type="button"
@@ -198,14 +217,6 @@
                                         <x-heroicon-o-pencil-square class="{{ $actIcon }}" aria-hidden="true" />
                                         {{ __('Edit') }}
                                     </button>
-                                    <a
-                                        href="{{ route('backups.storage') }}"
-                                        wire:navigate
-                                        class="{{ $actNeutral }}"
-                                    >
-                                        <x-heroicon-o-chart-bar class="{{ $actIcon }}" aria-hidden="true" />
-                                        {{ __('Usage') }}
-                                    </a>
                                     <button
                                         type="button"
                                         wire:click="promptDeleteDestination('{{ $row['id'] }}')"

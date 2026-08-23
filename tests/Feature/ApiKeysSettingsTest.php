@@ -150,3 +150,55 @@ test('revoke token uses confirmation modal before deleting', function () {
 
     $this->assertDatabaseMissing('api_tokens', ['id' => $token->id]);
 });
+
+test('scopes can be added to and removed from an existing token', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    $token = ApiToken::createToken($user, $org, 'CI', null, ['servers.read'], null)['token'];
+
+    Livewire::actingAs($user)
+        ->test(ApiKeys::class)
+        ->set('organization_id', $org->id)
+        ->call('openEditTokenAbilitiesModal', (string) $token->id)
+        ->assertSet('selected_abilities', ['servers.read'])
+        ->set('selected_abilities', ['sites.read', 'sites.deploy'])
+        ->call('updateTokenAbilities')
+        ->assertHasNoErrors();
+
+    expect($token->fresh()->abilities)->toEqualCanonicalizing(['sites.read', 'sites.deploy']);
+});
+
+test('a token cannot be stripped of every scope', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    $token = ApiToken::createToken($user, $org, 'CI', null, ['servers.read'], null)['token'];
+
+    Livewire::actingAs($user)
+        ->test(ApiKeys::class)
+        ->set('organization_id', $org->id)
+        ->call('openEditTokenAbilitiesModal', (string) $token->id)
+        ->set('selected_abilities', [])
+        ->call('updateTokenAbilities')
+        ->assertHasErrors('selected_abilities');
+
+    expect($token->fresh()->abilities)->toEqualCanonicalizing(['servers.read']);
+});
+
+test('scopes of another user\'s token cannot be edited', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    $other = User::factory()->create();
+    $org->users()->attach($other->id, ['role' => 'owner']);
+    $token = ApiToken::createToken($other, $org, 'Theirs', null, ['servers.read'], null)['token'];
+
+    Livewire::actingAs($user)
+        ->test(ApiKeys::class)
+        ->set('organization_id', $org->id)
+        ->call('openEditTokenAbilitiesModal', (string) $token->id)
+        ->call('updateTokenAbilities');
+
+    expect($token->fresh()->abilities)->toEqualCanonicalizing(['servers.read']);
+});

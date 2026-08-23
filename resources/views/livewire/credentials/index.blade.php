@@ -19,6 +19,32 @@
                      modal's picker — it used to be duplicated as 26 cards on
                      this page while your own credentials had no list at all. --}}
                 <x-slot:actions>
+                    {{-- A shared Git token is the machine-user credential sites
+                         deploy with when their creator's personal one dies. --}}
+                    <div x-data="{ open: false }" class="relative">
+                        <button
+                            type="button"
+                            x-on:click="open = ! open"
+                            class="inline-flex h-6 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-code-bracket class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('Add Git token') }}
+                            <x-heroicon-m-chevron-down class="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
+                        </button>
+                        <div x-show="open" x-cloak x-on:click.outside="open = false" class="absolute end-0 z-20 mt-1 w-40 rounded-lg border border-brand-ink/12 bg-white p-1 shadow-xl">
+                            @foreach (['github' => 'GitHub', 'gitlab' => 'GitLab', 'bitbucket' => 'Bitbucket'] as $providerId => $providerName)
+                                <button
+                                    type="button"
+                                    wire:click="startAddOrganizationPat('{{ $providerId }}')"
+                                    x-on:click="open = false"
+                                    class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
+                                >
+                                    <x-oauth-provider-icon :provider="$providerId" size="h-3.5 w-3.5" />
+                                    {{ $providerName }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
                     <button
                         type="button"
                         wire:click="openStorageModal"
@@ -78,6 +104,11 @@
          <select> is the catalog; a row's Manage button dispatches
          `open-add-provider-credential-modal` with that provider id. --}}
     <livewire:credentials.add-provider-credential-modal />
+
+    {{-- Shared Git token: a dialog like the two above it, so all three "add a
+         credential" flows on this page behave the same way. Writes an org-owned
+         row via gitProviderTokenOwnerAttributes(). --}}
+    @include('livewire.settings.partials.source-control._pat-modal')
 
     {{-- Storage destinations are a different shape from provider tokens (named,
          many per provider, no OAuth), so they keep their own two-mode dialog:

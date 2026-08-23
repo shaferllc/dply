@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\PaginatesSettingsLists;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ApiToken;
 use App\Models\Organization;
@@ -18,6 +19,10 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class CliAuthentications extends Component
 {
+    use PaginatesSettingsLists;
+
+    public int $cli_token_page = 1;
+
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
@@ -107,9 +112,13 @@ class CliAuthentications extends Component
 
         $catalog = DplyCliCommandCatalog::forServer();
 
+        $paged = $this->paginateSettingsList($cliTokens, 'cli_token_page');
+
         return view('livewire.settings.cli-authentications', [
             'organizations' => $this->adminOrganizations(),
             'cliTokens' => $cliTokens,
+            'pagedCliTokens' => $paged['rows'],
+            'cliTokenPageState' => $paged,
             'appUrl' => rtrim((string) config('app.url'), '/'),
             'cliTokenName' => (string) config('cli.token_name', 'dply CLI'),
             'cliGroups' => $catalog['groups'],

@@ -22,6 +22,8 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
+ * @property-read Collection<int, NotificationChannel> $pagedChannels Livewire computed — the current page of $channels.
+ * @property-read int $channelPages Livewire computed — page count for $channels.
  */
 trait ManagesNotificationChannels
 {
@@ -699,14 +701,31 @@ trait ManagesNotificationChannels
         };
     }
 
-    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels'): View
+    /**
+     * The ONE payload for the shared channels view and its content partial.
+     *
+     * Every surface (profile, organization, team) must come through here.
+     * Settings\NotificationChannels used to hand-roll the same array and drifted:
+     * when the partial started paginating it kept passing `channels` but not
+     * `pagedChannels`/`channelPages`, so /profile/notification-channels 500'd
+     * while the other two surfaces were fine. Surface-specific keys go in
+     * $extra rather than into a second copy of this list.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels', array $extra = []): View
     {
         return view($view, array_merge([
             'backUrl' => null,
             'backLabel' => null,
             'useOrgShell' => false,
+            'useProfileShell' => false,
             'organization' => null,
             'orgShellSection' => 'notifications',
+            'contentPartial' => 'livewire.settings.partials.notification-channels-content',
+            'currentOrganization' => null,
+            'organizationChannels' => collect(),
+            'teamChannelGroups' => collect(),
         ], $this->notificationChannelsViewData(), [
             'channels' => $this->channels,
             'pagedChannels' => $this->pagedChannels,
@@ -714,6 +733,6 @@ trait ManagesNotificationChannels
             'canManage' => $this->canManage(),
             'types' => NotificationChannel::typesForUi(),
             'typesForEdit' => NotificationChannel::typesForUi($this->editing_id ? $this->edit_type : null),
-        ]));
+        ], $extra));
     }
 }

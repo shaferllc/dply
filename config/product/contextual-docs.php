@@ -355,7 +355,7 @@ return [
             'group' => 'account',
         ],
         [
-            'route' => 'profile.backup-configurations',
+            'route' => 'organizations.credentials',
             'slug' => 'account-backup-destinations',
             'group' => 'account',
         ],

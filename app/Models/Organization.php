@@ -359,6 +359,31 @@ class Organization extends Model
     }
 
     /**
+     * Hand back the instance $user->currentOrganization() already memoized when
+     * the route binds that same org, so a page render holds ONE Organization
+     * object for the row. Two instances each lazy-load their own `subscriptions`
+     * relation and their own serverIds() memo — the debug bar showed both
+     * queries firing twice on an org-scoped page (route-bound $org in the
+     * component, memoized org in the shell/command palette).
+     *
+     * Admin routes that bind a foreign org fall through to the default lookup.
+     */
+    public function resolveRouteBinding($value, $field = null): ?static
+    {
+        $user = auth()->user();
+        $current = $user instanceof User ? $user->currentOrganization() : null;
+        $key = $field ?? $this->getRouteKeyName();
+
+        if ($current instanceof static && (string) $current->getAttribute($key) === (string) $value) {
+            return $current;
+        }
+
+        $resolved = parent::resolveRouteBinding($value, $field);
+
+        return $resolved instanceof static ? $resolved : null;
+    }
+
+    /**
      * Per-request memo for the current user's pivot role on this org.
      * Without this, hasMember / hasAdminAccess / userIsDeployer each
      * fire their own join against organization_user on every gate call —

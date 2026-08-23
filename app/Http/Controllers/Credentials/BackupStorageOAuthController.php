@@ -430,8 +430,8 @@ class BackupStorageOAuthController extends Controller
         $org ??= request()->user()?->currentOrganization();
 
         $path = $org instanceof Organization
-            ? '/organizations/'.$org->id.'/credentials?tab=storage'
-            : '/backups/storage';
+            ? '/organizations/'.$org->id.'/credentials?filter=storage'
+            : '/credentials';
 
         $redirect = redirect()->to($path);
 

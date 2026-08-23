@@ -4,13 +4,17 @@ namespace App\Livewire\Credentials;
 
 use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesGitProviderTokens;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
 use App\Models\BackupConfiguration;
 use App\Models\BackupSchedule;
+use App\Models\GitProviderToken;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\Site;
 use App\Models\RedisSnapshot;
+use App\Models\ServerDatabaseBackup;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
@@ -49,6 +53,9 @@ class Index extends Component
     // bucket" — so a storage card here can create the bucket, not just record
     // keys for one you made elsewhere.
     use ManagesBackupDestinationModal;
+    // Same add-a-token flow as /profile/source-control, but the row it writes
+    // belongs to the organization — see gitProviderTokenOwnerAttributes().
+    use ManagesGitProviderTokens;
     use ManagesProviderCredentials;
 
     /**
@@ -58,9 +65,17 @@ class Index extends Component
      *
      * @var list<string>
      */
-    private const FILTERS = ['all', 'compute', 'dns', 'cdn', 'storage', 'attention'];
+    private const FILTERS = ['all', 'compute', 'dns', 'cdn', 'storage', 'git', 'attention'];
 
     public ?Organization $organization = null;
+
+    /**
+     * Per-request memo for {@see rows()}. Not a public property, so Livewire
+     * never hydrates it — each request starts cold and reads fresh.
+     *
+     * @var ?list<array<string, mixed>>
+     */
+    private ?array $rowsMemo = null;
 
     #[Url(as: 'filter', except: 'all')]
     public string $filter = 'all';
@@ -336,9 +351,10 @@ class Index extends Component
             'provider' => $destination->provider,
         ]);
 
-        // No memo to invalidate: rows() queries fresh on every render. Reset the
-        // filter for the same reason credentialCreated() does — a destination
-        // saved while "DNS" is active would otherwise vanish on save.
+        // The rows() memo is filled during render(), which has not run yet in
+        // this request, so there is nothing to invalidate here. Reset the filter
+        // for the same reason credentialCreated() does — a destination saved
+        // while "DNS" is active would otherwise vanish on save.
         $this->filter = 'all';
     }
 
@@ -352,14 +368,25 @@ class Index extends Component
      */
     public function rows(): array
     {
+        // render() asks for the rows twice — once filtered for the table, once
+        // whole for the chip counts — and every call re-ran all four queries.
+        // Memoised per request: rows() is only reached from render(), which runs
+        // after any action has already written, so there is nothing stale to see.
+        if ($this->rowsMemo !== null) {
+            return $this->rowsMemo;
+        }
+
         $org = $this->currentOrg();
         if ($org === null) {
-            return $this->tokenRows(auth()->user()->providerCredentials()->whereNull('organization_id')->latest()->get());
+            return $this->rowsMemo = $this->tokenRows(
+                auth()->user()->providerCredentials()->whereNull('organization_id')->latest()->get()
+            );
         }
 
         $rows = array_merge(
             $this->tokenRows(ProviderCredential::where('organization_id', $org->id)->latest()->get()),
             $this->storageRows($org),
+            $this->gitRows($org),
         );
 
         // Anything broken floats, then anything expiring, then newest first.
@@ -372,7 +399,7 @@ class Index extends Component
                 : ($b['addedAt']?->getTimestamp() ?? 0) <=> ($a['addedAt']?->getTimestamp() ?? 0);
         });
 
-        return $rows;
+        return $this->rowsMemo = $rows;
     }
 
     /**
@@ -410,6 +437,7 @@ class Index extends Component
                 'status' => $status,
                 'statusLabel' => $statusLabel,
                 'error' => $credential->validation_error,
+                'lastWrite' => null,
                 'addedAt' => $credential->created_at,
             ];
         })->all();
@@ -433,9 +461,25 @@ class Index extends Component
             ->groupBy('backup_configuration_id')
             ->pluck('aggregate', 'backup_configuration_id');
 
-        return $destinations->map(function (BackupConfiguration $destination) use ($scheduleCounts): array {
+        // "3 schedules" says what is aimed at a bucket; it does not say whether
+        // anything ever landed. One more grouped query answers that, and it is
+        // the only thing the standalone destinations page showed that this row
+        // did not — so it comes along rather than justifying a second page.
+        $writeStats = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $org->servers()->select('id')))
+            ->whereIn('backup_configuration_id', $destinations->pluck('id'))
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->selectRaw('backup_configuration_id, count(*) as total, sum(bytes) as bytes, max(created_at) as last_write')
+            ->groupBy('backup_configuration_id')
+            ->toBase()
+            ->get()
+            ->keyBy('backup_configuration_id');
+
+        return $destinations->map(function (BackupConfiguration $destination) use ($scheduleCounts, $writeStats): array {
             $schedules = (int) ($scheduleCounts[$destination->id] ?? 0);
             $expiring = ! $destination->hasDurableCredentials();
+            $writes = $writeStats->get($destination->id);
+            $lastWriteAt = $writes?->last_write ? Carbon::parse($writes->last_write) : null;
 
             return [
                 'kind' => 'storage',
@@ -446,6 +490,12 @@ class Index extends Component
                 'usedFor' => $schedules > 0
                     ? __('Backups').' · '.trans_choice(':count schedule|:count schedules', $schedules, ['count' => $schedules])
                     : __('Backups').' · '.__('not used yet'),
+                // Rendered under the name: "last write 2d · 4.1 GB", or nothing
+                // at all for a destination that has never been written to.
+                'lastWrite' => $lastWriteAt === null
+                    ? null
+                    : __('last write :time', ['time' => $lastWriteAt->diffForHumans(short: true)])
+                        .((int) ($writes->bytes ?? 0) > 0 ? ' · '.\Illuminate\Support\Number::fileSize((int) $writes->bytes) : ''),
                 'caps' => ['storage'],
                 'status' => $expiring ? 'warn' : 'ok',
                 'statusLabel' => $expiring ? __('Token expires') : __('Ready'),
@@ -457,6 +507,156 @@ class Index extends Component
         })->all();
     }
 
+    /**
+     * Organization-owned Git tokens — the machine-user credential sites deploy
+     * with. Personal Git connections are deliberately absent: they are also the
+     * member's own GitHub access, and live on /profile/source-control.
+     * See docs/adr/org-owned-git-credentials.md.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function gitRows(Organization $org): array
+    {
+        $tokens = GitProviderToken::forOrganization((string) $org->id)->get();
+        if ($tokens->isEmpty()) {
+            return [];
+        }
+
+        // One grouped count: how many sites deploy with each token, so removing
+        // one is a decision rather than a guess.
+        $siteCounts = Site::query()
+            ->where('organization_id', $org->id)
+            ->get(['id', 'meta'])
+            ->groupBy(fn (Site $site) => (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? ''))
+            ->map->count();
+
+        return $tokens->map(function (GitProviderToken $token) use ($siteCounts): array {
+            $sites = (int) ($siteCounts[(string) $token->id] ?? 0);
+            $expired = $token->expires_at?->isPast() ?? false;
+            $rejected = filled($token->validation_error);
+
+            return [
+                'kind' => 'git',
+                'id' => (string) $token->id,
+                'provider' => $token->provider,
+                'providerLabel' => ucfirst($token->provider),
+                'name' => $token->nickname !== null && $token->nickname !== ''
+                    ? (string) $token->nickname
+                    : __('Untitled token'),
+                'usedFor' => $sites > 0
+                    ? __('Git').' · '.trans_choice(':count site|:count sites', $sites, ['count' => $sites])
+                    : __('Git').' · '.__('not used yet'),
+                'caps' => ['git'],
+                'status' => $rejected || $expired ? 'bad' : 'ok',
+                'statusLabel' => $rejected ? __('Rejected') : ($expired ? __('Expired') : __('Ready')),
+                'error' => $rejected
+                    ? (string) $token->validation_error
+                    : ($expired ? __('Expired :time — replace it to keep deploys working', ['time' => $token->expires_at->diffForHumans()]) : null),
+                'lastWrite' => null,
+                'addedAt' => $token->created_at,
+            ];
+        })->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function gitProviderTokenOwnerAttributes(): array
+    {
+        $org = $this->currentOrg();
+        abort_unless($org instanceof Organization, 404);
+        $this->authorize('update', $org);
+
+        return ['organization_id' => $org->id];
+    }
+
+    /** Opening the form is an admin action, same as creating a cloud credential. */
+    public function startAddOrganizationPat(string $provider): void
+    {
+        $org = $this->currentOrg();
+        if (! $org instanceof Organization || ! $org->hasAdminAccess(auth()->user())) {
+            $this->toastError(__('Only organization admins can add a shared Git token.'));
+
+            return;
+        }
+
+        $this->startAddPat($provider);
+    }
+
+    protected function afterGitProviderTokenSaved(string $provider): void
+    {
+        // A token saved while a capability filter is active would otherwise
+        // vanish on save — same reason credentialCreated() resets it.
+        $this->filter = 'all';
+        $this->rowsMemo = null;
+        $this->toastSuccess(__('Shared :provider token added.', ['provider' => ucfirst($provider)]));
+    }
+
+    public function promptDeleteGitToken(string $tokenId): void
+    {
+        $token = $this->organizationGitToken($tokenId);
+        $this->authorize('delete', $token);
+
+        $sites = Site::query()
+            ->where('organization_id', $token->organization_id)
+            ->get(['id', 'meta'])
+            ->filter(fn (Site $site) => (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '') === (string) $token->id)
+            ->count();
+
+        $this->openConfirmActionModal(
+            'deleteGitToken',
+            [$tokenId],
+            __('Remove shared token'),
+            // Quote the real number: sites pinned to this token fall back to
+            // their owner's personal credential, which may not exist.
+            $sites > 0
+                ? trans_choice(
+                    'Remove :name? :count site deploys with it and will fall back to its owner\'s personal Git credential.|Remove :name? :count sites deploy with it and will fall back to their owners\' personal Git credentials.',
+                    $sites,
+                    ['name' => $token->nickname ?? __('this token'), 'count' => $sites],
+                )
+                : __('Remove :name? No site is pinned to it right now.', ['name' => $token->nickname ?? __('this token')]),
+            __('Remove'),
+            true,
+        );
+    }
+
+    public function deleteGitToken(string $tokenId): void
+    {
+        $token = $this->organizationGitToken($tokenId);
+        $this->authorize('delete', $token);
+
+        $snapshot = [
+            'token_id' => (string) $token->id,
+            'provider' => $token->provider,
+            'nickname' => $token->nickname,
+        ];
+        $organization = $token->organization;
+        $token->delete();
+        $this->rowsMemo = null;
+
+        if ($organization !== null) {
+            audit_log($organization, auth()->user(), 'git_token.deleted', null, $snapshot, null);
+        }
+
+        $this->toastSuccess(__('Shared Git token removed.'));
+    }
+
+    /**
+     * Scoped lookup: a token id from another organization must not resolve here
+     * even for an admin of this one.
+     */
+    private function organizationGitToken(string $tokenId): GitProviderToken
+    {
+        $org = $this->currentOrg();
+        abort_unless($org instanceof Organization, 404);
+
+        return GitProviderToken::query()
+            ->where('organization_id', $org->id)
+            ->whereKey($tokenId)
+            ->firstOrFail();
+    }
+
     /** Rows left after the active filter. */
     public function visibleRows(): array
     {
@@ -464,6 +664,7 @@ class Index extends Component
 
         return match ($this->filter) {
             'storage' => array_values(array_filter($rows, fn (array $r): bool => $r['kind'] === 'storage')),
+            'git' => array_values(array_filter($rows, fn (array $r): bool => $r['kind'] === 'git')),
             'attention' => array_values(array_filter($rows, fn (array $r): bool => in_array($r['status'], ['bad', 'warn'], true))),
             'all' => $rows,
             default => array_values(array_filter(
@@ -489,6 +690,7 @@ class Index extends Component
             'dns' => count(array_filter($rows, fn (array $r): bool => in_array('dns', $r['caps'], true))),
             'cdn' => count(array_filter($rows, fn (array $r): bool => in_array('cdn', $r['caps'], true))),
             'storage' => count(array_filter($rows, fn (array $r): bool => $r['kind'] === 'storage')),
+            'git' => count(array_filter($rows, fn (array $r): bool => $r['kind'] === 'git')),
             'attention' => count(array_filter($rows, fn (array $r): bool => in_array($r['status'], ['bad', 'warn'], true))),
         ];
     }

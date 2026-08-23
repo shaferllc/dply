@@ -56,13 +56,23 @@ return [
     'git_auth_failed' => [
         'signature' => '/Invalid username or token|Support for password authentication was removed|could not read Username for|fatal: Authentication failed|Authentication failed for|Permission denied \(publickey\)|remote: Repository not found|ERROR: Repository not found|HTTP Basic: Access denied/i',
         'title' => 'Git authentication failed — dply could not access the repository',
-        'explanation' => 'The Git host rejected dply’s stored credentials for this repository. Most often the connected token has expired or been revoked (GitHub fine-grained tokens expire after 30 days by default); it can also mean the deploy key was removed or the account lost access to the repo. Replace the token under Settings → Source control, then re-deploy.',
+        'explanation' => 'The Git host rejected dply’s stored credentials for this repository. Most often the connected token has expired or been revoked (GitHub fine-grained tokens expire after 30 days by default); it can also mean the deploy key was removed or the account lost access to the repo. Replace the token — your own under Settings → Source control, or the organization’s shared token under Credentials — then re-deploy.',
         'actions' => [
             [
                 'key' => 'open_source_control_settings',
-                'label' => 'Update Git credentials',
+                'label' => 'Update your Git credentials',
                 'recommended' => true,
                 'route' => 'profile.source-control',
+            ],
+            // The failing credential is often somebody else's, and the personal
+            // page above then opens the WRONG account's settings. An org admin
+            // can always fix it here by adding or replacing the shared token.
+            [
+                'key' => 'open_organization_credentials',
+                'label' => 'Organization credentials',
+                'route' => 'organizations.credentials',
+                'org' => true,
+                'params' => ['filter' => 'git'],
             ],
         ],
     ],

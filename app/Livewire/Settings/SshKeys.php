@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Jobs\SyncServerAuthorizedKeysJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\PaginatesSettingsLists;
 use App\Models\Server;
 use App\Models\UserSshKey;
 use App\Services\Servers\UserSshKeyDeploymentService;
@@ -21,6 +22,7 @@ use Livewire\Component;
 class SshKeys extends Component
 {
     use ConfirmsActionWithModal;
+    use PaginatesSettingsLists;
     use DispatchesToastNotifications;
 
     public string $new_name = '';
@@ -50,6 +52,8 @@ class SshKeys extends Component
     public ?string $return_to = null;
 
     public string $ssh_keys_search = '';
+
+    public int $ssh_key_page = 1;
 
     public function mount(): void
     {
@@ -298,6 +302,11 @@ class SshKeys extends Component
             ->get();
     }
 
+    public function updatedSshKeysSearch(): void
+    {
+        $this->ssh_key_page = 1;
+    }
+
     public function render(): View
     {
         $allKeys = Auth::user()->sshKeys()->orderBy('name')->get();
@@ -309,8 +318,12 @@ class SshKeys extends Component
                 fn (UserSshKey $k): bool => str_contains(mb_strtolower($k->name), mb_strtolower($term))
             )->values();
 
+        $paged = $this->paginateSettingsList($keys, 'ssh_key_page');
+
         return view('livewire.settings.ssh-keys', [
             'sshKeys' => $keys,
+            'pagedSshKeys' => $paged['rows'],
+            'sshKeyPageState' => $paged,
             'sshKeysAll' => $allKeys,
             'servers' => $this->serversForUi(),
             'currentOrganization' => Auth::user()->currentOrganization(),

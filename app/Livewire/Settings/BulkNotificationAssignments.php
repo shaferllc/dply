@@ -623,6 +623,7 @@ class BulkNotificationAssignments extends Component
         $org = Auth::user()->currentOrganization();
 
         return view('livewire.settings.bulk-notification-assignments', [
+            'bodyPartial' => 'livewire.settings.partials.bulk-assign-body',
             'assignableChannels' => $this->channelsForUser(),
             'eventCatalog' => config('notification_events.categories', []),
             'servers' => $this->serversForCurrentOrg($org),

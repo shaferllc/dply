@@ -90,7 +90,7 @@ trait ResolvesCommandPaletteItems
                 // ['CLI tokens', 'cli command line tokens', 'profile.cli', 'command-line'], // hidden for now — bringing CLI back later
                 ['Source control', 'github gitlab source control git', 'profile.source-control', 'code-bracket'],
                 ['Notification channels', 'slack email webhook channels', 'profile.notification-channels', 'bell'],
-                ['Backup destinations', 'backup config destination bucket s3 storage', 'profile.backup-destinations', 'circle-stack'],
+                ['Backup destinations', 'backup config destination bucket s3 storage credentials', 'organizations.credentials', 'circle-stack', ['org' => true]],
                 // ['Referrals', 'referral invite friends', 'profile.referrals', 'user'], // hidden for now
                 ['Billing', 'billing invoices payment plan', 'billing.show', 'credit-card', ['org' => true]],
                 ['Invoices', 'invoices billing receipts', 'billing.invoices', 'credit-card', ['org' => true]],

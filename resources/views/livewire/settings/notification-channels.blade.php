@@ -41,7 +41,7 @@
                     @endif
                 </x-slot:actions>
 
-                @include('livewire.settings.partials.notification-channels-content')
+                @include($contentPartial)
             </x-organization-shell>
         </div>
     @else
@@ -75,38 +75,7 @@
                 @endif
             </x-slot:actions>
 
-            @php
-                $orgChannelCount = isset($organizationChannels) ? $organizationChannels->count() : 0;
-                $teamChannelCount = ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count());
-                $teamCount = ($teamChannelGroups ?? collect())->count();
-            @endphp
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Notification channels at a glance') }}">
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss">{{ trans_choice('channel you own|channels you own', $channelCount) }}</span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $orgChannelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss" title="{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('no current org') }}</span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $teamChannelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss">{{ trans_choice('across :n team|across :n teams', $teamCount, ['n' => $teamCount]) }}</span>
-                        </dd>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
-            @include('livewire.settings.partials.notification-channels-content')
+            @include($contentPartial)
         </x-profile-shell>
     @endif
 

@@ -36,9 +36,18 @@ class GitIdentityResolver
     private array $byId = [];
 
     /**
+     * Memo for organizationIds(). Keyed by user id.
+     *
+     * @var array<string, list<string>>
+     */
+    private array $orgIdsByUser = [];
+
+    /**
      * Resolve a stored identity ID to either a SocialAccount or a
-     * GitProviderToken, scoped to the given user. Returns null when the ID
-     * is unknown or belongs to a different user.
+     * GitProviderToken. Personal rows must belong to the given user; token rows
+     * owned by an organization resolve for any member of it, which is what makes
+     * a shared machine-user credential usable after its creator leaves.
+     * Returns null when the ID is unknown or owned by someone else.
      */
     public function forId(User $user, ?string $id): ?GitIdentity
     {
@@ -52,6 +61,8 @@ class GitIdentityResolver
             return $this->byId[$cacheKey];
         }
 
+        // OAuth accounts stay strictly personal — a SocialAccount is also a
+        // sign-in identity, so an org can never own one.
         $oauth = SocialAccount::query()
             ->where('user_id', $user->getKey())
             ->find($id);
@@ -60,13 +71,57 @@ class GitIdentityResolver
         }
 
         $pat = GitProviderToken::query()
-            ->where('user_id', $user->getKey())
+            ->where(fn ($q) => $q
+                ->where('user_id', $user->getKey())
+                ->orWhereIn('organization_id', $this->organizationIds($user)))
             ->find($id);
         if ($pat instanceof GitIdentity) {
             return $this->byId[$cacheKey] = $pat;
         }
 
         return $this->byId[$cacheKey] = null;
+    }
+
+    /**
+     * The organizations a user belongs to, memoised for the request. Empty for
+     * a user with no memberships, which makes the orWhereIn above a no-op
+     * rather than an accidental match-everything.
+     *
+     * @return list<string>
+     */
+    private function organizationIds(User $user): array
+    {
+        $key = (string) $user->getKey();
+        if (! array_key_exists($key, $this->orgIdsByUser)) {
+            $this->orgIdsByUser[$key] = $user->organizations()->pluck('organizations.id')
+                ->map(fn ($id) => (string) $id)
+                ->values()
+                ->all();
+        }
+
+        return $this->orgIdsByUser[$key];
+    }
+
+    /**
+     * Healthy org-owned tokens for a site's organization, freshest validation
+     * first. These outrank the site owner's personal identities in deploy
+     * resolution: they are the credential that survives that person leaving.
+     *
+     * @return list<GitProviderToken>
+     */
+    public function forSiteOrganization(Site $site, string $provider): array
+    {
+        $orgId = (string) ($site->organization_id ?? '');
+        if ($orgId === '') {
+            return [];
+        }
+
+        return GitProviderToken::forOrganization($orgId, $provider)
+            ->get()
+            ->filter(fn (GitProviderToken $t) => $t->accessToken() !== '' && ! $this->isKnownBad($t))
+            ->sortByDesc(fn (GitProviderToken $t) => $t->last_validated_at?->getTimestamp() ?? 0)
+            ->values()
+            ->all();
     }
 
     /**
@@ -92,6 +147,14 @@ class GitIdentityResolver
             // (stamped by the health check / deploy preflight) — fall through
             // to the best available healthy identity instead of failing the
             // deploy with a credential we already know is dead.
+        }
+
+        // Org-owned before personal: the whole point of a shared credential is
+        // that it keeps deploying when the site owner's token dies or they
+        // leave. See docs/adr/org-owned-git-credentials.md, decision 3.
+        $orgIdentity = $this->forSiteOrganization($site, $provider)[0] ?? null;
+        if ($orgIdentity instanceof GitIdentity) {
+            return $orgIdentity;
         }
 
         return $this->forUserProvider($user, $provider);
@@ -140,6 +203,10 @@ class GitIdentityResolver
             if ($pinned instanceof GitIdentity && ! $this->isKnownBad($pinned)) {
                 $push($pinned);
             }
+        }
+
+        foreach ($this->forSiteOrganization($site, $provider) as $orgToken) {
+            $push($orgToken);
         }
 
         foreach (SocialAccount::query()
@@ -238,8 +305,9 @@ class GitIdentityResolver
     }
 
     /**
-     * All identities for the given user, ordered by provider then created_at.
-     * Used by the wizards to build the "pick an account" dropdown.
+     * All identities the user can pick from: their own, plus the tokens their
+     * organizations own. Used by the wizards to build the "pick an account"
+     * dropdown — see ownerLabel() for how the two are told apart there.
      *
      * @return list<GitIdentity>
      */
@@ -261,6 +329,14 @@ class GitIdentityResolver
             ->get()
             ->all();
 
-        return array_merge($oauth, $pats);
+        $orgPats = GitProviderToken::query()
+            ->whereIn('organization_id', $this->organizationIds($user))
+            ->whereIn('provider', ['github', 'gitlab', 'bitbucket'])
+            ->orderBy('provider')
+            ->orderBy('id')
+            ->get()
+            ->all();
+
+        return array_merge($oauth, $pats, $orgPats);
     }
 }

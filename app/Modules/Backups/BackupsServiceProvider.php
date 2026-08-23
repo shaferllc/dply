@@ -22,8 +22,11 @@ use Illuminate\Support\ServiceProvider;
  * Re-registers the commands here. The two backup observers (Server/SiteFileBackup
  * ::observe) and BackupConfigurationPolicy (Gate::policy) stay wired in
  * AppServiceProvider with repointed references. Per rule (i), the Servers backup
- * workspace tabs + concerns and the Settings/BackupConfigurations page stay in the
- * shell; the 5 backup models stay in app/Models.
+ * workspace tabs + concerns stay in the shell; the 5 backup models stay in
+ * app/Models. Backup destinations are NOT a Backups tab and have no page of
+ * their own: a bucket key is a secret handed to a third party, so they are rows
+ * on the org Credentials table (App\Livewire\Credentials\Index, filter=storage).
+ * /backups/storage keeps its route name and redirects there.
  */
 class BackupsServiceProvider extends ServiceProvider
 {

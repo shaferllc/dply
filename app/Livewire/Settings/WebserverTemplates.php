@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\PaginatesSettingsLists;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\WebserverTemplate;
@@ -16,6 +17,10 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WebserverTemplates extends Component
 {
+    use PaginatesSettingsLists;
+
+    public int $template_page = 1;
+
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
@@ -239,8 +244,12 @@ NGINX;
         $templates = $this->organization->webserverTemplates()->latest()->get();
         $canManage = $this->organization->hasAdminAccess(Auth::user());
 
+        $paged = $this->paginateSettingsList($templates, 'template_page');
+
         return view('livewire.settings.webserver-templates', [
             'templates' => $templates,
+            'pagedTemplates' => $paged['rows'],
+            'templatePageState' => $paged,
             'canManage' => $canManage,
             'placeholders' => config('webserver_templates.placeholders', []),
             'orgShellSection' => 'webserver',
