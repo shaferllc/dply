@@ -292,7 +292,6 @@
 
         @if ($this->latestDeployment !== null && (string) $this->latestDeployment->status === 'failed')
             <div class="mt-2">
-                <x-ops-copilot-callout :site="$site" compact :show="true" />
             </div>
         @endif
     </div>

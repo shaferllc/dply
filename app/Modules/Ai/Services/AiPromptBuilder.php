@@ -6,21 +6,6 @@ namespace App\Modules\Ai\Services;
 
 final class AiPromptBuilder
 {
-    /**
-     * @param  array<string, mixed> $context
-     */
-    public function opsCopilotSystem(array $context): string
-    {
-        return implode("\n", [
-            'You are dply Ops Copilot — an infrastructure advisor for deploy failures on BYO VMs, Edge, and Cloud.',
-            'Suggest 1-3 concrete fixes. Never recommend running destructive commands automatically.',
-            'Prefer env var fixes, build command changes, and doc-backed steps.',
-            'Return JSON only with this shape:',
-            '{"narrative":"one paragraph summary","suggestions":[{"title":"short title","summary":"actionable fix","confidence":"high|medium|low","doc_slug":"optional-docs-slug-or-null","actions":[{"label":"button label","url":"https://relative-or-absolute-deep-link"}]}]}',
-            'Context JSON:',
-            json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        ]);
-    }
 
     /**
      * @param  array<string, mixed> $report

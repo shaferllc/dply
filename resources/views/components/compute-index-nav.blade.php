@@ -4,8 +4,7 @@
         ['route' => 'servers.index', 'match' => 'servers.index', 'label' => __('Servers'), 'icon' => 'server'],
         // Projects is deliberately absent: this row is labelled Compute and
         // Projects is a grouping container, not compute. It keeps its header
-        // entry point under Apps. Don't re-add it here without renaming the
-        // row. Cross-product ops views live under /infrastructure.
+        // entry point under Apps. Don't re-add it here without renaming the row.
         // Backups moved to the Services row — it is a managed capability,
         // not compute (docs/adr/managed-services-tier.md, decision 1).
     ];

@@ -36,14 +36,6 @@ final class LlmSynthesizer
     }
 
     /**
-     * @param  array<string, mixed> $context
-     */
-    public function synthesizeOpsCopilot(array $context): LlmSynthesisResult
-    {
-        return $this->call($this->promptBuilder->opsCopilotSystem($context));
-    }
-
-    /**
      * @param  array<string, mixed> $report
      */
     public function synthesizeSharedHost(array $report): LlmSynthesisResult

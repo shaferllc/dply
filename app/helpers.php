@@ -6,7 +6,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\Ai\Services\LlmSynthesizer;
-use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
@@ -786,28 +785,6 @@ if (! function_exists('cost_observatory_active')) {
         return $organization === null
             ? Feature::active('global.billing_enabled')
             : Feature::for($organization)->active('global.billing_enabled');
-    }
-}
-
-if (! function_exists('ops_copilot_active')) {
-    /**
-     * True when Fleet Ops Copilot deploy triage should be available.
-     */
-    function ops_copilot_active(?Organization $organization = null): bool
-    {
-        return $organization === null
-            ? Feature::active('global.ops_copilot')
-            : Feature::for($organization)->active('global.ops_copilot');
-    }
-}
-
-if (! function_exists('ops_copilot_site_has_failure')) {
-    /**
-     * True when the site has a recent failed BYO or Edge deploy Copilot can triage.
-     */
-    function ops_copilot_site_has_failure(Site $site): bool
-    {
-        return app(OpsCopilotContextBuilder::class)->siteHasRecentFailure($site);
     }
 }
 

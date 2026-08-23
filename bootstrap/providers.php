@@ -14,7 +14,6 @@ use App\Modules\Launch\LaunchServiceProvider;
 use App\Modules\Logs\LogsServiceProvider;
 use App\Modules\Marketplace\MarketplaceServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
-use App\Modules\OpsCopilot\OpsCopilotServiceProvider;
 use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Queue\QueueServiceProvider;
 use App\Modules\Realtime\RealtimeServiceProvider;
@@ -45,7 +44,6 @@ return [
     LaunchServiceProvider::class,
     MarketplaceServiceProvider::class,
     NotificationsServiceProvider::class,
-    OpsCopilotServiceProvider::class,
     ProjectsServiceProvider::class,
     QueueServiceProvider::class,
     RealtimeServiceProvider::class,

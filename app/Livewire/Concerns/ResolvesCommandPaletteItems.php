@@ -69,8 +69,6 @@ trait ResolvesCommandPaletteItems
             'go' => [
                 ['Dashboard', 'home overview', 'dashboard', 'squares-2x2'],
                 ['Networking', 'firewall dns network load balancer', 'networking.index', 'share'],
-                ['Infrastructure', 'infrastructure fleet overview', 'infrastructure.index', 'rectangle-group'],
-                ['Infrastructure health', 'infrastructure health monitoring fleet', 'infrastructure.health', 'heart'],
                 ['Databases', 'database postgres mysql redis', 'cloud.databases.index', 'circle-stack', [], 'surface.databases'],
                 // ['Deploy sync', 'deploy groups sync', 'deploy-sync.index', 'arrows-right-left'],
                 ['Scripts', 'scripts automation', 'scripts.index', 'code-bracket', [], 'surface.scripts'],

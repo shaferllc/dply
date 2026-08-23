@@ -52,7 +52,7 @@ test('banner shows when failed latest deploy exists', function () {
     $response->assertOk()
         ->assertSee('Infrastructure needs attention')
         ->assertSee('failed latest deploy', false)
-        ->assertSee(route('infrastructure.health'), false);
+        ->assertSee(route('servers.index'), false);
 });
 test('banner shows when long running deploy exists', function () {
     [$user, $org] = makeUserOrg();

@@ -3,7 +3,7 @@
 @endphp
 
 <div class="mt-6">
-    <form action="{{ route('infrastructure.health') }}" method="GET" class="flex items-center gap-2 max-w-md mx-auto">
+    <form action="{{ route('servers.index') }}" method="GET" class="flex items-center gap-2 max-w-md mx-auto">
         <div class="relative flex-1">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <x-heroicon-o-magnifying-glass class="h-5 w-5 text-brand-moss" />

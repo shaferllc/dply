@@ -113,40 +113,7 @@
             </div>
         @endif
 
-        @if ($showOpsLinks)
-            @php
-                $serversPillOrg = auth()->user()?->currentOrganization();
-                $serversPillCanTimeline = $serversPillOrg !== null && $serversPillOrg->hasAdminAccess(auth()->user());
-                $serversPillTiles = [
-                    ['url' => route('infrastructure.health'), 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
-                    ['url' => route('infrastructure.deploys'), 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
-                    ['url' => route('infrastructure.domains'), 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
-                    ['url' => route('infrastructure.env-search'), 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
-                    ['url' => route('infrastructure.env-drift'), 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
-                    ['url' => route('infrastructure.intelligence'), 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
-                ];
-                if ($serversPillCanTimeline) {
-                    $serversPillTiles[] = [
-                        'url' => route('organizations.activity', $serversPillOrg),
-                        'label' => __('Timeline'),
-                        'icon' => 'heroicon-o-clock',
-                    ];
-                }
-            @endphp
-            <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-3 py-2 text-sm sm:px-4" aria-label="{{ __('Operations') }}">
-                <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Operations') }}</span>
-                @foreach ($serversPillTiles as $opsTile)
-                    <a
-                        href="{{ $opsTile['url'] }}"
-                        wire:navigate
-                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
-                    >
-                        <x-dynamic-component :component="$opsTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ $opsTile['label'] }}
-                    </a>
-                @endforeach
-            </nav>
-        @endif
+
 
         @unless ($hasServersInScope)
             @if (isset($empty) && ! $empty->isEmpty())

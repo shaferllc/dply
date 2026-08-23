@@ -251,7 +251,6 @@ final class StandbyBlueprintPlanner
             return match ($index) {
                 1 => $this->firstCloudOriginLink($inventory),
                 2 => $this->firstHybridEdgeLink($inventory),
-                3 => [route('infrastructure.blast-radius'), __('Open blast radius')],
                 default => [null, null],
             };
         }
@@ -267,7 +266,7 @@ final class StandbyBlueprintPlanner
 
         if ($key === 'dns_cutover') {
             return match ($index) {
-                0 => [route('infrastructure.domains'), __('Domain inventory')],
+                0 => [route('sites.index'), __('Review site hostnames')],
                 1 => [route('settings.servers'), __('Credentials')],
                 default => [null, null],
             };

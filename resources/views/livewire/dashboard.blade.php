@@ -71,7 +71,7 @@
                                 </p>
                             </div>
                         </div>
-                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
+                        <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
                             {{ __('View infrastructure health') }}
                             <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         </a>
@@ -288,7 +288,7 @@
                             <span aria-hidden="true" class="text-brand-mist/60">·</span>
                             {{ __('worst first') }}
                         </span>
-                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex items-center gap-1 font-mono tabular-nums hover:text-brand-ink">
+                        <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center gap-1 font-mono tabular-nums hover:text-brand-ink">
                             {{-- Workspace-wide on purpose: this rollup spans every host and
                                  every site-scoped finding, so it will not tally to the
                                  server-scoped counts in the column above. --}}

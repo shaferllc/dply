@@ -10,7 +10,7 @@
 <div class="dply-page-shell space-y-8 py-8">
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+        ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ['label' => __('Import from DigitalOcean'), 'icon' => 'cloud'],
     ]" />

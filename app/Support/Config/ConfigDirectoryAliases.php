@@ -24,7 +24,6 @@ final class ConfigDirectoryAliases
      */
     public const MAP = [
         'dply_ai' => 'product.ai',
-        'dply_ops_copilot' => 'product.ops_copilot',
         'dply_runtime' => 'product.runtime',
         'feedback' => 'product.feedback',
         'admin' => 'product.admin',

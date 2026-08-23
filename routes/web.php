@@ -49,15 +49,6 @@ use App\Livewire\Dashboard;
 use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Databases\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
-use App\Livewire\Infrastructure\BlastRadius as InfrastructureBlastRadius;
-use App\Livewire\Infrastructure\Deploys as InfrastructureDeploys;
-use App\Livewire\Infrastructure\Domains as InfrastructureDomains;
-use App\Livewire\Infrastructure\EnvDrift as InfrastructureEnvDrift;
-use App\Livewire\Infrastructure\EnvSearch as InfrastructureEnvSearch;
-use App\Livewire\Infrastructure\Health as InfrastructureHealth;
-use App\Livewire\Infrastructure\Index as InfrastructureIndex;
-use App\Livewire\Infrastructure\Intelligence as InfrastructureIntelligence;
-use App\Livewire\Infrastructure\Previews as InfrastructurePreviews;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Notifications\Index as NotificationsIndex;
@@ -200,7 +191,6 @@ use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
 use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
 use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
-use App\Modules\OpsCopilot\Livewire\OpsCopilot as InfrastructureOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
 use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
@@ -317,32 +307,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // confirms scopes + org, and we mint an ApiToken that the polling
     // CLI picks up exactly once via /api/v1/auth/device/poll.
     Route::livewire('/auth/device', AuthDeviceApproval::class)->name('auth.device.show');
-    Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
-    // Cross-product operations views over every server and site in the org.
-    // These sit under /infrastructure alongside the compute hub — there is no
-    // separate "fleet" section (dropped 2026-08-15).
-    Route::prefix('infrastructure')->name('infrastructure.')->group(function (): void {
-        Route::livewire('/health', InfrastructureHealth::class)->name('health');
-        Route::livewire('/domains', InfrastructureDomains::class)->name('domains');
-        Route::livewire('/env-search', InfrastructureEnvSearch::class)->name('env-search');
-        Route::livewire('/env-drift', InfrastructureEnvDrift::class)->name('env-drift');
-        Route::livewire('/intelligence', InfrastructureIntelligence::class)->name('intelligence');
-        Route::livewire('/deploys', InfrastructureDeploys::class)->name('deploys');
-        Route::livewire('/blast-radius', InfrastructureBlastRadius::class)->name('blast-radius');
-        Route::livewire('/previews', InfrastructurePreviews::class)->name('previews');
-        Route::livewire('/copilot', InfrastructureOpsCopilot::class)
-            ->middleware('feature:global.ops_copilot')
-            ->name('copilot');
-    });
-
-    // Legacy /fleet/* URLs (bookmarks, docs, CLI output) -> /infrastructure/*.
-    Route::redirect('/fleet', '/infrastructure');
-    foreach ([
-        'health', 'domains', 'env-search', 'env-drift', 'intelligence',
-        'deploys', 'blast-radius', 'previews', 'copilot',
-    ] as $legacyFleetPath) {
-        Route::redirect("/fleet/{$legacyFleetPath}", "/infrastructure/{$legacyFleetPath}");
-    }
     Route::prefix('admin')
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.')

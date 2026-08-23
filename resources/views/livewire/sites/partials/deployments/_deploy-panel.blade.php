@@ -280,7 +280,6 @@
         </dl>
 
         @if ($latest && $latest->status === 'failed')
-            <x-ops-copilot-callout :site="$site" strip :show="true" />
         @endif
 
         @if ($canResumeDeploy)

@@ -335,7 +335,6 @@ return [
         // Be careful with this flag.
         'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
-        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', false),
         'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
     ],

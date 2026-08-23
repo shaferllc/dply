@@ -9,7 +9,7 @@
                 flush
             >
                 <x-slot name="actions">
-                    <a href="{{ route('infrastructure.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Back to infrastructure') }}</a>
+                    <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Servers') }}</a>
                 </x-slot>
             </x-page-header>
         </div>
