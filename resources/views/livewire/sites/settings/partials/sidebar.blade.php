@@ -46,7 +46,6 @@
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Back to sites') }}
                 </a>
-            @endif
             <div class="flex items-start gap-3">
                 {{-- Avatar + pencil opens the logo edit menu in place (nested
                      LogoMenu component, so it works from every workspace page). --}}
@@ -293,7 +292,6 @@
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
                     {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
                 </a>
-            @endif
         </div>
     </div>
     @endpersist

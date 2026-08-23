@@ -182,8 +182,6 @@ Move `app/Support/Cloud/{AzureAccessToken,GcpAccessToken,OciRequestSigner}.php` 
 - delete `docs/adr/{edge-product-boundary,serverless-asset-delivery}.md`; leave a
   line in `docs/adr/modular-monolith-structure.md` recording the extraction
 - `deploy/DO_MIGRATION.md`
-- **leave `content/blog/*` alone** — 5 posts are published build-in-public history,
-  not code references
 - delete this file
 
 Then: `composer analyse`, `composer test`, `composer test:arch`.

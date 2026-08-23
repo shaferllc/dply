@@ -1,11 +1,10 @@
 {{--
-    Both workspace rows, stacked: compute on top, services beneath.
+    Renders nothing. Both workspace nav rows are gone: the Services row first,
+    then Compute (Sites/Servers) — everything they held is in the header's
+    Compute/Apps dropdown and its responsive twin, so the rows were a second
+    navigation restating the first.
 
-    Rendering only the row you are "in" was rejected — Realtime would then be
-    unreachable from /sites, which is the same discoverability failure that
-    burying it in org settings caused. See docs/adr/managed-services-tier.md,
-    decision 1.
+    Kept as a no-op because ~16 pages call <x-workspace-nav />; delete those
+    calls (and this file, plus x-compute-index-nav / x-services-index-nav)
+    once it is clear the rows are not coming back.
 --}}
-
-<x-compute-index-nav />
-<x-services-index-nav />

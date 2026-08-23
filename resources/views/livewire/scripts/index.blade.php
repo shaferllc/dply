@@ -7,7 +7,7 @@
 @endphp
 
 <div class="contents">
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <x-breadcrumb-trail :items="array_values(array_filter([
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             feature('surface.marketplace') ? ['label' => __('Marketplace'), 'href' => route('marketplace.index'), 'icon' => 'rectangle-group'] : null,

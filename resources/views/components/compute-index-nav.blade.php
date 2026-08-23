@@ -12,13 +12,9 @@
 @endphp
 
 {{--
-    The Compute row: the machines your code runs on. Carries the same eyebrow
-    label + tab-strip shape as <x-services-index-nav> so the two rows read as
-    one navigation in two registers rather than two unrelated bars. The label
-    widths are pinned equal (sm:w-20) so both tab strips start on the same
-    column. Differentiation is carried by weight, not by shape: white ground
-    against the services row's sand tint, larger type, larger icons, and an
-    ink-toned label against the services row's muted moss.
+    The Compute row: the machines your code runs on. The only workspace nav
+    row — the Services row that used to sit beneath it was removed; those
+    entries live in the header's Compute dropdown.
 --}}
 
 <nav class="border-b border-brand-ink/10 bg-white" aria-label="{{ __('Workspace') }}">

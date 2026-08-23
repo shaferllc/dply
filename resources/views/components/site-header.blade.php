@@ -23,9 +23,12 @@
     $homeActive      = $active === 'home'      || ($req->is('/') && ! $req->routeIs('dashboard'));
     $hi      = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
+    // Every service now lives in this dropdown rather than its own nav row,
+    // so queues/caches must light the trigger too.
     $browseActive = $req->routeIs(
         'infrastructure.*', 'servers.*', 'cloud.databases.*',
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'backups.*',
+        'queues.*', 'caches.*',
     );
     $moreMenuActive = $featuresActive
         || $pricingActive
@@ -186,11 +189,12 @@
                                                 {{ __('Networking') }}
                                             </x-dropdown-link>
 
-                                            {{-- Services sits under Compute here for the same reason
-                                                 <x-services-index-nav> sits under <x-compute-index-nav>:
-                                                 managed capabilities your apps lean on, as opposed to the
-                                                 compute they run on. Keep this list in step with that
-                                                 component. See docs/adr/managed-services-tier.md. --}}
+                                            {{-- Services sits under Compute: managed capabilities your
+                                                 apps lean on, as opposed to the compute they run on.
+                                                 This is now the only desktop entry point (the second
+                                                 nav row was removed), so keep it in step with the
+                                                 responsive list below. See
+                                                 docs/adr/managed-services-tier.md. --}}
                                             <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Services') }}</p>
                                             @feature('workspace.backups')
                                                 <x-dropdown-link :href="route('backups.overview')" :description="__('Scheduled database snapshots')">
@@ -219,6 +223,14 @@
                                                         <x-heroicon-o-queue-list class="{{ $hi }}" />
                                                     </x-slot>
                                                     {{ __('Queues') }}
+                                                </x-dropdown-link>
+                                            @endfeature
+                                            @feature('surface.cache')
+                                                <x-dropdown-link :href="route('caches.index')" :description="__('Shared or dedicated Valkey')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Caches') }}
                                                 </x-dropdown-link>
                                             @endfeature
                                         </div>
@@ -441,8 +453,7 @@
                     </x-slot>
                     {{ __('Servers') }}
                 </x-responsive-nav-link>
-                {{-- Mirrors the desktop dropdown's Services group and
-                     <x-services-index-nav>; keep all three in step. --}}
+                {{-- Mirrors the desktop dropdown's Services group; keep both in step. --}}
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Services') }}</p>
                 @feature('workspace.backups')
                     <x-responsive-nav-link :href="route('backups.overview')" :active="request()->routeIs('backups.*')">
@@ -471,6 +482,14 @@
                             <x-heroicon-o-queue-list class="{{ $hi }}" />
                         </x-slot>
                         {{ __('Queues') }}
+                    </x-responsive-nav-link>
+                @endfeature
+                @feature('surface.cache')
+                    <x-responsive-nav-link :href="route('caches.index')" :active="request()->routeIs('caches.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Caches') }}
                     </x-responsive-nav-link>
                 @endfeature
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>

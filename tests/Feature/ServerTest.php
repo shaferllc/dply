@@ -99,7 +99,6 @@ test('servers index is displayed for authenticated user', function () {
     $response = $this->actingAs($user)->get(route('servers.index'));
 
     $response->assertOk();
-    $response->assertSee('Provision hosts', false);
     $response->assertDontSee('Open launchpad');
     $response->assertSee('No servers yet');
     $response->assertSee('Add server');
