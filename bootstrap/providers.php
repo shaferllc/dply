@@ -2,7 +2,6 @@
 
 use App\Modules\Backups\BackupsServiceProvider;
 use App\Modules\Billing\BillingServiceProvider;
-use App\Modules\Blog\BlogServiceProvider;
 use App\Modules\Cache\CacheServiceProvider;
 use App\Modules\Certificates\CertificatesServiceProvider;
 use App\Modules\Database\DatabaseServiceProvider;
@@ -39,7 +38,6 @@ return [
     DeployServiceProvider::class,
     LogsServiceProvider::class,
     SnapshotsServiceProvider::class,
-    BlogServiceProvider::class,
     DocsServiceProvider::class,
     FeedbackServiceProvider::class,
     ImportsServiceProvider::class,

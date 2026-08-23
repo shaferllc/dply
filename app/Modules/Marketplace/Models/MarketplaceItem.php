@@ -40,6 +40,8 @@ class MarketplaceItem extends Model
 
     public const CATEGORY_RUNBOOKS = 'runbooks';
 
+    public const CATEGORY_SCRIPTS = 'scripts';
+
     public const RECIPE_WEBSERVER_TEMPLATE = 'webserver_template';
 
     public const RECIPE_DEPLOY_COMMAND = 'deploy_command';
@@ -49,6 +51,9 @@ class MarketplaceItem extends Model
     public const RECIPE_WORKSPACE_RUNBOOK = 'workspace_runbook';
 
     public const RECIPE_EXTERNAL_LINK = 'external_link';
+
+    /** Preset shell script; payload carries the config/marketplace/scripts.php key. */
+    public const RECIPE_SCRIPT = 'script';
 
     protected $fillable = [
         'slug',
@@ -154,6 +159,7 @@ class MarketplaceItem extends Model
             self::CATEGORY_INTEGRATIONS => __('Integrations'),
             self::CATEGORY_GUIDES => __('Guides'),
             self::CATEGORY_RUNBOOKS => __('Runbooks'),
+            self::CATEGORY_SCRIPTS => __('Scripts'),
         ];
     }
 }

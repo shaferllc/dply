@@ -29,7 +29,7 @@
     );
     $moreMenuActive = $featuresActive
         || $pricingActive
-        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*', 'blog.*')
+        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*')
         || ($authed
             && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
             && ($req->routeIs('admin.*') || $req->is('horizon*', 'pulse*')));
@@ -264,7 +264,7 @@
                         <livewire:notifications.bell />
                     @endauth
                     <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('More navigation') }}">
-                        <x-dropdown align="right" width="36rem" contentClasses="p-0 overflow-hidden">
+                        <x-dropdown align="right" width="21rem" contentClasses="p-0 overflow-hidden">
                             <x-slot name="trigger">
                                 <button
                                     type="button"
@@ -277,96 +277,68 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
-                                    {{-- Product --}}
-                                    <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Product') }}</p>
-                                        <x-dropdown-link :href="route('features')" :description="__('Everything dply can do')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-sparkles class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Features') }}
-                                        </x-dropdown-link>
-                                    </div>
-
-                                    {{-- Resources + Workspace --}}
-                                    <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Resources') }}</p>
-                                        <x-dropdown-link :href="route('docs.index')" :description="__('Guides & API reference')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-book-open class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Docs') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('blog.index')" :description="__('Build-in-public devlog')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-newspaper class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Blog') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('pricing')" :description="__('Plans & pricing')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-credit-card class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Pricing') }}
-                                        </x-dropdown-link>
-
-                                        @if (feature('surface.status_pages') || feature('surface.marketplace') || feature('surface.scripts'))
-                                            <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Workspace') }}</p>
-                                            @feature('surface.status_pages')
-                                                <x-dropdown-link :href="route('status-pages.index')" :description="__('Public status pages')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-check-circle class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Status') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.marketplace')
-                                                <x-dropdown-link :href="route('marketplace.index')" :description="__('Templates & add-ons')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-squares-plus class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Marketplace') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.scripts')
-                                                <x-dropdown-link :href="route('scripts.index')" :description="__('Reusable run scripts')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Scripts') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                        @endif
-                                    </div>
+                                @php
+                                    // One column, built from data: the old two-column grid left a
+                                    // half-empty pane whenever a workspace flag was off.
+                                    $moreGroups = array_filter([
+                                        __('Product') => [
+                                            ['href' => route('features'), 'icon' => 'sparkles', 'label' => __('Features'), 'desc' => __('Everything dply can do')],
+                                        ],
+                                        __('Resources') => [
+                                            ['href' => route('docs.index'), 'icon' => 'book-open', 'label' => __('Docs'), 'desc' => __('Guides & API reference')],
+                                            ['href' => route('pricing'), 'icon' => 'credit-card', 'label' => __('Pricing'), 'desc' => __('Plans & pricing')],
+                                        ],
+                                        __('Workspace') => array_values(array_filter([
+                                            feature('surface.status_pages')
+                                                ? ['href' => route('status-pages.index'), 'icon' => 'check-circle', 'label' => __('Status'), 'desc' => __('Public status pages')]
+                                                : null,
+                                            // One Marketplace entry: script presets live in the
+                                            // catalog, and your own scripts hang off that page.
+                                            feature('surface.marketplace') || feature('surface.scripts')
+                                                ? ['href' => feature('surface.marketplace') ? route('marketplace.index') : route('scripts.index'), 'icon' => 'squares-plus', 'label' => __('Marketplace'), 'desc' => __('Templates & script presets')]
+                                                : null,
+                                        ])),
+                                    ]);
+                                @endphp
+                                <div class="p-1.5">
+                                    @foreach ($moreGroups as $groupLabel => $items)
+                                        <p @class([
+                                            'px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist',
+                                            'pt-1.5' => $loop->first,
+                                            'mt-1.5 border-t border-brand-ink/[0.07] pt-3' => ! $loop->first,
+                                        ])>{{ $groupLabel }}</p>
+                                        @foreach ($items as $item)
+                                            <x-dropdown-link :href="$item['href']" :description="$item['desc']">
+                                                <x-slot name="icon">
+                                                    <x-dynamic-component :component="'heroicon-o-' . $item['icon']" class="{{ $hi }}" />
+                                                </x-slot>
+                                                {{ $item['label'] }}
+                                            </x-dropdown-link>
+                                        @endforeach
+                                    @endforeach
                                 </div>
 
                                 @can('viewPlatformAdmin')
-                                    {{-- Privileged tools as a full-width footer strip. --}}
-                                    <div class="border-t border-brand-ink/10 bg-brand-sand/20 p-3">
-                                        <p class="flex items-center gap-1.5 px-1 pb-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                    {{-- Privileged tools as a compact footer strip. --}}
+                                    @php
+                                        $adminTools = [
+                                            ['href' => route('admin.overview'), 'icon' => 'squares-2x2', 'label' => __('Overview')],
+                                            ['href' => route('horizon.index'), 'icon' => 'queue-list', 'label' => __('Horizon')],
+                                            ['href' => route('pulse'), 'icon' => 'chart-bar', 'label' => __('Pulse')],
+                                        ];
+                                    @endphp
+                                    <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-2.5 py-2.5">
+                                        <p class="flex items-center gap-1.5 px-1 pb-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                             <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                             {{ __('Platform admin') }}
                                         </p>
-                                        <div class="grid grid-cols-3 gap-2">
-                                            <a href="{{ route('admin.overview') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Overview') }}</span>
-                                            </a>
-                                            <a href="{{ route('horizon.index') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-queue-list class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Horizon') }}</span>
-                                            </a>
-                                            <a href="{{ route('pulse') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Pulse') }}</span>
-                                            </a>
+                                        <div class="grid grid-cols-3 gap-1.5">
+                                            @foreach ($adminTools as $tool)
+                                                <a href="{{ $tool['href'] }}" class="group flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2 py-2 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5 hover:text-brand-ink">
+                                                    <x-dynamic-component :component="'heroicon-o-' . $tool['icon']" class="h-4 w-4 shrink-0 text-brand-mist transition group-hover:text-brand-forest" aria-hidden="true" />
+                                                    {{ $tool['label'] }}
+                                                </a>
+                                            @endforeach
                                         </div>
                                     </div>
                                 @endcan
@@ -537,22 +509,17 @@
                         {{ __('Status') }}
                     </x-responsive-nav-link>
                 @endfeature
-                @feature('surface.marketplace')
-                    <x-responsive-nav-link :href="route('marketplace.index')" :active="request()->routeIs('marketplace.index')">
+                @if (feature('surface.marketplace') || feature('surface.scripts'))
+                    <x-responsive-nav-link
+                        :href="feature('surface.marketplace') ? route('marketplace.index') : route('scripts.index')"
+                        :active="request()->routeIs('marketplace.index', 'scripts.*')"
+                    >
                         <x-slot name="icon">
                             <x-heroicon-o-squares-plus class="{{ $hi }}" />
                         </x-slot>
                         {{ __('Marketplace') }}
                     </x-responsive-nav-link>
-                @endfeature
-                @feature('surface.scripts')
-                    <x-responsive-nav-link :href="route('scripts.index')" :active="request()->routeIs('scripts.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Scripts') }}
-                    </x-responsive-nav-link>
-                @endfeature
+                @endif
                 @can('viewPlatformAdmin')
                     <div class="border-t border-brand-ink/10 pt-2 mt-2">
                         <p class="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Admin') }}</p>
@@ -589,12 +556,6 @@
                         <x-heroicon-o-book-open class="{{ $hi }}" />
                     </x-slot>
                     {{ __('Docs') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('blog.index')" :active="request()->routeIs('blog.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-newspaper class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Blog') }}
                 </x-responsive-nav-link>
                 <div class="pt-4 mt-2 border-t border-brand-ink/10">
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>

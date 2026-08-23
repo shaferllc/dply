@@ -390,51 +390,5 @@
                 @endforeach
             </nav>
         </div>
-
-        <div class="mt-5 border-t border-brand-ink/10 pt-4">
-            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
-            <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
-                <a
-                    href="{{ route('docs.index') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.index') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('All docs') }}
-                </a>
-                <a
-                    href="{{ route('docs.connect-provider') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.connect-provider') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-cloud class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Connect a provider') }}
-                </a>
-                <a
-                    href="{{ route('docs.create-first-server') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.create-first-server') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Create your first server') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'org-roles-and-limits' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-user-group class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Roles & plan limits') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'source-control' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-code-bracket-square class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Source control & deploys') }}
-                </a>
-            </nav>
-        </div>
     @endif
 </div>

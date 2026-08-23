@@ -81,7 +81,6 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Notifications** | Notification channels + event dispatch (server errors, webserver ops). Also owns the **Laravel notification drivers** under `Channels/<Provider>/` (Intercom, PagerDuty, MicrosoftTeams) registered by `NotificationsServiceProvider` — the module's only provider, added when the first driver landed. |
 | **Marketplace** | Script/runbook marketplace + imports. |
 | **Docs** | `/docs` front-matter docs system (manifest, contextual sidebar). |
-| **Blog** | Public build-in-public devlog at `/blog` — markdown in `content/blog/*.md` on the marketing shell. |
 | **Feedback** | Global feedback/bug slide-over + admin review. |
 | **Referrals** | Referral codes + Stripe-credit rewards. |
 | **Projects** | `Workspace` grouping container UI. |

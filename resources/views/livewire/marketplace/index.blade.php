@@ -19,6 +19,24 @@
             :description="__('Import curated starters into the right scope: webserver templates go to your organization, deploy starters and saved commands go to a server, and runbooks go to a project operations page. Guides and integrations stay linked here for discovery.')"
             icon="heroicon-o-rectangle-group"
         >
+            @if (feature('surface.scripts'))
+                <x-slot:actions>
+                    <a
+                        href="{{ route('scripts.index') }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-code-bracket class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Your scripts') }}
+                    </a>
+                </x-slot:actions>
+            @endif
+
+            @if (session('error'))
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">{{ session('error') }}</div>
+                </div>
+            @endif
             @if ($hasCatalogInScope)
                 <x-slot:stats>
                     <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -34,7 +52,7 @@
                                 <x-heroicon-o-funnel class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Showing') }}</span>
                             </dt>
-                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $items->count() }}</dd>
+                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $items->total() }}</dd>
                         </div>
                     </dl>
                 </x-slot:stats>
@@ -192,6 +210,27 @@
                                         @else
                                             <span class="text-xs text-brand-moss">{{ __('Requires a project in this organization') }}</span>
                                         @endif
+                                    @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_SCRIPT)
+                                        @if ($canCloneScripts)
+                                            <button
+                                                type="button"
+                                                wire:click="cloneScriptPreset('{{ $item->id }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="cloneScriptPreset"
+                                                class="inline-flex min-w-[8.5rem] items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90 disabled:opacity-50"
+                                            >
+                                                <span wire:loading.remove wire:target="cloneScriptPreset">{{ __('Add to my scripts') }}</span>
+                                                <span wire:loading wire:target="cloneScriptPreset" class="inline-flex items-center gap-2">
+                                                    <x-spinner variant="cream" size="sm" />
+                                                    {{ __('Adding…') }}
+                                                </span>
+                                            </button>
+                                        @else
+                                            <span class="text-xs text-brand-moss">{{ __('Requires an organization you can add scripts to') }}</span>
+                                        @endif
+                                        @if (! empty($item->payload['run_as_user']))
+                                            <p class="w-full text-xs text-brand-moss">{{ __('Run as:') }} <code class="text-brand-ink">{{ $item->payload['run_as_user'] }}</code></p>
+                                        @endif
                                     @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_EXTERNAL_LINK)
                                         @php
                                             $url = $item->payload['url'] ?? '/';
@@ -213,6 +252,11 @@
                             </li>
                         @endforeach
                     </ul>
+                    @if ($items->hasPages())
+                        <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
+                            <x-table-pager :paginator="$items" :noun="__('recipes')" />
+                        </div>
+                    @endif
                 @endif
             @endunless
         </x-profile-shell>

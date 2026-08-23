@@ -3,8 +3,9 @@
 namespace Tests\Feature\ScriptsTest;
 
 use App\Modules\Marketplace\Livewire\Scripts\Create;
+use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
 use App\Modules\Marketplace\Livewire\Scripts\Index;
-use App\Modules\Marketplace\Livewire\Scripts\Marketplace;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
@@ -14,7 +15,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-usesFeatures('surface.scripts');
+usesFeatures('surface.scripts', 'surface.marketplace');
 
 function ownerWithOrg(): User
 {
@@ -101,13 +102,20 @@ test('member can apply script to server as saved command', function () {
     ]);
 });
 
-test('marketplace clone creates marketplace sourced script', function () {
+test('cloning a script preset from the marketplace creates a marketplace sourced script', function () {
     $user = ownerWithOrg();
     $org = $user->currentOrganization();
 
+    $item = MarketplaceItem::factory()->create([
+        'slug' => 'script-disk-usage-summary',
+        'category' => MarketplaceItem::CATEGORY_SCRIPTS,
+        'recipe_type' => MarketplaceItem::RECIPE_SCRIPT,
+        'payload' => ['preset_key' => 'disk-usage-summary'],
+    ]);
+
     Livewire::actingAs($user)
-        ->test(Marketplace::class)
-        ->call('clonePreset', 'disk-usage-summary')
+        ->test(MarketplaceIndex::class)
+        ->call('cloneScriptPreset', $item->id)
         ->assertHasNoErrors()
         ->assertRedirect();
 
@@ -118,12 +126,10 @@ test('marketplace clone creates marketplace sourced script', function () {
     ]);
 });
 
-test('script presets page uses preset language', function () {
+test('the old script presets url redirects into the marketplace catalog', function () {
     $user = ownerWithOrg();
 
     $this->actingAs($user)
-        ->get(route('scripts.marketplace'))
-        ->assertOk()
-        ->assertSee('Script presets')
-        ->assertSee('Saved commands');
+        ->get('/scripts/marketplace')
+        ->assertRedirect('/marketplace?category=scripts');
 });

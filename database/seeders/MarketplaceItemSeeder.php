@@ -1174,6 +1174,30 @@ NGINX
             $items[] = $row;
         }
 
+        // Script presets live in config/marketplace/scripts.php (the runner and
+        // the inline picker read them from there). The catalog carries one row
+        // per preset pointing at that key, so the library has a single home.
+        $scriptTags = config('script_marketplace_tags', []);
+        $scriptOrder = 1000;
+        foreach (config('script_marketplace', []) as $key => $preset) {
+            $tags = $scriptTags[$key] ?? [];
+            $items[] = [
+                'slug' => 'script-'.$key,
+                'name' => $preset['name'] ?? $key,
+                'summary' => $tags === []
+                    ? __('Preset script you can clone into this organization.')
+                    : __('Preset script — :tags.', ['tags' => implode(', ', $tags)]),
+                'category' => MarketplaceItem::CATEGORY_SCRIPTS,
+                'recipe_type' => MarketplaceItem::RECIPE_SCRIPT,
+                'payload' => [
+                    'preset_key' => $key,
+                    'run_as_user' => $preset['run_as_user'] ?? null,
+                    'tags' => $tags,
+                ],
+                'sort_order' => $scriptOrder += 10,
+            ];
+        }
+
         foreach ($items as $row) {
             $row['is_active'] = true;
             $tags = $runtimeTags[$row['slug']] ?? [];

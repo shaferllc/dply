@@ -74,8 +74,8 @@ trait ResolvesCommandPaletteItems
                 ['Databases', 'database postgres mysql redis', 'cloud.databases.index', 'circle-stack', [], 'surface.databases'],
                 // ['Deploy sync', 'deploy groups sync', 'deploy-sync.index', 'arrows-right-left'],
                 ['Scripts', 'scripts automation', 'scripts.index', 'code-bracket', [], 'surface.scripts'],
-                ['Script marketplace', 'scripts marketplace presets', 'scripts.marketplace', 'rectangle-group', [], 'surface.scripts'],
-                ['Marketplace', 'marketplace apps', 'marketplace.index', 'rectangle-group', [], 'surface.marketplace'],
+                ['Marketplace', 'marketplace apps recipes script presets', 'marketplace.index', 'rectangle-group', [], 'surface.marketplace'],
+                ['Script presets', 'scripts marketplace presets', 'marketplace.index', 'rectangle-group', ['category' => 'scripts'], 'surface.marketplace'],
                 ['Backups — databases', 'backup database restore', 'backups.databases', 'circle-stack'],
                 ['Backups — files', 'backup files restore', 'backups.files', 'document-text'],
                 ['Status pages', 'status incident uptime', 'status-pages.index', 'document-text', [], 'surface.status_pages'],
@@ -193,7 +193,8 @@ trait ResolvesCommandPaletteItems
      */
     private function resolveUrl(string $routeName, array $params, ?Organization $org): ?string
     {
-        $routeParams = [];
+        // Everything but the 'org' marker is passed through as query/route params.
+        $routeParams = array_diff_key($params, ['org' => true]);
         if (($params['org'] ?? false) === true) {
             if ($org === null) {
                 return null;

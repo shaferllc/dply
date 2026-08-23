@@ -474,7 +474,7 @@
                         @if ($libraryTab === 'organization')
                             <a href="{{ route('scripts.index') }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Manage scripts →') }}</a>
                         @else
-                            <a href="{{ route('scripts.marketplace') }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open marketplace page →') }}</a>
+                            <a href="{{ route('marketplace.index', ['category' => 'scripts']) }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open marketplace page →') }}</a>
                         @endif
                         <button type="button" wire:click="closeLibrary" class="text-brand-ink hover:text-brand-sage">{{ __('Done') }}</button>
                     </div>

@@ -201,7 +201,6 @@ use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
 use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
 use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
-use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Modules\OpsCopilot\Livewire\OpsCopilot as InfrastructureOpsCopilot;
 use App\Modules\Projects\Livewire\Index as ProjectsIndex;
 use App\Modules\Projects\Livewire\Show as ProjectsShow;
@@ -256,11 +255,13 @@ Route::get('/', function () {
 });
 
 Route::get('/pricing', function () {
-    return view('pricing');
+    return view('pricing', require resource_path('views/pricing/data.php'));
 })->name('pricing');
 
 Route::get('/features', function () {
-    return view('features');
+    return view('features', [
+        'features' => require resource_path('views/features/data.php'),
+    ]);
 })->name('features');
 
 Route::get('/migrate', function () {
@@ -493,7 +494,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
     Route::middleware('feature:surface.scripts')->group(function (): void {
         Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
-        Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
+        // Presets folded into the marketplace catalog (category=scripts).
+        Route::redirect('scripts/marketplace', '/marketplace?category=scripts');
         Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
         Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
     });
