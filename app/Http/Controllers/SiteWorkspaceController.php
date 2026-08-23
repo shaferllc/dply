@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Livewire\Sites\EdgeSettings;
 use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
@@ -79,9 +78,10 @@ class SiteWorkspaceController
             ]);
         }
 
-        $component = $site->usesEdgeRuntime() ? EdgeSettings::class : Settings::class;
-
-        return RendersLivewirePage::render($component, [
+        // Edge sites rendered Livewire\Sites\EdgeSettings here; that component
+        // went with the surface (remove-cloud-edge-serverless), so every site
+        // gets the standard settings workspace.
+        return RendersLivewirePage::render(Settings::class, [
             'server' => $server,
             'site' => $site,
             'section' => $section,

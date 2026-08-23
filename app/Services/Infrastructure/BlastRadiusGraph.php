@@ -179,26 +179,6 @@ final class BlastRadiusGraph
         }
 
         foreach ($sites as $site) {
-            if (! $site->usesEdgeRuntime()) {
-                continue;
-            }
-
-            $edgeId = $this->siteId($site->id);
-            $origin = is_array($site->edgeMeta()['origin'] ?? null) ? $site->edgeMeta()['origin'] : [];
-            $cloudSiteId = (string) ($origin['cloud_site_id'] ?? '');
-            if ($cloudSiteId !== '' && isset($siteIndex[$cloudSiteId])) {
-                $this->addEdge(
-                    $this->siteId($cloudSiteId),
-                    $edgeId,
-                    'origin',
-                    __('Hybrid SSR origin'),
-                );
-            } elseif (is_string($origin['url'] ?? null) && trim((string) $origin['url']) !== '') {
-                $this->nodes[$edgeId]['external_origin'] = trim((string) $origin['url']);
-            }
-        }
-
-        foreach ($sites as $site) {
             if (! $site->usesContainerRuntime()) {
                 continue;
             }
@@ -220,7 +200,7 @@ final class BlastRadiusGraph
     }
 
     /**
-     * @param  array<string, mixed> $node
+     * @param  array<string, mixed>  $node
      */
     private function addNode(array $node): void
     {

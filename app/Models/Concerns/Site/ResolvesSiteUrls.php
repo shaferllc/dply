@@ -180,17 +180,10 @@ trait ResolvesSiteUrls
             return GitCloneUrl::normalize($direct);
         }
 
-        if (! $this->usesEdgeRuntime()) {
-            return null;
-        }
-
-        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
-        $repo = trim((string) ($source['repo'] ?? ''));
-        if ($repo === '') {
-            return null;
-        }
-
-        return GitCloneUrl::normalize($repo);
+        // Edge sites carried their remote in meta.edge.source instead of the
+        // column; that fallback is gone with the surface
+        // (remove-cloud-edge-serverless).
+        return null;
     }
 
     /**

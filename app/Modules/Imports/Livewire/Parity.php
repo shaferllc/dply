@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Imports\Livewire;
 
 use App\Models\ForgeServer;
-use App\Models\ForgeSite;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\PloiServer;
-use App\Models\PloiSite;
-use App\Models\Site;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -78,17 +75,10 @@ class Parity extends Component
 
         $vmRows = $migrations->map(fn (ImportServerMigration $m) => $this->buildVmRow($m, $forgeServers, $ploiServers));
 
-        $edgeRows = Site::query()
-            ->where('organization_id', $org->id)
-            ->whereNotNull('edge_backend')
-            ->with('server')
-            ->orderByDesc('created_at')
-            ->get()
-            ->filter(fn (Site $site): bool => is_string($site->edgeMeta()['import']['source'] ?? null))
-            ->map(fn (Site $site): array => $this->buildEdgeRow($site))
-            ->values();
-
-        $rows = $vmRows->concat($edgeRows);
+        // Edge-imported sites (Vercel / Netlify / Cloudflare Pages) used to be
+        // listed alongside VM migrations; the Edge surface is removed
+        // (remove-cloud-edge-serverless).
+        $rows = $vmRows;
 
         $totals = [
             'migrations' => $rows->count(),
@@ -100,47 +90,6 @@ class Parity extends Component
             'rows' => $rows,
             'totals' => $totals,
         ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function buildEdgeRow(Site $site): array
-    {
-        $import = is_array($site->edgeMeta()['import'] ?? null) ? $site->edgeMeta()['import'] : [];
-        $source = (string) ($import['source'] ?? '');
-        $sourceLabel = match ($source) {
-            'vercel' => 'Vercel',
-            'netlify' => 'Netlify',
-            'cloudflare_pages' => 'Cloudflare Pages',
-            default => ucfirst(str_replace('_', ' ', $source)),
-        };
-
-        $liveUrl = $site->edgeLiveUrl();
-        $status = (string) $site->status;
-        $hasDrift = in_array($status, [Site::STATUS_EDGE_FAILED, Site::STATUS_EDGE_PROVISIONING], true);
-
-        return [
-            'kind' => 'edge',
-            'source_label' => $sourceLabel,
-            'site' => $site,
-            'import' => $import,
-            'live_url' => $liveUrl,
-            'source_dashboard_url' => is_string($import['source_dashboard_url'] ?? null) ? $import['source_dashboard_url'] : null,
-            'imported_at' => is_string($import['imported_at'] ?? null) ? $import['imported_at'] : null,
-            'status' => $status,
-            'has_drift' => $hasDrift,
-            'migration' => null,
-            'source_server' => null,
-            'target_server' => $site->server,
-            'source_site_count' => null,
-            'migrated_site_count' => null,
-            'added_after_migration' => [],
-            'removed_from_source' => [],
-            'failed_cutover' => [],
-            'source_inventory_stale' => false,
-            'source_last_synced_at' => null,
-        ];
     }
 
     /**

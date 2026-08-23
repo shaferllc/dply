@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Billing;
 
-use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\Site;
 use App\Models\User;
 use App\Modules\Billing\Livewire\Analytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,15 +14,17 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-test('billing analytics page renders for org admin', function () {
-    Feature::define('surface.edge', fn () => true);
-    Feature::define('surface.cloud', fn () => true);
-    Feature::define('surface.serverless', fn () => true);
-    Feature::flushCache();
-
+function analyticsAdmin(): array
+{
     $admin = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($admin->id, ['role' => 'admin']);
+
+    return [$admin, $org];
+}
+
+test('the page leads with the projected total and its two supporting sections', function () {
+    [$admin, $org] = analyticsAdmin();
 
     Server::factory()->for($org)->create([
         'status' => Server::STATUS_READY,
@@ -35,30 +35,46 @@ test('billing analytics page renders for org admin', function () {
         ->test(Analytics::class, ['organization' => $org])
         ->assertOk()
         ->assertSee('Billing analytics')
-        ->assertSee('Spend by category')
-        ->assertSee('Historical spend')
-        // Vendor framing ("MRR", "ARR", "Recurring revenue") was removed: this
-        // page is customer-facing, so the same figure is their spend, not our
-        // revenue. Asserted absent so it cannot creep back.
-        ->assertDontSee('MRR')
-        ->assertDontSee('Recurring revenue')
-        ->assertSee('Cost forecast')
         ->assertSee('Projected this month')
-        ->assertSee('Stripe sync events')
-        ->assertSee('Edge sites')
-        ->assertSee('Managed products')
-        ->assertSee('BYO server fleet')
-        ->assertSee('Invoice history');
+        ->assertSee('Where it goes')
+        ->assertSee('Trend');
 });
 
-test('billing analytics shows cost observatory when billing flag enabled', function () {
-    Feature::define('global.billing_enabled', fn () => true);
+/*
+ * The page used to run nine sections in one scroll. These assert the six that
+ * were cut stay cut — three because they were dead once the Edge, Cloud and
+ * Serverless surfaces were removed, one because it was operator telemetry on a
+ * customer-facing page, one because it duplicated the observatory's server
+ * table, and one because /billing/invoices already is that page.
+ */
+test('sections cut in the 2026-08-22 redesign do not come back', function () {
     Feature::define('surface.edge', fn () => true);
+    Feature::define('surface.cloud', fn () => true);
+    Feature::define('surface.serverless', fn () => true);
     Feature::flushCache();
 
-    $admin = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($admin->id, ['role' => 'admin']);
+    [$admin, $org] = analyticsAdmin();
+
+    Server::factory()->for($org)->create(['status' => Server::STATUS_READY]);
+
+    Livewire::actingAs($admin)
+        ->test(Analytics::class, ['organization' => $org])
+        ->assertDontSee('Edge sites')
+        ->assertDontSee('Managed products')
+        ->assertDontSee('Stripe sync events')
+        ->assertDontSee('BYO server fleet')
+        ->assertDontSee('Invoice history')
+        // Vendor framing: this page is customer-facing, so the same figure is
+        // their spend, not our revenue.
+        ->assertDontSee('MRR')
+        ->assertDontSee('Recurring revenue');
+});
+
+test('the cost observatory is one collapsed row, not three competing tiles', function () {
+    Feature::define('global.billing_enabled', fn () => true);
+    Feature::flushCache();
+
+    [$admin, $org] = analyticsAdmin();
 
     Server::factory()->for($org)->create([
         'status' => Server::STATUS_READY,
@@ -68,45 +84,22 @@ test('billing analytics shows cost observatory when billing flag enabled', funct
 
     Livewire::actingAs($admin)
         ->test(Analytics::class, ['organization' => $org])
-        ->assertSee('Transparent cost observatory')
-        ->assertDontSee('Forge')
-        ->assertSee('BYO VM provider estimates');
+        ->assertSee('Your provider costs')
+        ->assertSee('We bill our work; you pay your cloud provider directly.')
+        // The three-tile strip and its old heading are gone.
+        ->assertDontSee('Transparent cost observatory')
+        ->assertDontSee('Full stack estimate');
 });
 
-test('billing analytics shows edge usage when snapshots exist', function () {
-    Feature::define('surface.edge', fn () => true);
-    Feature::flushCache();
+test('the reference tables are present but folded away', function () {
+    [$admin, $org] = analyticsAdmin();
 
-    $admin = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($admin->id, ['role' => 'admin']);
-
-    $server = Server::factory()->for($org)->create(['status' => Server::STATUS_READY]);
-    $site = Site::factory()->for($org)->for($server)->create([
-        'name' => 'Analytics Edge Site',
-        'status' => Site::STATUS_EDGE_ACTIVE,
-        'edge_backend' => 'dply_edge',
-        'created_at' => now()->subDays(2),
-    ]);
-
-    EdgeUsageSnapshot::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'period_start' => now()->toDateString(),
-        'period_end' => now()->toDateString(),
-        'requests' => 12_500,
-        'bytes_egress' => 1024 ** 3,
-        'r2_storage_bytes' => 0,
-        'r2_class_a_ops' => 0,
-        'r2_class_b_ops' => 0,
-        'source' => 'manual',
-    ]);
+    Server::factory()->for($org)->create(['status' => Server::STATUS_READY]);
 
     Livewire::actingAs($admin)
         ->test(Analytics::class, ['organization' => $org])
-        ->assertSee('Analytics Edge Site')
-        ->assertSee('12,500')
-        ->assertSee('Platform fee');
+        ->assertSee('Line items')
+        ->assertSeeHtml('<details');
 });
 
 test('billing analytics requires org update permission', function () {

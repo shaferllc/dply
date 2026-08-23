@@ -3,9 +3,7 @@
 namespace Tests;
 
 use App\Actions\Servers\GetProviderCredentialsForServerType;
-use App\Modules\Billing\Services\EdgeOrganizationUsageReader;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
-use App\Modules\Billing\Services\ServerlessOrganizationUsageReader;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerProviderCostEstimator;
 use App\Support\Servers\CacheServiceNetworkExposure;
@@ -102,8 +100,6 @@ abstract class TestCase extends BaseTestCase
         LinkedOrganizationSecrets::flushMemo();
         CacheServiceNetworkExposure::flushManagedRuleMemo();
         OrganizationBillingStateComputer::flushMemo();
-        EdgeOrganizationUsageReader::flushMemo();
-        ServerlessOrganizationUsageReader::flushMemo();
         ServerProviderCostEstimator::flushCredentialMemo();
         AssignableNotificationChannels::flushMemo();
 

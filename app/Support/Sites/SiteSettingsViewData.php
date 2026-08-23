@@ -11,12 +11,9 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Modules\Billing\Services\EdgeSiteAccessAnalytics;
-use App\Modules\Billing\Services\EdgeSiteBillingAnalytics;
-use App\Modules\Billing\Services\EdgeSiteTrafficAnalytics;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
-use App\Support\Deployment\DeploymentContract;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Support\Deployment\DeploymentContract;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Support\Collection;
@@ -28,7 +25,7 @@ use Illuminate\Support\Collection;
 final class SiteSettingsViewData
 {
     /**
-     * @param  array<string, mixed> $deploymentPreflight
+     * @param  array<string, mixed>  $deploymentPreflight
      * @return array<string, mixed>
      */
     public static function for(
@@ -111,7 +108,10 @@ final class SiteSettingsViewData
                 SiteCertificate::STATUS_FAILED,
             ], true));
         $latestCertificate = $activeCertificate ?? $pendingCertificate ?? $site->certificates->first();
-        $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
+        // Site::serverlessConfig() is removed with the serverless surface
+        // (remove-cloud-edge-serverless); the key stays so views that read it
+        // keep getting an array.
+        $serverlessRuntime = [];
         $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
         $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
         $runtimeTarget = $site->runtimeTarget();
@@ -354,7 +354,9 @@ final class SiteSettingsViewData
         $header = self::headerContext($site, $sectionHeader, $section, $user);
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
         $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
-        $edgeContext = EdgeSiteViewData::context($site, $section);
+        // EdgeSiteViewData is removed with the Edge surface; an empty context
+        // keeps array_merge() and the compact() list below intact.
+        $edgeContext = [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
         $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
@@ -445,8 +447,12 @@ final class SiteSettingsViewData
         $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
         $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
         $edgeUsageRates = app(ManagedProductCostEstimator::class)->edgeUsageRates();
-        $edgeSiteBilling = app(EdgeSiteBillingAnalytics::class)->forSite($site);
-        $edgeSiteTraffic = app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling);
+        // The three Edge analytics services are removed with the surface
+        // (remove-cloud-edge-serverless). Null is already a valid value for
+        // these keys — see the no-snapshot branches below — so callers and
+        // blades keep their shape.
+        $edgeSiteBilling = null;
+        $edgeSiteTraffic = null;
 
         return [
             'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
@@ -540,17 +546,9 @@ final class SiteSettingsViewData
             ? app(ManagedProductCostEstimator::class)->edgeUsageRates()
             : [];
 
-        $edgeSiteBilling = ($needsBillingSnapshot || $needsTrafficSnapshot)
-            ? app(EdgeSiteBillingAnalytics::class)->forSite($site)
-            : null;
-
-        $edgeSiteTraffic = $needsTrafficSnapshot
-            ? app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling)
-            : null;
-
-        $edgeSiteAccess = $needsAccessSnapshot
-            ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
-            : null;
+        $edgeSiteBilling = null;
+        $edgeSiteTraffic = null;
+        $edgeSiteAccess = null;
 
         $payload = [
             'edgeUsageBillingEnabled' => $flags['edgeUsageBillingEnabled'],
@@ -658,7 +656,7 @@ final class SiteSettingsViewData
     }
 
     /**
-     * @param  array<string, mixed> $kinds
+     * @param  array<string, mixed>  $kinds
      */
     private static function consoleActionRun(Site $site, array $kinds): ?ConsoleAction
     {

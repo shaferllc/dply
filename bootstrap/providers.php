@@ -20,7 +20,6 @@ use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Queue\QueueServiceProvider;
 use App\Modules\Realtime\RealtimeServiceProvider;
 use App\Modules\Referrals\ReferralsServiceProvider;
-use App\Modules\Roadmap\RoadmapServiceProvider;
 use App\Modules\Secrets\SecretVaultServiceProvider;
 use App\Modules\Snapshots\SnapshotsServiceProvider;
 use App\Modules\TaskRunner\TaskServiceProvider;
@@ -53,7 +52,6 @@ return [
     QueueServiceProvider::class,
     RealtimeServiceProvider::class,
     ReferralsServiceProvider::class,
-    RoadmapServiceProvider::class,
     AppServiceProvider::class,
     BundleSsoServiceProvider::class,
     LookoutDebugPageServiceProvider::class,

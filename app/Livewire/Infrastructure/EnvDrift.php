@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Infrastructure;
 
-use App\Models\EdgeSiteEnvVar;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
@@ -62,45 +61,10 @@ class EnvDrift extends Component
             })
             ->get(['id', 'name', 'slug', 'server_id', 'organization_id', 'git_repository_url', 'env_file_content', 'edge_backend', 'meta', 'deployment_environment', 'type', 'container_backend']);
 
-        // Edge env-var rows for any Edge site in the org. Load once and
-        // index by site_id so the per-site loop below stays O(sites).
-        $edgeSiteIds = $sites
-            ->filter(fn (Site $s) => $s->usesEdgeRuntime())
-            ->pluck('id');
-        $edgeVarsBySite = EdgeSiteEnvVar::query()
-            ->whereIn('site_id', $edgeSiteIds)
-            ->get(['site_id', 'key', 'scope', 'value_encrypted'])
-            ->groupBy('site_id');
-
         $environments = [];
         foreach ($sites as $site) {
             $repo = $this->normalizeRepoKey($site->sourceControlRepositoryUrl());
             if ($repo === null) {
-                continue;
-            }
-
-            if ($site->usesEdgeRuntime()) {
-                $rows = $edgeVarsBySite->get($site->id, collect());
-                $byScope = $rows->groupBy('scope');
-
-                foreach ([EdgeSiteEnvVar::SCOPE_PRODUCTION, EdgeSiteEnvVar::SCOPE_PREVIEW] as $scope) {
-                    $scopeRows = $byScope->get($scope, collect());
-                    if ($scopeRows->isEmpty()) {
-                        continue;
-                    }
-                    $vars = [];
-                    foreach ($scopeRows as $row) {
-                        $vars[$row->key] = (string) ($row->value ?? '');
-                    }
-                    $environments[] = [
-                        'repo' => $repo,
-                        'site' => $site,
-                        'surface' => 'Edge',
-                        'scope' => $scope === EdgeSiteEnvVar::SCOPE_PREVIEW ? 'preview' : 'production',
-                        'vars' => $vars,
-                    ];
-                }
-
                 continue;
             }
 

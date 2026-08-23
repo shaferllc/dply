@@ -67,12 +67,6 @@
                 @endif
             </div>
 
-            <p class="mt-6 text-center text-xs text-brand-mist">
-                Looking ahead?
-                <a href="{{ route('roadmap') }}" class="font-semibold text-brand-sage hover:text-brand-ink">{{ __('View the roadmap') }}</a>
-                <span class="mx-1.5 text-brand-mist/50">·</span>
-                <a href="{{ route('changelog') }}" class="font-semibold text-brand-sage hover:text-brand-ink">{{ __('Changelog') }}</a>
-            </p>
         </div>
     </section>
 </x-marketing-layout>

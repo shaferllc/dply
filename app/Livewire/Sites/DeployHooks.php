@@ -8,7 +8,6 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Modules\Deploy\Services\ServerlessDeployHookRunner;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -102,10 +101,25 @@ class DeployHooks extends Component
         $this->toastSuccess(__('Deploy hook removed.'));
     }
 
+    /**
+     * Deploy-hook phases, in run order.
+     *
+     * Lifted off ServerlessDeployHookRunner, which was deleted with the
+     * serverless surface (remove-cloud-edge-serverless). The phases belong to
+     * SiteDeployHook, not to serverless — every runtime runs them.
+     *
+     * @var array<string, string>
+     */
+    private const PHASE_LABELS = [
+        SiteDeployHook::PHASE_BEFORE_CLONE => 'Before build',
+        SiteDeployHook::PHASE_AFTER_CLONE => 'After build',
+        SiteDeployHook::PHASE_AFTER_ACTIVATE => 'After deploy',
+    ];
+
     public function render(): View
     {
         return view('livewire.sites.deploy-hooks', [
-            'phaseLabels' => ServerlessDeployHookRunner::PHASE_LABELS,
+            'phaseLabels' => self::PHASE_LABELS,
             'hooksByPhase' => SiteDeployHook::query()
                 ->where('site_id', $this->siteId)
                 ->orderBy('sort_order')

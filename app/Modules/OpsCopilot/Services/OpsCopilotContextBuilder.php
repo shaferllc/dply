@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\OpsCopilot\Services;
 
 use App\Models\DeployIntelligenceAlert;
-use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerRecipe;
@@ -27,7 +26,7 @@ final class OpsCopilotContextBuilder
     /**
      * Sites with a recent failed BYO deploy or failed Edge build.
      *
-     * @return \Illuminate\Support\Collection<int, array{id: string, name: string, product: string, failed_at: mixed}>
+     * @return Collection<int, array{id: string, name: string, product: string, failed_at: mixed}>
      */
     public function candidateSites(Organization $organization): Collection
     {
@@ -158,35 +157,10 @@ final class OpsCopilotContextBuilder
             ->orderByDesc('finished_at')
             ->first(['id', 'status', 'log_output', 'phase_results', 'exit_code', 'finished_at', 'started_at']);
 
-        $edge = EdgeDeployment::query()
-            ->where('site_id', $site->id)
-            ->where('status', EdgeDeployment::STATUS_FAILED)
-            ->orderByDesc('failed_at')
-            ->first(['id', 'status', 'failure_reason', 'build_log_path', 'repo_config', 'failed_at', 'created_at']);
-
+        // A failed EdgeDeployment used to compete with the BYO deploy for
+        // "most recent failure"; Edge is removed
+        // (remove-cloud-edge-serverless), so the BYO deploy is the only source.
         $byoAt = $byo?->finished_at;
-        $edgeAt = $edge->failed_at ?? $edge?->created_at;
-
-        if ($byo === null && $edge === null) {
-            return null;
-        }
-
-        $useEdge = $edge !== null && ($byoAt === null || ($edgeAt !== null && $edgeAt->gt($byoAt)));
-
-        if ($useEdge) {
-            $log = $edge->readBuildLog($site);
-            $excerpt = $this->tailExcerpt((string) ($log ?? ''));
-
-            return [
-                'source' => 'edge_deploy',
-                'deployment_id' => (string) $edge->id,
-                'summary' => is_string($edge->failure_reason) ? $edge->failure_reason : '',
-                'log_excerpt' => $excerpt,
-                'exit_code' => null,
-                'failed_at' => $edgeAt?->toIso8601String(),
-                'repo_config' => is_array($edge->repo_config) ? $edge->repo_config : null,
-            ];
-        }
 
         if ($byo === null) {
             return null;
@@ -207,7 +181,7 @@ final class OpsCopilotContextBuilder
     }
 
     /**
-     * @param  array<string, mixed> $phaseResults
+     * @param  array<string, mixed>  $phaseResults
      */
     private function failedPhaseSnippet(array $phaseResults): string
     {

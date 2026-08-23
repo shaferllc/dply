@@ -45,13 +45,11 @@ use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Backups\Overview as BackupsOverview;
 use App\Livewire\Backups\Snapshots as BackupsSnapshots;
 use App\Livewire\Backups\Storage as BackupsStorage;
-use App\Modules\Cache\Livewire\CacheShow as CachesShow;
-use App\Modules\Cache\Livewire\Caches as CachesIndex;
+use App\Livewire\Credentials\Index as CredentialsIndex;
+use App\Livewire\Dashboard;
 use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Databases\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
-use App\Livewire\Credentials\Index as CredentialsIndex;
-use App\Livewire\Dashboard;
 use App\Livewire\Infrastructure\BlastRadius as InfrastructureBlastRadius;
 use App\Livewire\Infrastructure\Deploys as InfrastructureDeploys;
 use App\Livewire\Infrastructure\Domains as InfrastructureDomains;
@@ -65,13 +63,14 @@ use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
+use App\Livewire\Organizations\ApiTokens as OrganizationsApiTokens;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Livewire\Organizations\Member as OrganizationsMember;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Organizations\Show as OrganizationsShow;
-use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\OrgNetworking;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
@@ -187,6 +186,8 @@ use App\Models\Site;
 use App\Modules\Billing\Livewire\Analytics as BillingAnalytics;
 use App\Modules\Billing\Livewire\Invoices as BillingInvoices;
 use App\Modules\Billing\Livewire\Show as BillingShow;
+use App\Modules\Cache\Livewire\Caches as CachesIndex;
+use App\Modules\Cache\Livewire\CacheShow as CachesShow;
 use App\Modules\Docs\Http\Controllers\DocsController;
 use App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController;
 use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
@@ -209,8 +210,6 @@ use App\Modules\Queue\Livewire\Queues as QueuesIndex;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
-use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
-use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Support\Admin\AdminFeatureFlags;
 use Illuminate\Support\Facades\Broadcast;
@@ -263,14 +262,6 @@ Route::get('/pricing', function () {
 Route::get('/features', function () {
     return view('features');
 })->name('features');
-
-Route::get('/changelog', function () {
-    return view('changelog');
-})->name('changelog');
-
-Route::livewire('/roadmap', RoadmapIndex::class)
-    ->middleware(['throttle:60,1'])
-    ->name('roadmap');
 
 Route::get('/migrate', function () {
     return view('migrate.index', [
@@ -359,7 +350,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/', AdminOverview::class)->name('overview');
             Route::livewire('/operations', AdminOperations::class)->name('operations');
             Route::livewire('/audit', AdminAuditLog::class)->name('audit');
-            Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
             Route::livewire('/feedback', AdminFeedbackIndex::class)->name('feedback.index');
             Route::get('/feedback/{report}/screenshot', FeedbackScreenshotController::class)->name('feedback.screenshot');
             Route::livewire('/users', Index::class)->name('users.index');
@@ -441,8 +431,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
     Route::livewire('organizations/{organization}/settings', OrganizationsSettings::class)->name('organizations.settings');
+    Route::livewire('organizations/{organization}/api-tokens', OrganizationsApiTokens::class)->name('organizations.api-tokens');
+    Route::livewire('organizations/{organization}/people/{user}', OrganizationsMember::class)->name('organizations.member');
     Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
-    Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
+    // The Teams page folded into People (2026-08-22): a team grants no access,
+    // so it is a filter over the member directory rather than a second copy of
+    // it. Kept as a redirect for bookmarks and for the URLs already sent out in
+    // past invitation notifications.
+    Route::redirect('organizations/{organization}/teams', 'organizations/{organization}/members')
+        ->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
     Route::get('organizations/{organization}/compliance-export', OrganizationComplianceExportController::class)->name('organizations.compliance-export');
     // The Automation & API tab folded into organization settings (2026-08).
@@ -746,7 +743,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ...$query,
         ]);
     })->name('sites.settings');
-
 
     Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)
         ->where('section', '[a-z0-9-]+')

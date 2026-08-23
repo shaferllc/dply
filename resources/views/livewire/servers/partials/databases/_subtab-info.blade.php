@@ -94,7 +94,7 @@
                     :placeholder="__('Leave blank to keep current')"
                     mono
                     class="mt-2 block w-full font-mono text-sm focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-50"
-                    @disabled($isDeployer)
+                    :disabled="$isDeployer"
                 />
                 <p class="mt-1 text-xs text-brand-mist">{{ __('Used to authenticate the processlist action. Stored in server metadata; treat as sensitive.') }}</p>
             </div>

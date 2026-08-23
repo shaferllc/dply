@@ -315,7 +315,7 @@ return [
             'group' => 'organization',
         ],
         [
-            'route' => 'organizations.teams',
+            'route' => 'organizations.members',
             'slug' => 'org-teams',
             'group' => 'organization',
         ],

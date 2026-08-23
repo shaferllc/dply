@@ -67,7 +67,11 @@ test('organization show is displayed for member', function () {
 
     $response->assertOk();
     $response->assertSee($org->name);
-    $response->assertSee('Sections');
+    // The overview is a ledger of workspace facts, one row per label.
+    $response->assertSee('Plan');
+    $response->assertSee('Fleet');
+    $response->assertSee('People');
+    $response->assertSee('Automation');
     $response->assertSee('Members');
 });
 

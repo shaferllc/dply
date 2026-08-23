@@ -72,29 +72,6 @@ final class LlmSynthesizer
         );
     }
 
-    /**
-     * Generic JSON completion for callers that need the raw decoded object plus
-     * token usage rather than the narrative/suggestions shape `call()` returns
-     * (e.g. the roadmap updater, which applies a structured plan).
-     *
-     * @return array{data: array<string, mixed>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int, raw: string}
-     */
-    public function completeJson(string $userPrompt, ?string $systemOverride = null): array
-    {
-        $result = $this->complete(
-            $systemOverride ?? 'You are a precise assistant for the dply hosting platform. Respond with valid JSON only.',
-            $userPrompt,
-        );
-
-        return [
-            'data' => $this->parseJsonContent($result['content']),
-            'prompt_tokens' => $result['prompt_tokens'],
-            'completion_tokens' => $result['completion_tokens'],
-            'latency_ms' => $result['latency_ms'],
-            'raw' => $result['content'],
-        ];
-    }
-
     private function call(string $userPrompt): LlmSynthesisResult
     {
         $result = $this->complete(

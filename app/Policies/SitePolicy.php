@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Models\EdgeSiteMember;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -24,8 +23,10 @@ class SitePolicy
             return true;
         }
 
-        // Edge per-site members elevate — never restrict — org access.
-        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_VIEWER);
+        // Edge per-site members used to elevate — never restrict — org access
+        // here. Edge is removed (remove-cloud-edge-serverless), so server
+        // access is the only grant left.
+        return false;
     }
 
     public function create(User $user): bool
@@ -58,7 +59,7 @@ class SitePolicy
                 return true;
             }
 
-            return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
+            return false;
         }
 
         $server = $this->resolveServer($site);
@@ -67,7 +68,7 @@ class SitePolicy
             return true;
         }
 
-        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
+        return false;
     }
 
     public function clone(User $user, Site $site): bool
@@ -103,20 +104,7 @@ class SitePolicy
             return true;
         }
 
-        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_ADMIN);
-    }
-
-    private function edgeMemberRank(User $user, Site $site): int
-    {
-        if (! $site->usesEdgeRuntime()) {
-            return 0;
-        }
-
-        $role = $site->edgeSiteMembers()
-            ->where('user_id', $user->id)
-            ->value('role');
-
-        return is_string($role) ? EdgeSiteMember::rankFor($role) : 0;
+        return false;
     }
 
     /**

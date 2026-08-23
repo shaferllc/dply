@@ -145,10 +145,9 @@ final class SiteCreateAccess
         $surface = QuotaSurface::forServer($server);
         $used = $org->quotaUsage($surface);
 
-        $here = $server->sites()
-            ->get()
-            ->reject(fn ($site) => $site->isEdgePreview() || $site->isCloudPreview())
-            ->count();
+        // Edge/Cloud preview sites were rejected here for the same reason
+        // quotaUsageBySurface() skipped them; both surfaces are gone.
+        $here = $server->sites()->count();
 
         return [
             'elsewhere' => max(0, $used - $here),

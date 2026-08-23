@@ -59,11 +59,10 @@ trait ManagesOrganizationQuotas
             $tally[$surface->value] = 0;
         }
 
+        // Edge/Cloud preview sites used to be skipped so a preview never ate
+        // quota; both surfaces are removed (remove-cloud-edge-serverless), so
+        // there is nothing left to exclude.
         foreach ($this->sites()->with('server')->get() as $site) {
-            if ($site->isEdgePreview() || $site->isCloudPreview()) {
-                continue;
-            }
-
             $tally[QuotaSurface::forSite($site)->value]++;
         }
 

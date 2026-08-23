@@ -19,9 +19,7 @@
     }
 
     $featuresActive  = $active === 'features'  || $req->routeIs('features');
-    $changelogActive = $active === 'changelog' || $req->routeIs('changelog');
     $pricingActive   = $active === 'pricing'   || $req->routeIs('pricing');
-    $roadmapActive   = $active === 'roadmap'   || $req->routeIs('roadmap');
     $homeActive      = $active === 'home'      || ($req->is('/') && ! $req->routeIs('dashboard'));
     $hi      = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
@@ -30,9 +28,7 @@
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'backups.*',
     );
     $moreMenuActive = $featuresActive
-        || $changelogActive
         || $pricingActive
-        || $roadmapActive
         || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*', 'blog.*')
         || ($authed
             && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
@@ -99,20 +95,6 @@
                     >
                         <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
                         {{ __('Features') }}
-                    </a>
-                    <a
-                        href="{{ route('roadmap') }}"
-                        class="inline-flex items-center gap-1.5 {{ $roadmapActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >
-                        <x-heroicon-o-map class="{{ $hiGuest }}" />
-                        {{ __('Roadmap') }}
-                    </a>
-                    <a
-                        href="{{ route('changelog') }}"
-                        class="inline-flex items-center gap-1.5 {{ $changelogActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >
-                        <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
-                        {{ __('Changelog') }}
                     </a>
                     <a
                         href="{{ route('pricing') }}"
@@ -304,18 +286,6 @@
                                                 <x-heroicon-o-sparkles class="{{ $hi }}" />
                                             </x-slot>
                                             {{ __('Features') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('roadmap')" :description="__('What we’re building next')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-map class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Roadmap') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('changelog')" :description="__('Recently shipped updates')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-megaphone class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Changelog') }}
                                         </x-dropdown-link>
                                     </div>
 
@@ -610,14 +580,6 @@
                     <x-heroicon-o-sparkles class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Features') }}
                 </a>
-                <a href="{{ route('roadmap') }}" class="flex items-center gap-2.5 border-l-4 {{ $roadmapActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
-                    <x-heroicon-o-map class="h-5 w-5 shrink-0 opacity-90" />
-                    {{ __('Roadmap') }}
-                </a>
-                <a href="{{ route('changelog') }}" class="flex items-center gap-2.5 border-l-4 {{ $changelogActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
-                    <x-heroicon-o-megaphone class="h-5 w-5 shrink-0 opacity-90" />
-                    {{ __('Changelog') }}
-                </a>
                 <a href="{{ route('pricing') }}" class="flex items-center gap-2.5 border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-credit-card class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Pricing') }}
@@ -677,7 +639,7 @@
 @auth
     {{-- Global command palette (⌘K). Mounted alongside the header so it's
          available on EVERY page that renders the header — including the guest
-         marketing pages (changelog, features, pricing, welcome) when viewed
+         marketing pages (features, pricing, welcome) when viewed
          while signed in. Rendered as a sibling of <header> (not nested) so the
          full-screen overlay isn't trapped in the header's stacking context. --}}
     <livewire:command-palette :key="'global-command-palette'" />

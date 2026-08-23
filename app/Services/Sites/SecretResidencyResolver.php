@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Models\ExternalSecretStore;
 use App\Models\OrgSecretKey;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
-use App\Modules\Secrets\Services\External\SecretStoreDriverFactory;
 use App\Modules\Secrets\Services\OrgSecretKeyManager;
 use RuntimeException;
 
@@ -24,8 +22,8 @@ use RuntimeException;
  *
  * No-op for the overwhelming common case: a site with no residency rows has no
  * placeholders, so {@see resolve()} returns the map untouched. The per-mode
- * resolution backends land in later PRs (escrow → PR1/PR2, external → PR3/PR4);
- * the match arms below are the seams they fill.
+ * Escrow is the one residency mode: the value is an `age` blob encrypted to the
+ * organization's key. (External-store residency was removed 2026-08-22.)
  */
 class SecretResidencyResolver
 {
@@ -33,11 +31,10 @@ class SecretResidencyResolver
 
     public function __construct(
         private readonly OrgSecretKeyManager $orgKeys,
-        private readonly SecretStoreDriverFactory $stores,
     ) {}
 
     /**
-     * @param  array<string, mixed> $vars  the merged env map (loose + bindings)
+     * @param  array<string, mixed>  $vars  the merged env map (loose + bindings)
      * @param  string|null  $ephemeralIdentity  a customer-held age identity supplied
      *                                          for THIS push only and never persisted (Tier 2b). Null for every other tier.
      * @return array<string, string>
@@ -87,7 +84,7 @@ class SecretResidencyResolver
     }
 
     /**
-     * @param  array<string, mixed> $vars
+     * @param  array<string, mixed>  $vars
      */
     private function hasPlaceholder(array $vars): bool
     {
@@ -104,39 +101,10 @@ class SecretResidencyResolver
     {
         return match ($residency->mode) {
             SiteSecretResidency::MODE_ESCROW => $this->resolveEscrow($residency, $orgKey, $ephemeralIdentity),
-            SiteSecretResidency::MODE_EXTERNAL => $this->resolveExternal($residency),
             default => throw new RuntimeException(
                 "Unknown secret residency mode '{$residency->mode}' for '{$residency->key}'."
             ),
         };
-    }
-
-    private function resolveExternal(SiteSecretResidency $residency): string
-    {
-        $store = $residency->store_id !== null ? ExternalSecretStore::find($residency->store_id) : null;
-        if ($store === null) {
-            throw new RuntimeException("external secret '{$residency->key}' has no store configured.");
-        }
-        if ($residency->reference === null || $residency->reference === '') {
-            throw new RuntimeException("external secret '{$residency->key}' has no reference.");
-        }
-
-        // On-box resolution: dply must NEVER fetch the value. When on-box is
-        // enabled we leave a directive the server's shim rewrites in place (see
-        // SiteEnvPusher::stageOnBoxResolution + dply-resolve-secrets.sh). When it
-        // is NOT enabled we fail closed rather than ship an unresolved directive
-        // or silently pull the secret into dply.
-        if ($store->resolvesOnBox()) {
-            if (! config('secret_vault.residency.onbox_enabled')) {
-                throw new RuntimeException(
-                    "external secret '{$residency->key}' resolves on the server (on-box mode), which is not enabled on this platform."
-                );
-            }
-
-            return OnBoxSecretManifestBuilder::directiveFor($residency->id);
-        }
-
-        return $this->stores->for($store)->fetch($store, $residency->reference);
     }
 
     private function resolveEscrow(SiteSecretResidency $residency, ?OrgSecretKey $orgKey, ?string $ephemeralIdentity): string

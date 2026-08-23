@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Providers\Cloudflare;
 
 use App\Modules\Billing\Services\EdgeUsageTotals;
-use Carbon\CarbonInterface;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -503,111 +500,9 @@ class EdgeCloudflareClient
             && config('edge.cloudflare.worker_zone_name') !== '';
     }
 
-    /**
-     * Pull zone HTTP request + bandwidth totals grouped by client request host.
-     *
-     * Uses Cloudflare GraphQL httpRequestsAdaptiveGroups. Requires Analytics
-     * read on the API token and a resolvable zone for worker_zone_name.
-     *
-     * @param  list<string>  $hostnames
-     * @return Collection<string, EdgeUsageTotals>
-     */
-    public function fetchHttpUsageByHostnames(
-        array $hostnames,
-        CarbonInterface $periodStart,
-        CarbonInterface $periodEnd,
-        ?string $zoneName = null,
-    ): Collection {
-        if ($hostnames === [] || ! $this->canCollectAnalytics()) {
-            return collect();
-        }
-
-        $zoneName = strtolower(trim($zoneName ?? (string) config('edge.cloudflare.worker_zone_name')));
-        if ($zoneName === '') {
-            throw new RuntimeException('Could not resolve Cloudflare zone for Edge analytics.');
-        }
-
-        $zoneId = $this->resolveZoneId($zoneName);
-        if ($zoneId === null) {
-            throw new RuntimeException('Could not resolve Cloudflare zone for Edge analytics.');
-        }
-
-        $query = <<<'GRAPHQL'
-        query EdgeHttpUsage($zoneTag: string!, $since: Time!, $until: Time!) {
-          viewer {
-            zones(filter: { zoneTag: $zoneTag }) {
-              httpRequestsAdaptiveGroups(
-                limit: 10000
-                filter: { datetime_geq: $since, datetime_leq: $until }
-                orderBy: [count_DESC]
-              ) {
-                count
-                dimensions { clientRequestHTTPHost }
-                sum { edgeResponseBytes }
-              }
-            }
-          }
-        }
-        GRAPHQL;
-
-        $response = Http::withToken($this->apiToken)
-            ->post(self::BASE.'/graphql', [
-                'query' => $query,
-                'variables' => [
-                    'zoneTag' => $zoneId,
-                    'since' => $periodStart->toIso8601String(),
-                    'until' => $periodEnd->toIso8601String(),
-                ],
-            ]);
-
-        $json = $response->json();
-        if (! is_array($json)) {
-            throw new RuntimeException('Cloudflare GraphQL returned a non-JSON response.');
-        }
-
-        if (! empty($json['errors'])) {
-            $message = is_array($json['errors'][0] ?? null)
-                ? (string) ($json['errors'][0]['message'] ?? 'Cloudflare GraphQL request failed.')
-                : 'Cloudflare GraphQL request failed.';
-
-            throw new RuntimeException($message);
-        }
-
-        $groups = data_get($json, 'data.viewer.zones.0.httpRequestsAdaptiveGroups', []);
-        if (! is_array($groups)) {
-            return collect();
-        }
-
-        $normalizedHosts = array_fill_keys(
-            array_map(static fn (string $host): string => strtolower($host), $hostnames),
-            true,
-        );
-
-        /** @var Collection<string, EdgeUsageTotals> $totals */
-        $totals = collect();
-
-        foreach ($groups as $group) {
-            if (! is_array($group)) {
-                continue;
-            }
-
-            $host = strtolower(trim((string) data_get($group, 'dimensions.clientRequestHTTPHost', '')));
-            if ($host === '' || ! isset($normalizedHosts[$host])) {
-                continue;
-            }
-
-            $requests = (int) data_get($group, 'count', 0);
-            $bytes = (int) data_get($group, 'sum.edgeResponseBytes', 0);
-
-            $existing = $totals->get($host, new EdgeUsageTotals);
-            $totals->put($host, $existing->add(new EdgeUsageTotals(
-                requests: $requests,
-                bytesEgress: $bytes,
-            )));
-        }
-
-        return $totals;
-    }
+    // fetchHttpUsageByHostnames() and fetchR2BucketUsage() stood here. Both
+    // returned EdgeUsageTotals, deleted with the Edge surface
+    // (remove-cloud-edge-serverless), and neither had a caller left.
 
     public function canQueryAnalyticsEngine(): bool
     {
@@ -718,105 +613,6 @@ class EdgeCloudflareClient
         $result = $json['result'] ?? [];
 
         return is_array($result) ? $result : [];
-    }
-
-    public function fetchR2BucketUsage(
-        CarbonInterface $periodStart,
-        CarbonInterface $periodEnd,
-        ?string $bucketName = null,
-    ): EdgeUsageTotals {
-        $bucketName = trim($bucketName ?? (string) config('edge.r2.bucket', ''));
-        if ($bucketName === '' || $this->accountId === '') {
-            return EdgeUsageTotals::empty();
-        }
-
-        $query = <<<'GRAPHQL'
-        query EdgeR2Usage($accountTag: string!, $since: Time!, $until: Time!, $bucket: string!) {
-          viewer {
-            accounts(filter: { accountTag: $accountTag }) {
-              r2StorageAdaptiveGroups(
-                limit: 100
-                filter: { datetime_geq: $since, datetime_leq: $until, bucketName: $bucket }
-              ) {
-                max { payloadSize, metadataSize }
-              }
-              r2OperationsAdaptiveGroups(
-                limit: 1000
-                filter: { datetime_geq: $since, datetime_leq: $until, bucketName: $bucket }
-              ) {
-                sum { requests }
-                dimensions { actionType }
-              }
-            }
-          }
-        }
-        GRAPHQL;
-
-        $response = Http::withToken($this->apiToken)
-            ->post(self::BASE.'/graphql', [
-                'query' => $query,
-                'variables' => [
-                    'accountTag' => $this->accountId,
-                    'since' => $periodStart->toIso8601String(),
-                    'until' => $periodEnd->toIso8601String(),
-                    'bucket' => $bucketName,
-                ],
-            ]);
-
-        $json = $response->json();
-        if (! is_array($json) || ! empty($json['errors'])) {
-            // Surface the real cause — HTTP status for transport failures,
-            // Cloudflare's errors[] for auth/permission/schema problems.
-            $detail = is_array($json['errors'] ?? null)
-                ? json_encode($json['errors'], JSON_UNESCAPED_SLASHES)
-                : Str::limit((string) $response->body(), 500);
-
-            throw new RuntimeException(sprintf(
-                'Cloudflare R2 GraphQL request failed (HTTP %d): %s',
-                $response->status(),
-                $detail !== '' ? $detail : 'no response body',
-            ));
-        }
-
-        $storageGroups = data_get($json, 'data.viewer.accounts.0.r2StorageAdaptiveGroups', []);
-        $operationGroups = data_get($json, 'data.viewer.accounts.0.r2OperationsAdaptiveGroups', []);
-
-        // Cloudflare's R2 storage dataset reports max{payloadSize, metadataSize}
-        // per sample. Billed storage = payload + metadata (object headers count
-        // against quota), so sum them per group before taking the peak.
-        $storedBytes = 0;
-        if (is_array($storageGroups)) {
-            foreach ($storageGroups as $group) {
-                $groupBytes = (int) data_get($group, 'max.payloadSize', 0)
-                    + (int) data_get($group, 'max.metadataSize', 0);
-                $storedBytes = max($storedBytes, $groupBytes);
-            }
-        }
-
-        $classA = 0;
-        $classB = 0;
-        $classAActions = [
-            'PutObject', 'CopyObject', 'ListObjects', 'CreateMultipartUpload',
-            'UploadPart', 'CompleteMultipartUpload', 'DeleteObject', 'AbortMultipartUpload',
-        ];
-
-        if (is_array($operationGroups)) {
-            foreach ($operationGroups as $group) {
-                $action = (string) data_get($group, 'dimensions.actionType', '');
-                $requests = (int) data_get($group, 'sum.requests', 0);
-                if (in_array($action, $classAActions, true)) {
-                    $classA += $requests;
-                } elseif (in_array($action, ['GetObject', 'HeadObject'], true)) {
-                    $classB += $requests;
-                }
-            }
-        }
-
-        return new EdgeUsageTotals(
-            r2StorageBytes: $storedBytes,
-            r2ClassAOps: $classA,
-            r2ClassBOps: $classB,
-        );
     }
 
     public function activeZoneId(string $zoneName): ?string

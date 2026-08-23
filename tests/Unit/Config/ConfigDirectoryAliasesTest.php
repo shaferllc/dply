@@ -18,7 +18,6 @@ test('every alias key equals its nested tree', function () {
 });
 
 test('legacy call sites still resolve after the folder move', function () {
-    expect(config('roadmap.statuses'))->toBeArray()->not->toBeEmpty();
     expect(config('server_logs.sources'))->toBeArray()->not->toBeEmpty();
     expect(config('dply_ai.llm'))->toBeArray()->toHaveKey('enabled');
     expect(config('feedback.types'))->toBeArray()->not->toBeEmpty();

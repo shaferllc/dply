@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Services;
 
-use App\Models\Site;
-use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
-use App\Modules\Queue\Actions\CreateQueueNamespace;
-use App\Modules\Queue\Contracts\QueueStore;
 use App\Models\ServiceCredential;
+use App\Models\Site;
+use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Actions\MintQueueCredential;
+use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueDepth;
 use App\Modules\Queue\Support\QueueEndpoint;
+use App\Support\Sites\SiteEnvFile;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
 use Throwable;
@@ -36,7 +36,6 @@ final class ServerlessQueueProvisioner
 {
     public function __construct(
         private readonly CreateQueueNamespace $create,
-        private readonly ServerlessEnvironmentPreparer $environment,
         private readonly QueueStore $store,
     ) {}
 
@@ -61,7 +60,10 @@ final class ServerlessQueueProvisioner
 
             $credential = $this->credentialFor($namespace);
 
-            $this->environment->mergeKeys($site, [
+            // Was ServerlessEnvironmentPreparer::mergeKeys(), deleted with the
+            // serverless surface (remove-cloud-edge-serverless).
+            // SiteEnvFile::merge() is the same in-place env-file write.
+            SiteEnvFile::merge($site, [
                 'QUEUE_CONNECTION' => 'dply',
                 'DPLY_QUEUE_URL' => $this->endpointFor($namespace),
                 'DPLY_QUEUE_KEY' => $credential['access_key_id'],

@@ -4,29 +4,61 @@ namespace App\Livewire;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Dashboard extends Component
 {
+    /** Free-text filter over server name and IP. */
+    #[Url(as: 'q', except: '')]
+    public string $q = '';
+
+    /** Row filter: `all` or `attention`. */
+    #[Url(as: 'show', except: 'all')]
+    public string $filter = 'all';
+
+    /** Reset both filters — the empty-state escape hatch. */
+    public function clearFilters(): void
+    {
+        $this->q = '';
+        $this->filter = 'all';
+    }
+
     public function render(OrganizationInsightsMetricsService $insightsMetrics): View
     {
         $user = auth()->user();
-        // Edge / serverless / Cloud placeholder hosts are product-line
-        // inventory, not the BYO Servers fleet — keep this card aligned with
-        // /servers.
-        $serverQuery = $user->servers()
-            ->onlyMachineHosts()
-            ->latest();
-        $servers = (clone $serverQuery)->withCount('sites')->take(5)->get();
-        $serverCount = (clone $serverQuery)->count();
         $org = $user->currentOrganization();
+
+        // Edge / serverless / Cloud placeholder hosts are product-line
+        // inventory, not the BYO Servers fleet — keep this table aligned with
+        // /servers.
+        $serverQuery = $user->servers()->onlyMachineHosts();
+        $serverCount = (clone $serverQuery)->count();
+
+        $servers = (clone $serverQuery)
+            ->when($this->q !== '', function ($query): void {
+                $term = '%'.trim($this->q).'%';
+                $query->where(function ($inner) use ($term): void {
+                    $inner->where('name', 'ilike', $term)
+                        ->orWhere('ip_address', 'ilike', $term);
+                });
+            })
+            ->withCount('sites')
+            ->get();
+
+        $rows = $this->fleetRows($servers, $insightsMetrics);
+        $attentionCount = $rows->where('attention', true)->count();
+
         $orgInsights = $insightsMetrics->organizationSummary($org);
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
@@ -36,12 +68,99 @@ class Dashboard extends Component
 
         return view('livewire.dashboard', [
             'organization' => $org,
-            'servers' => $servers,
+            'rows' => $this->filter === 'attention' ? $rows->where('attention', true)->values() : $rows,
             'serverCount' => $serverCount,
+            // Both chip counts are scoped to the current search, so they always
+            // add up against each other rather than against the whole fleet.
+            'matchedCount' => $rows->count(),
+            'attentionCount' => $attentionCount,
             'orgInsights' => $orgInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
             'healthAlert' => $healthAlert,
         ]);
+    }
+
+    /**
+     * One row per server: the box plus the three signals the table sorts on —
+     * latest health score, open findings, and how the last deploy ended.
+     *
+     * Worst first: a failed deploy outranks a critical finding, which outranks
+     * volume, and health breaks the tie.
+     *
+     * Each row: server, health, open/worst findings, last deploy, and the
+     * derived `attention` flag and `sort` weight the table orders on.
+     *
+     * @param  iterable<int, Server>  $servers
+     */
+    private function fleetRows(iterable $servers, OrganizationInsightsMetricsService $insightsMetrics): Collection
+    {
+        $servers = collect($servers);
+        $serverIds = $servers->pluck('id');
+
+        $findings = $insightsMetrics->perServerRollup($serverIds);
+        $health = $insightsMetrics->latestHealthScores($serverIds);
+        $deploys = $this->latestDeployPerServer($serverIds);
+
+        $rank = ['critical' => 3, 'warning' => 2, 'info' => 1];
+
+        return $servers
+            ->map(function (Server $server) use ($findings, $health, $deploys, $rank): array {
+                $open = (int) ($findings[$server->id]['open'] ?? 0);
+                $worst = $findings[$server->id]['worst'] ?? null;
+                $deploy = $deploys[$server->id] ?? null;
+                $failed = ($deploy['status'] ?? null) === SiteDeployment::STATUS_FAILED;
+                $score = $health->get($server->id);
+
+                return [
+                    'server' => $server,
+                    'health' => $score === null ? null : (int) round((float) $score),
+                    'open' => $open,
+                    'worst' => $worst,
+                    'deploy_status' => $deploy['status'] ?? null,
+                    'deploy_at' => $deploy['at'] ?? null,
+                    'attention' => $open > 0 || $failed,
+                    'sort' => ($failed ? 4000 : 0) + (($rank[$worst] ?? 0) * 1000) + min($open, 999),
+                ];
+            })
+            ->sortBy(fn (array $row): array => [
+                -$row['sort'],
+                $row['health'] ?? 101,
+                (string) $row['server']->name,
+            ])
+            ->values();
+    }
+
+    /**
+     * Latest deploy per server, keyed by server id.
+     *
+     * Joined through `sites` rather than `site_deployments.server_id`: that
+     * column is nullable and deliberately never backfilled, so the site's
+     * current server is the only link that covers historical rows.
+     *
+     * Values are `['status' => string, 'at' => Carbon|null]`.
+     *
+     * @param  Collection<int, string>  $serverIds
+     */
+    private function latestDeployPerServer(Collection $serverIds): Collection
+    {
+        if ($serverIds->isEmpty()) {
+            return collect();
+        }
+
+        $rows = DB::table('site_deployments')
+            ->join('sites', 'sites.id', '=', 'site_deployments.site_id')
+            ->whereIn('sites.server_id', $serverIds)
+            ->selectRaw('distinct on (sites.server_id) sites.server_id, site_deployments.status, site_deployments.created_at')
+            ->orderBy('sites.server_id')
+            ->orderByDesc('site_deployments.created_at')
+            ->get();
+
+        return collect($rows)
+            ->keyBy('server_id')
+            ->map(fn ($row): array => [
+                'status' => (string) $row->status,
+                'at' => $row->created_at ? Carbon::parse($row->created_at) : null,
+            ]);
     }
 
     /**

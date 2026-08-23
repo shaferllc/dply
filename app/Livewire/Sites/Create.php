@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Sites;
 
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -10,15 +9,15 @@ use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateContainer;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateDetection;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateFormFields;
-use App\Livewire\Sites\Concerns\ManagesSiteCreateFunctions;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateScaffold;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateStore;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Modules\Deploy\Services\LocalRepositoryInspector;
-use App\Services\Servers\ServerPhpManager;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
@@ -33,7 +32,6 @@ class Create extends Component
     use ManagesSiteCreateContainer;
     use ManagesSiteCreateDetection;
     use ManagesSiteCreateFormFields;
-    use ManagesSiteCreateFunctions;
     use ManagesSiteCreateScaffold;
     use ManagesSiteCreateStore;
     use RefreshesLinkedSourceControlAccounts;
@@ -170,7 +168,6 @@ class Create extends Component
             $this->phpVersions = [];
             $this->form->php_version = '';
             $this->form->applyFunctionsDefaults();
-            $this->loadFunctionsSourceControlState($repositoryBrowser);
         }
 
         $hostname = request()->query('hostname');
@@ -272,8 +269,6 @@ class Create extends Component
 
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
-        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
-
         if ($this->isContainerMode()) {
             $this->refreshContainerRepositories(app(SourceControlRepositoryBrowser::class));
         }

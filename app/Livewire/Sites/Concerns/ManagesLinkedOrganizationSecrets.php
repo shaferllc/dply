@@ -273,10 +273,6 @@ trait ManagesLinkedOrganizationSecrets
     private function siteEnvKeys(): array
     {
         $content = (string) ($this->site->env_file_content ?? '');
-        if ($this->site->usesEdgeRuntime()) {
-            return $this->site->edgeEnvVars()->pluck('key')->map(fn ($key) => (string) $key)->all();
-        }
-
         $parsed = app(DotEnvFileParser::class)->parse($content);
 
         return array_keys($parsed['variables']);

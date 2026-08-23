@@ -101,28 +101,6 @@ final class StandbyBlueprintPlanner
         $cloudSites = [];
 
         foreach ($sites as $site) {
-            if ($site->usesEdgeRuntime()) {
-                $edgeMeta = $site->edgeMeta();
-                $isHybrid = ($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid';
-                $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
-                $cloudSiteId = (string) ($origin['cloud_site_id'] ?? '');
-                $originUrl = is_string($origin['url'] ?? null) ? trim($origin['url']) : '';
-
-                if ($isHybrid || $cloudSiteId !== '' || $originUrl !== '') {
-                    $hybridEdges[] = [
-                        'id' => (string) $site->id,
-                        'name' => (string) $site->name,
-                        'server_id' => $site->server_id !== null ? (string) $site->server_id : null,
-                        'runtime_mode' => (string) ($edgeMeta['runtime_mode'] ?? 'static'),
-                        'cloud_site_id' => $cloudSiteId !== '' ? $cloudSiteId : null,
-                        'origin_url' => $originUrl !== '' ? $originUrl : null,
-                        'href' => $this->siteHref($site, 'edge-delivery'),
-                    ];
-                }
-
-                continue;
-            }
-
             if ($site->usesContainerRuntime()) {
                 $cloudSites[] = [
                     'id' => (string) $site->id,
@@ -182,7 +160,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return array{0: bool, 1: string|null}
      */
     private function availability(string $key, array $inventory): array
@@ -202,7 +180,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return list<string>
      */
     private function gaps(string $key, array $inventory): array
@@ -237,8 +215,8 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $definition
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, mixed>  $inventory
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
     private function buildSteps(string $key, array $definition, array $inventory): array
@@ -264,7 +242,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return array{0: string|null, 1: string|null}
      */
     private function stepLink(string $key, int $index, array $inventory): array
@@ -299,7 +277,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return list<array{kind: string, label: string, href: string|null, meta: string|null}>
      */
     private function hybridEdgeResources(array $inventory): array
@@ -335,7 +313,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return list<array{kind: string, label: string, href: string|null, meta: string|null}>
      */
     private function byoResources(array $inventory): array
@@ -368,7 +346,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return list<array{kind: string, label: string, href: string|null, meta: string|null}>
      */
     private function dnsResources(array $inventory): array
@@ -401,7 +379,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return array{0: string|null, 1: string|null}
      */
     private function firstHybridEdgeLink(array $inventory): array
@@ -415,7 +393,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return array{0: string|null, 1: string|null}
      */
     private function firstCloudOriginLink(array $inventory): array
@@ -441,7 +419,7 @@ final class StandbyBlueprintPlanner
     }
 
     /**
-     * @param  array<string, mixed> $inventory
+     * @param  array<string, mixed>  $inventory
      * @return array{0: string|null, 1: string|null}
      */
     private function firstByoSiteLink(array $inventory): array

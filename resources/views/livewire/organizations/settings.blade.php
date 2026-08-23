@@ -73,6 +73,50 @@
                 </div>
             @endif
 
+            {{-- Three short panels instead of one long scroll. Alpine-only: the
+                 tab is a view preference, not state worth a round-trip, and every
+                 panel's form posts independently anyway. --}}
+            <div x-data="{ tab: 'identity' }">
+                <div class="flex flex-wrap items-center gap-1 border-b border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
+                    @foreach ([
+                        'identity' => ['label' => __('Identity'), 'icon' => 'heroicon-o-identification'],
+                        'email' => ['label' => __('Email defaults'), 'icon' => 'heroicon-o-bell'],
+                    ] as $key => $tab)
+                        <button
+                            type="button"
+                            x-on:click="tab = '{{ $key }}'"
+                            :class="tab === '{{ $key }}' ? 'bg-brand-ink text-brand-cream' : 'border border-brand-ink/15 bg-white text-brand-moss hover:text-brand-ink'"
+                            class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors"
+                        >
+                            <x-dynamic-component :component="$tab['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $tab['label'] }}
+                        </button>
+                    @endforeach
+
+                    @if ($canDelete)
+                        <button
+                            type="button"
+                            x-on:click="tab = 'danger'"
+                            :class="tab === 'danger' ? 'bg-rose-600 text-white' : 'border border-rose-200 bg-white text-rose-700 hover:bg-rose-50'"
+                            class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors"
+                        >
+                            <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Danger') }}
+                        </button>
+                    @endif
+
+                    <a
+                        href="{{ route('organizations.api-tokens', $organization) }}"
+                        wire:navigate
+                        class="ms-auto inline-flex h-7 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-moss transition-colors hover:text-brand-ink"
+                    >
+                        <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('API tokens') }}
+                        <span class="font-mono text-brand-mist">{{ $tokensCount }}</span>
+                    </a>
+                </div>
+
+            <div x-show="tab === 'identity'">
             {{-- Icon / branding --}}
             <section class="border-b border-brand-ink/10">
                 <x-workspace-panel-head
@@ -182,7 +226,9 @@
                 </div>
             </form>
 
-            {{-- Email defaults --}}
+            </div>{{-- /identity --}}
+
+            <div x-show="tab === 'email'" x-cloak>
             <section class="border-b border-brand-ink/10" id="email-defaults">
                 <x-workspace-panel-head
                     dense
@@ -204,7 +250,8 @@
                         <input type="checkbox" wire:model.live="deploy_email_notifications_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                         <span class="min-w-0 flex-1">
                             <span class="text-sm font-medium text-brand-ink">{{ __('Deploy-finish emails') }}</span>
-                            <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Notify the deployer when a site\'s deploy completes or fails.') }}</span>
+                            <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Sent when a site\'s deploy completes or fails.') }}</span>
+                            @include('livewire.organizations.partials.email-recipients', ['emailKey' => 'deploy', 'creatorLabel' => __('the site owner')])
                         </span>
                     </label>
                     <label class="flex cursor-pointer items-start gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
@@ -212,6 +259,7 @@
                         <span class="min-w-0 flex-1">
                             <span class="text-sm font-medium text-brand-ink">{{ __('Email SSH details when a server finishes provisioning') }}</span>
                             <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Host, port, and username go to the server creator. The SSH private key stays gated behind the dashboard.') }}</span>
+                            @include('livewire.organizations.partials.email-recipients', ['emailKey' => 'server_credentials', 'creatorLabel' => __('the server creator')])
                         </span>
                     </label>
                     <label class="flex cursor-pointer items-start gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
@@ -219,80 +267,17 @@
                         <span class="min-w-0 flex-1">
                             <span class="text-sm font-medium text-brand-ink">{{ __('Email database credentials when created') }}</span>
                             <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Includes a plain-text database password when a site is scaffolded or a server database is created in the workspace. Off by default — credentials in mailboxes are an attack surface.') }}</span>
+                            @include('livewire.organizations.partials.email-recipients', ['emailKey' => 'database_credentials', 'creatorLabel' => __('whoever created it')])
                         </span>
                     </label>
                 </div>
             </section>
 
 
-            {{-- API tokens — inventory only.
-                 Issuing used to happen on the old Automation tab, from a
-                 four-preset scope dropdown. That was a weaker duplicate of the
-                 API keys settings page: it skipped the paid-plan gate, skipped
-                 the deployer ability cap, and wrote no api_token.created audit
-                 record, so a full-access ['*'] token could be minted with no
-                 trail. Creation now lives in one place (Settings\ApiKeys); this
-                 section keeps the org-wide view admins need — every member's
-                 tokens, not just your own — plus revoke. --}}
-            <section class="border-b border-brand-ink/10" id="api-tokens">
-                <x-workspace-panel-head
-                    dense
-                    icon="heroicon-o-key"
-                    :title="__('API tokens')"
-                    :count="$tokensCount ?: null"
-                    :note="__('Every token issued for this organization, across all members. Issue new ones from your API keys settings.')"
-                >
-                    <x-slot:actions>
-                        <x-outline-link size="xxs" href="{{ route('profile.api-keys') }}" wire:navigate>
-                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Create token') }}
-                        </x-outline-link>
-                    </x-slot:actions>
-                </x-workspace-panel-head>
+            </div>{{-- /email --}}
 
-                @if ($organization->apiTokens->isEmpty())
-                    <div class="px-3 py-8 text-center sm:px-4">
-                        <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <p class="mt-3 text-sm text-brand-moss">{{ __('No API tokens yet.') }}</p>
-                        <a href="{{ route('profile.api-keys') }}" wire:navigate class="mt-1 inline-block text-xs font-medium text-brand-forest hover:underline">
-                            {{ __('Create one in API keys settings') }}
-                        </a>
-                    </div>
-                @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($organization->apiTokens as $apiToken)
-                            <li wire:key="org-api-token-{{ $apiToken->id }}" class="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $apiToken->name }}</p>
-                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
-                                        <span class="font-mono text-brand-mist">{{ $apiToken->token_prefix }}…</span>
-                                        @if ($apiToken->last_used_at)
-                                            <span class="text-brand-mist">·</span>
-                                            <span>{{ __('Last used :time', ['time' => $apiToken->last_used_at->diffForHumans()]) }}</span>
-                                        @endif
-                                        @if ($apiToken->expires_at)
-                                            <span class="text-brand-mist">·</span>
-                                            <span>{{ __('Expires :date', ['date' => $apiToken->expires_at->format('M j, Y')]) }}</span>
-                                        @endif
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    wire:click='promptRevokeApiToken({{ json_encode((string) $apiToken->id) }})'
-                                    class="shrink-0 text-xs font-medium text-red-600 hover:text-red-700 hover:underline"
-                                >
-                                    {{ __('Revoke') }}
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </section>
-
-            {{-- Danger zone --}}
             @if ($canDelete)
+            <div x-show="tab === 'danger'" x-cloak>
                 <section>
                     <x-workspace-panel-head
                         dense
@@ -323,7 +308,9 @@
                         </button>
                     </div>
                 </section>
+            </div>{{-- /danger --}}
             @endif
+            </div>{{-- /tabs --}}
         </x-organization-shell>
     </div>
 
@@ -360,7 +347,7 @@
                         wire:click="deleteOrganization"
                         wire:loading.attr="disabled"
                         wire:target="deleteOrganization"
-                        @disabled($delete_confirm !== $organization->name)
+                        :disabled="$delete_confirm !== $organization->name"
                     >
                         <span wire:loading.remove wire:target="deleteOrganization">{{ __('Delete organization') }}</span>
                         <span wire:loading wire:target="deleteOrganization" class="inline-flex items-center gap-2">

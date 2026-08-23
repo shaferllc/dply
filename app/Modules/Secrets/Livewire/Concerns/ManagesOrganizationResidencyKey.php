@@ -136,6 +136,22 @@ trait ManagesOrganizationResidencyKey
         $this->toastSuccess(__('Generated a customer-held key. Save the identity now — dply does not keep a copy.'));
     }
 
+    public function openAdoptRecipientModal(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->reset('recipient_input');
+        $this->resetValidation(['recipient_input']);
+        $this->dispatch('open-modal', 'adopt-recipient-modal');
+    }
+
+    public function closeAdoptRecipientModal(): void
+    {
+        $this->reset('recipient_input');
+        $this->resetValidation(['recipient_input']);
+        $this->dispatch('close-modal', 'adopt-recipient-modal');
+    }
+
     public function adoptRecipient(OrgSecretKeyManager $manager): void
     {
         $this->authorize('update', $this->organization);
@@ -144,6 +160,10 @@ trait ManagesOrganizationResidencyKey
         $recipient = trim($this->recipient_input);
         $key = $this->orgKey;
         if ($key !== null) {
+            // Hand off to the confirm dialog — two stacked modals would fight
+            // over the overlay, and this one has said all it has to say.
+            $this->dispatch('close-modal', 'adopt-recipient-modal');
+
             $this->openConfirmActionModal(
                 'applyAdoptRecipient',
                 [$recipient],
@@ -168,12 +188,16 @@ trait ManagesOrganizationResidencyKey
         try {
             $manager->adoptCustomerRecipient($this->organization->id, $recipient);
         } catch (\Throwable $e) {
+            // Re-open the form the confirm step closed, or the message lands on
+            // a field nobody can see.
             $this->addError('recipient_input', $e->getMessage());
+            $this->dispatch('open-modal', 'adopt-recipient-modal');
 
             return;
         }
 
         $this->reset('recipient_input');
+        $this->dispatch('close-modal', 'adopt-recipient-modal');
         $this->forgetOrgKey();
         $this->toastSuccess(__('Adopted your recipient. dply can now encrypt to it but cannot decrypt — you hold the key.'));
     }

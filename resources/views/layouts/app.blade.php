@@ -92,7 +92,7 @@
         @auth
             {{-- The global command palette (⌘K) is now mounted inside
                  <x-site-header> (rendered above) so the shortcut + search also
-                 work on guest marketing pages (changelog / features / pricing)
+                 work on guest marketing pages (features / pricing)
                  when signed in — not just inside this app layout. --}}
 
             {{-- Shared Git provider connect modal (OAuth + PAT). Mounted here — not

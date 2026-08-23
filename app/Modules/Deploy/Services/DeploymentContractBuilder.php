@@ -44,13 +44,16 @@ final class DeploymentContractBuilder
             'repository_subdirectory' => $site->runtimeRepositorySubdirectory(),
             'app_port' => $site->app_port,
             'environment' => $environment,
-            'build_command' => trim((string) data_get($site->serverlessResolvedConfig(), 'build_command', '')),
+            // Was data_get($site->serverlessResolvedConfig(), 'build_command'):
+            // that accessor went with the serverless surface
+            // (remove-cloud-edge-serverless).
+            'build_command' => '',
             'healthcheck_url' => $site->visitUrl(),
         ];
         $artifacts = [
             'docker_runtime' => is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [],
             'kubernetes_runtime' => is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [],
-            'serverless' => $site->serverlessConfig(),
+            'serverless' => [],
         ];
 
         $draft = new DeploymentContract(

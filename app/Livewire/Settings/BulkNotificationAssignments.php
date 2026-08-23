@@ -45,6 +45,13 @@ class BulkNotificationAssignments extends Component
     /** @var list<int|string> */
     public array $selected_site_ids = [];
 
+    /**
+     * Subscribe the whole organization instead of picking targets: the routing
+     * resolver already matches Organization-scoped subscriptions for any event
+     * carrying an organization_id, so this covers servers and sites added later.
+     */
+    public bool $apply_org_wide = false;
+
     public ?string $context_server_id = null;
 
     public ?string $context_site_id = null;
@@ -123,6 +130,14 @@ class BulkNotificationAssignments extends Component
         $this->quick_new_owner_scope = $this->canManageOrganizationNotificationChannels() ? 'organization' : 'personal';
         $serverId = request()->string('server')->toString();
         $siteId = request()->string('site')->toString();
+        $channelId = request()->string('channel')->toString();
+
+        // ?channel= arrives from the "not routed" nudge on a channels page —
+        // land here with that channel already ticked. Validated against the
+        // assignable set, so a stale or foreign id just no-ops.
+        if ($channelId !== '' && $this->channelsForUser()->contains(fn (NotificationChannel $c) => (string) $c->id === $channelId)) {
+            $this->selected_channel_ids = [$channelId];
+        }
 
         if ($org && $serverId !== '' && Server::query()->where('organization_id', $org->id)->whereKey($serverId)->exists()) {
             $this->context_server_id = $serverId;
@@ -245,10 +260,10 @@ class BulkNotificationAssignments extends Component
             }
         }
 
-        if ($needsServers && $this->selected_server_ids === []) {
+        if ($needsServers && ! $this->apply_org_wide && $this->selected_server_ids === []) {
             return false;
         }
-        if ($needsSites && $this->selected_site_ids === []) {
+        if ($needsSites && ! $this->apply_org_wide && $this->selected_site_ids === []) {
             return false;
         }
 
@@ -307,12 +322,12 @@ class BulkNotificationAssignments extends Component
             }
         }
 
-        if ($needsServers && $this->selected_server_ids === []) {
+        if ($needsServers && ! $this->apply_org_wide && $this->selected_server_ids === []) {
             $this->addError('selected_server_ids', __('Select at least one server for the chosen notification types.'));
 
             return;
         }
-        if ($needsSites && $this->selected_site_ids === []) {
+        if ($needsSites && ! $this->apply_org_wide && $this->selected_site_ids === []) {
             $this->addError('selected_site_ids', __('Select at least one site for the chosen notification types.'));
 
             return;
@@ -327,6 +342,12 @@ class BulkNotificationAssignments extends Component
 
         $created = 0;
 
+        if ($this->apply_org_wide && ! $org->hasAdminAccess(Auth::user())) {
+            $this->addError('apply_org_wide', __('Only organization admins can subscribe the whole organization.'));
+
+            return;
+        }
+
         DB::transaction(function () use (&$created, $org): void {
             foreach ($this->selected_channel_ids as $cid) {
                 $channel = NotificationChannel::query()->findOrFail((string) $cid);
@@ -334,6 +355,21 @@ class BulkNotificationAssignments extends Component
 
                 foreach ($this->selected_event_keys as $event) {
                     $class = NotificationSubscriptionRules::subscribableClassForEvent($event);
+
+                    if ($this->apply_org_wide) {
+                        $row = NotificationSubscription::firstOrCreate([
+                            'notification_channel_id' => $channel->id,
+                            'subscribable_type' => Organization::class,
+                            'subscribable_id' => $org->id,
+                            'event_key' => $event,
+                        ]);
+                        if ($row->wasRecentlyCreated) {
+                            $created++;
+                        }
+
+                        continue;
+                    }
+
                     if ($class === Server::class) {
                         foreach ($this->selected_server_ids as $sid) {
                             $server = Server::query()->where('organization_id', $org->id)->findOrFail((string) $sid);

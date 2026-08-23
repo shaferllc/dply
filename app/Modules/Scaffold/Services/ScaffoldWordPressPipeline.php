@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Scaffold\Services;
 
+use App\Models\Organization;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -234,12 +236,14 @@ class ScaffoldWordPressPipeline
         // for rationale on plain-text password delivery.
         $organization = $site->organization;
         $creator = $site->user;
-        if ($organization
-            && $organization->email_database_credentials_enabled
-            && $creator
-            && filled($creator->email)
-        ) {
-            $creator->notify(new SiteDatabaseCredentialsNotification(
+        // Creator-only was the rule; it is the default now, and the org can
+        // widen it to members. See ManagesOrganizationEmailRecipients.
+        $recipients = $organization
+            ? $organization->emailRecipients(Organization::EMAIL_DATABASE_CREDENTIALS, $creator)
+            : collect();
+
+        if ($organization && $organization->email_database_credentials_enabled && $recipients->isNotEmpty()) {
+            Notification::send($recipients, new SiteDatabaseCredentialsNotification(
                 site: $site,
                 engine: $engine,
                 password: $password,

@@ -6,6 +6,7 @@ use App\Actions\Organizations\DeleteOrganizationAction;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ApiToken;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Organization;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
@@ -13,7 +14,6 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\WithFileUploads;
@@ -56,10 +56,22 @@ class Settings extends Component
 
     public bool $email_database_credentials_enabled = false;
 
+    /**
+     * Recipient mode per email key — see
+     * {@see ManagesOrganizationEmailRecipients}.
+     *
+     * @var array<string, string>
+     */
+    public array $email_recipient_modes = [];
 
+    /**
+     * Hand-picked member ids per email key, used in `custom` mode.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $email_recipient_user_ids = [];
 
     /** Comma- or newline-separated emails for the destinations textarea. */
-
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -96,6 +108,11 @@ class Settings extends Component
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
+
+        foreach (Organization::emailRecipientKeys() as $key) {
+            $this->email_recipient_modes[$key] = $this->organization->emailRecipientMode($key);
+            $this->email_recipient_user_ids[$key] = $this->organization->emailRecipientUserIds($key);
+        }
     }
 
     public function saveGeneral(): void
@@ -176,6 +193,52 @@ class Settings extends Component
         }
 
         $this->toastSuccess(__('Icon removed.'));
+    }
+
+    /**
+     * Persist who receives one of the org's email defaults.
+     *
+     * Hand-picked ids are intersected with current membership before saving:
+     * two of these emails carry secrets, so a non-member id must never be
+     * storable, not merely ignored at send time.
+     */
+    public function saveEmailRecipients(string $key): void
+    {
+        $this->authorize('update', $this->organization);
+
+        if (! in_array($key, Organization::emailRecipientKeys(), true)) {
+            return;
+        }
+
+        $mode = $this->email_recipient_modes[$key] ?? null;
+        if (! in_array($mode, Organization::emailRecipientModes(), true)) {
+            $mode = Organization::EMAIL_RECIPIENT_DEFAULTS[$key];
+            $this->email_recipient_modes[$key] = $mode;
+        }
+
+        $memberIds = $this->organization->users()->pluck('users.id')->map(fn ($id): string => (string) $id);
+        $picked = collect($this->email_recipient_user_ids[$key] ?? [])
+            ->map(fn ($id): string => (string) $id)
+            ->intersect($memberIds)
+            ->unique()
+            ->values();
+
+        $this->email_recipient_user_ids[$key] = $picked->all();
+
+        $prefs = $this->organization->email_recipient_prefs ?? [];
+        $prefs[$key] = [
+            'mode' => $mode,
+            'user_ids' => $mode === Organization::RECIPIENTS_CUSTOM ? $picked->all() : [],
+        ];
+
+        $this->organization->update(['email_recipient_prefs' => $prefs]);
+        audit_log($this->organization, auth()->user(), 'organization.email_recipients_updated', null, null, [
+            'email' => $key,
+            'mode' => $mode,
+            'recipient_count' => $picked->count(),
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Email recipients updated.'));
     }
 
     public function updatedDeployEmailNotificationsEnabled(): void
@@ -300,6 +363,9 @@ class Settings extends Component
     {
         return view('livewire.organizations.settings', [
             'timezones' => DateTimeZone::listIdentifiers(DateTimeZone::ALL),
+            'orgMembers' => $this->organization->users()
+                ->orderBy('name')
+                ->get(['users.id', 'users.name', 'users.email']),
         ]);
     }
 

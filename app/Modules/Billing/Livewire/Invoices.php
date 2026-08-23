@@ -3,23 +3,22 @@
 namespace App\Modules\Billing\Livewire;
 
 use App\Models\Organization;
+use App\Modules\Billing\Services\StripeInvoiceRows;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
-use Laravel\Cashier\Invoice;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Throwable;
 
 /**
  * Livewire exposes #[Computed] methods and the older get<Name>Property()
  * methods as $this-><name> in PHP and Blade. PHPStan cannot see that
  * magic, so the contract is stated here.
  *
- * @property-read \Illuminate\Pagination\LengthAwarePaginator $rowsPaginator
+ * @property-read LengthAwarePaginator $rowsPaginator
  */
 #[Layout('layouts.app')]
 class Invoices extends Component
@@ -87,79 +86,7 @@ class Invoices extends Component
 
     protected function invoiceRows(): Collection
     {
-        if ($this->invoiceRowsCache !== null) {
-            return $this->invoiceRowsCache;
-        }
-
-        if (! $this->organization->hasStripeId()) {
-            return $this->invoiceRowsCache = collect();
-        }
-
-        try {
-            $invoices = $this->organization->invoicesIncludingPending(['limit' => 100]);
-        } catch (Throwable) {
-            return $this->invoiceRowsCache = collect();
-        }
-
-        $tz = auth()->user()->timezone ?? config('app.timezone', 'UTC');
-
-        // The closure's array<string, mixed> return keeps the mapped Collection
-        // assignable to $invoiceRowsCache — Collection's TValue is invariant, so
-        // an inferred array{...} shape would not fit Collection<int, array<string, mixed>>.
-        /** @var Collection<int, array<string, mixed>> $rows */
-        $rows = $invoices->map(function (Invoice $invoice) use ($tz): array {
-            $stripe = $invoice->asStripeInvoice();
-            $pdfUrl = $stripe->invoice_pdf ?? $stripe->hosted_invoice_url;
-
-            return [
-                'id' => $stripe->id,
-                'number' => $stripe->number ?? $stripe->id,
-                'description' => $this->describeInvoice($invoice),
-                'status' => (string) ($stripe->status ?? 'unknown'),
-                'status_label' => $this->formatStatus((string) ($stripe->status ?? '')),
-                'total' => $invoice->total(),
-                'date' => $invoice->date($tz),
-                'pdf_url' => $pdfUrl,
-                'is_pdf' => ! empty($stripe->invoice_pdf),
-            ];
-        });
-
-        return $this->invoiceRowsCache = $rows;
-    }
-
-    protected function describeInvoice(Invoice $invoice): string
-    {
-        $stripe = $invoice->asStripeInvoice();
-        if (! empty($stripe->description)) {
-            return $stripe->description;
-        }
-
-        $lines = $stripe->lines->data ?? [];
-        if ($lines === []) {
-            return '—';
-        }
-
-        $first = $lines[0];
-        if (! empty($first->description)) {
-            return $first->description;
-        }
-
-        if (isset($first->plan) && is_object($first->plan) && ! empty($first->plan->nickname)) {
-            return (string) $first->plan->nickname;
-        }
-
-        if (isset($first->price) && is_object($first->price) && ! empty($first->price->nickname)) {
-            return (string) $first->price->nickname;
-        }
-
-        return __('Subscription invoice');
-    }
-
-    protected function formatStatus(string $status): string
-    {
-        return $status === ''
-            ? '—'
-            : ucfirst(str_replace('_', ' ', $status));
+        return $this->invoiceRowsCache ??= StripeInvoiceRows::for($this->organization);
     }
 
     public function getRowsPaginatorProperty(): LengthAwarePaginator

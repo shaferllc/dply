@@ -12,6 +12,20 @@
 ])
 
 @php
+    // Dense headers put the note on the title line, where a paragraph could only
+    // ever be truncated mid-word. Lead with its first sentence — which fits — and
+    // hang the rest off an info button (tooltip.js styles the `title`).
+    $noteLead = $note;
+    $noteRest = null;
+    if ($dense && filled($note)) {
+        $noteLead = \Illuminate\Support\Str::before($note, '. ');
+        $noteLead = $noteLead === $note ? $note : $noteLead.'.';
+        if (mb_strlen($noteLead) > 110) {
+            $noteLead = \Illuminate\Support\Str::limit($note, 110);
+        }
+        $noteRest = $noteLead === $note ? null : $note;
+    }
+
     $toneStrip = match ($tone) {
         'danger' => 'bg-rose-50/60',
         'amber' => 'bg-amber-50/60',
@@ -41,9 +55,21 @@
 
         @if (filled($note))
             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
-            {{-- `title` is upgraded to the styled bubble by resources/js/tooltip.js
-                 whenever the text is actually clipped — no native cut-off tooltip. --}}
-            <p class="min-w-0 flex-1 truncate text-xs text-brand-mist" title="{{ $note }}">{{ $note }}</p>
+            <p class="min-w-0 text-xs text-brand-mist">{{ $noteLead }}</p>
+            @if ($noteRest)
+                {{-- data-tooltip, not title: tooltip.js only hoists a `title` when
+                     the element's own text is clipped, and this button has none. --}}
+                <button
+                    type="button"
+                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-brand-mist transition-colors hover:bg-brand-sand/50 hover:text-brand-ink"
+                    data-tooltip="{{ $noteRest }}"
+                    data-tooltip-placement="bottom"
+                    aria-label="{{ $noteRest }}"
+                >
+                    <x-heroicon-o-information-circle class="h-4 w-4" aria-hidden="true" />
+                </button>
+            @endif
+            <span class="min-w-0 flex-1"></span>
         @endif
 
         {{-- ml-auto so actions stay right-aligned when there's no note; with a

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\ConsoleAction;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
@@ -659,7 +660,13 @@ trait ManagesDatabaseCrud
             return false;
         }
 
-        Notification::send($user, new ServerDatabaseCredentialsNotification(
+        // The acting user is the "creator" here; the org decides who else.
+        $recipients = $organization->emailRecipients(Organization::EMAIL_DATABASE_CREDENTIALS, $user);
+        if ($recipients->isEmpty()) {
+            return false;
+        }
+
+        Notification::send($recipients, new ServerDatabaseCredentialsNotification(
             server: $this->server,
             database: $database,
             password: $plainPassword,

@@ -46,7 +46,7 @@
 |   launch.*    — cross-product wizards
 |
 | Core BYO workspace (Overview, Sites, Metrics, Logs, Firewall, Cron, …) has
-| no workspace.* flag — only roadmap/advanced tabs and previews are gated here.
+| no workspace.* flag — only advanced tabs and previews are gated here.
 |
 | Adding a flag:
 |   1. Add an entry below with an exit-criteria comment.

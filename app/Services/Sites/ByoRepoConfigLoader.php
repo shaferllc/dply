@@ -32,7 +32,7 @@ final class ByoRepoConfigLoader
      */
     public function parse(string $sourcePath, string $raw): array
     {
-        $config = $this->edgeLoader->parse($sourcePath, $raw);
+        $config = $this->loader->parse($sourcePath, $raw);
         $decoded = $this->decodeRoot($sourcePath, $raw);
         $parsed = is_array($decoded) ? $decoded : [];
         $warnings = $config->warnings;
@@ -73,7 +73,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{schedule: string, command: string, user: ?string}>
      */
@@ -118,7 +118,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{phase: string, script: string, timeout: int, sort_order: int}>
      */
@@ -176,7 +176,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
      */

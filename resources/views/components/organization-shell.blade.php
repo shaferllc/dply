@@ -20,13 +20,13 @@
 
 @php
     $org = $organization;
-    $is = fn (string $key): bool => $section === $key;
+    $is = fn (string ...$keys): bool => in_array($section, $keys, true);
     $navBase = 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors';
-    $link = fn (string $key) => $is($key)
+    // Variadic so one nav item can stay lit across its tabs — Billing & plan
+    // covers both the bill page and the Trends tab.
+    $link = fn (string ...$keys) => $is(...$keys)
         ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm'
         : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent';
-    $docNavOn = 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm';
-    $docNavOff = 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent';
     $ni = 'h-[1.125rem] w-[1.125rem] shrink-0 opacity-90';
     $useMergedChrome = filled($title);
 @endphp
@@ -46,8 +46,7 @@
 <div class="lg:grid lg:grid-cols-12 lg:gap-10">
     <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
         <div class="dply-surface-nav">
-            <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
-            <div class="mt-1 flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 @if ($org->hasIcon())
                     {{-- onerror: never show the broken-image glyph when the stored
                          icon file is gone — swap to the initials fallback beside it. --}}
@@ -79,6 +78,18 @@
                         <x-heroicon-o-clock class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Activity') }}
                     </a>
+                @endif
+                @can('update', $org)
+                    <a
+                        href="{{ route('organizations.api-tokens', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('api-tokens')])
+                    >
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('API tokens') }}
+                    </a>
+                @endcan
+                @if ($org->hasAdminAccess(auth()->user()))
                     {{-- Automation folded into General settings — email defaults,
                          Cloud alerts, Edge data region, and the org-wide API token
                          list all live there now. --}}
@@ -87,18 +98,10 @@
                     <a
                         href="{{ route('billing.show', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('billing')])
+                        @class([$navBase, $link('billing', 'billing-analytics')])
                     >
                         <x-heroicon-o-credit-card class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Billing & plan') }}
-                    </a>
-                    <a
-                        href="{{ route('billing.analytics', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('billing-analytics')])
-                    >
-                        <x-heroicon-o-chart-bar class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Billing analytics') }}
                     </a>
                 @endcan
                 {{-- Realtime and Queues moved to the Services nav row (/realtime,
@@ -124,13 +127,17 @@
                         <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
                         {{ __('General') }}
                     </a>
+                    {{-- No Invoices entry: invoices are a section of Billing & plan
+                         now, and that page links on to the full history. --}}
+                @endcan
+                @can('viewNotificationChannels', $org)
                     <a
-                        href="{{ route('billing.invoices', $org) }}"
+                        href="{{ route('organizations.notification-channels', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('invoices')])
+                        @class([$navBase, $link('notifications')])
                     >
-                        <x-heroicon-o-document-text class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Invoices') }}
+                        <x-heroicon-o-bell class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Notification Channels') }}
                     </a>
                 @endcan
                 <a
@@ -139,18 +146,8 @@
                     @class([$navBase, $link('members')])
                 >
                     <x-heroicon-o-users class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Members') }}
+                    {{ __('People') }}
                 </a>
-                @can('viewNotificationChannels', $org)
-                    <a
-                        href="{{ route('organizations.notification-channels', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('notifications')])
-                    >
-                        <x-heroicon-o-bell class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Notification channels') }}
-                    </a>
-                @endcan
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.secrets', $org) }}"
@@ -161,14 +158,6 @@
                         {{ __('Secrets') }}
                     </a>
                 @endcan
-                <a
-                    href="{{ route('organizations.teams', $org) }}"
-                    wire:navigate
-                    @class([$navBase, $link('teams')])
-                >
-                    <x-heroicon-o-rectangle-group class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Teams') }}
-                </a>
                 {{-- Webserver templates nav temporarily hidden.
                 @can('view', $org)
                     <a
@@ -182,61 +171,7 @@
                 @endcan
                 --}}
             </nav>
-            <div
-                class="mt-4 border-t border-brand-ink/10 pt-4"
-                x-data="{
-                    _k: 'dply.orgNav.guidesCollapsed:{{ $org->id }}',
-                    collapsed: false,
-                    init() { try { this.collapsed = JSON.parse(localStorage.getItem(this._k)) || false; } catch (e) { this.collapsed = false; } },
-                    toggle() { this.collapsed = ! this.collapsed; localStorage.setItem(this._k, JSON.stringify(this.collapsed)); },
-                }"
-            >
-                <button
-                    type="button"
-                    x-on:click="toggle()"
-                    :aria-expanded="(! collapsed).toString()"
-                    class="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-moss hover:text-brand-ink"
-                >
-                    <span x-bind:class="collapsed ? '' : 'rotate-90'" class="inline-flex transition-transform">
-                        <x-heroicon-o-chevron-right class="h-3 w-3" />
-                    </span>
-                    <span class="flex-1 text-left">{{ __('Guides') }}</span>
-                </button>
-                <nav class="mt-2 space-y-0.5" aria-label="{{ __('Documentation guides') }}" x-show="! collapsed" x-collapse>
-                    <a
-                        href="{{ route('docs.index') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.index') ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-rectangle-stack class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('All docs') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.connect-provider') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.connect-provider') ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-cloud class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Connect a provider') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'org-roles-and-limits' ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-user-group class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Roles & plan limits') }}
-                    </a>
-                </nav>
-            </div>
         </div>
-        <a
-            href="{{ route('organizations.index') }}"
-            wire:navigate
-            class="mt-4 inline-flex text-sm text-brand-moss hover:text-brand-ink"
-        >
-            ← {{ __('All organizations') }}
-        </a>
     </aside>
     <div {{ $attributes->merge(['class' => 'lg:col-span-9 min-w-0']) }}>
 

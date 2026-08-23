@@ -78,13 +78,6 @@ final class UnifiedPreviewHostname
             return $dnsZone;
         }
 
-        if ($site->usesEdgeRuntime()) {
-            $hostname = strtolower(trim((string) ($site->edgeMeta()['routing']['hostname'] ?? '')));
-            if ($apex = $this->apexFromHostname($hostname)) {
-                return $apex;
-            }
-        }
-
         $existing = strtolower(trim($site->testingHostname()));
         if ($apex = $this->apexFromHostname($existing)) {
             return $apex;

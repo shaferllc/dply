@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 final class LocalRuntimeDetector
 {
     public function __construct(
-        private readonly ServerlessRuntimeDetector $serverlessRuntimeDetector,
+        private readonly RepositoryRuntimeDetector $serverlessRuntimeDetector,
     ) {}
 
     /**
@@ -165,7 +165,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $appDetection
+     * @param  array<string, mixed>  $appDetection
      */
     private function inferSiteType(array $appDetection): SiteType
     {
@@ -280,7 +280,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed>  $detectedFiles
      */
     private function hasDockerSignal(array $detectedFiles): bool
     {
@@ -289,7 +289,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed>  $detectedFiles
      */
     private function hasKubernetesSignal(array $detectedFiles, ?string $manifestPath): bool
     {

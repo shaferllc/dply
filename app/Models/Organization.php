@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\ManagesOrganizationBeta;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;
 use App\Models\Concerns\ManagesOrganizationQuotas;
@@ -90,6 +91,7 @@ class Organization extends Model
     use Billable, HasFactory, HasUlids;
 
     use ManagesOrganizationBeta;
+    use ManagesOrganizationEmailRecipients;
     use ManagesOrganizationMembership;
     use ManagesOrganizationPreferences;
     use ManagesOrganizationQuotas;
@@ -107,6 +109,7 @@ class Organization extends Model
         'deploy_email_notifications_enabled',
         'email_server_credentials_enabled',
         'email_database_credentials_enabled',
+        'email_recipient_prefs',
         'server_site_preferences',
         'default_site_script_id',
         'cron_maintenance_until',
@@ -130,6 +133,7 @@ class Organization extends Model
     protected function casts(): array
     {
         return [
+            'email_recipient_prefs' => 'array',
             'trial_ends_at' => 'datetime',
             'beta_joined_at' => 'datetime',
             'is_internal' => 'boolean',

@@ -170,7 +170,21 @@
                         {{ __('Select at least one channel and a notification type first.') }}
                     </div>
                 @else
-                    <div class="grid gap-8 md:grid-cols-2">
+                    {{-- Org-wide beats ticking every box: the resolver matches
+                         Organization subscriptions too, so servers and sites
+                         added later are covered without a revisit. --}}
+                    <label class="mb-4 flex cursor-pointer items-start gap-3 rounded-lg border border-brand-ink/12 bg-brand-sand/20 px-4 py-3">
+                        <input type="checkbox" wire:model.live="apply_org_wide" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
+                        <span class="min-w-0">
+                            <span class="block text-sm font-medium text-brand-ink">{{ __('Everything in :org', ['org' => $currentOrganization?->name ?? __('this organization')]) }}</span>
+                            <span class="block text-xs text-brand-moss">{{ __('Every server and site in the organization, including ones added later.') }}</span>
+                        </span>
+                    </label>
+                    @error('apply_org_wide')
+                        <p class="mb-3 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+
+                    <div @class(['grid gap-8 md:grid-cols-2', 'hidden' => $apply_org_wide])>
                         <div>
                             <p class="text-sm font-medium text-brand-ink mb-2">{{ __('Servers') }}</p>
                             <div class="space-y-2 max-h-48 overflow-y-auto">

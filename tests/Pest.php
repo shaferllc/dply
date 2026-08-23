@@ -185,7 +185,6 @@ const DOMAIN_GROUPS = [
     'webhooks' => ['Webhook'],
     'organizations' => ['Organization'],
     'scaffold' => ['Scaffold'],
-    'roadmap' => ['Roadmap'],
     'sourcecontrol' => ['SourceControl'],
     'marketplace' => ['Marketplace'],
     'realtime' => ['Realtime'],

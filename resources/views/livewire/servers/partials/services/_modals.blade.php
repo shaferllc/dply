@@ -281,7 +281,7 @@
                             wire:click="addCustomSystemdUnit"
                             wire:loading.attr="disabled"
                             wire:target="addCustomSystemdUnit"
-                            @disabled($isDeployer)
+                            :disabled="$isDeployer"
                             class="shrink-0"
                         >
                             <span wire:loading wire:target="addCustomSystemdUnit" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" aria-hidden="true"></span>
@@ -352,7 +352,7 @@
                                     wire:click="fetchSystemdModalStatus"
                                     wire:loading.attr="disabled"
                                     wire:target="fetchSystemdModalStatus"
-                                    @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
+                                    :disabled="! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading"
                                     class="!inline-flex !items-center !gap-1.5 !py-2 !text-xs"
                                 >
                                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
@@ -591,7 +591,7 @@
                                     wire:click="saveSystemdNotifyPreferences"
                                     wire:loading.attr="disabled"
                                     wire:target="saveSystemdNotifyPreferences"
-                                    @disabled($isDeployer)
+                                    :disabled="$isDeployer"
                                     class="!py-2 !text-xs"
                                 >
                                     <span wire:loading wire:target="saveSystemdNotifyPreferences" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" aria-hidden="true"></span>

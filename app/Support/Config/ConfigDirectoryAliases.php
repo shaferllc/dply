@@ -26,7 +26,6 @@ final class ConfigDirectoryAliases
         'dply_ai' => 'product.ai',
         'dply_ops_copilot' => 'product.ops_copilot',
         'dply_runtime' => 'product.runtime',
-        'roadmap' => 'product.roadmap',
         'feedback' => 'product.feedback',
         'admin' => 'product.admin',
         'api_token_permissions' => 'product.api_token_permissions',

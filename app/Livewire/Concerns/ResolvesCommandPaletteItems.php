@@ -7,8 +7,8 @@ namespace App\Livewire\Concerns;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Servers\ServerRegistry;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Support\Servers\ServerRegistry;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 
@@ -19,8 +19,6 @@ use Laravel\Pennant\Feature;
  */
 trait ResolvesCommandPaletteItems
 {
-
-
     /** Best doc slug for a site when the palette wasn't opened on its page. */
     private function siteFallbackDocSlug(Site $site): ?string
     {
@@ -96,8 +94,7 @@ trait ResolvesCommandPaletteItems
                 // ['Referrals', 'referral invite friends', 'profile.referrals', 'user'], // hidden for now
                 ['Billing', 'billing invoices payment plan', 'billing.show', 'credit-card', ['org' => true]],
                 ['Invoices', 'invoices billing receipts', 'billing.invoices', 'credit-card', ['org' => true]],
-                ['Org members', 'organization members invite', 'organizations.members', 'building-office-2', ['org' => true]],
-                ['Org teams', 'organization teams', 'organizations.teams', 'building-office-2', ['org' => true]],
+                ['Org people', 'organization people members teams invite', 'organizations.members', 'building-office-2', ['org' => true]],
             ],
             'admin' => [
                 ['Admin overview', 'admin platform overview', 'admin.overview', 'wrench-screwdriver', [], null, true],

@@ -203,7 +203,7 @@ test('every full-page Livewire route component resolves to a registered componen
         $broken,
         "These full-page route components do not resolve at render time.\n"
             ."A component moved out of App\\Livewire must be registered in its module ServiceProvider\n"
-            ."under its original name, e.g. Livewire::component('roadmap.index', RoadmapIndex::class):\n\n"
+            ."under its original name, e.g. Livewire::component('feedback.index', FeedbackIndex::class):\n\n"
             .$report,
     );
 });

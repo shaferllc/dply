@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class LocalRepositoryInspector
 {
     public function __construct(
-        private readonly ServerlessRepositoryCheckout $repositoryCheckout,
+        private readonly RepositoryCheckout $repositoryCheckout,
         private readonly LocalRuntimeDetector $runtimeDetector,
     ) {}
 

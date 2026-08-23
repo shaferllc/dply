@@ -33,7 +33,7 @@ class NotificationChannels extends Component
     protected function notificationChannelsViewData(): array
     {
         return [
-            'pageTitle' => __('Notification channels'),
+            'pageTitle' => __('Notification Channels'),
             // The old copy described the plumbing ("webhooks and chat
             // destinations") rather than what the page is for. Lead with the
             // outcome, and name the scope benefit that makes an org channel
