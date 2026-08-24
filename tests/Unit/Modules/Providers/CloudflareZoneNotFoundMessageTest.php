@@ -18,8 +18,8 @@ uses(RefreshDatabase::class);
  * These lock in that the failure identifies the token, and never prints it.
  */
 beforeEach(function () {
-    // One canonical token now — see config/product/testing_domains.php.
-    config(['testing_domains.cloudflare_api_token' => 'platform-token-aaaa']);
+    // One canonical token now — services.cloudflare.key.
+    config(['services.cloudflare.key' => 'platform-token-aaaa']);
 });
 
 /** No zone matches the lookup; the token can see two unrelated zones. */
@@ -42,7 +42,7 @@ test('the error identifies the platform token by name', function () {
     fakeZoneMiss();
 
     expect(fn () => (new CloudflareDnsService('platform-token-aaaa'))->upsertARecord('on-dply.cc', 'x', '1.2.3.4'))
-        ->toThrow(RuntimeException::class, 'CLOUDFLARE_API_TOKEN');
+        ->toThrow(RuntimeException::class, 'CLOUDFLARE_KEY');
 });
 
 test('a customer credential is called out as a customer credential', function () {

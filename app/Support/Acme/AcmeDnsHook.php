@@ -30,7 +30,7 @@ final class AcmeDnsHook
      */
     public static function secret(): string
     {
-        $explicit = trim((string) config('testing_domains.acme_hook_secret', ''));
+        $explicit = trim((string) config('services.cloudflare.acme_hook_secret', ''));
 
         if ($explicit !== '') {
             return $explicit;

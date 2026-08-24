@@ -195,7 +195,7 @@ class SiteProvisioner
             $detail = (string) ($testingHostnameMeta['error'] ?? '');
 
             throw new \RuntimeException(match ($reason) {
-                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable testing hostnames and configure Namecheap plus at least one zone in config/product/testing_domains.php.',
+                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable testing hostnames and configure Cloudflare plus at least one zone in config/services.php.',
                 'missing_server_ip' => 'Testing hostname creation requires a server IP address before provisioning can continue.',
                 default => $detail !== ''
                     ? 'Testing hostname creation failed before provisioning could continue: '.$detail

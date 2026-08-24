@@ -46,8 +46,8 @@ class TestingHostnameProvisioner
             return null;
         }
 
-        // Testing hostnames live on Dply-owned Namecheap zones
-        // (config/product/testing_domains.php).
+        // Testing hostnames live on Dply-owned Cloudflare zones
+        // (services.cloudflare.vm).
         $routing = $this->resolveTestingProviderForSite($site);
         $dnsProviderKey = $routing['provider'];
         $dnsProvider = $routing['dns_provider'];
@@ -581,17 +581,9 @@ class TestingHostnameProvisioner
         $routing = $this->resolveTestingProviderForSite($site);
         $credential = $routing['credential'];
 
-        $token = $credential?->getApiToken();
-        if (! is_string($token) || trim($token) === '') {
-            $token = match ($routing['provider']) {
-                'digitalocean' => trim((string) config('services.digitalocean.token')),
-                'namecheap' => trim((string) config('services.namecheap.api_key', '')),
-                'cloudflare' => TestingDomains::cloudflareApiTokenForZone(
-                    $site->testingZone() ?? TestingDomains::vmApex(),
-                ),
-                default => '',
-            };
-        }
+        // Always the platform Cloudflare token: resolveTestingProviderForSite()
+        // returns no credential and no other provider.
+        $token = TestingDomains::cloudflareApiToken();
 
         return [
             'provider' => $routing['provider'],
@@ -602,86 +594,47 @@ class TestingHostnameProvisioner
 
     /**
      * Testing hostnames mint on dply-owned zones from
-     * config/product/testing_domains.php. Customer DNS credentials cannot
-     * write those zones — Hetzner/Vultr org tokens used to steal the write
-     * and create a non-authoritative zone. Cloudflare is first; Namecheap
-     * and DigitalOcean remain fallbacks.
+     * services.cloudflare.vm.
      *
-     * PLATFORM CREDENTIALS ONLY. Every branch below resolves a dply-owned
-     * token from config; none falls back to a customer's ProviderCredential.
-     * It used to, and because the pool is dply's own apexes the customer token
-     * could never see them — the "fallback" just converted a missing platform
-     * token into a confusing "Zone [on-dply.cc] was not found in this
-     * Cloudflare account" pointed at the wrong account. Failing loudly with
-     * the platform misconfiguration is the correct outcome.
+     * CLOUDFLARE ONLY, PLATFORM TOKEN ONLY. There is no provider choice and no
+     * credential lookup left here, by design.
+     *
+     * This used to walk ['hetzner', 'cloudflare', 'digitalocean'] looking for a
+     * ProviderCredential the ORG had connected, "so the record stays inside the
+     * operator's existing DNS account". That premise is wrong: the record does
+     * not go in the operator's zone, it goes in on-dply.cc, which dply owns. A
+     * customer's DigitalOcean or Cloudflare token cannot write it. The result
+     * was that connecting any DNS credential silently hijacked testing-hostname
+     * creation and failed with "Zone [on-dply.cc] was not found", pointing the
+     * blame at an account that was never involved.
+     *
+     * Namecheap and the DigitalOcean platform token are gone from this path too
+     * — the zones are on Cloudflare, so anything else could only ever fail.
+     * Existing records created under the old routing keep their stored
+     * provider_type and are still deleted through the matching branch in
+     * {@see self::delete()}.
      */
     private function resolveTestingProviderForSite(Site $site): array
     {
         $pool = TestingDomains::vm();
         if ($pool === []) {
-            throw new \RuntimeException('Dply has no testing-hostname zones configured. Add them to config/product/testing_domains.php.');
+            throw new \RuntimeException('Dply has no testing-hostname zones configured. Add them to services.cloudflare.vm in config/services.php.');
         }
 
-        // Zone-aware even here, where the site's zone is not picked yet: the
-        // apex is the pool default, and probing it is what stops CLOUDFLARE_KEY
-        // (historically the MAIL token, often a different account) from being
-        // chosen purely because it is first in the list. Callers that DO know
-        // the final zone re-resolve against it immediately after.
-        $cloudflareToken = TestingDomains::cloudflareApiTokenForZone(
-            $site->testingZone() ?? TestingDomains::vmApex(),
-        );
-        if ($cloudflareToken !== '') {
-            return [
-                'provider' => 'cloudflare',
-                'dns_provider' => SiteDnsProviderFactory::forCloudflareAppConfigToken($cloudflareToken),
-                'pool' => $pool,
-                'credential' => null,
-            ];
-        }
-
-        // NO customer-credential fallback here, deliberately. The pool is
-        // dply-OWNED apexes (on-dply.cc and friends) living in dply's own
-        // Cloudflare account. A customer's Cloudflare token structurally
-        // cannot see those zones, so falling back to one does not degrade
-        // gracefully — it guarantees:
-        //
-        //   Zone [on-dply.cc] was not found in this Cloudflare account.
-        //
-        // and blames the customer's token for a platform misconfiguration.
-        // If dply's own token is missing or cannot see the zone, that is the
-        // thing to report; see the throw at the end of this method.
-
-        if (NamecheapDnsService::isConfigured()) {
-            return [
-                'provider' => 'namecheap',
-                'dns_provider' => SiteDnsProviderFactory::forNamecheapAppConfig(),
-                'pool' => $pool,
-                'credential' => null,
-            ];
-        }
-
-        $doPool = $this->configuredDomainsForProvider('digitalocean');
-        if ($doPool === []) {
-            $doPool = $pool;
-        }
-
-        // Same rule as Cloudflare above: a customer's DigitalOcean token cannot
-        // write dply-owned zones either, so only the platform token qualifies.
-        $doToken = trim((string) config('services.digitalocean.token'));
-        if ($doToken === '') {
+        $token = TestingDomains::cloudflareApiToken();
+        if ($token === '') {
             throw new \RuntimeException(
-                'Dply has no PLATFORM DNS credential that can write its testing zones ('
-                .implode(', ', array_slice($pool, 0, 3)).(count($pool) > 3 ? ', …' : '').'). '
-                .'These zones live in dply\'s own accounts, so a customer credential cannot serve them. '
-                .'Set CLOUDFLARE_KEY to a token whose Zone Resources include them, '
-                .'or configure Namecheap / services.digitalocean.token.'
+                'Testing hostnames require CLOUDFLARE_API_TOKEN. The testing zones ('
+                .implode(', ', array_slice($pool, 0, 3)).(count($pool) > 3 ? ', …' : '')
+                .') live in dply\'s own Cloudflare account, so only dply\'s platform token can write them. '
+                .'Set CLOUDFLARE_API_TOKEN to a token whose Zone Resources include those zones.'
             );
         }
 
         return [
-            'provider' => 'digitalocean',
-            'dns_provider' => SiteDnsProviderFactory::forDigitalOceanAppConfigToken($doToken),
-            'pool' => $doPool,
+            'provider' => 'cloudflare',
+            'dns_provider' => SiteDnsProviderFactory::forCloudflareAppConfigToken($token),
+            'pool' => $pool,
             'credential' => null,
         ];
     }
@@ -753,20 +706,16 @@ class TestingHostnameProvisioner
         $site->setAttribute('meta', $meta);
     }
 
+    /**
+     * Testing hostnames are Cloudflare-only, so this asks exactly one question.
+     *
+     * It used to also accept Namecheap, a DigitalOcean token, or the mere
+     * EXISTENCE of any org DNS credential — which let provisioning start on a
+     * box with no usable platform token and fail later at the DNS write.
+     */
     private function hasAvailableToken(): bool
     {
-        if (TestingDomains::cloudflareIsConfigured() || NamecheapDnsService::isConfigured()) {
-            return true;
-        }
-
-        if (trim((string) config('services.digitalocean.token')) !== '') {
-            return true;
-        }
-
-        return ProviderCredential::query()
-            ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
-            ->whereNotNull('organization_id')
-            ->exists();
+        return TestingDomains::cloudflareIsConfigured();
     }
 
     /**

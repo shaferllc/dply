@@ -1,5 +1,17 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Dply-owned testing / preview zones
+|--------------------------------------------------------------------------
+|
+| These lists live here — not in .env — so adding a zone is a code change.
+| Tests (APP_ENV=testing) use local *.test apexes so the suite never talks
+| to a public zone. DNS is Cloudflare via CLOUDFLARE_KEY.
+*/
+
+$testing = env('APP_ENV') === 'testing';
+
 return [
 
     /*
@@ -24,10 +36,12 @@ return [
 
     'cloudflare' => [
         'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-        // Accept either name: the mail transport key was historically provisioned
-        // as CLOUDFLARE_KEY in env, while this config read only CLOUDFLARE_API_KEY —
-        // the mismatch left services.cloudflare.key null and crashed CloudflareTransport.
-        'key' => env('CLOUDFLARE_API_KEY', env('CLOUDFLARE_KEY')),
+        'key' => env('CLOUDFLARE_KEY'),
+        'provider' => 'cloudflare',
+        'vm_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_VM_APEX', 'on-dply.cc'),
+        'edge_apex' => $testing ? 'edge.test' : env('CLOUDFLARE_EDGE_APEX', 'on-dply.site'),
+        'serverless_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_SERVERLESS_APEX', 'dply-serverless.cloud'),
+        'vm' => env('CLOUDFLARE_VM_TESTING_DOMAINS', ['on-dply.cc']),
     ],
 
     'ses' => [
@@ -184,19 +198,6 @@ return [
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
         'auto_testing_hostname_enabled' => true,
-        /*
-         * Legacy alias of the VM testing-zone pool. The list lives in
-         * config/product/testing_domains.php — not DPLY_TESTING_DOMAINS.
-         */
-        'testing_domains' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
-        'testing_domain_strategy' => 'deterministic',
-        /*
-         * DNS target for a deployed serverless function's friendly hostname
-         * ({slug}.{testing-domain}). An IP becomes an A record; a hostname
-         * becomes a CNAME. When unset, the function host CNAMEs onto the
-         * testing-domain apex (which must already resolve to the dply app).
-         */
-        'serverless_function_dns_target' => env('DPLY_SERVERLESS_FUNCTION_DNS_TARGET'),
     ],
 
     /*
@@ -363,9 +364,8 @@ return [
     | Dply testing-hostname pools by DNS provider
     |--------------------------------------------------------------------------
     |
-    | Dply-owned testing zones live in config/product/testing_domains.php
-    | and are written through Namecheap (services.namecheap). Legacy
-    | per-provider env lists (DPLY_TESTING_DOMAINS_*) are no longer read.
+    | Dply-owned testing zones live under services.cloudflare above.
+    | Legacy per-provider env lists (DPLY_TESTING_DOMAINS_*) are no longer read.
     |
     */
     /*
@@ -390,13 +390,5 @@ return [
         // Service token + default org for the 'managed' model only.
         'provision_token' => env('LOOKOUT_PROVISION_TOKEN'),
         'managed_organization_id' => env('LOOKOUT_MANAGED_ORG_ID'),
-    ],
-
-    'dply' => [
-        'testing_domains' => [
-            'cloudflare' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
-            'namecheap' => array_values((array) ((require __DIR__.'/product/testing_domains.php')['vm'] ?? [])),
-        ],
-    ],
-
+    ]
 ];

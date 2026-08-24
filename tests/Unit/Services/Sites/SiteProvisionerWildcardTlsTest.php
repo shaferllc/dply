@@ -17,8 +17,7 @@ function wildcardTlsSite(): Site
 {
     config([
         'sites.wildcard_testing_ssl' => true,
-        'testing_domains.cloudflare_api_token' => 'cf-test-token',
-        'services.cloudflare.key' => '',
+        'services.cloudflare.key' => 'cf-test-token',
         'edge.cloudflare.api_token' => '',
     ]);
 

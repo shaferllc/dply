@@ -63,7 +63,6 @@ final class ConfigDirectoryAliases
         'solo' => 'product.solo',
         'standby_blueprints' => 'product.standby_blueprints',
         'subscription' => 'product.subscription',
-        'testing_domains' => 'product.testing_domains',
         'user_preferences' => 'product.user_preferences',
         'vat' => 'product.vat',
         'warm_pool' => 'product.warm_pool',

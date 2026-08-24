@@ -21,9 +21,9 @@ test('acme dns hook rejects a bad signature', function () {
 
 test('acme dns hook writes a namecheap txt record', function () {
     config([
-        'testing_domains.vm' => ['dply.test'],
-        'testing_domains.edge' => [],
-        'testing_domains.serverless' => [],
+        'services.cloudflare.vm' => ['dply.test'],
+        'services.cloudflare.edge' => [],
+        'services.cloudflare.serverless' => [],
         'services.namecheap.api_user' => 'user',
         'services.namecheap.api_key' => 'key',
         'services.namecheap.client_ip' => '1.2.3.4',

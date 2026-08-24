@@ -12,10 +12,10 @@ use Illuminate\Support\Collection;
 
 test('vm testing hostnames prefer cloudflare when a platform token exists', function () {
     config([
-        'testing_domains.provider' => 'cloudflare',
-        'testing_domains.vm_apex' => 'on-dply.cc',
-        'testing_domains.vm' => ['on-dply.cc', 'dply.host'],
-        'testing_domains.cloudflare_api_token' => 'cf-dns-token',
+        'services.cloudflare.provider' => 'cloudflare',
+        'services.cloudflare.vm_apex' => 'on-dply.cc',
+        'services.cloudflare.vm' => ['on-dply.cc', 'dply.host'],
+        'services.cloudflare.key' => 'cf-dns-token',
         'services.namecheap.api_user' => 'tshafer',
         'services.namecheap.api_key' => 'nc-key',
         'services.namecheap.client_ip' => '1.2.3.4',
@@ -82,29 +82,25 @@ test('ssl hostnames prefer the testing hostname when present', function () {
 
     expect($site->sslDomainHostnames()->all())->toBe(['preview-app.dply.cc']);
 });
-test('vm testing hostnames fall back to digitalocean without cloudflare or namecheap credentials', function () {
+test('testing hostnames are cloudflare-only — no digitalocean or namecheap fallback', function () {
+    // The old behaviour routed to DigitalOcean (or Namecheap) when no Cloudflare
+    // token was set. That could never work: the testing zones are on Cloudflare,
+    // so any other provider was guaranteed to fail at the DNS write, just later
+    // and with a more confusing message.
     config([
-        'testing_domains.vm' => ['dply.host'],
-        'testing_domains.cloudflare_api_token' => '',
+        'services.cloudflare.vm' => ['dply.host'],
         'services.cloudflare.key' => '',
-        'edge.cloudflare.api_token' => '',
-        'serverless.testing_dns.cloudflare_api_token' => '',
-        'services.namecheap.api_user' => '',
-        'services.namecheap.api_key' => '',
-        'services.namecheap.client_ip' => '',
+        'services.namecheap.api_user' => 'nc',
+        'services.namecheap.api_key' => 'nc_key',
+        'services.namecheap.client_ip' => '1.2.3.4',
         'services.digitalocean.token' => 'do_token',
         'services.digitalocean.testing_domains' => ['dply.host'],
     ]);
 
-    $site = new Site([
-        'name' => 'Marketing API',
-        'slug' => 'marketing-api',
-    ]);
+    $site = new Site(['name' => 'Marketing API', 'slug' => 'marketing-api']);
 
-    $routing = app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($site);
-
-    expect($routing['provider'])->toBe('digitalocean');
-    expect($routing['token'])->toBe('do_token');
+    expect(fn () => app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($site))
+        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_API_TOKEN');
 });
 
 test('testing hostname prefers primary preview domain over legacy meta', function () {
@@ -155,9 +151,6 @@ test('a customer cloudflare credential is never used for a dply testing zone', f
 test('the platform failure names the platform, not the customer account', function () {
     config([
         'services.cloudflare.key' => '',
-        'testing_domains.cloudflare_api_token' => '',
-        'edge.cloudflare.api_token' => '',
-        'serverless.testing_dns.cloudflare_api_token' => '',
         'services.namecheap.api_key' => '',
         'services.digitalocean.token' => '',
     ]);
@@ -168,5 +161,5 @@ test('the platform failure names the platform, not the customer account', functi
     $method->setAccessible(true);
 
     expect(fn () => $method->invoke(app(\App\Services\Sites\TestingHostnameProvisioner::class), $site))
-        ->toThrow(\RuntimeException::class, 'PLATFORM DNS credential');
+        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_API_TOKEN');
 });

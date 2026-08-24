@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-
 /**
- * Dply-owned testing / preview zones from config/product/testing_domains.php.
+ * Dply-owned testing / preview zones from config/services.php (cloudflare).
  */
 final class TestingDomains
 {
     public static function provider(): string
     {
-        $provider = strtolower(trim((string) config('testing_domains.provider', 'cloudflare')));
+        $provider = strtolower(trim((string) config('services.cloudflare.provider', 'cloudflare')));
 
         return $provider !== '' ? $provider : 'cloudflare';
     }
@@ -20,14 +19,14 @@ final class TestingDomains
     /**
      * The one Cloudflare token dply uses for its own testing zones.
      *
-     * Deliberately a single config path (see config/product/testing_domains.php).
+     * Deliberately a single config path (services.cloudflare.key / CLOUDFLARE_KEY).
      * This used to consult four, in priority order, and return the first
      * non-empty one — which silently preferred a stale CLOUDFLARE_KEY over a
      * correctly-scoped token and made "which token is this?" unanswerable.
      */
     public static function cloudflareApiToken(): string
     {
-        $token = trim((string) config('testing_domains.cloudflare_api_token', ''));
+        $token = trim((string) config('services.cloudflare.key', ''));
 
         // Unexpanded `${VAR}` from .env is not a token — never send it as a
         // Bearer, or Cloudflare answers 400 and the real cause stays hidden.
@@ -74,10 +73,10 @@ final class TestingDomains
 
         $configured = self::cloudflareApiToken();
         if ($configured !== '' && hash_equals($configured, $token)) {
-            return 'the platform token (CLOUDFLARE_API_TOKEN)';
+            return 'the platform token (CLOUDFLARE_KEY)';
         }
 
-        return 'a token that is NOT the configured CLOUDFLARE_API_TOKEN '
+        return 'a token that is NOT the configured CLOUDFLARE_KEY '
             .'(a customer credential, or stale env on this worker)';
     }
 
@@ -88,21 +87,21 @@ final class TestingDomains
 
     public static function vmApex(): string
     {
-        $apex = strtolower(trim((string) config('testing_domains.vm_apex', 'on-dply.cc')));
+        $apex = strtolower(trim((string) config('services.cloudflare.vm_apex', 'on-dply.cc')));
 
         return $apex !== '' ? $apex : 'on-dply.cc';
     }
 
     public static function edgeApex(): string
     {
-        $apex = strtolower(trim((string) config('testing_domains.edge_apex', 'on-dply.site')));
+        $apex = strtolower(trim((string) config('services.cloudflare.edge_apex', 'on-dply.site')));
 
         return $apex !== '' ? $apex : 'on-dply.site';
     }
 
     public static function serverlessApex(): string
     {
-        $apex = strtolower(trim((string) config('testing_domains.serverless_apex', 'dply-serverless.cloud')));
+        $apex = strtolower(trim((string) config('services.cloudflare.serverless_apex', 'dply-serverless.cloud')));
 
         return $apex !== '' ? $apex : 'dply-serverless.cloud';
     }
@@ -112,7 +111,7 @@ final class TestingDomains
      */
     public static function vm(): array
     {
-        return self::normalize((array) config('testing_domains.vm', []));
+        return self::normalize((array) config('services.cloudflare.vm', []));
     }
 
     /**
@@ -120,7 +119,7 @@ final class TestingDomains
      */
     public static function edge(): array
     {
-        return self::normalize((array) config('testing_domains.edge', []));
+        return self::normalize((array) config('services.cloudflare.edge', []));
     }
 
     /**
@@ -128,7 +127,7 @@ final class TestingDomains
      */
     public static function serverless(): array
     {
-        return self::normalize((array) config('testing_domains.serverless', []));
+        return self::normalize((array) config('services.cloudflare.serverless', []));
     }
 
     /**
