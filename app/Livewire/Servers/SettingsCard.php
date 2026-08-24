@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\ResizeServerJob;
 use App\Jobs\SyncServerProviderSpecsJob;
 use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -17,6 +18,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\ServerResizeOptions;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
@@ -65,6 +67,19 @@ class SettingsCard extends Component
     /** @var array<string, mixed>|null Most recent inline test-connection result. */
     public ?array $testConnectionResult = null;
 
+    /** Resize modal state. */
+    public bool $showResizeModal = false;
+
+    public string $resizeTarget = '';
+
+    /** Populated when the modal opens; null while it has never been opened. */
+    public ?array $resizeCatalog = null;
+
+    public ?string $resizeError = null;
+
+    /** False for providers that reboot in place (Vultr) rather than stopping the box. */
+    public bool $resizePowerCycles = true;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -105,6 +120,62 @@ class SettingsCard extends Component
 
         SyncServerProviderSpecsJob::dispatch($this->server);
         $this->toastSuccess(__('Verifying with the provider — stored size and specs will update shortly.'));
+    }
+
+    /** Whether this server's provider supports an in-app resize (DigitalOcean only). */
+    #[Computed]
+    public function canResizeServer(): bool
+    {
+        return app(ServerResizeOptions::class)->supports($this->server)
+            && $this->canEditServerSettings();
+    }
+
+    /**
+     * Load the legal size list and open the modal. The catalog is fetched here
+     * rather than in render() so the provider API is only hit when the operator
+     * actually asks — every Settings page view would otherwise pay for it.
+     */
+    public function openResizeModal(ServerResizeOptions $options): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->resizeError = null;
+        $this->resizeTarget = '';
+
+        try {
+            $this->resizeCatalog = $options->forServer($this->server);
+            $this->resizePowerCycles = $options->requiresPowerCycle($this->server);
+        } catch (\Throwable $e) {
+            $this->resizeCatalog = null;
+            $this->resizeError = $e->getMessage();
+        }
+
+        $this->showResizeModal = true;
+    }
+
+    /**
+     * Queue the resize. Validation is re-run in the job against live droplet
+     * facts — this check is only here to fail fast with a message.
+     */
+    public function resizeServer(ServerResizeOptions $options): void
+    {
+        $this->authorize('update', $this->server);
+
+        try {
+            $target = $options->resolveTarget($this->server, $this->resizeTarget);
+        } catch (\Throwable $e) {
+            $this->resizeError = $e->getMessage();
+
+            return;
+        }
+
+        ResizeServerJob::dispatch($this->server, $target['slug'], $target['grows_disk'], auth()->id());
+
+        $this->showResizeModal = false;
+        $this->resizeTarget = '';
+        $this->toastSuccess(__('Resizing to :size — the server will be powered off and back on. This takes a few minutes.', [
+            'size' => $target['slug'],
+        ]));
     }
 
     public function checkHealth(ServerHealthProbe $probe): void

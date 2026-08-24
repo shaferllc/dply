@@ -209,6 +209,69 @@ class VultrService
     }
 
     /**
+     * Resize an instance onto a different plan.
+     *
+     * Unlike DigitalOcean and Hetzner, Vultr does NOT require the instance to
+     * be powered off — the platform reboots it as part of applying the plan,
+     * and there is no separate action object to poll. The caller polls the
+     * instance's own `server_status`/`power_status` instead.
+     *
+     * Vultr has no CPU/RAM-only mode: a plan change always carries that plan's
+     * disk, and the disk can only grow. Upstream filtering must therefore drop
+     * any plan with a smaller disk than the instance currently has.
+     */
+    public function resizeInstance(string $id, string $plan): void
+    {
+        $plan = trim($plan);
+        if ($plan === '') {
+            throw new \InvalidArgumentException('Target plan is required.');
+        }
+
+        $response = $this->request('patch', '/instances/'.$id, ['plan' => $plan]);
+        $this->assertSuccess($response, 'resize instance');
+    }
+
+    /**
+     * Block until the instance reports itself active and running, or the
+     * deadline passes.
+     *
+     * @param  callable(array<string, mixed>): void|null  $onTick
+     * @return array<string, mixed> final instance payload
+     */
+    public function waitForInstanceActive(string $id, int $timeoutSeconds = 1800, int $pollSeconds = 15, ?callable $onTick = null): array
+    {
+        $deadline = time() + max(30, $timeoutSeconds);
+        $pollSeconds = max(5, $pollSeconds);
+
+        while (true) {
+            $instance = $this->getInstance($id);
+            if ($onTick !== null) {
+                $onTick($instance);
+            }
+
+            $server = strtolower((string) ($instance['server_status'] ?? ''));
+            $power = strtolower((string) ($instance['power_status'] ?? ''));
+            $status = strtolower((string) ($instance['status'] ?? ''));
+
+            if ($status === 'active' && $power === 'running' && in_array($server, ['ok', 'installingbooting'], true)) {
+                return $instance;
+            }
+
+            if (time() >= $deadline) {
+                throw new \RuntimeException(sprintf(
+                    'Timed out waiting for Vultr instance %s (status=%s, power=%s, server=%s).',
+                    $id,
+                    $status,
+                    $power,
+                    $server,
+                ));
+            }
+
+            sleep($pollSeconds);
+        }
+    }
+
+    /**
      * Find a firewall group by description (exact or contains). Null when missing.
      */
     public function findFirewallGroupByDescription(string $description): ?string

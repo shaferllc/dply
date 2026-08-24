@@ -203,6 +203,58 @@ trait ManagesHetznerInstances
     }
 
     /**
+     * Power a server back on. Pairs with {@see self::powerOffServer()} — a
+     * change_type leaves the server off, so the caller restarts it.
+     *
+     * @return array<string, mixed>
+     */
+    public function powerOnServer(int $id): array
+    {
+        $response = $this->request('post', "/servers/{$id}/actions/poweron");
+        $this->assertSuccess($response, 'power on server');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action) || ! isset($action['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a power-on action.');
+        }
+
+        return $action;
+    }
+
+    /**
+     * Change a server's type (Hetzner's resize). The server must be powered
+     * off first — Hetzner rejects the action on a running server.
+     *
+     * $upgradeDisk mirrors DigitalOcean's `disk` flag:
+     *   false — CPU/RAM only, disk left alone, so the server can be moved back
+     *           down to a smaller type later.
+     *   true  — the disk grows too. PERMANENT: Hetzner will not downgrade a
+     *           server whose disk has been upgraded.
+     *
+     * @return array<string, mixed>
+     */
+    public function changeServerType(int $id, string $serverType, bool $upgradeDisk = false): array
+    {
+        $serverType = trim($serverType);
+        if ($serverType === '') {
+            throw new \InvalidArgumentException('Target server type is required.');
+        }
+
+        $response = $this->request('post', "/servers/{$id}/actions/change_type", [
+            'server_type' => $serverType,
+            'upgrade_disk' => $upgradeDisk,
+        ]);
+        $this->assertSuccess($response, 'change server type');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action) || ! isset($action['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a change-type action.');
+        }
+
+        return $action;
+    }
+
+    /**
      * Create a snapshot image from a server. Hetzner snapshots are GLOBAL across
      * locations (usable to create servers in any region). Returns
      * ['action' => <action>, 'image_id' => <int>].

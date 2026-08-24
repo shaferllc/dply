@@ -236,6 +236,56 @@ trait ManagesDoDroplets
     }
 
     /**
+     * Issue a power_on action against a droplet. Pairs with
+     * {@see self::powerOffDroplet()} — a resize leaves the droplet off, so the
+     * caller has to bring it back up itself.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function powerOnDroplet(int $id): array
+    {
+        $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_on']);
+        $this->assertSuccess($response, 'power on droplet');
+
+        return $this->extractAction($response->json(), 'power on droplet');
+    }
+
+    /**
+     * Resize a droplet to a new size slug.
+     *
+     * DigitalOcean requires the droplet to be POWERED OFF first — this method
+     * only issues the action, {@see \App\Jobs\ResizeServerJob} owns the
+     * off → resize → on sequence.
+     *
+     * $resizeDisk is the irreversible half of the API:
+     *   false — CPU and RAM only, disk untouched. Reversible: the droplet can
+     *           be moved back down to a smaller plan later.
+     *   true  — grows the disk too. PERMANENT. DigitalOcean will refuse every
+     *           later resize to a plan with a smaller disk, forever.
+     *
+     * A disk can never shrink, so a target whose disk is smaller than the
+     * current one is not resizable at all and must be filtered out upstream.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function resizeDroplet(int $id, string $size, bool $resizeDisk = false): array
+    {
+        $size = trim($size);
+        if ($size === '') {
+            throw new \InvalidArgumentException('Target size slug is required.');
+        }
+
+        $response = $this->request('post', '/droplets/'.$id.'/actions', [
+            'type' => 'resize',
+            'size' => $size,
+            'disk' => $resizeDisk,
+        ]);
+        $this->assertSuccess($response, 'resize droplet');
+
+        return $this->extractAction($response->json(), 'resize droplet');
+    }
+
+    /**
      * Trigger a snapshot of the droplet's disk into a custom image.
      *
      * @return array<string, mixed> action payload

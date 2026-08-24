@@ -22,6 +22,9 @@ return [
                 'server.container_launch.failed' => 'Container app deploy failed (action required)',
                 'server.provisioned' => 'Server provisioned',
                 'server.provision_failed' => 'Server provisioning failed (action required)',
+                'server.resize.started' => 'Server resize started (going offline)',
+                'server.resize.completed' => 'Server resize finished',
+                'server.resize.failed' => 'Server resize failed (action required)',
             ],
         ],
         'source_control' => [

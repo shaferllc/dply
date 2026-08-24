@@ -21,7 +21,7 @@ test('catalog lists the v1 presets in order', function () {
         'custom',
     ]);
 });
-test('only laravel and wordpress are pickable for now', function () {
+test('only the configured presets are pickable', function () {
     // config/server_create.php is the switch — see also StepType::availableModes()
     // and StepWhere::availableProviderHostKinds().
     $catalog = new ServerCreatePresetCatalog;
@@ -31,14 +31,31 @@ test('only laravel and wordpress are pickable for now', function () {
         'id',
     );
 
-    expect($available)->toBe(['laravel', 'wordpress']);
+    // Asserted against the config rather than a hard-coded list: this switch is
+    // expected to move as templates are turned on, and the invariant under test
+    // is that `available` tracks it — not which ones happen to be on today.
+    expect($available)->toBe(array_values(array_intersect(
+        array_column($catalog->all(), 'id'),
+        config('server_create.available_presets'),
+    )));
 
-    // Everything else still ships in the catalog — it renders as a disabled
-    // "Coming soon" tile rather than disappearing from the picker.
-    foreach (['rails', 'nextjs', 'django', 'polyglot', 'static', 'database', 'custom'] as $id) {
+    // Everything switched off still ships in the catalog — it renders as a
+    // disabled "Coming soon" tile rather than disappearing from the picker.
+    foreach (array_diff(array_column($catalog->all(), 'id'), $available) as $id) {
         expect($catalog->isAvailable($id))->toBeFalse();
         expect($catalog->find($id))->not->toBeNull();
     }
+});
+
+test('nextjs is currently on offer and pre-fills the node stack', function () {
+    $catalog = new ServerCreatePresetCatalog;
+
+    expect($catalog->isAvailable(ServerCreatePresetCatalog::ID_NEXTJS))->toBeTrue();
+
+    $preset = $catalog->find(ServerCreatePresetCatalog::ID_NEXTJS);
+    expect($preset['runtimes'])->toBe(['node' => '22'])
+        ->and($preset['database'])->toBe('postgres17')
+        ->and($preset['webserver'])->toBe('nginx');
 });
 test('wordpress preset uses mariadb redis php 84', function () {
     $wp = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_WORDPRESS);

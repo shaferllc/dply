@@ -268,6 +268,116 @@ class AwsEc2Service
     }
 
     /**
+     * Stop an instance and block until it reports `stopped`.
+     *
+     * EC2 refuses ModifyInstanceAttribute(InstanceType) on a running instance,
+     * so this is the required first leg of a resize.
+     */
+    public function stopInstanceAndWait(string $instanceId, int $timeoutSeconds = 900): void
+    {
+        $this->client->stopInstances(['InstanceIds' => [$instanceId]]);
+        $this->client->waitUntil('InstanceStopped', [
+            'InstanceIds' => [$instanceId],
+            '@waiter' => [
+                'delay' => 15,
+                'maxAttempts' => (int) max(2, ceil($timeoutSeconds / 15)),
+            ],
+        ]);
+    }
+
+    /**
+     * Start an instance and block until it reports `running`.
+     */
+    public function startInstanceAndWait(string $instanceId, int $timeoutSeconds = 900): void
+    {
+        $this->client->startInstances(['InstanceIds' => [$instanceId]]);
+        $this->client->waitUntil('InstanceRunning', [
+            'InstanceIds' => [$instanceId],
+            '@waiter' => [
+                'delay' => 15,
+                'maxAttempts' => (int) max(2, ceil($timeoutSeconds / 15)),
+            ],
+        ]);
+    }
+
+    /**
+     * Change a stopped instance's type. EC2's resize is attribute-only: the
+     * root EBS volume is a separate resource and is NOT touched here, which is
+     * why an EC2 resize is always reversible and never "grows the disk".
+     */
+    public function modifyInstanceType(string $instanceId, string $instanceType): void
+    {
+        $instanceType = trim($instanceType);
+        if ($instanceType === '') {
+            throw new \InvalidArgumentException('Target instance type is required.');
+        }
+
+        $this->client->modifyInstanceAttribute([
+            'InstanceId' => $instanceId,
+            'InstanceType' => ['Value' => $instanceType],
+        ]);
+    }
+
+    /**
+     * Instance types actually offered in this service's region, with their
+     * vCPU and memory figures.
+     *
+     * Two calls on purpose: DescribeInstanceTypeOfferings answers "is this type
+     * sold here", DescribeInstanceTypes answers "how big is it", and neither
+     * answers both. The offerings list is the filter, the types list the detail.
+     *
+     * @return list<array{slug: string, vcpus: int, memory_mb: int}>
+     */
+    public function describeAvailableInstanceTypes(int $limit = 400): array
+    {
+        $offered = [];
+        $token = null;
+        do {
+            $args = [
+                'LocationType' => 'region',
+                'MaxResults' => 100,
+                'Filters' => [['Name' => 'location', 'Values' => [$this->region]]],
+            ];
+            if ($token !== null) {
+                $args['NextToken'] = $token;
+            }
+            $page = $this->client->describeInstanceTypeOfferings($args);
+            foreach ($page['InstanceTypeOfferings'] ?? [] as $offering) {
+                $slug = $offering['InstanceType'] ?? null;
+                if (is_string($slug) && $slug !== '') {
+                    $offered[$slug] = true;
+                }
+            }
+            $token = $page['NextToken'] ?? null;
+        } while ($token !== null && count($offered) < $limit);
+
+        if ($offered === []) {
+            return [];
+        }
+
+        $out = [];
+        // DescribeInstanceTypes caps InstanceTypes at 100 entries per call.
+        foreach (array_chunk(array_keys($offered), 100) as $chunk) {
+            $page = $this->client->describeInstanceTypes(['InstanceTypes' => $chunk]);
+            foreach ($page['InstanceTypes'] ?? [] as $type) {
+                $slug = $type['InstanceType'] ?? null;
+                $vcpus = $type['VCpuInfo']['DefaultVCpus'] ?? null;
+                $memory = $type['MemoryInfo']['SizeInMiB'] ?? null;
+                if (! is_string($slug) || ! is_numeric($vcpus) || ! is_numeric($memory)) {
+                    continue;
+                }
+                $out[] = [
+                    'slug' => $slug,
+                    'vcpus' => (int) $vcpus,
+                    'memory_mb' => (int) $memory,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Terminate instance(s).
      */
     public function terminateInstances(string $instanceId): void

@@ -537,7 +537,37 @@
                             <x-heroicon-m-arrow-path class="h-4 w-4" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
                             {{ __('Verify with provider') }}
                         </x-secondary-button>
+                        @if ($this->canResizeServer)
+                            <x-secondary-button
+                                type="button"
+                                size="xs"
+                                wire:click="openResizeModal"
+                                wire:loading.attr="disabled"
+                                wire:target="openResizeModal"
+                                class="shrink-0"
+                                title="{{ __('Move this server onto a different plan at its provider.') }}"
+                            >
+                                <x-heroicon-m-arrows-pointing-out class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Resize') }}
+                            </x-secondary-button>
+                        @endif
                     </div>
+                    @php $resizeState = $server->meta['resize'] ?? null; @endphp
+                    @if (is_array($resizeState) && in_array($resizeState['state'] ?? null, ['powering_off', 'resizing', 'powering_on'], true))
+                        <p class="mt-2 text-xs font-medium text-amber-700">
+                            {{ __('Resize in progress → :size (:state). The server is offline until it finishes.', [
+                                'size' => $resizeState['target_size'] ?? '?',
+                                'state' => str_replace('_', ' ', (string) $resizeState['state']),
+                            ]) }}
+                        </p>
+                    @elseif (is_array($resizeState) && ($resizeState['state'] ?? null) === 'failed')
+                        <p class="mt-2 text-xs text-rose-700">
+                            {{ __('Last resize to :size failed: :msg', [
+                                'size' => $resizeState['target_size'] ?? '?',
+                                'msg' => $resizeState['error'] ?? __('unknown error'),
+                            ]) }}
+                        </p>
+                    @endif
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
                     <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
@@ -551,3 +581,113 @@
         </div>
     </div>
 </section>
+
+{{-- Resize confirm. Sizes come from ServerResizeOptions, which has already
+     dropped anything DigitalOcean would reject (wrong region, smaller disk). --}}
+<x-modal name="server-resize" :show="$showResizeModal" wire:model="showResizeModal" maxWidth="2xl">
+    <div class="p-6">
+        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Resize :name', ['name' => $server->name]) }}</h2>
+
+        @if ($resizeError !== null)
+            <p class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ $resizeError }}</p>
+        @endif
+
+        @if (is_array($resizeCatalog))
+            @php
+                $cur = $resizeCatalog['current'];
+                $opts = $resizeCatalog['options'];
+                $selected = collect($opts)->firstWhere('slug', $resizeTarget);
+            @endphp
+
+            <p class="mt-1 text-sm text-brand-moss">
+                {{ __('Currently :slug — :vcpu vCPU · :mem GB RAM in :region.', [
+                    'slug' => $cur['slug'] ?? '—',
+                    'vcpu' => $cur['vcpus'] ?? '—',
+                    'mem' => $cur['memory_mb'] ? round($cur['memory_mb'] / 1024, 1) : '—',
+                    'region' => $cur['region'] ?? '—',
+                ]) }}
+                @if ($cur['disk_gb'] !== null)
+                    {{ __('Disk :disk GB.', ['disk' => $cur['disk_gb']]) }}
+                @endif
+            </p>
+
+            @php $siteCount = $server->sites()->count(); @endphp
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                @if ($resizePowerCycles)
+                    {{ __('The server is powered off for the resize and started again afterwards.') }}
+                @else
+                    {{ __('The provider reboots this machine while it applies the new plan.') }}
+                @endif
+                @if ($siteCount > 0)
+                    <strong class="font-semibold">{{ trans_choice('{1}1 site on it goes offline.|[2,*]:count sites on it go offline.', $siteCount, ['count' => $siteCount]) }}</strong>
+                    {{ __('Owners and admins are emailed when it starts and when it finishes.') }}
+                @else
+                    {{ __('No sites are deployed on it.') }}
+                @endif
+            </div>
+
+            @if ($opts === [])
+                <p class="mt-4 text-sm text-brand-moss">{{ __('No other size is available for this server in :region.', ['region' => $cur['region'] ?? '—']) }}</p>
+            @else
+                <label class="mt-4 block">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('New size') }}</span>
+                    <select wire:model.live="resizeTarget" class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30">
+                        <option value="">{{ __('Choose a size…') }}</option>
+                        @foreach ($opts as $opt)
+                            @php
+                                $optLabel = sprintf(
+                                    '%s — %d vCPU · %s GB',
+                                    $opt['slug'],
+                                    $opt['vcpus'],
+                                    rtrim(rtrim(number_format($opt['memory_mb'] / 1024, 1), '0'), '.'),
+                                );
+                                if ($opt['disk_gb'] !== null) {
+                                    $optLabel .= ' · '.$opt['disk_gb'].' GB disk';
+                                }
+                                if ($opt['price_monthly'] !== null) {
+                                    $optLabel .= ' · $'.rtrim(rtrim(number_format($opt['price_monthly'], 2), '0'), '.').'/mo';
+                                }
+                                if ($opt['grows_disk']) {
+                                    $optLabel .= ' · '.__('grows disk, permanent');
+                                }
+                            @endphp
+                            <option value="{{ $opt['slug'] }}">{{ $optLabel }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                @if (is_array($selected) && $selected['grows_disk'])
+                    <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                        <strong class="font-semibold">{{ __('This permanently grows the disk.') }}</strong>
+                        {{ __('Going from :from GB to :to GB cannot be undone — DigitalOcean will refuse every later resize to a plan with a smaller disk.', [
+                            'from' => $cur['disk_gb'] ?? '—',
+                            'to' => $selected['disk_gb'],
+                        ]) }}
+                    </div>
+                @elseif (is_array($selected) && $cur['disk_gb'] !== null)
+                    <p class="mt-3 text-xs text-brand-moss">{{ __('CPU and RAM only — the disk stays at :disk GB, so this can be reversed later.', ['disk' => $cur['disk_gb']]) }}</p>
+                @elseif (is_array($selected))
+                    {{-- EC2: the root volume is a separate EBS resource and is untouched. --}}
+                    <p class="mt-3 text-xs text-brand-moss">{{ __('Instance type only — storage is a separate volume and is not changed, so this can be reversed later.') }}</p>
+                @endif
+            @endif
+        @endif
+
+        <div class="mt-6 flex justify-end gap-2">
+            <x-secondary-button type="button" wire:click="$set('showResizeModal', false)">{{ __('Cancel') }}</x-secondary-button>
+            {{-- Only offered once a legal target is actually selected: with no
+                 catalog (provider error) or no choice there is nothing to confirm. --}}
+            @if ($resizeTarget !== '')
+                <x-danger-button
+                    type="button"
+                    wire:click="resizeServer"
+                    wire:loading.attr="disabled"
+                    wire:target="resizeServer"
+                >
+                    {{ __('Power off and resize') }}
+                </x-danger-button>
+            @endif
+        </div>
+    </div>
+</x-modal>
+
