@@ -7,32 +7,32 @@
  */
 return [
     'enabled' => [
-        'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true), // https://www.digitalocean.com/
-        'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true), // https://www.digitalocean.com/products/functions/
-        'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
-        'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', true), // https://www.hetzner.com/cloud
-        'linode' => env('DPLY_SERVER_PROVIDER_LINODE', true), // https://www.linode.com/
-        'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', true), // https://www.vultr.com/
-        'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', true), // https://upcloud.com/
+        'digitalocean' => true, // https://www.digitalocean.com/
+        'digitalocean_functions' => true, // https://www.digitalocean.com/products/functions/
+        'digitalocean_kubernetes' => true, // https://www.digitalocean.com/products/kubernetes/
+        'hetzner' => true, // https://www.hetzner.com/cloud
+        'linode' => true, // https://www.linode.com/
+        'vultr' => true, // https://www.vultr.com/
+        'upcloud' => true, // https://upcloud.com/
 
-        'ovh' => env('DPLY_SERVER_PROVIDER_OVH', false), // https://www.ovhcloud.com/en/public-cloud/ — off for now; shown as coming soon
+        'ovh' => false, // https://www.ovhcloud.com/en/public-cloud/ — off for now; shown as coming soon
 
-        'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
-        'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
-        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/ — DNS + CDN (no compute)
-        'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', false), // https://www.gandi.net/
-        'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', false), // https://www.namecheap.com/
-        'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', false), // https://vercel.com/docs/projects/domains — DNS only
-        'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
-        'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', false), // GitHub Container Registry — image pull creds for Cloud apps
-        'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
-        'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // DNS only (Cloud DNS); compute removed
-        'azure' => env('DPLY_SERVER_PROVIDER_AZURE', true), // https://azure.microsoft.com/en-us/products/virtual-machines/
-        'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true), // Custom/manual server entry
+        'aws' => true, // https://aws.amazon.com/ec2/
+        'aws_app_runner' => false, // https://aws.amazon.com/apprunner/
+        'cloudflare' => true, // https://www.cloudflare.com/ — DNS + CDN (no compute)
+        'gandi' => false, // https://www.gandi.net/
+        'namecheap' => false, // https://www.namecheap.com/
+        'vercel_dns' => false, // https://vercel.com/docs/projects/domains — DNS only
+        'aws_lambda' => true, // https://aws.amazon.com/lambda/
+        'ghcr' => false, // GitHub Container Registry — image pull creds for Cloud apps
+        'aws_kubernetes' => true, // https://aws.amazon.com/eks/
+        'gcp' => false, // DNS only (Cloud DNS); compute removed
+        'azure' => true, // https://azure.microsoft.com/en-us/products/virtual-machines/
+        'custom' => true, // Custom/manual server entry
 
         /** Inventory-import sources (not compute targets). dply reads existing fleets to migrate them. */
-        'ploi' => env('DPLY_SERVER_PROVIDER_PLOI', false), // https://ploi.io/
-        'forge' => env('DPLY_SERVER_PROVIDER_FORGE', false), // https://forge.laravel.com/
+        'ploi' => false, // https://ploi.io/
+        'forge' => false, // https://forge.laravel.com/
 
     ],
 ];

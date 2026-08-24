@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'enabled' => filter_var(env('BUNDLE_PRODUCTS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    'enabled' => filter_var(false, FILTER_VALIDATE_BOOLEAN),
 
     // Days an org's bundle stays SUSPENDED (data frozen, reversible) before it is
     // hard-purged. A re-qualification inside this window resumes instantly.

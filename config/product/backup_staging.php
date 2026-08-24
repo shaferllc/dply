@@ -30,7 +30,7 @@ return [
         'endpoint' => env('BACKUP_STAGING_ENDPOINT'),
         'access_key' => env('BACKUP_STAGING_ACCESS_KEY'),
         'secret' => env('BACKUP_STAGING_SECRET'),
-        'use_path_style' => (bool) env('BACKUP_STAGING_PATH_STYLE', false),
+        'use_path_style' => (bool) false,
         'path' => env('BACKUP_STAGING_PATH', 'downloads'),
     ],
 

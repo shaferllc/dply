@@ -13,7 +13,7 @@
 return [
 
     'llm' => [
-        'enabled' => env('DPLY_AI_LLM_ENABLED', env('DPLY_OPS_COPILOT_LLM_ENABLED', false)),
+        'enabled' => env('DPLY_AI_LLM_ENABLED', false),
         // 'claude' (or 'claude-cli') routes completions through the local `claude` CLI
         // — no API key needed; anything else hits an OpenAI-compatible HTTP endpoint.
         'provider' => env('DPLY_AI_LLM_PROVIDER', env('DPLY_OPS_COPILOT_LLM_PROVIDER', 'openai')),
@@ -25,8 +25,8 @@ return [
     ],
 
     'features' => [
-        'shared_host' => env('DPLY_AI_SHARED_HOST_ENABLED', true),
-        'docs_ask' => env('DPLY_AI_DOCS_ASK_ENABLED', true),
+        'shared_host' => true,
+        'docs_ask' => true,
     ],
 
     'rate_limits' => [

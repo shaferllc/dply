@@ -77,28 +77,28 @@ return [
     */
     'provider' => [
         // exit: keep on; flagship MVP provider — flag exists for per-org pause / emergency cutoff
-        'digitalocean' => env('FEATURE_PROVIDER_DIGITALOCEAN', true),
+        'digitalocean' => true,
         // exit: keep on; full BYO compute + Cloud DNS — flag exists for per-org pause / emergency cutoff
-        'hetzner' => env('FEATURE_PROVIDER_HETZNER', true),
+        'hetzner' => true,
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
-        'aws' => env('FEATURE_PROVIDER_AWS', false),
+        'aws' => false,
         // exit: DNS only (Cloud DNS); compute removed — per-org rollout via Pennant
-        'gcp' => env('FEATURE_PROVIDER_GCP', false),
+        'gcp' => false,
         // exit: keep on; full BYO compute + Linode DNS Manager — flag for per-org pause / emergency cutoff
-        'linode' => env('FEATURE_PROVIDER_LINODE', true),
+        'linode' => true,
         // exit: full BYO compute + Vultr DNS — per-org rollout via Pennant
-        'vultr' => env('FEATURE_PROVIDER_VULTR', true),
+        'vultr' => true,
         // exit: full BYO compute + Azure DNS — per-org rollout via Pennant
-        'azure' => env('FEATURE_PROVIDER_AZURE', false),
+        'azure' => false,
         // exit: full BYO compute on OCI — per-org rollout via Pennant
-        'oracle' => env('FEATURE_PROVIDER_ORACLE', false),
+        'oracle' => false,
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
-        'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', false),
+        'upcloud' => false,
         // exit: dogfood with DPLY_SERVER_PROVIDER_AWS_APP_RUNNER=true + this flag; App Runner
         // web path is live (image + GitHub source via connection ARN). Workers/deploy-tasks stay DO-only.
-        'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
+        'aws_app_runner' => false,
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
-        'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', false),
+        'aws_eks' => false,
     ],
 
     /*
@@ -157,12 +157,12 @@ return [
         // Upstash serverless Redis in the site binding provision picker.
         // Off = visible Coming soon card (no connect fields). Flip per-org
         // from /admin/flags or set FEATURE_DATABASE_UPSTASH=true.
-        'upstash' => filter_var(env('FEATURE_DATABASE_UPSTASH', false), FILTER_VALIDATE_BOOLEAN),
+        'upstash' => filter_var(false, FILTER_VALIDATE_BOOLEAN),
         // BYO serverless Postgres vendors in the database binding picker.
         // Off = visible Coming soon card (no connect fields). APIs exist but
         // are not shipped until a live account run validates them.
-        'neon' => filter_var(env('FEATURE_DATABASE_NEON', false), FILTER_VALIDATE_BOOLEAN),
-        'supabase' => filter_var(env('FEATURE_DATABASE_SUPABASE', false), FILTER_VALIDATE_BOOLEAN),
+        'neon' => filter_var(false, FILTER_VALIDATE_BOOLEAN),
+        'supabase' => filter_var(false, FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*
@@ -170,8 +170,8 @@ return [
     | Livewire component under app/Livewire/Servers/Workspace*.php.
     */
     'workspace' => [
-        'site_promote' => env('FEATURE_WORKSPACE_SITE_PROMOTE', true),
-        'health' => env('FEATURE_WORKSPACE_HEALTH', true),
+        'site_promote' => true,
+        'health' => true,
         // Parked: OFF with no preview teaser, so the nav row is filtered out
         // entirely rather than showing a "Soon" badge. Both keys must stay
         // false — server_workspace_nav_for_server() keeps the row whenever
@@ -180,22 +180,22 @@ return [
         // config, so flipping one back is a code change and a code review.
         'server_blueprint' => false,
         'server_blueprint_preview' => false,
-        'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
-        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
-        'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
-        'patch_advisor' => env('FEATURE_WORKSPACE_PATCH_ADVISOR', true),
-        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', true),
-        'release_hygiene_preview' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE_PREVIEW', false),
-        'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
-        'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
-        'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
-        'ssh_access_graph_preview' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH_PREVIEW', false),
-        'ssh_sessions' => env('FEATURE_WORKSPACE_SSH_SESSIONS', true),
-        'server_cost' => env('FEATURE_WORKSPACE_SERVER_COST', true),
-        'bulk_site_actions' => env('FEATURE_WORKSPACE_BULK_SITE_ACTIONS', true),
-        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', true),
-        'security_digest_preview' => env('FEATURE_WORKSPACE_SECURITY_DIGEST_PREVIEW', false),
-        'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
+        'webserver_config_diff' => true,
+        'server_maintenance' => true,
+        'server_maintenance_preview' => true,
+        'patch_advisor' => true,
+        'release_hygiene' => true,
+        'release_hygiene_preview' => false,
+        'daemon_slo' => true,
+        'cert_inventory' => true,
+        'ssh_access_graph' => true,
+        'ssh_access_graph_preview' => false,
+        'ssh_sessions' => true,
+        'server_cost' => true,
+        'bulk_site_actions' => true,
+        'security_digest' => true,
+        'security_digest_preview' => false,
+        'cluster' => true,
         // Parked — see the server_blueprint note above.
         'console' => false,
         'console_preview' => false,
@@ -217,61 +217,61 @@ return [
         // `feature` key, so it could not be parked. Flag added + wired into
         // config/server_workspace.php.
         'edge_proxy' => false,
-        'services' => env('FEATURE_WORKSPACE_SERVICES', true),
-        'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', true),
-        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', true),
-        'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', false),
-        'caches' => env('FEATURE_WORKSPACE_CACHES', true),
+        'services' => true,
+        'system_users' => true,
+        'insights' => true,
+        'insights_preview' => false,
+        'caches' => true,
         'docker' => true,
         'docker_preview' => true,
-        // Parked with the rest of the Services tier — see config/features.php
-        // 'surface' block. The pages still exist behind the flag.
-        'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
-        'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
-        'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
+        // Parked with the rest of the Services tier — see the 'surface' block
+        // below. The pages still exist behind the flag.
+        'backups' => false,
+        'backups_preview' => false,
+        'schedule' => true,
         // Parked — see the server_blueprint note above.
         'run' => false,
         'run_preview' => false,
-        'shared_host' => env('FEATURE_WORKSPACE_SHARED_HOST', true),
-        'shared_host_preview' => env('FEATURE_WORKSPACE_SHARED_HOST_PREVIEW', true),
+        'shared_host' => true,
+        'shared_host_preview' => true,
 
-        'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
+        'ephemeral_credentials' => true,
         // GA: the CDN / Edge workspace is on by default. Like site_caching the
         // flag only reveals the surface — no site gets proxied until an
         // operator enables it there with a Cloudflare credential.
-        'site_cdn' => env('FEATURE_WORKSPACE_SITE_CDN', true),
-        'site_cdn_preview' => env('FEATURE_WORKSPACE_SITE_CDN_PREVIEW', false),
+        'site_cdn' => true,
+        'site_cdn_preview' => false,
         // GA: the Caching workspace is on by default. The flag only reveals the
         // surface — page caching stays off for every site until an operator
         // toggles it there, so shipping this changes no site's behaviour.
-        'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', true),
-        'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', false),
-        'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', true),
-        'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', false),
-        'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', true),
-        'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', false),
-        'site_backends' => env('FEATURE_WORKSPACE_SITE_BACKENDS', false),
-        'site_backends_preview' => env('FEATURE_WORKSPACE_SITE_BACKENDS_PREVIEW', false),
-        'site_notifications' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS', true),
-        'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', false),
-        'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', true),
-        'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', false),
-        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', true),
-        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', false),
-        'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', true),
-        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW'),
-        'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', true),
-        'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', false),
-        'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', true),
-        'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', false),
-        'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', true),
-        'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', false),
-        'site_redirects' => env('FEATURE_WORKSPACE_SITE_REDIRECTS', false),
-        'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', false),
-        'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', true),
-        'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', false),
-        'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', true),
-        'site_tenants_preview' => env('FEATURE_WORKSPACE_SITE_TENANTS_PREVIEW', false),
+        'site_caching' => true,
+        'site_caching_preview' => false,
+        'deploy_pipeline_visual' => true,
+        'deploy_pipeline_visual_preview' => false,
+        'site_logs' => true,
+        'site_logs_preview' => false,
+        'site_backends' => false,
+        'site_backends_preview' => false,
+        'site_notifications' => true,
+        'site_notifications_preview' => false,
+        'site_monitor' => true,
+        'site_monitor_preview' => false,
+        'site_errors' => true,
+        'site_errors_preview' => false,
+        'site_files' => true,
+        'site_files_preview' => false,
+        'site_cli' => true,
+        'site_cli_preview' => false,
+        'site_system_user' => true,
+        'site_system_user_preview' => false,
+        'site_aliases' => true,
+        'site_aliases_preview' => false,
+        'site_redirects' => false,
+        'site_redirects_preview' => false,
+        'site_preview' => true,
+        'site_preview_preview' => false,
+        'site_tenants' => true,
+        'site_tenants_preview' => false,
     ],
 
     /*
@@ -295,28 +295,29 @@ return [
         | products moved to their own app; managed databases rode on
         | surface.cloud and now carry their own flag.
         */
-        'databases' => env('FEATURE_SURFACE_DATABASES', true),
+        'databases' => true,
 
         // Creating a site on a BYO server from the CLI (`dply init --kind vm`).
         // Ordinary webserver hosts only — see App\Services\Sites\CreateVmSite.
-        'vm_cli_create' => env('FEATURE_SURFACE_VM_CLI_CREATE', true),
+        'vm_cli_create' => true,
 
-        'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
-        'projects' => env('FEATURE_SURFACE_PROJECTS', true),
-        'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
-        'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
+        'marketplace' => true,
+        'projects' => true,
+        'scripts' => true,
+        'status_pages' => true,
         // Parked for this version: the whole Services tier ships as "coming
         // soon" — nav entries fall to their coming-soon branch and the routes
-        // 404. Flip the env var (or this default) to bring one back.
-        'realtime' => env('FEATURE_SURFACE_REALTIME', false),
-        'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', true),
+        // 404. Unparking one is a code change and a code review, not an env
+        // var someone flips on a box at 2am.
+        'realtime' => false,
+        'managed_servers' => true,
         // dply Queue — the managed job queue. Default off: the control plane
         // exists but the data plane does not yet. Runtime dials and pricing
         // live in config/queue_service.php, per the layering rules above.
         // Exit criteria: SQS-compatible API verified against Laravel's stock
         // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
         // (docs/adr/dply-queue.md).
-        'queue' => env('FEATURE_SURFACE_QUEUE', false),
+        'queue' => false,
         // dply Cache — the managed cache. The shared tier's data plane is
         // live (DynamoDB-compatible endpoint over Postgres); the dedicated
         // tier and the Serverless fold-in are not. Runtime dials live in
@@ -325,7 +326,7 @@ return [
         // which gates cache ENGINES offered for install on BYO servers.
         // Exit criteria: /caches index + show, attach/detach, and the docs
         // page (docs/adr/dply-cache.md, M2).
-        'cache' => env('FEATURE_SURFACE_CACHE', false),
+        'cache' => false,
     ],
 
     /*
@@ -334,20 +335,20 @@ return [
     | directive with the same name (resolver handles null-scope).
     */
     'global' => [
-        'billing_enabled' => env('FEATURE_GLOBAL_BILLING_ENABLED', true),
-        'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', true),
+        'billing_enabled' => true,
+        'signups_open' => true,
 
         // Be careful with this flag.
-        'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
-        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
-        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
-        'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
+        'maintenance_mode' => false,
+        'byo_repo_config' => true,
+        'ai_llm' => false,
+        'vm_enabled' => true,
     ],
 
     'launch' => [
         // The full-stack wizard went with the Cloud and Edge products it planned
         // against — every plan it built ended in an `edge.create` handoff.
-        'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', true),
+        'standby_blueprint' => true,
     ],
 
 ];

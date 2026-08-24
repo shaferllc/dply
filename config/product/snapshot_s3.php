@@ -31,7 +31,7 @@ return [
 
     'secret' => env('DPLY_SNAPSHOT_S3_SECRET'),
 
-    'use_path_style_endpoint' => filter_var(env('DPLY_SNAPSHOT_S3_PATH_STYLE', false), FILTER_VALIDATE_BOOL),
+    'use_path_style_endpoint' => filter_var(false, FILTER_VALIDATE_BOOL),
 
     /*
     | Optional prefix prepended to every snapshot's S3 key. Useful for

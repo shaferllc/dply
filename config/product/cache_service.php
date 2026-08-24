@@ -35,7 +35,7 @@ return [
     |
     */
 
-    'enabled' => filter_var(env('DPLY_CACHE_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------

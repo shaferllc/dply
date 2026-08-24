@@ -168,6 +168,11 @@ if [[ "$RUN_MIGRATIONS" == "1" ]]; then
 fi
 
 say "Caching config, routes, views, events"
+# Clear before caching, always. A cached config.php/events.php that still names a
+# deleted class kills the app before Laravel can render its own error page — you
+# get Symfony's bare 500 and nothing in the log that points at the cache. Free on
+# a fresh release dir; the thing that saves a flat `git pull` checkout.
+( cd "$RELEASE" && php artisan optimize:clear )
 ( cd "$RELEASE" && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache )
 
 # ---------------------------------------------------------------------- swap --

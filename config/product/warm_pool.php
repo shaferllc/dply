@@ -15,7 +15,7 @@ return [
     | Idle warm servers cost money (platform cost, not customer-billed until
     | claimed), so keep buckets to genuinely hot combinations and small min/max.
     */
-    'enabled' => (bool) env('DPLY_WARM_POOL_ENABLED', false),
+    'enabled' => (bool) false,
 
     // The system organization that owns unclaimed warm servers. Resolved by the
     // autoscaler; create it once (ops) and set its id here.
@@ -65,7 +65,7 @@ return [
     | window wraps midnight when start > end (e.g. 22→6).
     */
     'off_hours' => [
-        'enabled' => (bool) env('DPLY_WARM_POOL_OFF_HOURS', false),
+        'enabled' => (bool) false,
         'start' => (int) env('DPLY_WARM_POOL_OFF_HOURS_START', 22),
         'end' => (int) env('DPLY_WARM_POOL_OFF_HOURS_END', 6),
         'min' => (int) env('DPLY_WARM_POOL_OFF_HOURS_MIN', 0),

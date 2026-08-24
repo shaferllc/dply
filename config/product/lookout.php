@@ -20,7 +20,7 @@ return [
     |
     */
 
-    'billing_enabled' => (bool) env('LOOKOUT_BILLING_ENABLED', false),
+    'billing_enabled' => (bool) false,
 
     'default_tier' => env('LOOKOUT_DEFAULT_TIER', 'starter'),
 

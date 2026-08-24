@@ -17,7 +17,7 @@ return [
     |
     */
     'install_method' => env('DPLY_CLI_INSTALL_METHOD', 'tarball'),
-    'npm_published' => filter_var(env('DPLY_CLI_NPM_PUBLISHED', false), FILTER_VALIDATE_BOOLEAN),
+    'npm_published' => filter_var(false, FILTER_VALIDATE_BOOLEAN),
     'npm_package' => env('DPLY_CLI_NPM_PACKAGE', '@dply/cli'),
 
     /*

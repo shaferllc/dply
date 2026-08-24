@@ -30,7 +30,7 @@ return [
     'postgres' => [
         'superuser' => env('SELF_MANAGE_PG_SUPERUSER', 'postgres'),
         'password' => env('SELF_MANAGE_PG_SUPERUSER_PASSWORD'),
-        'use_sudo' => (bool) env('SELF_MANAGE_PG_USE_SUDO', false),
+        'use_sudo' => (bool) false,
     ],
 
     // Which app DB connection IS the control-plane DB (defaults to the app default).
@@ -42,7 +42,7 @@ return [
      * Set use_templates=false once dply-sv-* from processes: owns the box.
      */
     'supervisor' => [
-        'use_templates' => filter_var(env('DPLY_SELF_SUPERVISOR_TEMPLATES', true), FILTER_VALIDATE_BOOLEAN),
+        'use_templates' => filter_var(true, FILTER_VALIDATE_BOOLEAN),
         'conf_d' => env('DPLY_SELF_SUPERVISOR_CONF_D', '/etc/supervisor/conf.d'),
         'install_as' => env('DPLY_SELF_SUPERVISOR_INSTALL_AS', 'dply-platform.conf'),
         'supervisord_conf' => env('DPLY_SELF_SUPERVISORD_CONF', '/etc/supervisor/supervisord.conf'),

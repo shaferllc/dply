@@ -86,7 +86,7 @@ return [
     | backoff up to MAX_AUTO_RETRY_ATTEMPTS. Default on — disable with
     | DPLY_AUTO_RETRY_ENABLED=false when iterating on the bash script locally.
     */
-    'auto_retry_enabled' => filter_var(env('DPLY_AUTO_RETRY_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'auto_retry_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -113,9 +113,9 @@ return [
     | Site URL health checks (HTTPS against primary domain)
     |--------------------------------------------------------------------------
     */
-    'site_health_check_enabled' => filter_var(env('DPLY_SITE_HEALTH_CHECK', true), FILTER_VALIDATE_BOOL),
+    'site_health_check_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
-    'deploy_notifications' => filter_var(env('DPLY_DEPLOY_NOTIFICATIONS', true), FILTER_VALIDATE_BOOL),
+    'deploy_notifications' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     // Queued notifications (UniversalEventNotification, deploy mail, …) —
     // Horizon supervisor-fast. Keep off dply / dply-provision so Edge builds
@@ -136,7 +136,7 @@ return [
     */
     'delete_remote_repository_on_site_delete' => true,
 
-    'delete_remote_certbot_certificate_on_site_delete' => filter_var(env('DPLY_DELETE_REMOTE_CERT_ON_SITE_DELETE', false), FILTER_VALIDATE_BOOL),
+    'delete_remote_certbot_certificate_on_site_delete' => filter_var(false, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -159,7 +159,7 @@ return [
     | When true, only organizations on an active Pro Stripe price may create
     | new tokens from Settings → API keys. Revoking still works.
     */
-    'api_tokens_require_paid_plan' => filter_var(env('DPLY_API_TOKENS_REQUIRE_PAID_PLAN', false), FILTER_VALIDATE_BOOL),
+    'api_tokens_require_paid_plan' => filter_var(false, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -232,7 +232,7 @@ return [
     | members with owner or admin roles (see DeleteServerAction and Livewire
     | server removal flows).
     */
-    'server_deletion_notify_org_admins' => filter_var(env('DPLY_SERVER_DELETION_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
+    'server_deletion_notify_org_admins' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -249,9 +249,9 @@ return [
     | have active programs and stores a snapshot in `servers.meta.supervisor_health`.
     | Org owners/admins can receive mail when managed programs look unhealthy.
     */
-    'supervisor_health_check_enabled' => filter_var(env('DPLY_SUPERVISOR_HEALTH_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'supervisor_health_check_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
-    'supervisor_health_notify_org_admins' => filter_var(env('DPLY_SUPERVISOR_HEALTH_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
+    'supervisor_health_notify_org_admins' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -262,7 +262,7 @@ return [
     | back-end pipelines (PR 5–6) and journey UI (PR 7) ship; flips on once
     | the pipeline is reliable end-to-end.
     */
-    'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'scaffold_v1_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -275,7 +275,7 @@ return [
     | wizard remains the fallback. VM hosts only for now — container/serverless
     | keep their dedicated create flows. See docs/CHOOSE_APP_FLOW.md.
     */
-    'choose_app_enabled' => filter_var(env('DPLY_CHOOSE_APP_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'choose_app_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -348,7 +348,7 @@ return [
             // of DigitalOcean compute (200c / $0.0000185), so an unmetered
             // managed function goes upside-down the moment it gets real
             // traffic. Set the env to false to stage the meter per environment.
-            'enabled' => filter_var(env('DPLY_SERVERLESS_USAGE_BILLING_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            'enabled' => filter_var(true, FILTER_VALIDATE_BOOLEAN),
             // Blanket margin on overage, aligned with edge/cloud_markup_percent.
             'markup_percent' => (int) env('DPLY_SERVERLESS_USAGE_MARKUP_PERCENT', 40),
             // Invocation meter — NOT provider compute (DO bills GiB-seconds
@@ -406,7 +406,7 @@ return [
 
 
     'local_workspace_prune' => [
-        'enabled' => filter_var(env('DPLY_LOCAL_WORKSPACE_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
         // Built artifact zips are byproducts once uploaded to the provider; keep
         // a short window for post-mortem on a failed deploy, then reclaim.
         'artifacts_max_age_hours' => max(1, (int) env('DPLY_LOCAL_ARTIFACTS_MAX_AGE_HOURS', 48)),
@@ -423,7 +423,7 @@ return [
     // age-deletes them; the age guard means a script for an in-flight or recently
     // backgrounded task is never touched, so this can't race a running deploy.
     'remote_task_runner_prune' => [
-        'enabled' => filter_var(env('DPLY_REMOTE_TASK_RUNNER_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
         'max_age_hours' => max(1, (int) env('DPLY_REMOTE_TASK_RUNNER_MAX_AGE_HOURS', 48)),
     ],
 

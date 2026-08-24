@@ -28,6 +28,15 @@ return new class extends Migration
 
     public function up(): void
     {
+        // The ledger lives on the DEFAULT connection; this table lives on
+        // 'dply_cache', which has its own lifecycle. Recreate the control-plane
+        // database — as the MySQL -> Postgres move did — and every migration is
+        // replayed against a 'dply_cache' that still has its tables. Idempotent
+        // create, so replaying is a no-op instead of a failed deploy.
+        if (Schema::connection(self::CONNECTION)->hasTable('dply_cache_items')) {
+            return;
+        }
+
         Schema::connection(self::CONNECTION)->create('dply_cache_items', function (Blueprint $table): void {
             $table->char('cache_id', 26);
 

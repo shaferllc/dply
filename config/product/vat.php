@@ -8,7 +8,7 @@
  */
 return [
 
-    'vies_enabled' => env('VAT_VIES_ENABLED', true),
+    'vies_enabled' => true,
 
     'vies_timeout_seconds' => (int) env('VAT_VIES_TIMEOUT', 8),
 

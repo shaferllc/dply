@@ -30,7 +30,7 @@ return [
     |
     */
 
-    'enabled' => filter_var(env('DPLY_QUEUE_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -179,7 +179,7 @@ return [
     */
 
     'billing' => [
-        'enabled' => filter_var(env('DPLY_QUEUE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'enabled' => filter_var(false, FILTER_VALIDATE_BOOL),
     ],
 
     /*

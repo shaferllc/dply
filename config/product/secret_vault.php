@@ -35,26 +35,26 @@ return [
         // Versioned + object-locked bucket in a SEPARATE cloud account.
         // Key names mirror DatabaseBackupS3ClientFactory so the S3 wiring is identical.
         'object' => [
-            'enabled' => (bool) env('SECRET_VAULT_OBJECT_ENABLED', false),
+            'enabled' => (bool) false,
             'bucket' => env('SECRET_VAULT_OBJECT_BUCKET'),
             'region' => env('SECRET_VAULT_OBJECT_REGION', 'us-east-1'),
             'endpoint' => env('SECRET_VAULT_OBJECT_ENDPOINT'),
             'access_key' => env('SECRET_VAULT_OBJECT_ACCESS_KEY'),
             'secret' => env('SECRET_VAULT_OBJECT_SECRET'),
-            'use_path_style' => (bool) env('SECRET_VAULT_OBJECT_PATH_STYLE', false),
+            'use_path_style' => (bool) false,
             'path' => env('SECRET_VAULT_OBJECT_PATH', ''),
         ],
         // Private ops git repo (ciphertext only). The bash side pushes via ssh;
         // PHP shells the same `git` against a working clone.
         'git' => [
-            'enabled' => (bool) env('SECRET_VAULT_GIT_ENABLED', false),
+            'enabled' => (bool) false,
             'repo' => env('SECRET_VAULT_GIT_REPO'),
             'branch' => env('SECRET_VAULT_GIT_BRANCH', 'main'),
             'work_dir' => env('SECRET_VAULT_GIT_WORKDIR', storage_path('app/secret-vault/git')),
         ],
         // 1Password documents via the `op` CLI (emergency human access).
         'onepassword' => [
-            'enabled' => (bool) env('SECRET_VAULT_OP_ENABLED', false),
+            'enabled' => (bool) false,
             'vault' => env('SECRET_VAULT_OP_VAULT'),
             'op_bin' => env('SECRET_VAULT_OP_BIN', 'op'),
         ],
@@ -137,7 +137,7 @@ return [
     // proves the canary decrypts. Connection must NOT be the live control-plane DB.
     'drill' => [
         // Only the isolated drill host sets this true (it alone has the identity).
-        'enabled' => (bool) env('SECRET_VAULT_DRILL_ENABLED', false),
+        'enabled' => (bool) false,
         'connection' => env('SECRET_VAULT_DRILL_CONNECTION', 'scratch'),
     ],
 ];
