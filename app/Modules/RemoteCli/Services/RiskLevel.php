@@ -6,9 +6,9 @@ namespace App\Modules\RemoteCli\Services;
 
 /**
  * Risk classification applied to every wp-cli / artisan command before
- * dispatch. Drives the permission gate (Q17): read + mutating-recoverable
- * are open to any org member; destructive requires admin/owner + an
- * explicit confirm-by-site-name modal.
+ * dispatch. Drives the permission gate (Q17): read requires site view;
+ * mutating-recoverable requires site update; destructive requires site
+ * update plus org admin/owner and an explicit confirm-by-site-name modal.
  *
  * Unknown commands default to {@see self::Destructive} as a failsafe.
  */
@@ -20,7 +20,7 @@ enum RiskLevel: string
     /**
      * Changes state but the change is straightforward to back out
      * (install a plugin → uninstall it; migrate forward → migrate
-     * back). Allowed for any member.
+     * back). Requires {@see \App\Policies\SitePolicy::update}.
      */
     case MutatingRecoverable = 'mutating_recoverable';
 

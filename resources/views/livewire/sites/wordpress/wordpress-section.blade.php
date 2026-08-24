@@ -61,6 +61,9 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
+                    @if (! $canMutate)
+                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your role can inspect this site. Mutating wp-cli (install, users, SQL) needs edit access. Secret values stay hidden.') }}</p>
+                    @endif
                 </div>
             </div>
 

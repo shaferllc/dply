@@ -10,13 +10,13 @@ use App\Models\User;
 /**
  * Two-tier permission gate for wp-cli / artisan invocations (Q17).
  *
- * - Read + MutatingRecoverable → any org member of the site's org.
- * - Destructive → admin or owner of the site's org.
+ * - Read → {@see SitePolicy::view} (inventory / keys-only inspect).
+ * - MutatingRecoverable → {@see SitePolicy::update}.
+ * - Destructive → site update plus org admin/owner.
  *
- * The gate is intentionally org-scoped (not site-scoped). Per-site
- * roles are deferred to v2; in v1 the assumption is that org membership
- * implies access to every site in that org. This matches how the rest
- * of the dply UI behaves today.
+ * Org membership is not site-update. Project viewers can view a
+ * workspace site but must not run mutating wp-cli (user create,
+ * plugin install, db query, …) or dump wp-config secrets unmasked.
  *
  * System-triggered runs (no user — e.g. scaffold pipeline applying a
  * hardening default) are always permitted; the audit log marks them
@@ -33,22 +33,24 @@ class RemoteCliPermissions
             return true;
         }
 
-        $org = $site->organization;
-        if ($org === null) {
-            // Site without an org — legacy data, treat as locked down.
-            // Read still allowed so dashboards don't blow up.
-            return $risk === RiskLevel::Read;
+        if (! $user->can('view', $site)) {
+            return false;
         }
 
-        if (! $org->hasMember($user)) {
+        if ($risk === RiskLevel::Read) {
+            return true;
+        }
+
+        if (! $user->can('update', $site)) {
             return false;
         }
 
         if ($risk === RiskLevel::Destructive) {
-            return $org->hasAdminAccess($user);
+            $org = $site->organization;
+
+            return $org !== null && $org->hasAdminAccess($user);
         }
 
-        // Read + MutatingRecoverable for any member.
         return true;
     }
 

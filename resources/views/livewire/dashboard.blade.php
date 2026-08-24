@@ -4,6 +4,8 @@
     $organizationName = $organization?->name ?? __('Your organization');
     $openFindings = (int) ($orgInsights['total_open'] ?? 0);
     $avgHealthScore = $orgInsights['avg_health_score'] ?? null;
+    $severityCounts = $orgInsights['open_by_severity'] ?? ['critical' => 0, 'warning' => 0, 'info' => 0];
+    $serversWithFindings = (int) ($orgInsights['servers_with_findings'] ?? 0);
 
     $primaryHref = route('servers.create');
     $primaryLabel = __('Add a server');
@@ -111,6 +113,21 @@
                     </div>
                 </div>
             @endunless
+
+            @if ($serverCount > 0)
+                {{-- Workspace-wide, and deliberately not reactive to the search
+                     chips below it: these four read the whole fleet. --}}
+                <x-fleet-signal-bar
+                    class="border-b border-brand-ink/10"
+                    :health-score="$avgHealthScore"
+                    :health-series="$healthSeries"
+                    :severity="$severityCounts"
+                    :total-open="$openFindings"
+                    :deploy-outcomes="$deployOutcomes"
+                    :server-count="$serverCount"
+                    :servers-with-findings="$serversWithFindings"
+                />
+            @endif
 
             @if ($serverCount === 0)
                 {{-- Nothing to tabulate yet: the page becomes the one thing to do. --}}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\RemoteCli\Jobs;
 
 use App\Models\RemoteCliRun;
+use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Modules\RemoteCli\Services\Artisan;
 use App\Modules\RemoteCli\Services\Kind;
@@ -107,7 +108,7 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
                     ? RemoteCliRun::STATUS_FAILED
                     : RemoteCliRun::STATUS_COMPLETED,
                 'exit_code' => $exitCode,
-                'stdout' => $stdout !== '' ? $stdout : null,
+                'stdout' => $this->nullablePersistedStdout($cli, $site, $run, $stdout),
                 'stderr' => $stderr !== '' ? $stderr : null,
                 'finished_at' => now(),
             ])->save();
@@ -123,7 +124,7 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
             $run->fill([
                 'status' => RemoteCliRun::STATUS_FAILED,
                 'stderr' => trim(($stderr !== '' ? $stderr."\n" : '').$e->getMessage()),
-                'stdout' => $stdout !== '' ? $stdout : null,
+                'stdout' => $this->nullablePersistedStdout($cli, $site, $run, $stdout),
                 'finished_at' => now(),
             ])->save();
         }
@@ -156,5 +157,22 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
             Kind::Wp => app(WpCli::class),
             Kind::Artisan => app(Artisan::class),
         };
+    }
+
+    private function nullablePersistedStdout(RemoteCli $cli, Site $site, RemoteCliRun $run, string $stdout): ?string
+    {
+        if ($stdout === '') {
+            return null;
+        }
+
+        $redacted = $cli->persistableStdout(
+            $site,
+            $run->queuedByUser,
+            $run->command,
+            $run->args ?? [],
+            $stdout,
+        );
+
+        return $redacted !== '' ? $redacted : null;
     }
 }

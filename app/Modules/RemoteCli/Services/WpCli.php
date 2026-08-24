@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\RemoteCli\Services;
 
 use App\Models\Site;
+use App\Models\User;
 
 /**
  * wp-cli adapter on top of {@see RemoteCli}.
@@ -70,14 +71,14 @@ class WpCli extends RemoteCli
             'theme list', 'theme status', 'theme get',
             'cron event list', 'cron schedule list', 'cron test',
             'core version', 'core check-update', 'core verify-checksums',
-            'db check', 'db size', 'db tables', 'db columns', 'db query',
+            'db check', 'db size', 'db tables', 'db columns',
             'user list', 'user get',
             'config get', 'config list',
             'menu list', 'role list', 'cap list',
             'language core list', 'language plugin list', 'language theme list',
             'site list',
             'maintenance-mode status',
-            'export', 'transient list',
+            'transient list',
         ];
         foreach ($reads as $read) {
             if ($command === $read || str_starts_with($command, $read.' ')) {
@@ -93,6 +94,8 @@ class WpCli extends RemoteCli
             'cron event run', 'cron event schedule', 'cron event delete',
             'option add', 'option update', 'option patch',
             'transient set', 'transient delete',
+            'db query',
+            'export',
             'user create', 'user update', 'user set-role', 'user add-role', 'user remove-role',
             'user meta add', 'user meta update',
             'menu create', 'menu item add-post', 'menu item add-custom', 'menu item add-term',
@@ -117,6 +120,64 @@ class WpCli extends RemoteCli
     public function kind(): Kind
     {
         return Kind::Wp;
+    }
+
+    /**
+     * Viewers may run Read commands, but wp-config / option values stay
+     * keys-only or masked. Editors and system runs see the raw stdout.
+     *
+     * @param  list<string>  $args
+     */
+    public function redactStdoutForViewer(Site $site, ?User $user, string $command, array $args, string $stdout): string
+    {
+        if ($user === null || $user->can('update', $site) || $stdout === '') {
+            return $stdout;
+        }
+
+        return $this->maskSecretReadStdout($command, $stdout);
+    }
+
+    private function maskSecretReadStdout(string $command, string $stdout): string
+    {
+        $command = trim($command);
+
+        foreach (['config get', 'option get'] as $verb) {
+            if ($command === $verb || str_starts_with($command, $verb.' ')) {
+                return '********';
+            }
+        }
+
+        foreach (['config list', 'option list'] as $verb) {
+            if ($command === $verb || str_starts_with($command, $verb.' ')) {
+                return $this->keysOnlyListStdout($stdout);
+            }
+        }
+
+        return $stdout;
+    }
+
+    private function keysOnlyListStdout(string $stdout): string
+    {
+        $decoded = json_decode(trim($stdout), true);
+        if (! is_array($decoded)) {
+            return __('Values hidden for your role.');
+        }
+
+        $keys = [];
+        foreach ($decoded as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $name = $row['name'] ?? $row['option_name'] ?? $row['key'] ?? null;
+            if (is_string($name) && $name !== '') {
+                $keys[] = ['name' => $name];
+            }
+        }
+
+        $encoded = json_encode($keys, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return is_string($encoded) ? $encoded : __('Values hidden for your role.');
     }
 
     /**

@@ -6,7 +6,9 @@ use App\Models\InsightFinding;
 use App\Models\InsightHealthSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class OrganizationInsightsMetricsService
 {
@@ -31,6 +33,7 @@ class OrganizationInsightsMetricsService
                 'total_open' => 0,
                 'avg_health_score' => null,
                 'worst_servers' => [],
+                'servers_with_findings' => 0,
             ];
         }
 
@@ -59,6 +62,11 @@ class OrganizationInsightsMetricsService
             'total_open' => $totalOpen,
             'avg_health_score' => $avgHealth,
             'worst_servers' => $worstServers,
+            // Derived from the rollup already in hand — no extra query. Counts
+            // servers, where total_open counts findings. Server-scoped like the
+            // /servers badge, so it will not tally against total_open, which
+            // also includes per-site findings.
+            'servers_with_findings' => $perServer->filter(fn (array $row): bool => $row['open'] > 0)->count(),
         ];
     }
 
@@ -176,6 +184,44 @@ class OrganizationInsightsMetricsService
             ->orderBy('server_id')
             ->orderByDesc('captured_at')
             ->pluck('score', 'server_id');
+    }
+
+    /**
+     * Fleet-average health per day, oldest first, for the dashboard sparkline.
+     *
+     * Deliberately the most recent $days *days that have snapshots*, not the
+     * last $days calendar days: capture stops when an organization is paused or
+     * its agents disconnect, so a calendar window silently renders an empty
+     * chart on exactly the workspaces most worth looking at. Trading an
+     * even x-axis for a line that still says something.
+     *
+     * @param  Collection<int, string>  $serverIds
+     * @return Collection<int, array{day: Carbon, score: float}>
+     */
+    public function dailyHealthSeries(Collection $serverIds, int $days = 30): Collection
+    {
+        if ($serverIds->isEmpty()) {
+            return collect();
+        }
+
+        // Query builder, not Eloquent: this is a grouped aggregate, so there is
+        // no model to hydrate and the aliases are not columns on one.
+        $rows = DB::table((new InsightHealthSnapshot)->getTable())
+            ->whereIn('server_id', $serverIds)
+            ->whereNotNull('captured_at')
+            ->selectRaw('date(captured_at) as day, avg(score::numeric) as score')
+            ->groupBy('day')
+            ->orderByDesc('day')
+            ->limit($days)
+            ->get();
+
+        return collect($rows)
+            ->reverse()
+            ->values()
+            ->map(fn (object $row): array => [
+                'day' => Carbon::parse((string) $row->day),
+                'score' => round((float) $row->score, 1),
+            ]);
     }
 
     /**

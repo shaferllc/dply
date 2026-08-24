@@ -21,10 +21,11 @@ use Throwable;
  *   1. Risk classification — {@see classifyRisk()} consults the
  *      subclass's static lookup table; unknown commands fall through
  *      to {@see RiskLevel::Destructive} as the failsafe (Q17).
- *   2. Permission gate — {@see RemoteCliPermissions} consults the
- *      site's org RBAC. Read + MutatingRecoverable allowed for any
- *      member; Destructive requires admin/owner. System-triggered
- *      runs ($queuedBy === null) bypass the gate.
+ *   2. Permission gate — {@see RemoteCliPermissions} consults
+ *      {@see \App\Policies\SitePolicy}. Read requires view;
+ *      MutatingRecoverable requires update; Destructive requires
+ *      update plus org admin/owner. System-triggered runs
+ *      ($queuedBy === null) bypass the gate.
  *   3. Sync vs async routing — commands listed by {@see instantCommands()}
  *      run synchronously over {@see ExecuteRemoteTaskOnServer} with a
  *      tight timeout (5s); everything else dispatches a queued job.
@@ -175,7 +176,7 @@ abstract class RemoteCli
             $run->fill([
                 'status' => RemoteCliRun::STATUS_FAILED,
                 'stderr' => trim(($stderr !== '' ? $stderr."\n" : '').$e->getMessage()),
-                'stdout' => $stdout !== '' ? $stdout : null,
+                'stdout' => $this->nullablePersistedStdout($site, $queuedBy, $run, $stdout),
                 'finished_at' => now(),
             ])->save();
 
@@ -192,7 +193,7 @@ abstract class RemoteCli
                 ? RemoteCliRun::STATUS_FAILED
                 : RemoteCliRun::STATUS_COMPLETED,
             'exit_code' => $exitCode,
-            'stdout' => $stdout !== '' ? $stdout : null,
+            'stdout' => $this->nullablePersistedStdout($site, $queuedBy, $run, $stdout),
             'stderr' => $stderr !== '' ? $stderr : null,
             'finished_at' => now(),
         ])->save();
@@ -237,5 +238,39 @@ abstract class RemoteCli
         }
 
         return false;
+    }
+
+    /**
+     * Persist stdout after viewer redaction so secret-bearing Read
+     * commands never store wp-config / option values for a user who
+     * cannot update the site.
+     *
+     * @param  list<string>  $args
+     */
+    public function persistableStdout(Site $site, ?User $user, string $command, array $args, string $stdout): string
+    {
+        return $this->redactStdoutForViewer($site, $user, $command, $args, $stdout);
+    }
+
+    /**
+     * @param  list<string>  $args
+     */
+    public function redactStdoutForViewer(Site $site, ?User $user, string $command, array $args, string $stdout): string
+    {
+        return $stdout;
+    }
+
+    /**
+     * @return string|null
+     */
+    protected function nullablePersistedStdout(Site $site, ?User $user, RemoteCliRun $run, string $stdout): ?string
+    {
+        if ($stdout === '') {
+            return null;
+        }
+
+        $redacted = $this->persistableStdout($site, $user, $run->command, $run->args ?? [], $stdout);
+
+        return $redacted !== '' ? $redacted : null;
     }
 }

@@ -19,6 +19,7 @@ use App\Modules\Snapshots\Services\SnapshotService;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -30,9 +31,9 @@ use Livewire\Component;
  * placeholders gated on a v2 message until PR 10 fills them in.
  *
  * Permission checks delegate to {@see WpCli} via the underlying
- * {@see RemoteCliPermissions} gate (Q17), so
- * the same risk classification that drives the API layer also drives
- * the UI's enable/disable state.
+ * {@see RemoteCliPermissions} gate (Q17), which uses
+ * {@see \App\Policies\SitePolicy} (view for Read, update for
+ * anything else). Org membership is not treated as site-update.
  */
 class WordPressSection extends Component
 {
@@ -50,6 +51,7 @@ class WordPressSection extends Component
     public string $consoleArgs = '--format=table';
 
     /** Most recent run id rendered in the Console output panel. */
+    #[Locked]
     public ?int $latestRunId = null;
 
     /**
@@ -112,14 +114,14 @@ class WordPressSection extends Component
     public function render(): View
     {
         // The same risk classification that gates the WpCli service also
-        // drives the UI's enable/disable state, so a member never sees an
+        // drives the UI's enable/disable state, so a viewer never sees an
         // action button that the backend would reject.
         $permissions = app(RemoteCliPermissions::class);
         $user = auth()->user();
 
         return view('livewire.sites.wordpress.wordpress-section', [
             'history' => $this->history(),
-            'latestRun' => $this->latestRunId !== null ? RemoteCliRun::query()->find($this->latestRunId) : null,
+            'latestRun' => $this->visibleLatestRun(),
             'snapshots' => $this->snapshots(),
             'canMutate' => $permissions->can($user, $this->site, RiskLevel::MutatingRecoverable),
             'canDestroy' => $permissions->can($user, $this->site, RiskLevel::Destructive),
@@ -141,6 +143,10 @@ class WordPressSection extends Component
         }
 
         $args = $this->consoleArgs !== '' ? preg_split('/\s+/', trim($this->consoleArgs)) : [];
+
+        if ($wpcli->classifyRisk($command) !== RiskLevel::Read) {
+            $this->authorize('update', $this->site);
+        }
 
         try {
             $result = $wpcli->run(
@@ -172,6 +178,8 @@ class WordPressSection extends Component
      */
     public function switchToSystemCron(WpCli $wpcli): void
     {
+        $this->authorize('update', $this->site);
+
         try {
             $wpcli->run(
                 site: $this->site,
@@ -254,6 +262,8 @@ class WordPressSection extends Component
      */
     public function updateAllPlugins(WpCli $wpcli): void
     {
+        $this->authorize('update', $this->site);
+
         try {
             $wpcli->run(
                 site: $this->site,
@@ -271,9 +281,9 @@ class WordPressSection extends Component
     }
 
     /**
-     * Per-row plugin lifecycle actions (mutating-recoverable — any org
-     * member). These queue async, so the table reflects the change after
-     * a Refresh rather than instantly; the toast says as much.
+     * Per-row plugin lifecycle actions (mutating-recoverable — requires
+     * site update). These queue async, so the table reflects the change
+     * after a Refresh rather than instantly; the toast says as much.
      */
     public function activatePlugin(string $slug, WpCli $wpcli): void
     {
@@ -292,8 +302,8 @@ class WordPressSection extends Component
 
     /**
      * Install a plugin by wp.org slug and activate it in one step
-     * (mutating-recoverable — any org member). The slug box is cleared
-     * on dispatch so the operator gets a clean field back.
+     * (mutating-recoverable — requires site update). The slug box is
+     * cleared on dispatch so the operator gets a clean field back.
      */
     public function installPlugin(WpCli $wpcli): void
     {
@@ -499,6 +509,8 @@ class WordPressSection extends Component
      */
     private function runWpAction(WpCli $wpcli, string $command, ?string $slug, string $errorBag, array $extraArgs = []): void
     {
+        $this->authorize('update', $this->site);
+
         $args = [];
         if ($slug !== null) {
             if (! $this->isValidSlug($slug)) {
@@ -703,6 +715,42 @@ class WordPressSection extends Component
             ->orderByDesc('created_at')
             ->limit(25)
             ->get();
+    }
+
+    /**
+     * Console output for the run this request created. Viewers cannot
+     * point {@see $latestRunId} at another row (Locked), and secret
+     * Read stdout is masked even if an older unredacted row is shown.
+     */
+    private function visibleLatestRun(): ?RemoteCliRun
+    {
+        if ($this->latestRunId === null) {
+            return null;
+        }
+
+        $run = RemoteCliRun::query()
+            ->where('site_id', $this->site->id)
+            ->where('kind', Kind::Wp)
+            ->find($this->latestRunId);
+
+        if ($run === null || ! is_string($run->stdout) || $run->stdout === '') {
+            return $run;
+        }
+
+        $user = auth()->user();
+        if ($user === null || $user->can('update', $this->site)) {
+            return $run;
+        }
+
+        $run->stdout = app(WpCli::class)->redactStdoutForViewer(
+            $this->site,
+            $user,
+            $run->command,
+            $run->args ?? [],
+            $run->stdout,
+        );
+
+        return $run;
     }
 
     /**

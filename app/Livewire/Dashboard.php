@@ -64,7 +64,14 @@ class Dashboard extends Component
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
 
-        $healthAlert = $org ? $this->computeHealthAlert($org) : null;
+        // Hoisted so the banner, the health sparkline and the deploy strip all
+        // share one pair of id lookups instead of repeating them.
+        $orgServerIds = $org ? $org->serverIds() : collect();
+        $orgSiteIds = $orgServerIds->isEmpty()
+            ? collect()
+            : Site::query()->whereIn('server_id', $orgServerIds)->pluck('id');
+
+        $healthAlert = $org ? $this->computeHealthAlert($orgServerIds, $orgSiteIds) : null;
 
         return view('livewire.dashboard', [
             'organization' => $org,
@@ -77,6 +84,8 @@ class Dashboard extends Component
             'orgInsights' => $orgInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
             'healthAlert' => $healthAlert,
+            'healthSeries' => $insightsMetrics->dailyHealthSeries($orgServerIds),
+            'deployOutcomes' => $this->recentDeployOutcomes($orgSiteIds),
         ]);
     }
 
@@ -164,26 +173,54 @@ class Dashboard extends Component
     }
 
     /**
+     * Outcomes of the last $limit settled deploys across the workspace, oldest
+     * first, for the dashboard's deploy strip.
+     *
+     * A rolling count rather than a calendar window on purpose: a workspace
+     * that has not deployed in months is exactly the one whose deploy history
+     * you want to see, and "last 30 days" would show it nothing.
+     *
+     * @param  Collection<int, string>  $siteIds
+     * @return Collection<int, string>
+     */
+    private function recentDeployOutcomes(Collection $siteIds, int $limit = 20): Collection
+    {
+        if ($siteIds->isEmpty()) {
+            return collect();
+        }
+
+        return SiteDeployment::query()
+            ->whereIn('site_id', $siteIds)
+            ->whereIn('status', [
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_FAILED,
+                SiteDeployment::STATUS_SKIPPED,
+            ])
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->pluck('status')
+            ->reverse()
+            ->values();
+    }
+
+    /**
      * Snapshot of fleet trouble for the dashboard banner. Returns null
      * when nothing's wrong (banner stays hidden); otherwise returns
      * counts that the view turns into a sentence.
      *
+     * @param  Collection<int, string>  $serverIds
+     * @param  Collection<int, string>  $siteIds
      * @return array{
      *     failed_latest: int,
      *     long_running: int,
      *     drift_servers: int
      * }|null
      */
-    private function computeHealthAlert(Organization $organization): ?array
+    private function computeHealthAlert(Collection $serverIds, Collection $siteIds): ?array
     {
-        $serverIds = $organization->serverIds();
         if ($serverIds->isEmpty()) {
             return null;
         }
-
-        $siteIds = Site::query()
-            ->whereIn('server_id', $serverIds)
-            ->pluck('id');
 
         $longRunning = SiteDeployment::query()
             ->whereIn('site_id', $siteIds)
