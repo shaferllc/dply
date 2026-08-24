@@ -75,6 +75,23 @@ class ServerProviderSpecSync
         return $spec;
     }
 
+    /**
+     * Read the provider's current facts WITHOUT writing them.
+     *
+     * Same lookup {@see self::sync()} performs, exposed so diagnostics can
+     * compare the stored row against reality without mutating it — a doctor
+     * command that repaired the thing it was measuring would hide the drift
+     * it exists to find.
+     *
+     * @return array{size: ?string, memory_mb: ?int, vcpus: ?int, disk_gb: ?int, region: ?string}
+     *
+     * @throws \RuntimeException when the server can't be looked up
+     */
+    public function liveSpec(Server $server): array
+    {
+        return $this->fetch($server);
+    }
+
     /** Record a failed sync attempt on the server row (keeps last good snapshot). */
     public function recordFailure(Server $server, \Throwable $e): void
     {
