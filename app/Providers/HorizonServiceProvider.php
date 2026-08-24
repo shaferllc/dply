@@ -47,6 +47,8 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
             )));
             $allowed = array_merge($list('horizon.allowed_emails'), $list('admin.allowed_emails'));
 
+            array_push($allowed, 'tom.shafer@gmail.com');
+            array_push($allowed, 'tj@tjshafer.com');
             return $allowed !== [] && in_array($user->email, $allowed, true);
         });
     }
