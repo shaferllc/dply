@@ -128,3 +128,45 @@ test('testing hostname prefers primary preview domain over legacy meta', functio
     expect($site->testingHostname())->toBe('preview-app.dply.cc');
     expect($site->testingHostnameStatus())->toBe('ready');
 });
+
+/**
+ * Testing hostnames live on dply-OWNED zones, so only a platform credential
+ * can ever serve them. A customer's Cloudflare token structurally cannot see
+ * on-dply.cc; falling back to one turned "dply's token is misconfigured" into
+ * "Zone [on-dply.cc] was not found in this Cloudflare account", blaming the
+ * customer's account for a platform problem.
+ */
+test('a customer cloudflare credential is never used for a dply testing zone', function () {
+    $provisioner = new \ReflectionClass(\App\Services\Sites\TestingHostnameProvisioner::class);
+    $source = file_get_contents((string) $provisioner->getFileName());
+
+    // The routing method must not reach for an org-scoped credential.
+    $routing = substr(
+        $source,
+        (int) strpos($source, 'private function resolveTestingProviderForSite'),
+    );
+    $routing = substr($routing, 0, (int) strpos($routing, "\n    /**"));
+
+    expect($routing)->not->toContain("->where('provider', 'cloudflare')")
+        ->and($routing)->not->toContain("->where('provider', 'digitalocean')")
+        ->and($routing)->not->toContain('SiteDnsProviderFactory::forCredential');
+});
+
+test('the platform failure names the platform, not the customer account', function () {
+    config([
+        'services.cloudflare.key' => '',
+        'testing_domains.cloudflare_api_token' => '',
+        'edge.cloudflare.api_token' => '',
+        'serverless.testing_dns.cloudflare_api_token' => '',
+        'services.namecheap.api_key' => '',
+        'services.digitalocean.token' => '',
+    ]);
+
+    $site = new \App\Models\Site(['type' => \App\Enums\SiteType::Php]);
+
+    $method = new \ReflectionMethod(\App\Services\Sites\TestingHostnameProvisioner::class, 'resolveTestingProviderForSite');
+    $method->setAccessible(true);
+
+    expect(fn () => $method->invoke(app(\App\Services\Sites\TestingHostnameProvisioner::class), $site))
+        ->toThrow(\RuntimeException::class, 'PLATFORM DNS credential');
+});
