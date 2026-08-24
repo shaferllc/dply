@@ -183,7 +183,6 @@ class VultrControlPlaneProvisionCommand extends Command
                 'env_sync' => 'deploy/ENV_SYNC.md',
                 'next' => [
                     'php artisan dply:vultr:control-plane:bootstrap --execute',
-                    'On workers after app deploy: dply:edge:ensure-build-docker',
                     'Run dply:vultr:control-plane:cutover --checklist',
                 ],
             ],
