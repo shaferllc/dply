@@ -185,6 +185,10 @@
             </x-server-workspace-tablist>
         @endif
 
+        {{-- In-flight resize: visible from every tab, because the machine being
+             offline affects whatever the operator is currently looking at. --}}
+        <x-server-resize-journey :server="$server" />
+
         {{ $slot }}
     </div>
 

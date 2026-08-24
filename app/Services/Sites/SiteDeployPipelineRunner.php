@@ -72,6 +72,72 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /**
+     * Detached, drain-aware Horizon restart — the only safe way to bounce
+     * Horizon from a deploy that Horizon itself is running.
+     *
+     * Terminating inline makes the master exit and systemd (KillMode=mixed)
+     * reap the cgroup, SIGKILLing every in-flight deploy worker: this deploy
+     * and any concurrent customer deploy. setsid detaches from both the SSH
+     * session and the Horizon cgroup so the restarter survives what it triggers.
+     *
+     * Falls back to an inline terminate only when the drain command is not on
+     * the box yet — the deploy that first ships it is still running old code.
+     *
+     * @see \App\Console\Commands\SelfHorizonRestartCommand
+     */
+    protected function selfDeployHorizonRestartShell(): string
+    {
+        return 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
+            .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
+            .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
+            .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
+            .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
+            .'php artisan horizon:terminate 2>&1 || true; '
+            .'fi';
+    }
+
+    /**
+     * Apply the self-deploy Horizon guard to a USER-authored pipeline command.
+     *
+     * dply's own managed restart has been guarded for a while, but an operator
+     * who types `php artisan horizon:terminate` into a site's Restart block
+     * bypassed all of it and silently re-armed the footgun: on a self-deploy
+     * that command kills the worker mid-deploy, and whether the deploy is
+     * recorded as success or failure becomes a race against the shutdown
+     * grace period. That shows up as an intermittent, unexplained
+     * "Deploy failed during the restart phase".
+     *
+     * A command that is EXACTLY a horizon:terminate call is rewritten to the
+     * detached restart. A compound command that merely contains one is left
+     * alone and warned about — silently rewriting half of someone's `&&` chain
+     * would be a worse surprise than the one being fixed.
+     */
+    protected function guardSelfDeployHorizonTerminate(Site $site, string $cmd, string &$log): string
+    {
+        if (! str_contains($cmd, 'horizon:terminate')) {
+            return $cmd;
+        }
+
+        $server = $site->server;
+        if ($server === null || ! $server->isLocalDeployHost()) {
+            return $cmd;
+        }
+
+        if (preg_match('/^\s*(?:php\s+)?artisan\s+horizon:terminate\s*$/', $cmd) === 1) {
+            $log .= "[dply] self-deploy: rewrote `horizon:terminate` to the detached drain-aware restart "
+                ."(terminating inline would SIGKILL this deploy).\n";
+
+            return $this->selfDeployHorizonRestartShell();
+        }
+
+        $log .= "[dply] WARNING: this restart command calls horizon:terminate on the box running the deploy. "
+            ."It can SIGKILL the deploy mid-flight. Remove it (dply restarts Horizon itself) or run it detached "
+            ."via `dply:self-horizon-restart`.\n";
+
+        return $cmd;
+    }
+
     public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RESTART);
@@ -141,15 +207,7 @@ class SiteDeployPipelineRunner
                 // deploy job (and any concurrent one) — it runs on the Horizon we'd
                 // bounce. Hand the restart to a DETACHED drain-aware command that
                 // waits for in-flight deploys to finish first, then terminates.
-                // Falls back to the inline terminate only if the command isn't on
-                // the box yet (the deploy that first ships it still runs old code).
-                $parts[] = 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
-                    .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
-                    .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
-                    .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
-                    .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
-                    .'php artisan horizon:terminate 2>&1 || true; '
-                    .'fi';
+                $parts[] = $this->selfDeployHorizonRestartShell();
             } else {
                 // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
                 $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
@@ -290,6 +348,9 @@ class SiteDeployPipelineRunner
             $emitProgress($idx);
 
             $cmd = $this->resolveShellCommand($step);
+            if ($cmd !== null && $cmd !== '') {
+                $cmd = $this->guardSelfDeployHorizonTerminate($site, $cmd, $log);
+            }
             if ($cmd === null || $cmd === '') {
                 // A step with no resolvable command (e.g. an empty custom
                 // step) is a no-op — record it as skipped so the timeline
