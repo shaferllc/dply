@@ -228,6 +228,27 @@
                     <x-backups-subnav active="files" />
                 </x-slot:tabs>
 
+                {{-- Coverage: same grid as Databases, same question about a
+                     different artifact. Edge and serverless sites have no
+                     filesystem to tar, so they read n/a rather than as gaps. --}}
+                @if ($coverageChecks !== [])
+                    <x-backups-coverage-grid
+                        :rows="$coverageChecks"
+                        :entity-label="__('Site')"
+                        :columns="[
+                            'schedule' => __('Schedule'),
+                            'archive' => __('Last archive'),
+                            'offsite' => __('Off-box copy'),
+                            'retrievable' => __('Retrievable'),
+                        ]"
+                        :note="__(':covered of :total checks passing across :count sites.', [
+                            'covered' => collect($coverageChecks)->sum('covered'),
+                            'total' => collect($coverageChecks)->sum('applicable'),
+                            'count' => count($coverageChecks),
+                        ])"
+                    />
+                @endif
+
                 {{-- One row per site with the schedule protecting it folded in.
                      Until now this tab showed no schedules at all, so a file
                      schedule set up in a server workspace was invisible here even
@@ -293,7 +314,7 @@
                                     wire:key="file-backup-{{ $site->id }}"
                                     @class([
                                         'group grid gap-x-4 gap-y-3 border-l-[3px] px-3 py-3 transition-colors hover:bg-brand-sand/15 sm:px-4',
-                                        'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto_auto] lg:items-center',
+                                        'lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,11rem)_auto_auto] lg:items-center',
                                         'border-brand-rust' => $lastRunFailed,
                                         'border-brand-sage' => ! $lastRunFailed && $schedule?->is_active,
                                         'border-brand-gold' => ! $lastRunFailed && $schedule && ! $schedule->is_active,
@@ -398,31 +419,19 @@
                                         @endif
                                     </div>
 
-                                    {{-- Last archive + where it landed --}}
+                                    {{-- Restore readiness. The coverage grid above owns
+                                         when the archive ran and where it landed; an
+                                         archive with no runbook is half a recovery plan,
+                                         and nothing else on the page says so. --}}
                                     <div class="min-w-0 text-xs">
-                                        @if ($latest)
-                                            <p class="truncate text-brand-ink">
-                                                <span @class([
-                                                    'font-medium',
-                                                    'text-brand-rust' => $latest->status === \App\Modules\Backups\Models\SiteFileBackup::STATUS_FAILED,
-                                                ])>{{ $latest->created_at->diffForHumans(short: true) }}</span>
-                                                @if ($latest->bytes)
-                                                    <span class="font-mono tabular-nums text-brand-moss">· {{ \Illuminate\Support\Number::fileSize((int) $latest->bytes) }}</span>
-                                                @endif
-                                            </p>
-                                            <p class="mt-0.5 truncate text-brand-mist">
-                                                {{ \Illuminate\Support\Str::of($latest->status)->replace('_', ' ')->title() }}
-                                                {{-- Restore readiness belongs next to the artifact: an
-                                                     archive with no runbook is half a recovery plan. --}}
-                                                · {{ $runbookCount > 0
-                                                    ? trans_choice(':count runbook|:count runbooks', $runbookCount, ['count' => $runbookCount])
-                                                    : __('no runbook') }}
-                                            </p>
-                                        @elseif ($archivable)
-                                            <p class="text-brand-mist">{{ __('Never archived') }}</p>
-                                            <p class="mt-0.5 truncate text-brand-mist">
+                                        @if ($archivable)
+                                            <p @class([
+                                                'truncate',
+                                                'text-brand-moss' => $runbookCount > 0,
+                                                'text-brand-mist' => $runbookCount === 0,
+                                            ])>
                                                 {{ $runbookCount > 0
-                                                    ? trans_choice(':count runbook|:count runbooks', $runbookCount, ['count' => $runbookCount])
+                                                    ? trans_choice(':count restore runbook|:count restore runbooks', $runbookCount, ['count' => $runbookCount])
                                                     : __('No restore runbook') }}
                                             </p>
                                         @else

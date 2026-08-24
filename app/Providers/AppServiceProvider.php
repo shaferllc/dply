@@ -153,6 +153,7 @@ use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
 use Livewire\Blaze\Blaze;
 use Livewire\Livewire;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -345,6 +346,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A parked surface is not a malformed request. Pennant's middleware
+        // aborts 400 by default, which tells a visitor they sent something
+        // wrong; config/features.php has always documented these routes as
+        // 404ing, and a product that is not shipping yet should simply not be
+        // there. One responder covers every `feature:` route.
+        EnsureFeaturesAreActive::whenInactive(fn () => abort(404));
+
         Blaze::optimize()
             ->in(resource_path('views/components/spinner.blade.php'), memo: true)
             ->in(resource_path('views/components/application-logo.blade.php'), memo: true)

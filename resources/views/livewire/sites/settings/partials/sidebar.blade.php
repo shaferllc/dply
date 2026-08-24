@@ -209,21 +209,13 @@
                                 'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
                                 default => ['server' => $server, 'site' => $site],
                             };
-                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
-                                $item['route'],
-                                $site,
-                                $routeArgs + ($item['route_query'] ?? []),
-                            ) ?? route($item['route'], $routeArgs + ($item['route_query'] ?? []));
+                            $href = route($item['route'], $routeArgs + ($item['route_query'] ?? []));
                         } else {
                             $sectionQuery = array_merge(
                                 $item['id'] === 'routing' ? ['tab' => $routingTab] : [],
                                 $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : [],
                             );
-                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
-                                'sites.show',
-                                $site,
-                                ['section' => $item['id']] + $sectionQuery,
-                            ) ?? route('sites.show', array_merge([
+                            $href = route('sites.show', array_merge([
                                 'server' => $server,
                                 'site' => $site,
                                 'section' => $item['id'],

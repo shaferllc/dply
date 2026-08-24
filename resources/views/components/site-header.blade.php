@@ -195,12 +195,21 @@
                                                     {{ __('Backups') }}
                                                 </x-coming-soon-dropdown-link>
                                             @endfeature
-                                            <x-dropdown-link :href="route('realtime.index')" :description="__('Pusher-compatible channels')">
-                                                <x-slot name="icon">
-                                                    <x-heroicon-o-signal class="{{ $hi }}" />
-                                                </x-slot>
-                                                {{ __('Realtime') }}
-                                            </x-dropdown-link>
+                                            @feature('surface.realtime')
+                                                <x-dropdown-link :href="route('realtime.index')" :description="__('Pusher-compatible channels')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-signal class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Realtime') }}
+                                                </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Pusher-compatible channels')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-signal class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Realtime') }}
+                                                </x-coming-soon-dropdown-link>
+                                            @endfeature
                                             @feature('surface.queue')
                                                 <x-dropdown-link :href="route('queues.index')" :description="__('Background jobs, no workers')">
                                                     <x-slot name="icon">
@@ -208,6 +217,13 @@
                                                     </x-slot>
                                                     {{ __('Queues') }}
                                                 </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Background jobs, no workers')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-queue-list class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Queues') }}
+                                                </x-coming-soon-dropdown-link>
                                             @endfeature
                                             @feature('surface.cache')
                                                 <x-dropdown-link :href="route('caches.index')" :description="__('Shared or dedicated Valkey')">
@@ -216,6 +232,13 @@
                                                     </x-slot>
                                                     {{ __('Caches') }}
                                                 </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Shared or dedicated Valkey')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Caches') }}
+                                                </x-coming-soon-dropdown-link>
                                             @endfeature
                                         </div>
 
@@ -442,12 +465,21 @@
                         {{ __('Backups') }}
                     </x-coming-soon-responsive-nav-link>
                 @endfeature
-                <x-responsive-nav-link :href="route('realtime.index')" :active="request()->routeIs('realtime.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-signal class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Realtime') }}
-                </x-responsive-nav-link>
+                @feature('surface.realtime')
+                    <x-responsive-nav-link :href="route('realtime.index')" :active="request()->routeIs('realtime.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-signal class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Realtime') }}
+                    </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-signal class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Realtime') }}
+                    </x-coming-soon-responsive-nav-link>
+                @endfeature
                 @feature('surface.queue')
                     <x-responsive-nav-link :href="route('queues.index')" :active="request()->routeIs('queues.*')">
                         <x-slot name="icon">
@@ -455,6 +487,13 @@
                         </x-slot>
                         {{ __('Queues') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-queue-list class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Queues') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 @feature('surface.cache')
                     <x-responsive-nav-link :href="route('caches.index')" :active="request()->routeIs('caches.*')">
@@ -463,6 +502,13 @@
                         </x-slot>
                         {{ __('Caches') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Caches') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>
                 <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">

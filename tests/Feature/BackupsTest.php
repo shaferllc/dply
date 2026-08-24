@@ -76,8 +76,7 @@ test('authenticated user can view the backups overview', function () {
     $this->actingAs($user)
         ->get(route('backups.overview'))
         ->assertOk()
-        ->assertSee('Backups', false)
-        ->assertSee(route('launches.create'), false);
+        ->assertSee('Backups', false);
 });
 
 test('authenticated user can view file backups page', function () {
@@ -87,7 +86,7 @@ test('authenticated user can view file backups page', function () {
         ->get(route('backups.files'))
         ->assertOk()
         ->assertSee('File backups', false)
-        ->assertSee(route('launches.create'), false);
+        ->assertSee(route('servers.create'), false);
 });
 
 test('backups livewire components render', function () {

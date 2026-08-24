@@ -208,6 +208,26 @@
                     <x-backups-subnav active="snapshots" />
                 </x-slot:tabs>
 
+                {{-- Coverage: same grid as the other tabs. Age is a check of
+                     its own — an image is only as good as the machine state it
+                     froze, so a stale one is not the same as a fresh one. --}}
+                @if ($coverageChecks !== [])
+                    <x-backups-coverage-grid
+                        :rows="$coverageChecks"
+                        :entity-label="__('Server')"
+                        :columns="[
+                            'policy' => __('Image policy'),
+                            'image' => __('Latest image'),
+                            'age' => __('Age'),
+                        ]"
+                        :note="__(':covered of :total checks passing. An image counts as current for :days days.', [
+                            'covered' => collect($coverageChecks)->sum('covered'),
+                            'total' => collect($coverageChecks)->sum('applicable'),
+                            'days' => 30,
+                        ])"
+                    />
+                @endif
+
                 {{-- One row per server with its newest image folded in. The old
                      layout scattered the same servers across three lists — a
                      "never imaged" chip row, an images table, and a "cannot be
@@ -270,7 +290,7 @@
                                     wire:key="server-{{ $server->id }}"
                                     @class([
                                         'group grid gap-x-4 gap-y-3 border-l-[3px] px-3 py-3 transition-colors hover:bg-brand-sand/15 sm:px-4',
-                                        'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto_auto] lg:items-center',
+                                        'lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,12rem)_auto_auto] lg:items-center',
                                         'border-brand-sage' => $imageCapable && $imaged,
                                         'border-brand-gold' => $imageCapable && ! $imaged,
                                         'border-transparent' => ! $imageCapable,
@@ -351,32 +371,17 @@
                                         @endif
                                     </div>
 
-                                    {{-- Newest image --}}
+                                    {{-- Which artifact, and how big. The coverage grid
+                                         above owns when it ran and whether it is stale;
+                                         what it cannot show is the image's own name,
+                                         which is what you pick from when restoring. --}}
                                     <div class="min-w-0 text-xs">
                                         @if ($latest)
-                                            @php
-                                                $latestLabel = match ($latest->status) {
-                                                    \App\Models\ServerImage::STATUS_COMPLETED => __('Ready'),
-                                                    \App\Models\ServerImage::STATUS_FAILED => __('Failed'),
-                                                    default => __('Creating'),
-                                                };
-                                            @endphp
-                                            <p class="truncate text-brand-ink">
-                                                <span @class([
-                                                    'font-medium',
-                                                    'text-brand-rust' => $latest->status === \App\Models\ServerImage::STATUS_FAILED,
-                                                ])>{{ $latest->created_at->diffForHumans(short: true) }}</span>
-                                                @if ($latest->bytes)
-                                                    <span class="font-mono tabular-nums text-brand-moss">· {{ \Illuminate\Support\Number::fileSize((int) $latest->bytes) }}</span>
-                                                @endif
-                                            </p>
-                                            <p class="mt-0.5 truncate text-brand-mist" title="{{ $latest->name }}">
-                                                {{ $latestLabel }} · {{ $latest->name }}
-                                            </p>
+                                            <p class="truncate text-brand-ink" title="{{ $latest->name }}">{{ $latest->name }}</p>
+                                            @if ($latest->bytes)
+                                                <p class="mt-0.5 font-mono tabular-nums text-brand-mist">{{ \Illuminate\Support\Number::fileSize((int) $latest->bytes) }}</p>
+                                            @endif
                                         @else
-                                            {{-- The coverage column already says
-                                                 "Never imaged"; repeating it here
-                                                 just doubles the same word. --}}
                                             <p class="text-brand-mist">—</p>
                                         @endif
                                     </div>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <x-seo-meta
         full-title="{{ config('app.name') }} – Infrastructure operations, in motion"
-        description="Provision, secure, and run servers across any cloud—organization-scoped, audit-ready, and fast. Watch a deploy happen." />
+        description="Provision servers, deploy from git, and run TLS, databases, cron, firewall, monitoring, and backups from one console." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')
@@ -17,62 +17,22 @@
     <style>
         [x-cloak] { display: none !important; }
 
-        /* ---- Ambient motion ---------------------------------------------- */
-        @keyframes dply-float {
-            0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-            50%      { transform: translate3d(0, -28px, 0) scale(1.06); }
-        }
-        @keyframes dply-float-slow {
-            0%, 100% { transform: translate3d(0, 0, 0); }
-            50%      { transform: translate3d(24px, 18px, 0); }
-        }
-        @keyframes dply-aurora {
-            0%   { transform: translate(-12%, -8%) rotate(0deg); }
-            50%  { transform: translate(8%, 10%) rotate(180deg); }
-            100% { transform: translate(-12%, -8%) rotate(360deg); }
-        }
-        @keyframes dply-grid-pan {
-            from { background-position: 0 0; }
-            to   { background-position: 56px 56px; }
-        }
-        @keyframes dply-marquee {
-            from { transform: translateX(0); }
-            to   { transform: translateX(-50%); }
-        }
-        @keyframes dply-shimmer {
-            0%   { transform: translateX(-120%); }
-            60%, 100% { transform: translateX(220%); }
-        }
-        @keyframes dply-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-        @keyframes dply-pulse-ring {
-            0%   { transform: scale(0.6); opacity: 0.7; }
-            100% { transform: scale(2.4); opacity: 0; }
-        }
-        @keyframes dply-pop {
-            0%   { transform: scale(0.4); opacity: 0; }
-            60%  { transform: scale(1.15); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .dply-orb { will-change: transform; filter: blur(40px); border-radius: 9999px; }
-        .dply-aurora-layer {
-            position: absolute; inset: -40%;
+        /* ---- Static ambient background --------------------------------- */
+        /* Layers live inside a clipped fixed wrapper so nothing can widen the
+           document and let the page pan sideways. */
+        .dply-wash {
+            position: absolute; inset: 0;
             background:
-                radial-gradient(closest-side, rgba(205,169,66,0.18), transparent),
-                radial-gradient(closest-side, rgba(104,132,121,0.16), transparent),
-                radial-gradient(closest-side, rgba(50,72,44,0.14), transparent);
-            background-position: 20% 30%, 75% 25%, 50% 80%;
-            background-repeat: no-repeat;
-            background-size: 55% 55%, 45% 45%, 50% 50%;
-            animation: dply-aurora 26s linear infinite;
-            will-change: transform;
+                radial-gradient(60% 45% at 12% 8%, rgba(205,169,66,0.20), transparent 70%),
+                radial-gradient(55% 45% at 88% 32%, rgba(104,132,121,0.18), transparent 70%),
+                radial-gradient(50% 40% at 30% 92%, rgba(50,72,44,0.14), transparent 70%);
         }
         .dply-grid {
+            position: absolute; inset: 0;
             background-image:
                 linear-gradient(to right, rgba(23,26,14,0.05) 1px, transparent 1px),
                 linear-gradient(to bottom, rgba(23,26,14,0.05) 1px, transparent 1px);
             background-size: 56px 56px;
-            animation: dply-grid-pan 18s linear infinite;
             mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 35%, transparent 75%);
             -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 35%, transparent 75%);
         }
@@ -82,8 +42,14 @@
                 linear-gradient(to bottom, rgba(238,240,232,0.06) 1px, transparent 1px);
         }
 
+        /* ---- Motion ------------------------------------------------------ */
+        @keyframes dply-shimmer { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(220%); } }
+        @keyframes dply-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        @keyframes dply-pulse-ring { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes dply-pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+
         /* ---- Scroll reveal ----------------------------------------------- */
-        .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+        .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1); }
         .reveal.reveal-in { opacity: 1; transform: none; }
 
         /* ---- Buttons ----------------------------------------------------- */
@@ -95,11 +61,7 @@
         }
         .dply-shine:hover::after { animation: dply-shimmer 1.1s ease; }
 
-        /* ---- Marquee ----------------------------------------------------- */
-        .dply-marquee-track { display: flex; width: max-content; animation: dply-marquee 26s linear infinite; }
-        .dply-marquee:hover .dply-marquee-track { animation-play-state: paused; }
-
-        /* ---- Bento tilt -------------------------------------------------- */
+        /* ---- Cards ------------------------------------------------------- */
         .dply-tilt { transform-style: preserve-3d; transition: transform .25s ease, box-shadow .25s ease; will-change: transform; }
         .dply-tilt .dply-glow {
             position: absolute; inset: -1px; border-radius: inherit; opacity: 0; transition: opacity .3s ease;
@@ -115,51 +77,47 @@
         .dply-pop { animation: dply-pop .4s cubic-bezier(.2,.7,.2,1) both; }
 
         @media (prefers-reduced-motion: reduce) {
-            .dply-orb, .dply-aurora-layer, .dply-grid, .dply-marquee-track,
             .dply-step-dot::before { animation: none !important; }
             .reveal { opacity: 1 !important; transform: none !important; transition: none; }
         }
     </style>
 </head>
 <body class="font-sans antialiased bg-brand-cream text-brand-ink overflow-x-hidden" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;">
-    {{-- Animated background --}}
-    <div class="fixed inset-0 -z-30 bg-brand-cream"></div>
-    <div class="fixed inset-0 -z-20 dply-aurora-layer"></div>
-    <div class="fixed inset-0 -z-10 dply-grid"></div>
-    <div class="dply-orb fixed -z-10 top-[-6rem] left-[-4rem] h-72 w-72 bg-brand-gold/25" style="animation: dply-float 11s ease-in-out infinite;" aria-hidden="true"></div>
-    <div class="dply-orb fixed -z-10 top-1/3 right-[-5rem] h-80 w-80 bg-brand-sage/25" style="animation: dply-float-slow 15s ease-in-out infinite;" aria-hidden="true"></div>
-    <div class="dply-orb fixed -z-10 bottom-[-6rem] left-1/4 h-72 w-72 bg-brand-forest/20" style="animation: dply-float 13s ease-in-out infinite;" aria-hidden="true"></div>
+    {{-- Ambient background: fixed, clipped, motionless --}}
+    <div class="fixed inset-0 -z-10 overflow-hidden bg-brand-cream" aria-hidden="true">
+        <div class="dply-wash"></div>
+        <div class="dply-grid"></div>
+    </div>
 
     <x-site-header active="home" />
 
     <main>
         {{-- ============================= HERO ============================= --}}
-        <section class="relative px-4 sm:px-6 lg:px-8 pt-16 pb-20 sm:pt-24 lg:pt-28">
-            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center">
+        <section class="relative px-4 sm:px-6 lg:px-8 pt-14 pb-14 sm:pt-20 lg:pt-24">
+            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-14 lg:items-center">
                 <div class="lg:col-span-6 text-center lg:text-left">
                     <p class="reveal inline-flex items-center gap-2 rounded-full border border-brand-sage/30 bg-white/60 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-forest uppercase backdrop-blur-sm">
                         <span class="relative flex h-2 w-2">
                             <span class="absolute inline-flex h-full w-full rounded-full bg-brand-gold opacity-75 dply-step-dot"></span>
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-brand-gold"></span>
                         </span>
-                        Cloud · SSH · Edge · Functions
+                        Servers · Deploys · Databases · Backups
                     </p>
 
-                    <h1 class="reveal mt-8 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl lg:text-[3.4rem] lg:leading-[1.06]" style="transition-delay:.06s">
+                    <h1 class="reveal mt-7 text-4xl font-bold tracking-tight text-balance text-brand-ink sm:text-5xl lg:text-[3.4rem] lg:leading-[1.06]" style="transition-delay:.06s">
                         Ship
                         <span class="relative inline-grid align-baseline" aria-hidden="true">
                             <span id="rotator" class="bg-gradient-to-r from-brand-rust via-brand-gold to-brand-sage bg-clip-text text-transparent">deploys</span>
                         </span>
                         <span class="sr-only">deploys</span>
-                        <br class="hidden sm:block" />
                         with command-center calm
                     </h1>
 
-                    <p class="reveal mt-6 text-lg sm:text-xl text-brand-moss max-w-xl mx-auto lg:mx-0 leading-relaxed" style="transition-delay:.12s">
-                        One console for servers, credentials, and remote execution—scoped to organizations, audit-ready, and built for how serious teams actually operate.
+                    <p class="reveal mt-5 text-lg sm:text-xl text-brand-moss max-w-xl mx-auto lg:mx-0 leading-relaxed" style="transition-delay:.12s">
+                        Provision or bring your own server, ship from git, and keep TLS, databases, workers, firewall, monitoring, and backups in the same place as the team that runs them.
                     </p>
 
-                    <div class="reveal mt-10 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4" style="transition-delay:.18s">
+                    <div class="reveal mt-9 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4" style="transition-delay:.18s">
                         @auth
                             <a href="{{ route('dashboard') }}" class="dply-shine group w-full sm:w-auto inline-flex justify-center items-center gap-2 px-7 py-3.5 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/30 hover:shadow-xl hover:shadow-brand-gold/40 hover:-translate-y-0.5 transition-all">
                                 Open dashboard
@@ -175,25 +133,10 @@
                             View pricing
                         </a>
                     </div>
-
-                    <dl class="reveal mt-12 grid grid-cols-3 gap-6 max-w-md mx-auto lg:mx-0 border-t border-brand-ink/10 pt-8" style="transition-delay:.24s">
-                        <div>
-                            <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="12" data-suffix="+">0</dd>
-                            <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Cloud providers</dt>
-                        </div>
-                        <div>
-                            <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="40" data-suffix="s">0</dd>
-                            <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Avg. provision</dt>
-                        </div>
-                        <div>
-                            <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="100" data-suffix="%">0</dd>
-                            <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Secrets vaulted</dt>
-                        </div>
-                    </dl>
                 </div>
 
                 {{-- Live terminal --}}
-                <div class="lg:col-span-6 mt-16 lg:mt-0">
+                <div class="lg:col-span-6 mt-14 lg:mt-0">
                     <div class="reveal relative mx-auto w-full max-w-lg" style="transition-delay:.16s">
                         <div class="absolute -inset-4 bg-gradient-to-br from-brand-gold/25 via-brand-sage/20 to-transparent rounded-[2rem] blur-2xl" aria-hidden="true"></div>
                         <div class="dply-tilt relative rounded-2xl border border-brand-ink/10 bg-brand-ink shadow-2xl shadow-brand-forest/20 overflow-hidden">
@@ -211,39 +154,61 @@
             </div>
         </section>
 
-        {{-- ===================== PROVIDER MARQUEE ===================== --}}
-        <section class="py-8 border-y border-brand-ink/10 bg-white/40 backdrop-blur-sm">
-            <p class="text-center text-xs font-semibold uppercase tracking-wider text-brand-mist mb-6">Provision anywhere — one inventory</p>
-            <div class="dply-marquee relative overflow-hidden" style="mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);-webkit-mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);">
-                <div class="dply-marquee-track gap-4 pr-4">
-                    @php($providers = ['DigitalOcean','Hetzner','AWS', 'Linode','Vultr','Google Cloud','Azure','UpCloud','Oracle'])
-                    @foreach (array_merge($providers, $providers) as $p)
-                        <span class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-white/70 px-5 py-2.5 text-sm font-semibold text-brand-forest whitespace-nowrap">
-                            <span class="h-1.5 w-1.5 rounded-full bg-brand-gold"></span>{{ $p }}
-                        </span>
-                    @endforeach
+        {{-- ===================== TRUST BAND: stats + providers ===================== --}}
+        <section class="border-y border-brand-ink/10 bg-white/50 backdrop-blur-sm">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12 lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center">
+                @php($avg = $avgProvisionSeconds === null ? null : ($avgProvisionSeconds >= 90
+                    ? ['value' => (int) round($avgProvisionSeconds / 60), 'suffix' => 'm']
+                    : ['value' => (int) round($avgProvisionSeconds), 'suffix' => 's']))
+                <dl class="reveal grid {{ $avg ? 'grid-cols-3' : 'grid-cols-2' }} gap-6 lg:col-span-4 lg:border-r lg:border-brand-ink/10 lg:pr-12">
+                    <div>
+                        <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="{{ $providers->count() }}">0</dd>
+                        <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Providers supported</dt>
+                    </div>
+                    @if ($avg)
+                        <div>
+                            <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="{{ $avg['value'] }}" data-suffix="{{ $avg['suffix'] }}">0</dd>
+                            <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Avg. provision</dt>
+                        </div>
+                    @endif
+                    <div>
+                        <dd class="text-2xl font-bold text-brand-ink tabular-nums" data-count="100" data-suffix="%">0</dd>
+                        <dt class="mt-1 text-xs font-medium uppercase tracking-wider text-brand-mist">Secrets vaulted</dt>
+                    </div>
+                </dl>
+
+                <div class="reveal mt-10 lg:mt-0 lg:col-span-8" style="transition-delay:.08s">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist">Provision anywhere — one inventory</p>
+                    <ul class="mt-4 flex flex-wrap gap-2.5">
+                        @foreach ($providers as $p)
+                            <li class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-white/70 px-4 py-2 text-sm font-semibold text-brand-forest whitespace-nowrap">
+                                <span class="h-1.5 w-1.5 rounded-full bg-brand-gold"></span>{{ $p }}
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
             </div>
         </section>
 
-        {{-- ===================== INTERACTIVE BENTO ===================== --}}
-        <section class="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
+        {{-- ===================== FEATURE BENTO ===================== --}}
+        <section class="py-20 sm:py-24 px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-7xl">
-                <div class="reveal max-w-2xl mx-auto text-center">
+                <div class="reveal max-w-2xl">
                     <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Everything your platform team expects</h2>
                     <p class="mt-4 text-lg text-brand-moss">Provisioning, access, and day-two operations—without stitching together five tools.</p>
                 </div>
 
-                <div class="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
                     @php($cards = [
-                        ['icon' => 'server-stack', 'span' => 'sm:col-span-2', 'title' => 'Cloud &amp; SSH in one inventory', 'body' => 'Link any provider or bare SSH host. Servers land in the right organization automatically—no manual key handoffs.', 'tone' => 'forest'],
-                        ['icon' => 'key', 'span' => '', 'title' => 'Secrets that stay vaulted', 'body' => 'Members use infrastructure without ever copying tokens to a laptop.', 'tone' => 'gold'],
-                        ['icon' => 'user-group', 'span' => '', 'title' => 'Organizations &amp; teams', 'body' => 'Invite by email, segment access, align billing to the org.', 'tone' => 'sage'],
-                        ['icon' => 'bolt', 'span' => '', 'title' => 'Edge &amp; serverless', 'body' => 'Ship containers and functions to the edge behind the same console.', 'tone' => 'copper'],
-                        ['icon' => 'command-line', 'span' => '', 'title' => 'Remote execution', 'body' => 'Run audited one-off commands from the console—no local terminal.', 'tone' => 'forest'],
+                        ['icon' => 'server-stack', 'title' => 'Servers, anywhere', 'body' => 'Provision on DigitalOcean, Hetzner, Vultr, Linode, AWS and more—or connect a box you already own over SSH. No resident agent, no OS lock-in.', 'tone' => 'forest'],
+                        ['icon' => 'rocket-launch', 'title' => 'Deploy from git', 'body' => 'Push to deploy, or call a signed webhook from your CI. Atomic releases, post-deploy commands, and one-click rollback.', 'tone' => 'gold'],
+                        ['icon' => 'cube', 'title' => 'Databases, cron &amp; queues', 'body' => 'MySQL, MariaDB, or PostgreSQL over SSH, managed crontab blocks, and Supervisor and Horizon worker pools.', 'tone' => 'sage'],
+                        ['icon' => 'shield-check', 'title' => 'Firewall, TLS &amp; backups', 'body' => 'Declarative UFW rules with a reviewable history, certificates that renew themselves, and backups with a restore path.', 'tone' => 'copper'],
+                        ['icon' => 'user-group', 'title' => 'Teams, audit &amp; API', 'body' => 'Organizations, roles, and invite links keep secrets out of Slack. Every change is logged; org-scoped tokens power the API and CLI.', 'tone' => 'forest'],
+                        ['icon' => 'command-line', 'title' => 'Remote execution', 'body' => 'Run audited one-off commands from the console—no local terminal, no copied keys.', 'tone' => 'gold'],
                     ])
                     @foreach ($cards as $i => $card)
-                        <article class="reveal dply-tilt {{ $card['span'] }} group relative rounded-2xl border border-brand-ink/10 bg-white/70 backdrop-blur-sm p-7 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-brand-forest/10 overflow-hidden"
+                        <article class="reveal dply-tilt lg:col-span-2 group relative rounded-2xl border border-brand-ink/10 bg-white/70 backdrop-blur-sm p-7 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-brand-forest/10 overflow-hidden"
                                  style="transition-delay: {{ $i * 60 }}ms">
                             <div class="dply-glow"></div>
                             <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-{{ $card['tone'] }}/15 text-brand-{{ $card['tone'] }} transition-transform group-hover:scale-110 group-hover:-rotate-6">
@@ -251,8 +216,10 @@
                                     @case('server-stack') <x-heroicon-o-server-stack class="h-6 w-6" /> @break
                                     @case('key') <x-heroicon-o-key class="h-6 w-6" /> @break
                                     @case('user-group') <x-heroicon-o-user-group class="h-6 w-6" /> @break
-                                    @case('bolt') <x-heroicon-o-bolt class="h-6 w-6" /> @break
                                     @case('command-line') <x-heroicon-o-command-line class="h-6 w-6" /> @break
+                                    @case('rocket-launch') <x-heroicon-o-rocket-launch class="h-6 w-6" /> @break
+                                    @case('cube') <x-heroicon-o-cube class="h-6 w-6" /> @break
+                                    @case('shield-check') <x-heroicon-o-shield-check class="h-6 w-6" /> @break
                                 @endswitch
                             </div>
                             <h3 class="mt-6 text-lg font-semibold text-brand-ink">{!! $card['title'] !!}</h3>
@@ -263,17 +230,16 @@
             </div>
         </section>
 
-        {{-- ===================== ANIMATED PIPELINE ===================== --}}
-        <section class="py-20 px-4 sm:px-6 lg:px-8">
-            <div class="mx-auto max-w-5xl rounded-3xl border border-white/10 bg-brand-ink text-brand-cream p-8 sm:p-12 shadow-2xl shadow-brand-forest/20 overflow-hidden relative">
-                <div class="absolute inset-0 dply-grid opacity-30" aria-hidden="true"></div>
-                <div class="relative">
-                    <div class="reveal text-center max-w-xl mx-auto">
+        {{-- ===================== PIPELINE ===================== --}}
+        <section class="pb-20 px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-7xl rounded-3xl border border-white/10 bg-brand-ink text-brand-cream p-8 sm:p-12 shadow-2xl shadow-brand-forest/20 overflow-hidden relative">
+                <div class="lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center">
+                    <div class="reveal lg:col-span-4">
                         <h2 class="text-2xl sm:text-3xl font-bold text-brand-cream">From commit to live, watched the whole way</h2>
-                        <p class="mt-3 text-brand-sand/80">Every step is timed, audited, and reversible. Hover or scroll—the pipeline runs.</p>
+                        <p class="mt-3 text-brand-sand/80">Every step is timed, audited, and reversible.</p>
                     </div>
 
-                    <ol id="pipeline" class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <ol id="pipeline" class="mt-10 lg:mt-0 lg:col-span-8 grid gap-4 sm:grid-cols-2">
                         @php($steps = [
                             ['t' => 'Provision', 'd' => 'Droplet created · hardened', 'ic' => 'server-stack'],
                             ['t' => 'Secure', 'd' => 'Keys vaulted · firewall set', 'ic' => 'shield-check'],
@@ -309,7 +275,7 @@
         {{-- ============================= CTA ============================= --}}
         <section class="pb-28 px-4 sm:px-6 lg:px-8">
             <div class="reveal relative max-w-4xl mx-auto rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-white via-brand-cream to-brand-sand/40 px-8 py-16 sm:px-14 sm:py-20 text-center shadow-xl shadow-brand-forest/5 overflow-hidden">
-                <div class="dply-orb absolute -top-16 -right-10 h-48 w-48 bg-brand-gold/30" style="animation: dply-float 9s ease-in-out infinite;" aria-hidden="true"></div>
+                <div class="absolute -top-16 -right-10 h-48 w-48 rounded-full bg-brand-gold/30 blur-3xl" aria-hidden="true"></div>
                 <div class="relative">
                     <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Ready for a calmer operations posture?</h2>
                     <p class="mt-4 text-lg text-brand-moss max-w-xl mx-auto">Spin up an organization, connect your first provider, and run a real trial on infrastructure you already control.</p>
@@ -374,17 +340,15 @@
         /* ---- Rotating headline word ---- */
         const rotator = document.getElementById('rotator');
         if (rotator && !reduce) {
-            const words = ['deploys', 'servers', 'secrets', 'functions', 'the edge', 'teams'];
+            const words = ['deploys', 'servers', 'sites', 'databases', 'backups', 'teams'];
             let i = 0;
             setInterval(() => {
                 i = (i + 1) % words.length;
-                rotator.style.transition = 'opacity .3s, transform .3s';
+                rotator.style.transition = 'opacity .3s';
                 rotator.style.opacity = '0';
-                rotator.style.transform = 'translateY(-8px)';
                 setTimeout(() => {
                     rotator.textContent = words[i];
                     rotator.style.opacity = '1';
-                    rotator.style.transform = 'none';
                 }, 300);
             }, 2200);
         }

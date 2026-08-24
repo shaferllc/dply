@@ -185,6 +185,7 @@ class Databases extends Component
                 ->sortDesc(),
             'runs' => $runs,
             'lastRuns' => $lastRuns,
+            'coverageChecks' => $this->coverage($databases, $schedulesByTarget, $lastRuns),
             'runDestinations' => $org->backupConfigurations()->orderBy('name')->get(['id', 'name']),
             'metrics' => [
                 'databases' => $databases->count(),
@@ -197,4 +198,91 @@ class Databases extends Component
         ]);
     }
 
+    /**
+     * Coverage as a grid: one row per database, one cell per property that has
+     * to hold before a dump is worth anything.
+     *
+     * The four columns are deliberately not "does a schedule exist" four times.
+     * A dump that runs nightly and lands next to the database it came from dies
+     * with the box; a schedule whose every run fails looks healthy in a list of
+     * schedules. Those are the two ways this page could previously report
+     * protection that does not exist. Engines dply cannot dump read `na` rather
+     * than counting as a gap — same rule as the Overview grid.
+     *
+     * @param  Collection<int, ServerDatabase>  $databases
+     * @param  Collection<string, Collection<int, BackupSchedule>>  $schedulesByTarget
+     * @param  Collection<string, ServerDatabaseBackup>  $lastRuns
+     * @return list<array{key: string, title: string, subtitle: string, url: ?string, applicable: int, covered: int, cells: array<string, array{state: string, label: string, note: ?string}>}>
+     */
+    private function coverage($databases, $schedulesByTarget, $lastRuns): array
+    {
+        $databaseIds = $databases->pluck('id');
+
+        // Where the newest *successful* dump actually landed. A completed run
+        // with no backup configuration stayed on the server it came from.
+        $lastCompleted = ServerDatabaseBackup::query()
+            ->whereIn('server_database_id', $databaseIds)
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->orderByDesc('created_at')
+            ->get(['server_database_id', 'backup_configuration_id', 'bytes', 'created_at'])
+            ->unique('server_database_id')
+            ->keyBy('server_database_id');
+
+        $rows = [];
+
+        foreach ($databases as $database) {
+            $schedules = $schedulesByTarget->get($database->id) ?? collect();
+            $active = $schedules->firstWhere('is_active', true);
+            $completed = $lastCompleted->get($database->id);
+            $lastRun = $lastRuns->get($database->id);
+            $canDump = $database->supportsDump();
+
+            $cells = [
+                'schedule' => match (true) {
+                    $active !== null => ['state' => 'scheduled', 'label' => $active->cronDescription() ?: $active->cron_expression, 'note' => null],
+                    $schedules->isNotEmpty() => ['state' => 'manual', 'label' => __('paused'), 'note' => null],
+                    ! $canDump => ['state' => 'na', 'label' => __('n/a'), 'note' => __('dply cannot dump :engine', ['engine' => $database->engine])],
+                    default => ['state' => 'missing', 'label' => __('none'), 'note' => null],
+                },
+                'dump' => match (true) {
+                    $lastRun?->status === ServerDatabaseBackup::STATUS_FAILED => ['state' => 'failed', 'label' => __('failed :when', ['when' => $lastRun->created_at->diffForHumans(short: true)]), 'note' => $lastRun->error_message],
+                    $completed !== null => ['state' => 'scheduled', 'label' => $completed->created_at->diffForHumans(short: true), 'note' => null],
+                    ! $canDump => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('never'), 'note' => null],
+                },
+                'offsite' => match (true) {
+                    $completed === null && ! $canDump => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $completed === null => ['state' => 'missing', 'label' => __('nothing stored'), 'note' => null],
+                    $completed->backup_configuration_id !== null => ['state' => 'scheduled', 'label' => __('shipped off-box'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('on the server'), 'note' => __('This copy dies with the machine it came from.')],
+                },
+                'restore' => $canDump
+                    ? ['state' => 'scheduled', 'label' => __('available'), 'note' => null]
+                    : ['state' => 'na', 'label' => __('n/a'), 'note' => __('no dump path for :engine', ['engine' => $database->engine])],
+            ];
+
+            $applicable = collect($cells)->reject(fn (array $cell) => $cell['state'] === 'na');
+
+            $rows[] = [
+                'key' => $database->id,
+                'title' => $database->name,
+                'subtitle' => ($database->server?->name ?? '—').' · '.$database->engine,
+                'url' => $database->server ? route('servers.backups', $database->server) : null,
+                'applicable' => $applicable->count(),
+                'covered' => $applicable->where('state', 'scheduled')->count(),
+                'cells' => $cells,
+            ];
+        }
+
+        // Least-covered first: the rows worth reading are the empty ones. A row
+        // with nothing applicable at all sinks to the bottom instead of leading
+        // on a zero — there is no action to take on it.
+        usort($rows, fn (array $a, array $b) => [
+            $a['applicable'] === 0 ? 1 : 0, $a['covered'], -$a['applicable'],
+        ] <=> [
+            $b['applicable'] === 0 ? 1 : 0, $b['covered'], -$b['applicable'],
+        ]);
+
+        return $rows;
+    }
 }

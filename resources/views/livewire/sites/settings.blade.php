@@ -66,15 +66,12 @@
                     @class(['space-y-6' => ! $usesMergedChrome])
                 >
                     @if ($section === 'general')
-                        @if ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
-                            @include('livewire.sites.partials.container-dashboard')
-                        @endif
-
-                        @if ($site->usesFunctionsRuntime())
-                            @include('livewire.sites.partials.serverless-dashboard')
-                        @endif
-
-                        @if (! $isContainerWorkspace)
+                        {{-- The container dashboard was Cloud's workspace overview and
+                             was built on the ManagesContainerSite trait, deleted with the
+                             product. Docker and Kubernetes sites — also "container
+                             workspaces" — now use the same General section as every other
+                             site rather than a panel whose controls no longer exist. --}}
+                        @if (! $isContainerWorkspace || true)
                             {{-- choose-app CTA (if any) stays outside; everything
                                  else shares one merged card like server Settings. --}}
                             @if ($site->canRechooseApp())

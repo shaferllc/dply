@@ -224,7 +224,9 @@ return [
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         'docker' => true,
         'docker_preview' => true,
-        'backups' => env('FEATURE_WORKSPACE_BACKUPS', true),
+        // Parked with the rest of the Services tier — see config/features.php
+        // 'surface' block. The pages still exist behind the flag.
+        'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // Parked — see the server_blueprint note above.
@@ -303,7 +305,10 @@ return [
         'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
-        'realtime' => env('FEATURE_SURFACE_REALTIME', true),
+        // Parked for this version: the whole Services tier ships as "coming
+        // soon" — nav entries fall to their coming-soon branch and the routes
+        // 404. Flip the env var (or this default) to bring one back.
+        'realtime' => env('FEATURE_SURFACE_REALTIME', false),
         'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', true),
         // dply Queue — the managed job queue. Default off: the control plane
         // exists but the data plane does not yet. Runtime dials and pricing
@@ -311,7 +316,7 @@ return [
         // Exit criteria: SQS-compatible API verified against Laravel's stock
         // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
         // (docs/adr/dply-queue.md).
-        'queue' => env('FEATURE_SURFACE_QUEUE', true),
+        'queue' => env('FEATURE_SURFACE_QUEUE', false),
         // dply Cache — the managed cache. The shared tier's data plane is
         // live (DynamoDB-compatible endpoint over Postgres); the dedicated
         // tier and the Serverless fold-in are not. Runtime dials live in
@@ -320,7 +325,7 @@ return [
         // which gates cache ENGINES offered for install on BYO servers.
         // Exit criteria: /caches index + show, attach/detach, and the docs
         // page (docs/adr/dply-cache.md, M2).
-        'cache' => env('FEATURE_SURFACE_CACHE', true),
+        'cache' => env('FEATURE_SURFACE_CACHE', false),
     ],
 
     /*

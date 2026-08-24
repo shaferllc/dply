@@ -18,7 +18,7 @@
 @php
     $items = [
         ['route' => 'backups.overview', 'match' => 'backups.*', 'label' => __('Backups'), 'icon' => 'archive-box', 'feature' => 'workspace.backups'],
-        ['route' => 'realtime.index', 'match' => 'realtime.*', 'label' => __('Realtime'), 'icon' => 'signal'],
+        ['route' => 'realtime.index', 'match' => 'realtime.*', 'label' => __('Realtime'), 'icon' => 'signal', 'feature' => 'surface.realtime'],
         ['route' => 'queues.index', 'match' => 'queues.*', 'label' => __('Queues'), 'icon' => 'queue-list', 'feature' => 'surface.queue'],
         ['route' => 'caches.index', 'match' => 'caches.*', 'label' => __('Caches'), 'icon' => 'bolt', 'feature' => 'surface.cache'],
     ];
@@ -62,6 +62,19 @@
                         />
                         {{ $item['label'] }}
                     </a>
+                @elseif ($routeExists)
+                    {{-- Parked, not hidden. A product that vanishes from the row
+                         reads as one that never existed; "Soon" says the tab is
+                         coming back. Matches the dropdown's coming-soon branch. --}}
+                    <span
+                        class="inline-flex shrink-0 cursor-default select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-2 py-1.5 text-xs font-medium leading-5 text-brand-moss/50 sm:px-2.5"
+                        aria-disabled="true"
+                        title="{{ __('Coming soon') }}"
+                    >
+                        <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="h-3.5 w-3.5 shrink-0 text-brand-moss/40" aria-hidden="true" />
+                        {{ $item['label'] }}
+                        <span class="rounded-full bg-brand-gold/15 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Soon') }}</span>
+                    </span>
                 @endif
             @endforeach
         </div>

@@ -300,6 +300,7 @@ class Files extends Component
             'recentBackups' => $recentBackups,
             'runs' => $runs,
             'lastRuns' => $lastRuns,
+            'coverageChecks' => $this->coverage($sites, $schedulesByTarget, $lastRuns),
             'metrics' => [
                 'sites' => $sites->count(),
                 'archivable' => $archivable->count(),
@@ -315,5 +316,91 @@ class Files extends Component
             'providerLabels' => collect(BackupConfiguration::providers())
                 ->mapWithKeys(fn (string $provider) => [$provider => BackupConfiguration::labelForProvider($provider)]),
         ]);
+    }
+
+    /**
+     * Coverage as a grid: one row per site, one cell per property an archive
+     * needs before it counts as protection.
+     *
+     * Mirrors the Databases grid deliberately — the two tabs answer the same
+     * question about different artifacts, so they should not need to be read
+     * differently. An archive that never left the server it came from is the
+     * case this makes visible: it shows up in the run feed as a completed
+     * backup and dies with the machine.
+     *
+     * @param  Collection<int, Site>  $sites
+     * @param  Collection<string, Collection<int, BackupSchedule>>  $schedulesByTarget
+     * @param  Collection<string, SiteFileBackup>  $lastRuns
+     * @return list<array{key: string, title: string, subtitle: string, url: ?string, applicable: int, covered: int, cells: array<string, array{state: string, label: string, note: ?string}>}>
+     */
+    private function coverage($sites, $schedulesByTarget, $lastRuns): array
+    {
+        $lastCompleted = SiteFileBackup::query()
+            ->whereIn('site_id', $sites->pluck('id'))
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->orderByDesc('created_at')
+            ->get()
+            ->unique('site_id')
+            ->keyBy('site_id');
+
+        $rows = [];
+
+        foreach ($sites as $site) {
+            $schedules = $schedulesByTarget->get($site->id) ?? collect();
+            $active = $schedules->firstWhere('is_active', true);
+            $completed = $lastCompleted->get($site->id);
+            $lastRun = $lastRuns->get($site->id);
+            // Edge and serverless sites have no filesystem to tar — nothing to
+            // schedule, so nothing to count as missing.
+            $canArchive = $site->supportsSshFileArchive();
+
+            $cells = [
+                'schedule' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => __('no filesystem to archive')],
+                    $active !== null => ['state' => 'scheduled', 'label' => $active->cronDescription() ?: $active->cron_expression, 'note' => null],
+                    $schedules->isNotEmpty() => ['state' => 'manual', 'label' => __('paused'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('none'), 'note' => null],
+                },
+                'archive' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $lastRun?->status === SiteFileBackup::STATUS_FAILED => ['state' => 'failed', 'label' => __('failed :when', ['when' => $lastRun->created_at->diffForHumans(short: true)]), 'note' => $lastRun->error_message],
+                    $completed !== null => ['state' => 'scheduled', 'label' => $completed->created_at->diffForHumans(short: true), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('never'), 'note' => null],
+                },
+                'offsite' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $completed === null => ['state' => 'missing', 'label' => __('nothing stored'), 'note' => null],
+                    $completed->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER => ['state' => 'missing', 'label' => __('on the server'), 'note' => __('This copy dies with the machine it came from.')],
+                    default => ['state' => 'scheduled', 'label' => __('shipped off-box'), 'note' => null],
+                },
+                'retrievable' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $completed === null => ['state' => 'missing', 'label' => __('nothing to pull'), 'note' => null],
+                    $completed->isDownloadable() => ['state' => 'scheduled', 'label' => __('downloadable'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('no path recorded'), 'note' => __('The archive row has no remote, disk or destination path.')],
+                },
+            ];
+
+            $applicable = collect($cells)->reject(fn (array $cell) => $cell['state'] === 'na');
+
+            $rows[] = [
+                'key' => $site->id,
+                'title' => $site->name,
+                'subtitle' => $site->server?->name ?? '—',
+                'url' => $site->server ? route('servers.backups', $site->server) : null,
+                'applicable' => $applicable->count(),
+                'covered' => $applicable->where('state', 'scheduled')->count(),
+                'cells' => $cells,
+            ];
+        }
+
+        // Least-covered first; rows with nothing applicable sink to the bottom.
+        usort($rows, fn (array $a, array $b) => [
+            $a['applicable'] === 0 ? 1 : 0, $a['covered'], -$a['applicable'],
+        ] <=> [
+            $b['applicable'] === 0 ? 1 : 0, $b['covered'], -$b['applicable'],
+        ]);
+
+        return $rows;
     }
 }

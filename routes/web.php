@@ -201,6 +201,8 @@ use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
 use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Support\Admin\AdminFeatureFlags;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
@@ -240,7 +242,27 @@ Route::post('/hooks/acme-dns', AcmeDnsHookController::class)
 
 Route::get('/', function () {
     // The animated homepage is THE homepage — no classic/animated switching.
-    return view('welcome-v2');
+    // Providers come from the build catalog, not a hand-kept list, so the marketing
+    // page can never advertise a provider that is switched off. Deliberately config-only:
+    // the per-org Pennant rollout in ServerProviderGate has no meaning for a visitor.
+    $providers = collect(\App\Enums\ServerProvider::cases())
+        ->filter(fn ($p) => $p->supportsCompute()
+            && filter_var(config('servers.providers.enabled.'.$p->value, false), FILTER_VALIDATE_BOOL))
+        ->map->label()
+        ->values();
+
+    // Real mean wall-clock of successful provisions. Null (stat hidden) until there is data.
+    // ponytail: postgres EXTRACT — swap to TIMESTAMPDIFF if this ever runs on mysql.
+    $avgProvisionSeconds = Cache::remember('home.avg_provision_seconds', now()->addHour(), fn () => DB::table('server_provision_runs')
+        ->where('status', 'succeeded')
+        ->whereNotNull('started_at')
+        ->whereNotNull('completed_at')
+        ->avg(DB::raw('EXTRACT(EPOCH FROM (completed_at - started_at))')));
+
+    return view('welcome-v2', [
+        'providers' => $providers,
+        'avgProvisionSeconds' => $avgProvisionSeconds === null ? null : (float) $avgProvisionSeconds,
+    ]);
 });
 
 Route::get('/pricing', function () {
@@ -462,8 +484,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('/backups/storage', $backupDestinationsRedirect)->name('backups.storage');
 
     // Managed services — session-scoped like every other product surface.
-    Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');
-    Route::livewire('/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('realtime.show');
+    // Realtime was the one Services product with no surface gate, so parking it
+    // left the pages reachable by URL while the nav said "coming soon".
+    Route::middleware('feature:surface.realtime')->group(function (): void {
+        Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');
+        Route::livewire('/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('realtime.show');
+    });
 
     Route::middleware('feature:surface.queue')->group(function (): void {
         Route::livewire('/queues', QueuesIndex::class)->name('queues.index');
