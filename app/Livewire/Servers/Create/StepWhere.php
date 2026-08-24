@@ -17,6 +17,8 @@ use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Providers\Services\VultrService;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogCache;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -291,8 +293,26 @@ class StepWhere extends Component
         $this->notifySizeRoleGuidance();
     }
 
+    public function retryProviderCatalog(): void
+    {
+        $type = $this->form->type !== '' ? $this->form->type : (string) $this->active_provider;
+        if ($type === '' || $type === 'custom') {
+            return;
+        }
+
+        ProviderApiStatus::forget($type);
+        ProviderCatalogCache::forgetProvider($type);
+        $this->memoServerCreateCatalog = null;
+        $this->memoServerCreateCatalogKey = null;
+        $this->memoListServerProviderCards = null;
+    }
+
     public function chooseProvider(string $provider): void
     {
+        if (ProviderApiStatus::isUnreachable($provider)) {
+            return;
+        }
+
         // For K8s the tile id is the bare provider name (digitalocean / aws)
         // but the form.type the wizard ultimately stores is the K8s-suffixed
         // variant — that's what StoreServerFromCreateForm dispatches on.

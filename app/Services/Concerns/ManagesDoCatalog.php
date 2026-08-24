@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
+use App\Support\Providers\ProviderCatalogCache;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -22,7 +23,7 @@ trait ManagesDoCatalog
      */
     public function getRegions(): array
     {
-        return $this->cachedCatalogList('do_regions', '/regions', 'regions');
+        return $this->cachedCatalogList('regions', '/regions', 'regions');
     }
 
     /**
@@ -32,47 +33,42 @@ trait ManagesDoCatalog
      */
     public function getSizes(): array
     {
-        return $this->cachedCatalogList('do_sizes', '/sizes', 'sizes');
+        return $this->cachedCatalogList('sizes', '/sizes', 'sizes');
     }
 
     /**
-     * Cache regions/sizes responses per token. The wizard renders these on every
-     * step and they don't change often — a 10 minute cache keeps the page fast
-     * even when the DO API is slow, and bounded HTTP timeouts (in request())
-     * keep the worst-case render under ~10s instead of stalling for 30s+.
+     * Cache regions/sizes (and other catalog lists) for hours. The wizard
+     * renders these on every step; a shared store keeps the page off the
+     * DigitalOcean API after the first success. Timeouts trip the provider
+     * circuit instead of caching an empty list.
      *
      * @return array<int, array<string, mixed>>
      */
     private function cachedCatalogList(string $kind, string $path, string $primaryKey): array
     {
-        $cacheKey = $kind.':'.sha1($this->token);
-        $cached = Cache::get($cacheKey);
-        if (is_array($cached)) {
-            return $cached;
-        }
+        $scope = ProviderCatalogCache::scopeForToken($this->token);
 
-        // DO paginates these lists (default per_page=20), and /sizes alone has
-        // 100+ plans — a single unpaginated GET silently dropped every size
-        // beyond the 20 cheapest (breaking catalog pricing and the create
-        // wizard's size picker for mid/large plans). Request the max page size
-        // and follow pages until the list is exhausted.
-        $items = [];
-        $page = 1;
-        do {
-            $response = $this->request('get', $path, ['per_page' => 200, 'page' => $page]);
-            $this->assertSuccess($response, 'list '.$primaryKey);
-            $data = $response->json();
-            $batch = $data[$primaryKey] ?? $data['data'] ?? [];
-            $batch = is_array($batch) ? $batch : [];
-            $items = array_merge($items, $batch);
+        return ProviderCatalogCache::remember('digitalocean', $kind, $scope, function () use ($path, $primaryKey): array {
+            // DO paginates these lists (default per_page=20), and /sizes alone
+            // has 100+ plans — a single unpaginated GET silently dropped every
+            // size beyond the 20 cheapest. Request the max page size and follow
+            // pages until the list is exhausted.
+            $items = [];
+            $page = 1;
+            do {
+                $response = $this->request('get', $path, ['per_page' => 200, 'page' => $page]);
+                $this->assertSuccess($response, 'list '.$primaryKey);
+                $data = $response->json();
+                $batch = $data[$primaryKey] ?? $data['data'] ?? [];
+                $batch = is_array($batch) ? $batch : [];
+                $items = array_merge($items, $batch);
 
-            $hasNext = filled($data['links']['pages']['next'] ?? null);
-            $page++;
-        } while ($hasNext && $batch !== [] && $page <= 10);
+                $hasNext = filled($data['links']['pages']['next'] ?? null);
+                $page++;
+            } while ($hasNext && $batch !== [] && $page <= 10);
 
-        Cache::put($cacheKey, $items, now()->addMinutes(10));
-
-        return $items;
+            return $items;
+        });
     }
 
     /**
@@ -82,6 +78,11 @@ trait ManagesDoCatalog
      */
     public function forgetCatalogCaches(): void
     {
+        $scope = ProviderCatalogCache::scopeForToken($this->token);
+        ProviderCatalogCache::forget('digitalocean', 'regions', $scope);
+        ProviderCatalogCache::forget('digitalocean', 'sizes', $scope);
+        ProviderCatalogCache::forget('digitalocean', 'images', $scope);
+        ProviderCatalogCache::forget('digitalocean', 'vpcs', $scope);
         Cache::forget('do_regions:'.sha1($this->token));
         Cache::forget('do_sizes:'.sha1($this->token));
     }
@@ -93,10 +94,19 @@ trait ManagesDoCatalog
      */
     public function listVpcs(?string $region = null): array
     {
-        $response = $this->request('get', '/vpcs');
-        $this->assertSuccess($response, 'list vpcs');
-        $data = $response->json();
-        $vpcs = $data['vpcs'] ?? [];
+        $vpcs = ProviderCatalogCache::remember(
+            'digitalocean',
+            'vpcs',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/vpcs');
+                $this->assertSuccess($response, 'list vpcs');
+                $data = $response->json();
+                $raw = $data['vpcs'] ?? [];
+
+                return is_array($raw) ? $raw : [];
+            },
+        );
         if (! is_array($vpcs)) {
             return [];
         }
@@ -133,11 +143,18 @@ trait ManagesDoCatalog
      */
     public function getImages(): array
     {
-        $response = $this->request('get', '/images');
-        $this->assertSuccess($response, 'list images');
-        $data = $response->json();
-        $images = $data['images'] ?? $data['data'] ?? [];
+        return ProviderCatalogCache::remember(
+            'digitalocean',
+            'images',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/images');
+                $this->assertSuccess($response, 'list images');
+                $data = $response->json();
+                $images = $data['images'] ?? $data['data'] ?? [];
 
-        return is_array($images) ? $images : [];
+                return is_array($images) ? $images : [];
+            },
+        );
     }
 }

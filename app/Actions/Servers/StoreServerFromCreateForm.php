@@ -31,6 +31,8 @@ use App\Notifications\RedisServerProvisioningStartedNotification;
 use App\Modules\Providers\Services\AwsEksService;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Providers\Services\HetznerService;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogFailure;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -53,6 +55,12 @@ final class StoreServerFromCreateForm
         if (! ServerProviderGate::enabled($form->type)) {
             throw ValidationException::withMessages([
                 'form.type' => __('This server provider is not available yet.'),
+            ]);
+        }
+
+        if (ProviderApiStatus::isUnreachable($form->type)) {
+            throw ValidationException::withMessages([
+                'form.type' => ProviderCatalogFailure::message($form->type),
             ]);
         }
 

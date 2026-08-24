@@ -3,6 +3,7 @@
 namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
+use App\Support\Providers\ProviderCatalogCache;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -327,11 +328,18 @@ class LinodeService
      */
     public function getRegions(): array
     {
-        $response = $this->request('get', '/regions');
-        $this->assertSuccess($response, 'list regions');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'linode',
+            'regions',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/regions');
+                $this->assertSuccess($response, 'list regions');
+                $data = $response->json();
 
-        return $data['data'] ?? [];
+                return $data['data'] ?? [];
+            },
+        );
     }
 
     /**
@@ -341,11 +349,18 @@ class LinodeService
      */
     public function getTypes(): array
     {
-        $response = $this->request('get', '/linode/types');
-        $this->assertSuccess($response, 'list types');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'linode',
+            'types',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/linode/types');
+                $this->assertSuccess($response, 'list types');
+                $data = $response->json();
 
-        return $data['data'] ?? [];
+                return $data['data'] ?? [];
+            },
+        );
     }
 
     /**

@@ -7,6 +7,8 @@ namespace App\Actions\Servers\Concerns;
 use App\Actions\Servers\ServerProvisionPreferenceRules;
 use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Livewire\Forms\ServerCreateForm;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogFailure;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -99,6 +101,17 @@ trait BuildsServerCreateChecks
                 $providerHealth['detail'],
                 in_array($providerHealth['status'], ['invalid', 'expired', 'under_scoped', 'misconfigured'], true),
                 'provider_credential_id',
+            );
+        }
+
+        if (! empty($catalog['provider_unreachable']) || ProviderApiStatus::isUnreachable($form->type)) {
+            $checks[] = $this->check(
+                'provider_unreachable',
+                'error',
+                ProviderCatalogFailure::title($form->type),
+                ProviderCatalogFailure::message($form->type),
+                true,
+                'form.type',
             );
         }
 
@@ -652,7 +665,7 @@ trait BuildsServerCreateChecks
 
         foreach ($checks as $check) {
             $group = match (true) {
-                in_array($check['key'], ['provider_credentials', 'provider_credential_id', 'provider_health', 'server_limit', 'user_ssh_keys', 'user_ssh_key_defaults'], true) => 'account_readiness',
+                in_array($check['key'], ['provider_credentials', 'provider_credential_id', 'provider_health', 'provider_unreachable', 'server_limit', 'user_ssh_keys', 'user_ssh_key_defaults'], true) => 'account_readiness',
                 str_starts_with($check['key'], 'region_'), str_starts_with($check['key'], 'size_'), in_array($check['key'], ['regions_unverified', 'sizes_unverified'], true) => 'infrastructure_selection',
                 str_starts_with($check['key'], 'stack_'), $check['key'] === 'stack' => 'stack_readiness',
                 $check['key'] === 'custom_connection' || $check['key'] === 'custom_verification' => 'verification',

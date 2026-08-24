@@ -3,6 +3,7 @@
 namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
+use App\Support\Providers\ProviderCatalogCache;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -482,22 +483,29 @@ class VultrService
      */
     public function getRegions(): array
     {
-        $response = $this->request('get', '/regions');
-        $this->assertSuccess($response, 'list regions');
-        $data = $response->json();
-        $raw = $data['regions'] ?? [];
-        if (! is_array($raw)) {
-            return [];
-        }
-        if (array_is_list($raw)) {
-            return $raw;
-        }
-        $list = [];
-        foreach ($raw as $id => $item) {
-            $list[] = array_merge(is_array($item) ? $item : [], ['id' => $id]);
-        }
+        return ProviderCatalogCache::remember(
+            'vultr',
+            'regions',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/regions');
+                $this->assertSuccess($response, 'list regions');
+                $data = $response->json();
+                $raw = $data['regions'] ?? [];
+                if (! is_array($raw)) {
+                    return [];
+                }
+                if (array_is_list($raw)) {
+                    return $raw;
+                }
+                $list = [];
+                foreach ($raw as $id => $item) {
+                    $list[] = array_merge(is_array($item) ? $item : [], ['id' => $id]);
+                }
 
-        return $list;
+                return $list;
+            },
+        );
     }
 
     /**
@@ -507,22 +515,29 @@ class VultrService
      */
     public function getPlans(): array
     {
-        $response = $this->request('get', '/plans');
-        $this->assertSuccess($response, 'list plans');
-        $data = $response->json();
-        $raw = $data['plans'] ?? [];
-        if (! is_array($raw)) {
-            return [];
-        }
-        if (array_is_list($raw)) {
-            return $raw;
-        }
-        $list = [];
-        foreach ($raw as $id => $item) {
-            $list[] = array_merge(is_array($item) ? $item : [], ['id' => $id]);
-        }
+        return ProviderCatalogCache::remember(
+            'vultr',
+            'plans',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/plans');
+                $this->assertSuccess($response, 'list plans');
+                $data = $response->json();
+                $raw = $data['plans'] ?? [];
+                if (! is_array($raw)) {
+                    return [];
+                }
+                if (array_is_list($raw)) {
+                    return $raw;
+                }
+                $list = [];
+                foreach ($raw as $id => $item) {
+                    $list[] = array_merge(is_array($item) ? $item : [], ['id' => $id]);
+                }
 
-        return $list;
+                return $list;
+            },
+        );
     }
 
     /**

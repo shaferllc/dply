@@ -186,29 +186,42 @@
                                 @php
                                     $isCardSelected = $form->type === $card['id']
                                         || ($form->provider_host_kind === 'kubernetes' && $form->type === $card['id'].'_kubernetes');
+                                    $cardAvailable = ($card['available'] ?? true) !== false;
                                 @endphp
                                 <div
                                     wire:key="provider-card-{{ $card['id'] }}"
                                     @class([
                                         'group flex flex-col rounded-2xl border-2 p-3 text-left shadow-sm transition-all',
-                                        'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $isCardSelected,
-                                        'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:shadow-md' => ! $isCardSelected,
+                                        'border-rose-300 bg-rose-50/70 ring-1 ring-rose-200' => ! $cardAvailable,
+                                        'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $cardAvailable && $isCardSelected,
+                                        'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:shadow-md' => $cardAvailable && ! $isCardSelected,
                                     ])
                                 >
                                     <button
                                         type="button"
-                                        wire:click="chooseProvider('{{ $card['id'] }}')"
+                                        @if ($cardAvailable)
+                                            wire:click="chooseProvider('{{ $card['id'] }}')"
+                                        @endif
                                         wire:loading.attr="disabled"
                                         wire:target="chooseProvider"
-                                        class="flex w-full items-center justify-between gap-3 text-left disabled:cursor-wait disabled:opacity-60"
+                                        @disabled(! $cardAvailable)
+                                        aria-disabled="{{ $cardAvailable ? 'false' : 'true' }}"
+                                        @class([
+                                            'flex w-full items-center justify-between gap-3 text-left disabled:cursor-wait disabled:opacity-60',
+                                            'cursor-not-allowed opacity-80' => ! $cardAvailable,
+                                        ])
                                     >
                                         <span class="min-w-0 truncate text-sm font-semibold text-brand-ink">{{ $card['label'] }}</span>
                                         <span @class([
                                             'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
-                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $card['linked'],
-                                            'border-amber-200 bg-amber-50 text-amber-800' => ! $card['linked'],
+                                            'border-rose-200 bg-rose-100 text-rose-800' => ! $cardAvailable,
+                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $cardAvailable && $card['linked'],
+                                            'border-amber-200 bg-amber-50 text-amber-800' => $cardAvailable && ! $card['linked'],
                                         ])>
-                                            @if ($card['linked'])
+                                            @if (! $cardAvailable)
+                                                <x-heroicon-m-no-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Unavailable') }}
+                                            @elseif ($card['linked'])
                                                 <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Connected') }}
                                             @else
@@ -217,6 +230,9 @@
                                             @endif
                                         </span>
                                     </button>
+                                    @if (! $cardAvailable && filled($card['unavailable_reason'] ?? null))
+                                        <p class="mt-2 text-xs leading-relaxed text-rose-900">{{ $card['unavailable_reason'] }}</p>
+                                    @endif
                                     @if ($card['linked'])
                                         <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-xs text-brand-moss">
                                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -379,7 +395,10 @@
                                 ? $catalog['error']
                                 : null;
                             $catalogFromPlatform = ($catalog['source'] ?? '') === 'platform';
+                            $catalogUnreachable = ! empty($catalog['provider_unreachable'])
+                                || \App\Support\Providers\ProviderCatalogFailure::isUnreachable($catalogError);
                             $catalogAuthFailed = $catalogError !== null
+                                && ! $catalogUnreachable
                                 && \App\Support\Providers\ProviderAuthFailure::detected($catalogError);
                             $catalogProvider = str_replace('_kubernetes', '', (string) $form->type);
                         @endphp
@@ -387,16 +406,34 @@
                             <div class="border-b border-brand-ink/10 px-4 py-3.5 sm:px-5">
                                 <div class="rounded-xl border border-rose-300 bg-rose-50/90 p-3 ring-1 ring-rose-200">
                                     <p class="text-sm font-semibold text-rose-950">
-                                        {{ $catalogAuthFailed && ! $catalogFromPlatform
-                                            ? \App\Support\Providers\ProviderAuthFailure::title($catalogProvider)
-                                            : __('Couldn’t load regions and sizes') }}
+                                        @if ($catalogUnreachable)
+                                            {{ \App\Support\Providers\ProviderCatalogFailure::title($catalogProvider) }}
+                                        @elseif ($catalogAuthFailed && ! $catalogFromPlatform)
+                                            {{ \App\Support\Providers\ProviderAuthFailure::title($catalogProvider) }}
+                                        @else
+                                            {{ __('Couldn’t load regions and sizes') }}
+                                        @endif
                                     </p>
                                     <p class="mt-1 text-xs leading-relaxed text-rose-900">
-                                        {{ $catalogAuthFailed && ! $catalogFromPlatform
-                                            ? \App\Support\Providers\ProviderAuthFailure::message($catalogProvider)
-                                            : $catalogError }}
+                                        @if ($catalogUnreachable)
+                                            {{ \App\Support\Providers\ProviderCatalogFailure::sanitize($catalogError, $catalogProvider) }}
+                                        @elseif ($catalogAuthFailed && ! $catalogFromPlatform)
+                                            {{ \App\Support\Providers\ProviderAuthFailure::message($catalogProvider) }}
+                                        @else
+                                            {{ $catalogError }}
+                                        @endif
                                     </p>
-                                    @if (! $catalogFromPlatform)
+                                    @if ($catalogUnreachable)
+                                        <button
+                                            type="button"
+                                            wire:click="retryProviderCatalog"
+                                            wire:loading.attr="disabled"
+                                            class="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-rose-800 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-900 disabled:opacity-60"
+                                        >
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Try again') }}
+                                        </button>
+                                    @elseif (! $catalogFromPlatform)
                                         <x-add-provider-credential-link
                                             :provider="$catalogProvider"
                                             class="!mt-2.5 !inline-flex !items-center !gap-1.5 !rounded-md !bg-rose-800 !px-2.5 !py-1.5 !text-xs !font-semibold !text-white !shadow-sm hover:!bg-rose-900 hover:!no-underline hover:!text-white"

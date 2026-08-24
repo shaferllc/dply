@@ -44,7 +44,9 @@ use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -898,6 +900,43 @@ test('stale user token still loads regions from the platform catalog', function 
         ->assertSee('s-1vcpu-1gb')
         ->assertDontSee('Select an account first to load regions.')
         ->assertDontSee('Couldn’t load regions and sizes');
+});
+
+test('provider api timeout shows an unavailable state instead of a curl dump', function () {
+    Cache::flush();
+    config(['services.digitalocean.token' => 'dop_v1_platform']);
+
+    Http::fake(function () {
+        throw new ConnectionException('cURL error 28: Operation timed out after 8002 milliseconds with 0 bytes received (see https://curl.se/libcurl/c/libcurl-errors.html) for https://api.digitalocean.com/v2/regions?per_page=200&page=1');
+    });
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Primary DO',
+        'credentials' => ['api_token' => 'token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('DigitalOcean is unavailable')
+        ->assertSee('Creating new servers on this provider is paused')
+        ->assertSee('Try again')
+        ->assertSee('Unavailable')
+        ->assertDontSee('curl.se')
+        ->assertDontSee('api.digitalocean.com/v2/regions');
 });
 
 test('rejected provider credential shows reconnect instead of select-account placeholder', function () {

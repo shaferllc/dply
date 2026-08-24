@@ -112,9 +112,11 @@
         @if ($sizeCards->isEmpty())
             <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
                 @if (! empty($catalog['error']))
-                    {{ ($catalog['source'] ?? '') === 'platform'
-                        ? __('Plans will appear once the platform catalog can be reached.')
-                        : __('Plans will appear once this account can be reached.') }}
+                    {{ ! empty($catalog['provider_unreachable']) || \App\Support\Providers\ProviderCatalogFailure::isUnreachable($catalog['error'] ?? null)
+                        ? __('This provider is paused until its API responds.')
+                        : (($catalog['source'] ?? '') === 'platform'
+                            ? __('Plans will appear once the platform catalog can be reached.')
+                            : __('Plans will appear once this account can be reached.')) }}
                 @elseif (filled($form->region ?? null))
                     {{ __('No plans came back for this region.') }}
                 @else

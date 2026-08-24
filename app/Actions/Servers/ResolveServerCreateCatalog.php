@@ -7,6 +7,8 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogFailure;
 use App\Modules\Providers\Services\AwsEc2Service;
 use App\Modules\Providers\Services\AzureComputeService;
 use App\Modules\Providers\Services\DigitalOceanService;
@@ -66,6 +68,15 @@ final class ResolveServerCreateCatalog
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
+        if (ProviderApiStatus::isUnreachable($type)) {
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => ProviderApiStatus::operatorMessage($type),
+                'source' => 'platform',
+                'provider_unreachable' => true,
+            ]);
+        }
+
         // Regions/sizes are a global provider catalog. When the app-level
         // token is set, use it and stop — do not fall through to the
         // customer's ProviderCredential (that token is for create only).
@@ -73,7 +84,7 @@ final class ResolveServerCreateCatalog
         if ($platformCatalog !== null) {
             $platformCatalog['source'] = 'platform';
 
-            return $platformCatalog;
+            return $this->finalizeCatalog($platformCatalog, $type);
         }
 
         $credential = ($providerCredentialId !== '' && $providerCredentialId !== '0')
@@ -123,13 +134,27 @@ final class ResolveServerCreateCatalog
 
         $catalog['source'] = 'credential';
 
-        return $catalog;
+        return $this->finalizeCatalog($catalog, $type);
     }
 
     /**
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array<string, mixed>>, sizes: list<array<string, mixed>>, region_label: string, size_label: string, error?: string|null}|null
      */
+    /**
+     * @param  array<string, mixed>  $catalog
+     * @return array<string, mixed>
+     */
+    private function finalizeCatalog(array $catalog, string $type): array
+    {
+        if (ProviderApiStatus::isUnreachable($type) || ProviderCatalogFailure::isUnreachable($catalog['error'] ?? null)) {
+            $catalog['provider_unreachable'] = true;
+            $catalog['error'] = ProviderCatalogFailure::sanitize($catalog['error'] ?? null, $type);
+        }
+
+        return $catalog;
+    }
+
     private function catalogFromGlobalToken(string $type, Collection $credentials, string $selectedRegion): ?array
     {
         return match ($type) {
@@ -264,7 +289,7 @@ final class ResolveServerCreateCatalog
 
             $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable $e) {
-            $error = $e->getMessage();
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'digitalocean');
         }
 
         if ($sizes === [] && $error === null && $selectedRegion !== '') {
@@ -416,6 +441,7 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
             $svc = new HetznerService($credential);
@@ -482,8 +508,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'hetzner');
         }
 
         return [
@@ -492,6 +518,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Location'),
             'size_label' => __('Server type'),
+            'error' => $error ?? null,
         ];
     }
 
@@ -548,6 +575,7 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         try {
             $token = $this->platformToken('linode');
             $svc = match (true) {
@@ -585,8 +613,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'linode');
         }
 
         return [
@@ -595,6 +623,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => $regionLabel,
             'size_label' => $sizeLabel,
+            'error' => $error,
         ];
     }
 
@@ -606,6 +635,7 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
             $token = $this->platformToken('vultr');
@@ -647,8 +677,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'vultr');
         }
 
         return [
@@ -657,6 +687,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Plan'),
+            'error' => $error,
         ];
     }
 

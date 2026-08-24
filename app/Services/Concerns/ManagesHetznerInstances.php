@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
+use App\Support\Providers\ProviderCatalogCache;
+
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -326,11 +328,18 @@ trait ManagesHetznerInstances
      */
     public function getLocations(): array
     {
-        $response = $this->request('get', '/locations');
-        $this->assertSuccess($response, 'list locations');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'hetzner',
+            'locations',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/locations');
+                $this->assertSuccess($response, 'list locations');
+                $data = $response->json();
 
-        return $data['locations'] ?? [];
+                return $data['locations'] ?? [];
+            },
+        );
     }
 
     /**
@@ -340,11 +349,18 @@ trait ManagesHetznerInstances
      */
     public function getServerTypes(): array
     {
-        $response = $this->request('get', '/server_types');
-        $this->assertSuccess($response, 'list server types');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'hetzner',
+            'server_types',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/server_types');
+                $this->assertSuccess($response, 'list server types');
+                $data = $response->json();
 
-        return $data['server_types'] ?? [];
+                return $data['server_types'] ?? [];
+            },
+        );
     }
 
     /**

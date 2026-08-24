@@ -11,6 +11,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Providers\ProviderApiStatus;
 use App\Support\ServerProviderGate;
 
 /**
@@ -28,7 +29,9 @@ final class ListServerProviderCards
      *     server_count: int,
      *     site_count: int,
      *     installed_roles: list<array{id: string, label: string, count: int}>,
-     *     installed_locations: list<array{region: string, label: string, count: int}>
+     *     installed_locations: list<array{region: string, label: string, count: int}>,
+     *     available: bool,
+     *     unavailable_reason: string|null
      * }>
      */
     public function handle(?Organization $org): array
@@ -50,6 +53,7 @@ final class ListServerProviderCards
             }
             $pkey = ServerProviderTypeMap::toCredentialProvider($def['id']);
             $countKey = $pkey ?? $def['id'];
+            $available = $def['id'] === 'custom' || ! ProviderApiStatus::isUnreachable($def['id']);
             $cards[] = [
                 'id' => $def['id'],
                 'label' => $def['label'],
@@ -58,6 +62,8 @@ final class ListServerProviderCards
                 'site_count' => (int) ($siteCounts[$countKey] ?? 0),
                 'installed_roles' => $installedRoles[$countKey] ?? [],
                 'installed_locations' => $installedLocations[$countKey] ?? [],
+                'available' => $available,
+                'unavailable_reason' => $available ? null : ProviderApiStatus::operatorMessage($def['id']),
             ];
         }
 

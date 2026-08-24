@@ -18,6 +18,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Services\SshConnectionFactory;
+use App\Support\Providers\ProviderCatalogFailure;
 use App\Support\ServerProviderGate;
 use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
@@ -228,6 +229,11 @@ trait ServerCreateActions
             fallbackToGlobalCatalog: true,
         );
 
+        if (! empty($catalog['provider_unreachable'])
+            || ProviderCatalogFailure::isUnreachable($catalog['error'] ?? null)) {
+            $this->memoListServerProviderCards = null;
+        }
+
         $this->memoServerCreateCatalogKey = $memoKey;
         $this->memoServerCreateCatalog = $catalog;
 
@@ -295,7 +301,7 @@ trait ServerCreateActions
     protected function defaultProvisionProvider(): string
     {
         foreach ($this->provisionProviderCardsFromList($this->listServerProviderCards()) as $card) {
-            if ($card['linked'] === true) {
+            if ($card['linked'] === true && ($card['available'] ?? true) !== false) {
                 return $card['id'];
             }
         }
