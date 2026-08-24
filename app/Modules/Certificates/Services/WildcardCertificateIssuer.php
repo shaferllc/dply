@@ -56,7 +56,9 @@ class WildcardCertificateIssuer
             $token = match ($provider) {
                 'digitalocean' => trim((string) config('services.digitalocean.token')),
                 'namecheap' => trim((string) config('services.namecheap.api_key', '')),
-                'cloudflare' => \App\Support\TestingDomains::cloudflareApiToken(),
+                // Zone-aware: the first configured token is CLOUDFLARE_KEY, which
+                // often belongs to a different account than the zone being issued for.
+                'cloudflare' => \App\Support\TestingDomains::cloudflareApiTokenForZone($zone),
                 default => '',
             };
         }

@@ -500,8 +500,10 @@ class TestingHostnameProvisioner
             if ($recordId === '') {
                 return;
             }
-            $cloudflareAuth = $credential ?? TestingDomains::cloudflareApiToken();
-            if ($cloudflareAuth === '' || $cloudflareAuth === null) {
+            // $zone is known here — deleting through a token that cannot see it
+            // fails the same way creation did.
+            $cloudflareAuth = $credential ?? TestingDomains::cloudflareApiTokenForZone($zone);
+            if ($cloudflareAuth === '') {
                 return;
             }
             (new CloudflareDnsService($cloudflareAuth))->deleteDnsRecord($zone, $recordId);
@@ -591,7 +593,9 @@ class TestingHostnameProvisioner
             $token = match ($routing['provider']) {
                 'digitalocean' => trim((string) config('services.digitalocean.token')),
                 'namecheap' => trim((string) config('services.namecheap.api_key', '')),
-                'cloudflare' => TestingDomains::cloudflareApiToken(),
+                'cloudflare' => TestingDomains::cloudflareApiTokenForZone(
+                    $site->testingZone() ?? TestingDomains::vmApex(),
+                ),
                 default => '',
             };
         }
@@ -617,7 +621,14 @@ class TestingHostnameProvisioner
             throw new \RuntimeException('Dply has no testing-hostname zones configured. Add them to config/product/testing_domains.php.');
         }
 
-        $cloudflareToken = TestingDomains::cloudflareApiToken();
+        // Zone-aware even here, where the site's zone is not picked yet: the
+        // apex is the pool default, and probing it is what stops CLOUDFLARE_KEY
+        // (historically the MAIL token, often a different account) from being
+        // chosen purely because it is first in the list. Callers that DO know
+        // the final zone re-resolve against it immediately after.
+        $cloudflareToken = TestingDomains::cloudflareApiTokenForZone(
+            $site->testingZone() ?? TestingDomains::vmApex(),
+        );
         if ($cloudflareToken !== '') {
             return [
                 'provider' => 'cloudflare',

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Cache;
+
 /**
  * Dply-owned testing / preview zones from config/product/testing_domains.php.
  */
@@ -25,6 +27,18 @@ final class TestingDomains
      * Prefer a token that can actually see this zone. Queue workers often
      * still hold an older Edge token that is Zone:Read-only or scoped to
      * a different account than CLOUDFLARE_KEY.
+     *
+     * Never pick blindly by position: the first configured token is
+     * CLOUDFLARE_KEY, which was historically provisioned for the MAIL
+     * transport (see the note in config/services.php) and frequently belongs
+     * to a different Cloudflare account than the one owning the testing
+     * zones. That mismatch surfaces as "Zone [x] was not found in this
+     * Cloudflare account" on an otherwise correct configuration.
+     *
+     * Results are cached per zone+token-set: this runs on the provisioning
+     * path, each miss costs one Cloudflare round-trip per token tried, and
+     * the answer only changes when a token or its Zone Resources change.
+     * The token set is part of the key, so editing env invalidates it.
      */
     public static function cloudflareApiTokenForZone(string $zone): string
     {
@@ -38,17 +52,44 @@ final class TestingDomains
             return $tokens[0];
         }
 
-        foreach ($tokens as $token) {
-            try {
-                if ((new \App\Modules\Providers\Cloudflare\CloudflareDnsService($token))->zoneExists($zone)) {
-                    return $token;
-                }
-            } catch (\Throwable) {
-                continue;
-            }
-        }
+        $cacheKey = 'testing_domains:cf_token_for_zone:'.$zone.':'.substr(hash('sha256', implode('|', $tokens)), 0, 16);
 
-        return $tokens[0];
+        $resolved = Cache::remember(
+            $cacheKey,
+            now()->addMinutes(30),
+            function () use ($tokens, $zone): ?string {
+                foreach ($tokens as $token) {
+                    try {
+                        if ((new \App\Modules\Providers\Cloudflare\CloudflareDnsService($token))->zoneExists($zone)) {
+                            return $token;
+                        }
+                    } catch (\Throwable) {
+                        continue;
+                    }
+                }
+
+                // Cache the miss too — a zone nobody can see is usually a
+                // config problem that will not fix itself within the TTL, and
+                // re-probing every token on every provision is expensive.
+                return null;
+            },
+        );
+
+        return $resolved ?? $tokens[0];
+    }
+
+    /** Drop the cached zone→token decisions (after rotating a token). */
+    public static function forgetCloudflareTokenForZone(string $zone = ''): void
+    {
+        $tokens = self::cloudflareTokens();
+        if ($tokens === []) {
+            return;
+        }
+        $suffix = substr(hash('sha256', implode('|', $tokens)), 0, 16);
+
+        foreach ($zone !== '' ? [strtolower(trim($zone))] : self::vm() as $z) {
+            Cache::forget('testing_domains:cf_token_for_zone:'.$z.':'.$suffix);
+        }
     }
 
     /**
