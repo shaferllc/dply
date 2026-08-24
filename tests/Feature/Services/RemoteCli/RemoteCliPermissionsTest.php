@@ -8,6 +8,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use App\Modules\RemoteCli\Services\RemoteCliPermissions;
 use App\Modules\RemoteCli\Services\RiskLevel;
@@ -59,12 +61,61 @@ test('member can read and recoverable but not destructive', function () {
     expect($gate->can($user, $site, RiskLevel::Destructive))->toBeFalse();
 });
 test('non member can run nothing', function () {
-    [$user, $site] = makeUserWithRole(role: null);
+    $owner = User::factory()->create();
+    $stranger = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+    $server = Server::factory()->ready()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+    ]);
     $gate = new RemoteCliPermissions;
 
-    expect($gate->can($user, $site, RiskLevel::Read))->toBeFalse();
-    expect($gate->can($user, $site, RiskLevel::MutatingRecoverable))->toBeFalse();
-    expect($gate->can($user, $site, RiskLevel::Destructive))->toBeFalse();
+    expect($gate->can($stranger, $site, RiskLevel::Read))->toBeFalse();
+    expect($gate->can($stranger, $site, RiskLevel::MutatingRecoverable))->toBeFalse();
+    expect($gate->can($stranger, $site, RiskLevel::Destructive))->toBeFalse();
+});
+test('project viewer can read but cannot mutate', function () {
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $viewer = User::factory()->create();
+    $org->users()->attach($viewer->id, ['role' => 'member']);
+
+    $workspace = Workspace::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $owner->id,
+    ]);
+    $workspace->members()->create([
+        'user_id' => $viewer->id,
+        'role' => WorkspaceMember::ROLE_VIEWER,
+    ]);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+    ]);
+    $gate = new RemoteCliPermissions;
+
+    expect($viewer->can('view', $site))->toBeTrue();
+    expect($viewer->can('update', $site))->toBeFalse();
+    expect($gate->can($viewer, $site, RiskLevel::Read))->toBeTrue();
+    expect($gate->can($viewer, $site, RiskLevel::MutatingRecoverable))->toBeFalse();
+    expect($gate->can($viewer, $site, RiskLevel::Destructive))->toBeFalse();
 });
 test('system run with no user bypasses gate', function () {
     [, $site] = makeUserWithRole('member');

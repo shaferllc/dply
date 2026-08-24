@@ -24,7 +24,7 @@ return [
      * laravel, rails, nextjs, django, polyglot, wordpress, static, database,
      * custom.
      */
-    'available_presets' => ['laravel', 'wordpress'],
+    'available_presets' => ['laravel', 'wordpress', 'nextjs'],
 
     /*
      * Step 1 modes. 'provider' and 'custom' are always on; this switches the

@@ -223,7 +223,9 @@ return [
         'insights_preview' => false,
         'caches' => true,
         'docker' => true,
-        'docker_preview' => true,
+        // Preview panel off — the real Docker workspace (containers, images,
+        // compose, volumes, networks) is what ships now.
+        'docker_preview' => false,
         // Parked with the rest of the Services tier — see the 'surface' block
         // below. The pages still exist behind the flag.
         'backups' => false,
