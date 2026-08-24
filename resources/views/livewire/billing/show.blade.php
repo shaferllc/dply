@@ -1,48 +1,9 @@
 @php
-    // At-a-glance figures for the hero stat strip. The "status" tile is the
-    // big one — color-coded so it doubles as a banner.
-    $billableCount = $this->billableServers->count();
+    // $betaFeeWaived gates the beta banner below; $monthlyCents is the figure
+    // every band totals to. The status/tile locals that stood here fed the
+    // three-cell stat strip, which repeated what sits directly beneath it.
     $monthlyCents = (int) ($this->billingState->monthlyTotalCents ?? 0);
-    $intervalLabel = $this->subscriptionInterval === 'year' ? __('billed annually') : __('billed monthly');
-
     $betaFeeWaived = $this->organization->betaFeeWaived();
-
-    if ($betaFeeWaived) {
-        $statusTone = 'success';
-        $statusLabel = __('Beta');
-        $statusSub = __('$0 — nothing due');
-    } elseif ($this->onGracePeriod) {
-        $statusTone = 'warning';
-        $statusLabel = __('Cancelled');
-        $statusSub = $this->subscriptionEndsAt ? __('Access until :date', ['date' => $this->subscriptionEndsAt->toFormattedDateString()]) : __('In grace period');
-    } elseif ($this->subscription) {
-        $statusTone = 'success';
-        $statusLabel = __('Active');
-        $statusSub = $intervalLabel;
-    } elseif ($this->onDplyTrial) {
-        $statusTone = 'info';
-        $statusLabel = __('Trial');
-        $statusSub = trans_choice(':n day left|:n days left', $this->dplyTrialDaysLeft, ['n' => $this->dplyTrialDaysLeft]);
-    } else {
-        $statusTone = 'neutral';
-        $statusLabel = __('No plan');
-        $statusSub = __('Pick a plan below');
-    }
-
-    $statusTiles = [
-        'success' => 'border-brand-sage/30 bg-brand-sage/8',
-        'info' => 'border-sky-200 bg-sky-50',
-        'warning' => 'border-amber-200 bg-amber-50',
-        'danger' => 'border-red-200 bg-red-50',
-        'neutral' => 'border-brand-ink/10 bg-white',
-    ];
-    $statusDot = [
-        'success' => 'bg-brand-sage',
-        'info' => 'bg-sky-500',
-        'warning' => 'bg-amber-500',
-        'danger' => 'bg-red-500',
-        'neutral' => 'bg-brand-ink/15',
-    ];
 @endphp
 
 <div>
@@ -84,63 +45,13 @@
                 ['label' => __('Billing & plan'), 'icon' => 'credit-card'],
             ]"
         >
-            <x-slot:actions>
-                <x-outline-link size="xxs" href="{{ route('billing.analytics', $organization) }}" wire:navigate>
-                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Analytics') }}
-                </x-outline-link>
-                @if ($this->canManageBilling)
-                    <x-outline-link size="xxs" href="{{ route('billing.invoices', $organization) }}" wire:navigate>
-                        <x-heroicon-o-document class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('All invoices') }}
-                    </x-outline-link>
-                @endif
-            </x-slot:actions>
+            <x-slot:tabs>
+                <x-billing.tabs :organization="$organization" active="bill" />
+            </x-slot:tabs>
 
-            {{-- Hairline strip, matching invoices / org settings / notification
-                 channels. The status tile keeps its tone tint — it doubles as the
-                 subscription banner. --}}
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Billing at a glance') }}">
-                    <div class="px-3 py-2 {{ $statusTiles[$statusTone] }}">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="inline-block h-1.5 w-1.5 shrink-0 self-center rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
-                            <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
-                            <span class="truncate text-xs text-brand-moss" title="{{ $statusSub }}">{{ $statusSub }}</span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Servers') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
-                            <span class="truncate text-xs text-brand-moss">
-                                {{ __('billable') }}@if ($this->excludedServers->isNotEmpty()) · {{ __('+:n excluded', ['n' => $this->excludedServers->count()]) }}@endif
-                            </span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current bill') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
-                            <span class="truncate text-xs text-brand-moss">
-                                @if ($this->subscriptionInterval === 'year')
-                                    {{ __('/mo · $:n/yr', ['n' => number_format($this->yearlyTotalCents / 100, 0)]) }}
-                                @else
-                                    {{ __('/mo · :interval', ['interval' => $intervalLabel]) }}
-                                @endif
-                            </span>
-                        </dd>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
-            @if ($errors->isNotEmpty())
-                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-                    <x-livewire-validation-errors />
-                </div>
-            @endif
-
+            {{-- No generic "there are errors" summary here: billing errors are
+                 already rendered as alerts below, and the form fields carry their
+                 own inline messages, so the summary only ever double-printed. --}}
             @if ($betaFeeWaived)
                 <div class="border-b border-brand-ink/10 bg-brand-gold/8 px-3 py-2 sm:px-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -193,9 +104,11 @@
                 <span class="text-sm font-medium text-brand-ink">{{ __('Updating your subscription with Stripe…') }}</span>
             </div>
 
-            @include('livewire.billing.partials.bill-hero')
-            @include('livewire.billing.partials.fleet-table')
-            @include('livewire.billing.partials.bill-preview')
+            {{-- Merged billing page: what you owe → why it's that number →
+                 history. bill-hero / fleet-table / bill-preview were the old
+                 top of this page; the analytics page folded in below. --}}
+            @include('livewire.billing.partials.band-owe')
+            @include('livewire.billing.partials.band-plan')
 
             {{-- Bundled products (free tracely + Lookout). Hidden while the perk
                  is dark or for orgs that don't participate — see getBundleProperty(). --}}
@@ -264,14 +177,12 @@
                         </p>
                     @endif
 
-                    @if ($this->canManageBilling)
-                        <x-secondary-button size="xs" type="button" wire:click="portal">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            {{ $hasPaymentMethod ? __('Manage in Stripe') : __('Add a card') }}
-                        </x-secondary-button>
-                    @else
-                        <p class="text-xs font-medium text-amber-900/80">{{ __('Pick a plan above to add a payment method.') }}</p>
-                    @endif
+                    {{-- Always rendered: a hidden portal button reads as a missing
+                         feature. Without a Stripe customer it says so on click. --}}
+                    <x-secondary-button size="xs" type="button" wire:click="portal">
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ $hasPaymentMethod ? __('Manage in Stripe') : __('Add a card') }}
+                    </x-secondary-button>
                 </div>
             </section>
 
@@ -386,44 +297,7 @@
                 </section>
             @endif
 
-            {{-- Invoices --}}
-            @if ($this->canManageBilling)
-                <section class="border-b border-brand-ink/10">
-                    <x-workspace-panel-head dense icon="heroicon-o-document" :title="__('Invoices')" :note="__('Recent invoices from Stripe.')">
-                        <x-slot:actions>
-                            <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
-                        </x-slot:actions>
-                    </x-workspace-panel-head>
-                    @if ($this->invoices->isEmpty())
-                        <div class="px-3 py-8 text-center sm:px-4">
-                            <span class="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                <x-heroicon-o-document class="h-4 w-4" aria-hidden="true" />
-                            </span>
-                            <p class="mt-2.5 text-sm text-brand-moss">{{ __('No invoices yet.') }}</p>
-                        </div>
-                    @else
-                        <ul class="divide-y divide-brand-ink/10">
-                            @foreach ($this->invoices as $invoice)
-                                @php $hosted = $invoice->asStripeInvoice()->hosted_invoice_url ?? null; @endphp
-                                <li class="flex items-center justify-between gap-4 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
-                                    <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ $invoice->date()->toFormattedDateString() }}</p>
-                                        <p class="mt-0.5 font-mono text-xs text-brand-moss tabular-nums">{{ $invoice->total() }}</p>
-                                    </div>
-                                    @if ($hosted)
-                                        <a href="{{ $hosted }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-brand-sage hover:text-brand-ink">
-                                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Open in Stripe') }}
-                                        </a>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </section>
-            @endif
-
-            @include('livewire.billing.partials.how-billing-works')
+            @include('livewire.billing.partials.band-history')
 
             {{-- Confirmation modals --}}
             @if ($this->subscription)

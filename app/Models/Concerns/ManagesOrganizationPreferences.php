@@ -30,17 +30,18 @@ trait ManagesOrganizationPreferences
      */
     public function iconUrl(): ?string
     {
-        $path = $this->icon_path;
-        if ($path === '') {
+        // blank(), not === '': icon_path is nullable, and a null slipped past
+        // the string compare and produced a bare disk URL (broken-image glyph).
+        if (blank($this->icon_path)) {
             return null;
         }
 
-        return Storage::disk('site_assets')->url($path);
+        return Storage::disk('site_assets')->url($this->icon_path);
     }
 
     public function hasIcon(): bool
     {
-        return $this->icon_path !== '';
+        return filled($this->icon_path);
     }
 
     /**

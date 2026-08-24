@@ -138,9 +138,9 @@
                                             'total' => $metrics['servers'],
                                         ]) }}
                                     </p>
-                                    @if ($unprotectedCount > 0 && $gaps !== [])
+                                    @if ($unprotectedCount > 0 && $matrix !== [])
                                         <a
-                                            href="#backup-gaps"
+                                            href="#backup-coverage"
                                             class="group mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-cream/10 px-2.5 py-1.5 text-xs font-semibold text-brand-cream ring-1 ring-brand-cream/15 transition-colors hover:bg-brand-cream/20"
                                         >
                                             <x-heroicon-m-shield-exclamation class="h-3.5 w-3.5 text-brand-gold" aria-hidden="true" />
@@ -305,65 +305,26 @@
                     <x-backups-subnav active="overview" />
                 </x-slot:tabs>
 
-                {{-- Gaps: not "who has nothing" but "protected against what".
-                     Capability-aware, so a Custom box is never nagged about an
-                     image its provider cannot take. --}}
-                @if ($gaps !== [])
-                    <section id="backup-gaps" class="scroll-mt-24 border-b border-brand-ink/10 bg-brand-gold/[0.06]">
-                        <x-workspace-panel-head
-                            dense
-                            tone="amber"
-                            class="border-b border-brand-ink/10"
-                            icon="heroicon-o-shield-exclamation"
-                            :title="__('Gaps')"
-                            :count="count($gaps)"
-                            :note="__('What each server is missing — open one to close the gap.')"
-                        />
-                        <ul class="divide-y divide-brand-ink/8">
-                            @foreach ($gaps as $gap)
-                                <li
-                                    wire:key="gap-{{ $gap['server']->id }}"
-                                    @class([
-                                        'group flex flex-wrap items-center gap-x-3 gap-y-1 border-l-[3px] px-3 py-2.5 transition-colors hover:bg-white sm:px-4',
-                                        'border-brand-rust' => ! $gap['protected'],
-                                        'border-brand-gold' => $gap['protected'],
-                                    ])
-                                >
-                                    <a
-                                        href="{{ route('servers.backups', $gap['server']) }}"
-                                        wire:navigate
-                                        class="min-w-0 shrink-0 text-sm font-semibold text-brand-ink hover:text-brand-forest"
-                                    >
-                                        {{ $gap['server']->name }}
-                                    </a>
-                                    @if (! $gap['protected'])
-                                        <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-rust px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-cream">
-                                            <x-heroicon-m-exclamation-triangle class="h-3 w-3" aria-hidden="true" />
-                                            {{ __('no protection') }}
-                                        </span>
-                                    @endif
-                                    <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                                        @foreach ($gap['missing'] as $missing)
-                                            <span class="inline-flex shrink-0 items-center rounded-md bg-brand-ink/[0.06] px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-inset ring-brand-ink/8">
-                                                {{ $missing }}
-                                            </span>
-                                        @endforeach
-                                        @if ($gap['note'])
-                                            <span class="text-xs text-brand-mist">· {{ $gap['note'] }}</span>
-                                        @endif
-                                    </span>
-                                    <a
-                                        href="{{ route('servers.backups', $gap['server']) }}"
-                                        wire:navigate
-                                        class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-ink px-2 py-1 text-xs font-semibold text-brand-cream opacity-70 transition-all hover:bg-brand-forest group-hover:opacity-100"
-                                    >
-                                        {{ __('Fix') }}
-                                        <x-heroicon-m-arrow-right class="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </section>
+                {{-- Coverage: servers down, artifact types across. The n/a
+                     state is the reason this is a grid and not a list — a cache
+                     box with no database should read as "nothing to dump". --}}
+                @if ($matrix !== [])
+                    <x-backups-coverage-grid
+                        id="backup-coverage"
+                        class="scroll-mt-24"
+                        :rows="$matrix"
+                        :entity-label="__('Server')"
+                        score-label="{{ __('Covered') }}"
+                        :columns="[
+                            'database' => __('Database dump'),
+                            'files' => __('File archive'),
+                            'image' => __('Server image'),
+                        ]"
+                        :note="__(':covered of :total applicable artifacts on a schedule.', [
+                            'covered' => collect($matrix)->sum('covered'),
+                            'total' => collect($matrix)->sum('applicable'),
+                        ])"
+                    />
                 @endif
 
                 @if ($neverUsed)

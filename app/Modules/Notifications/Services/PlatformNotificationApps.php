@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notifications\Services;
 
 use App\Models\PlatformConnection;
+use Illuminate\Support\Once;
 
 /**
  * Resolves the deployment's Slack / Discord / Telegram *apps* (the credentials
@@ -139,6 +140,8 @@ final class PlatformNotificationApps
             'config' => $config,
         ])->save();
 
+        Once::flush();
+
         return $row;
     }
 
@@ -163,7 +166,11 @@ final class PlatformNotificationApps
      */
     private static function overlay(string $provider, array $defaults): array
     {
-        $row = PlatformConnection::query()->where('provider', $provider)->first();
+        // Memoized per request: slackReady() / slackRedirectUri() / the blade
+        // partials each re-enter overlay() for the same provider — the debug bar
+        // showed the same single-row lookup 5x on one render. once() keys on the
+        // captured $provider and is flushed by the framework between tests/jobs.
+        $row = once(fn () => PlatformConnection::query()->where('provider', $provider)->first());
         $stored = is_array($row?->config) ? $row->config : [];
 
         foreach ($defaults as $key => $fallback) {

@@ -7,7 +7,6 @@ use App\Models\InsightHealthSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class OrganizationInsightsMetricsService
 {
@@ -156,25 +155,35 @@ class OrganizationInsightsMetricsService
     }
 
     /**
+     * Latest health score per server, keyed by server id.
+     *
+     * DISTINCT ON picks the newest snapshot per box in one statement; on a tie
+     * it returns a single row, where the old joinSub returned every tied row
+     * and double-counted the box in the average.
+     *
+     * @param  Collection<int, string>  $serverIds
+     * @return Collection<string, float>
+     */
+    public function latestHealthScores(Collection $serverIds): Collection
+    {
+        if ($serverIds->isEmpty()) {
+            return collect();
+        }
+
+        return InsightHealthSnapshot::query()
+            ->selectRaw('distinct on (server_id) server_id, score')
+            ->whereIn('server_id', $serverIds)
+            ->orderBy('server_id')
+            ->orderByDesc('captured_at')
+            ->pluck('score', 'server_id');
+    }
+
+    /**
      * @param  Collection<int, string>  $serverIds
      */
     protected function averageLatestHealthScore(Collection $serverIds): ?float
     {
-        if ($serverIds->isEmpty()) {
-            return null;
-        }
-
-        $sub = DB::table('insight_health_snapshots')
-            ->select('server_id', DB::raw('MAX(captured_at) as max_captured_at'))
-            ->whereIn('server_id', $serverIds)
-            ->groupBy('server_id');
-
-        $scores = InsightHealthSnapshot::query()
-            ->joinSub($sub, 'latest', function ($join): void {
-                $join->on('insight_health_snapshots.server_id', '=', 'latest.server_id')
-                    ->on('insight_health_snapshots.captured_at', '=', 'latest.max_captured_at');
-            })
-            ->pluck('insight_health_snapshots.score');
+        $scores = $this->latestHealthScores($serverIds);
 
         if ($scores->isEmpty()) {
             return null;

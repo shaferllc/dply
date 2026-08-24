@@ -33,7 +33,7 @@ test('settings hub servers tab shows servers and sites in breadcrumb', function 
     $this->actingAs($user)
         ->get(route('settings.servers'))
         ->assertOk()
-        ->assertSeeText('Servers & Sites')
+        ->assertSeeText('Servers & sites')
         ->assertSee('aria-current="page"', false);
 });
 

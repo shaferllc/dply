@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
-use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Console\Command;
 
 /**
@@ -60,12 +58,6 @@ class OpsSummaryCommand extends Command
             ->sortKeys()
             ->all();
         $cloudPreviewCount = $cloudSites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
-        $cloudBackendCredentials = ProviderCredential::query()
-            ->whereIn('provider', CloudRouter::credentialProviderKeys())
-            ->get(['provider'])
-            ->groupBy('provider')
-            ->map->count()
-            ->all();
 
         $payload = [
             'totals' => [
@@ -81,7 +73,6 @@ class OpsSummaryCommand extends Command
                 'by_status' => $cloudByStatus,
                 'by_mode' => $cloudByMode,
                 'previews' => $cloudPreviewCount,
-                'backend_credentials' => $cloudBackendCredentials,
             ],
         ];
 

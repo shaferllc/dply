@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\EdgeSiteAccessRule;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -18,7 +17,7 @@ use ZipArchive;
 
 /**
  * One-click org compliance export. Bundles the audit log, deploy
- * history, certificate status, and Edge access rules into a single ZIP
+ * history and certificate status into a single ZIP
  * that auditors can drop into a ticket. Mirrors the SOC2-style "show
  * me what happened in your platform in the last 90 days" question.
  *
@@ -47,7 +46,6 @@ class OrganizationComplianceExportController extends Controller
         $zip->addFromString('audit_log.csv', $this->auditLogCsv($organization));
         $zip->addFromString('deploys.csv', $this->deployHistoryCsv($organization));
         $zip->addFromString('certificates.csv', $this->certificatesCsv($organization));
-        $zip->addFromString('edge_access_rules.csv', $this->edgeAccessRulesCsv($organization));
         $zip->close();
 
         $stem = preg_replace('/[^a-z0-9-]+/i', '-', (string) $organization->name) ?: 'org';
@@ -75,7 +73,6 @@ class OrganizationComplianceExportController extends Controller
             '  audit_log.csv         — every audited event for this organization (full history).',
             '  deploys.csv           — site deployment history across BYO + Cloud + Serverless surfaces.',
             '  certificates.csv      — TLS certificate inventory with expiry dates.',
-            '  edge_access_rules.csv — Edge preview-protection rules per site.',
             '',
             'Timestamps are ISO 8601 UTC. JSON-valued columns are rendered as compact JSON.',
             'Sensitive material (passwords, secrets, raw key material) is intentionally excluded.',
@@ -167,31 +164,6 @@ class OrganizationComplianceExportController extends Controller
                 $row->expires_at?->toIso8601String() ?? '',
                 $row->last_requested_at?->toIso8601String() ?? '',
                 $row->last_installed_at?->toIso8601String() ?? '',
-            ],
-        );
-    }
-
-    private function edgeAccessRulesCsv(Organization $organization): string
-    {
-        $siteIdQuery = Site::query()
-            ->where('organization_id', $organization->id)
-            ->orWhereIn('server_id', Server::query()->where('organization_id', $organization->id)->select('id'));
-
-        $query = EdgeSiteAccessRule::query()
-            ->with('site:id,name')
-            ->whereIn('site_id', $siteIdQuery->select('id'))
-            ->orderBy('created_at');
-
-        return $this->streamCsv(
-            ['site', 'site_id', 'mode', 'allowed_emails_json', 'created_at', 'updated_at'],
-            $query,
-            fn (EdgeSiteAccessRule $row) => [
-                (string) ($row->site !== null ? $row->site->name : ''),
-                (string) $row->site_id,
-                (string) $row->mode,
-                json_encode($row->allowed_emails, JSON_UNESCAPED_SLASHES),
-                $row->created_at->toIso8601String(),
-                $row->updated_at->toIso8601String(),
             ],
         );
     }

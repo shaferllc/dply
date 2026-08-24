@@ -5,9 +5,11 @@ namespace App\Modules\Marketplace\Livewire;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Modules\Marketplace\Models\MarketplaceItem;
+use App\Models\Script;
 use App\Models\Server;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Modules\Marketplace\Scripts\CloneScriptPreset;
 use App\Modules\Marketplace\Services\MarketplaceImportService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -16,11 +18,13 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
     use RequiresFeature;
+    use WithPagination;
 
     protected string $requiredFeature = 'surface.marketplace';
 
@@ -42,8 +46,15 @@ class Index extends Component
 
     public ?string $runbookWorkspaceId = null;
 
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedCategory(string $value): void
     {
+        $this->resetPage();
+
         if ($value !== 'all' && ! array_key_exists($value, MarketplaceItem::categories())) {
             $this->category = 'all';
         }
@@ -51,6 +62,7 @@ class Index extends Component
 
     public function resetFilters(): void
     {
+        $this->resetPage();
         $this->category = 'all';
         $this->search = '';
     }
@@ -265,6 +277,39 @@ class Index extends Component
     }
 
     /**
+     * Copy a preset script into the current organization and open it for edits.
+     */
+    public function cloneScriptPreset(string $itemId, CloneScriptPreset $cloner): mixed
+    {
+        $this->authorize('create', Script::class);
+
+        $item = MarketplaceItem::query()->active()->findOrFail($itemId);
+        if ($item->recipe_type !== MarketplaceItem::RECIPE_SCRIPT) {
+            return null;
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+        $org = $user->currentOrganization();
+        if (! $org) {
+            session()->flash('error', __('Select an organization first.'));
+
+            return null;
+        }
+
+        $script = $cloner->clone((string) ($item->payload['preset_key'] ?? ''), $org, $user);
+        if ($script === null) {
+            session()->flash('error', __('This marketplace script is not available.'));
+
+            return null;
+        }
+
+        $this->toastSuccess(__('Script added to your organization. You can edit it below.'));
+
+        return $this->redirect(route('scripts.edit', $script), navigate: true);
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     protected function serversForCurrentOrg(): Collection
@@ -320,11 +365,18 @@ class Index extends Component
             });
         }
 
-        $items = $query->get();
+        // The catalog carries the script-preset library too (167 rows), so the
+        // grid pages rather than rendering every card at once.
+        $items = $query->paginate(48);
         $catalogTotal = MarketplaceItem::query()->active()->count();
         $servers = $this->serversForCurrentOrg();
         $workspaces = $this->workspacesForCurrentOrg();
         $canImportWebserver = $org && $org->hasAdminAccess($user);
+        // Scripts keep their own surface flag — hide the clone action when it is
+        // off, otherwise the post-clone redirect lands on a 404 route.
+        $canCloneScripts = $org !== null
+            && feature('surface.scripts')
+            && $user->can('create', Script::class);
 
         return view('livewire.marketplace.index', [
             'items' => $items,
@@ -333,6 +385,7 @@ class Index extends Component
             'servers' => $servers,
             'workspaces' => $workspaces,
             'canImportWebserver' => $canImportWebserver,
+            'canCloneScripts' => $canCloneScripts,
             'hasOrganization' => $org !== null,
         ]);
     }

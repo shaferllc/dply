@@ -505,7 +505,6 @@ If you want **maximum differentiation with least risk**:
 ## Related docs
 
 - [Edge roadmap — next phases](edge-roadmap-next.md) — Wave E sequencing
-- [ROADMAPS.md](ROADMAPS.md) — compiled product roadmaps
 - [BILLING_AND_PLANS.md](BILLING_AND_PLANS.md) — org pricing model
 - [ORG_ROLES_AND_LIMITS.md](ORG_ROLES_AND_LIMITS.md) — team/RBAC foundation
 - [edge-product-boundary ADR](adr/edge-product-boundary.md) — Edge vs Cloud vs BYO boundaries

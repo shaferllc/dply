@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseCreatePageTest;
 
-use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
+use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

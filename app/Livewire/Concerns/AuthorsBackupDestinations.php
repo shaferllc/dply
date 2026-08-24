@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Form helpers for create/edit of a {@see BackupConfiguration} ("backup
- * destination"). Used by both `Livewire\Backups\Storage` and
+ * destination"). Used by both `Livewire\Credentials\Index` and
  * `Livewire\Servers\WorkspaceBackups` so the provider picker, per-provider
  * field set, validation, and persistence shape stay identical across both
  * surfaces. Drift here would let an operator create a destination via one

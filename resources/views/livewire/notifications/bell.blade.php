@@ -69,7 +69,9 @@
                 {{-- Stop clicks here from bubbling to the dropdown panel's
                      @click="close()" — filtering/clearing must keep the bell open. --}}
                 <div class="flex items-center gap-2 border-b border-brand-ink/5 bg-white px-3 py-1.5" x-on:click.stop>
-                    <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-0.5">
+                    {{-- dply-tablist-scroll: reserves the scrollbar's height and thins it.
+                         pb-0.5 was ~2px, so a macOS always-visible bar painted over the chips. --}}
+                    <div class="dply-tablist-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                         <button type="button" wire:click="resetFilters" class="{{ $chipBase }} {{ ($categoryFilters === [] && ! $alertsOnly) ? $chipOn : $chipOff }}">{{ __('All') }}</button>
                         <button type="button" wire:click="toggleAlertsOnly" class="{{ $chipBase }} {{ $alertsOnly ? 'bg-amber-500 text-white' : $chipOff }}">
                             <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />

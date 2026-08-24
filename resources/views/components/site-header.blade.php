@@ -11,9 +11,6 @@
     // @feature directive below issues its own SELECT against `features`.
     if ($authed && auth()->user()->currentOrganization()) {
         \Laravel\Pennant\Feature::loadMissing([
-            'surface.cloud',
-            'surface.edge',
-            'surface.serverless',
             'surface.projects',
             'surface.status_pages',
             'surface.marketplace',
@@ -22,21 +19,20 @@
     }
 
     $featuresActive  = $active === 'features'  || $req->routeIs('features');
-    $changelogActive = $active === 'changelog' || $req->routeIs('changelog');
     $pricingActive   = $active === 'pricing'   || $req->routeIs('pricing');
-    $roadmapActive   = $active === 'roadmap'   || $req->routeIs('roadmap');
     $homeActive      = $active === 'home'      || ($req->is('/') && ! $req->routeIs('dashboard'));
     $hi      = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
+    // Every service now lives in this dropdown rather than its own nav row,
+    // so queues/caches must light the trigger too.
     $browseActive = $req->routeIs(
-        'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
+        'servers.*', 'cloud.databases.*',
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'backups.*',
+        'queues.*', 'caches.*',
     );
     $moreMenuActive = $featuresActive
-        || $changelogActive
         || $pricingActive
-        || $roadmapActive
-        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*', 'blog.*')
+        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*')
         || ($authed
             && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
             && ($req->routeIs('admin.*') || $req->is('horizon*', 'pulse*')));
@@ -104,20 +100,6 @@
                         {{ __('Features') }}
                     </a>
                     <a
-                        href="{{ route('roadmap') }}"
-                        class="inline-flex items-center gap-1.5 {{ $roadmapActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >
-                        <x-heroicon-o-map class="{{ $hiGuest }}" />
-                        {{ __('Roadmap') }}
-                    </a>
-                    <a
-                        href="{{ route('changelog') }}"
-                        class="inline-flex items-center gap-1.5 {{ $changelogActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
-                    >
-                        <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
-                        {{ __('Changelog') }}
-                    </a>
-                    <a
                         href="{{ route('pricing') }}"
                         class="inline-flex items-center gap-1.5 {{ $pricingActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
                     >
@@ -174,22 +156,6 @@
                                     </button>
                                 </x-slot>
                                 <x-slot name="content">
-                                    {{-- Featured overview row spans the full panel. Always shown: it is the
-                                         landing page for the org-wide Operations views, not just a compute index. --}}
-                                    <a
-                                        href="{{ route('infrastructure.index') }}"
-                                        class="group flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-4 py-3 transition hover:bg-brand-sand/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35"
-                                    >
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10 [&>svg]:h-5 [&>svg]:w-5" aria-hidden="true">
-                                            <x-heroicon-o-rectangle-group class="{{ $hi }}" />
-                                        </span>
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block text-sm font-semibold text-brand-ink">{{ __('Infrastructure') }}</span>
-                                            <span class="block truncate text-xs text-brand-moss">{{ __('Every server, site, and deploy in one place') }}</span>
-                                        </span>
-                                        <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 text-brand-mist transition group-hover:text-brand-forest" aria-hidden="true" />
-                                    </a>
-
                                     <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
                                         {{-- Compute --}}
                                         <div class="p-2">
@@ -206,57 +172,13 @@
                                                 </x-slot>
                                                 {{ __('Networking') }}
                                             </x-dropdown-link>
-                                            @feature('surface.cloud')
-                                                <x-dropdown-link :href="route('cloud.index')" :description="__('Managed container apps')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-cube class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Cloud apps') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Managed container apps')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-cube class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Cloud apps') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.serverless')
-                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Laravel apps, no servers')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Serverless') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Laravel apps, no servers')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Serverless') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.edge')
-                                                <x-dropdown-link :href="route('edge.index')" :description="__('Deploy to the global edge')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Edge') }}
-                                                </x-dropdown-link>
-                                            @else
-                                                <x-coming-soon-dropdown-link :description="__('Deploy to the global edge')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Edge') }}
-                                                </x-coming-soon-dropdown-link>
-                                            @endfeature
 
-                                            {{-- Services sits under Compute here for the same reason
-                                                 <x-services-index-nav> sits under <x-compute-index-nav>:
-                                                 managed capabilities your apps lean on, as opposed to the
-                                                 compute they run on. Keep this list in step with that
-                                                 component. See docs/adr/managed-services-tier.md. --}}
+                                            {{-- Services sits under Compute: managed capabilities your
+                                                 apps lean on, as opposed to the compute they run on.
+                                                 This is now the only desktop entry point (the second
+                                                 nav row was removed), so keep it in step with the
+                                                 responsive list below. See
+                                                 docs/adr/managed-services-tier.md. --}}
                                             <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Services') }}</p>
                                             @feature('workspace.backups')
                                                 <x-dropdown-link :href="route('backups.overview')" :description="__('Scheduled database snapshots')">
@@ -273,12 +195,21 @@
                                                     {{ __('Backups') }}
                                                 </x-coming-soon-dropdown-link>
                                             @endfeature
-                                            <x-dropdown-link :href="route('realtime.index')" :description="__('Pusher-compatible channels')">
-                                                <x-slot name="icon">
-                                                    <x-heroicon-o-signal class="{{ $hi }}" />
-                                                </x-slot>
-                                                {{ __('Realtime') }}
-                                            </x-dropdown-link>
+                                            @feature('surface.realtime')
+                                                <x-dropdown-link :href="route('realtime.index')" :description="__('Pusher-compatible channels')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-signal class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Realtime') }}
+                                                </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Pusher-compatible channels')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-signal class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Realtime') }}
+                                                </x-coming-soon-dropdown-link>
+                                            @endfeature
                                             @feature('surface.queue')
                                                 <x-dropdown-link :href="route('queues.index')" :description="__('Background jobs, no workers')">
                                                     <x-slot name="icon">
@@ -286,6 +217,28 @@
                                                     </x-slot>
                                                     {{ __('Queues') }}
                                                 </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Background jobs, no workers')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-queue-list class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Queues') }}
+                                                </x-coming-soon-dropdown-link>
+                                            @endfeature
+                                            @feature('surface.cache')
+                                                <x-dropdown-link :href="route('caches.index')" :description="__('Shared or dedicated Valkey')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Caches') }}
+                                                </x-dropdown-link>
+                                            @else
+                                                <x-coming-soon-dropdown-link :description="__('Shared or dedicated Valkey')">
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-bolt class="{{ $hi }}" />
+                                                    </x-slot>
+                                                    {{ __('Caches') }}
+                                                </x-coming-soon-dropdown-link>
                                             @endfeature
                                         </div>
 
@@ -314,12 +267,6 @@
                                                 </x-slot>
                                                 {{ __('Organizations') }}
                                             </x-dropdown-link>
-                                            <x-dropdown-link :href="route('infrastructure.health')" :description="__('Live status across every server and site')">
-                                                <x-slot name="icon">
-                                                    <x-heroicon-o-heart class="{{ $hi }}" />
-                                                </x-slot>
-                                                {{ __('Health') }}
-                                            </x-dropdown-link>
                                         </div>
                                     </div>
                                 </x-slot>
@@ -330,7 +277,7 @@
                         <livewire:notifications.bell />
                     @endauth
                     <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('More navigation') }}">
-                        <x-dropdown align="right" width="36rem" contentClasses="p-0 overflow-hidden">
+                        <x-dropdown align="right" width="21rem" contentClasses="p-0 overflow-hidden">
                             <x-slot name="trigger">
                                 <button
                                     type="button"
@@ -343,108 +290,68 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <div class="grid grid-cols-2 divide-x divide-brand-ink/10">
-                                    {{-- Product --}}
-                                    <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Product') }}</p>
-                                        <x-dropdown-link :href="route('features')" :description="__('Everything dply can do')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-sparkles class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Features') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('roadmap')" :description="__('What we’re building next')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-map class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Roadmap') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('changelog')" :description="__('Recently shipped updates')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-megaphone class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Changelog') }}
-                                        </x-dropdown-link>
-                                    </div>
-
-                                    {{-- Resources + Workspace --}}
-                                    <div class="p-2">
-                                        <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Resources') }}</p>
-                                        <x-dropdown-link :href="route('docs.index')" :description="__('Guides & API reference')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-book-open class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Docs') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('blog.index')" :description="__('Build-in-public devlog')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-newspaper class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Blog') }}
-                                        </x-dropdown-link>
-                                        <x-dropdown-link :href="route('pricing')" :description="__('Plans & pricing')">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-credit-card class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Pricing') }}
-                                        </x-dropdown-link>
-
-                                        @if (feature('surface.status_pages') || feature('surface.marketplace') || feature('surface.scripts'))
-                                            <p class="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Workspace') }}</p>
-                                            @feature('surface.status_pages')
-                                                <x-dropdown-link :href="route('status-pages.index')" :description="__('Public status pages')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-check-circle class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Status') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.marketplace')
-                                                <x-dropdown-link :href="route('marketplace.index')" :description="__('Templates & add-ons')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-squares-plus class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Marketplace') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                            @feature('surface.scripts')
-                                                <x-dropdown-link :href="route('scripts.index')" :description="__('Reusable run scripts')">
-                                                    <x-slot name="icon">
-                                                        <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
-                                                    </x-slot>
-                                                    {{ __('Scripts') }}
-                                                </x-dropdown-link>
-                                            @endfeature
-                                        @endif
-                                    </div>
+                                @php
+                                    // One column, built from data: the old two-column grid left a
+                                    // half-empty pane whenever a workspace flag was off.
+                                    $moreGroups = array_filter([
+                                        __('Product') => [
+                                            ['href' => route('features'), 'icon' => 'sparkles', 'label' => __('Features'), 'desc' => __('Everything dply can do')],
+                                        ],
+                                        __('Resources') => [
+                                            ['href' => route('docs.index'), 'icon' => 'book-open', 'label' => __('Docs'), 'desc' => __('Guides & API reference')],
+                                            ['href' => route('pricing'), 'icon' => 'credit-card', 'label' => __('Pricing'), 'desc' => __('Plans & pricing')],
+                                        ],
+                                        __('Workspace') => array_values(array_filter([
+                                            feature('surface.status_pages')
+                                                ? ['href' => route('status-pages.index'), 'icon' => 'check-circle', 'label' => __('Status'), 'desc' => __('Public status pages')]
+                                                : null,
+                                            // One Marketplace entry: script presets live in the
+                                            // catalog, and your own scripts hang off that page.
+                                            feature('surface.marketplace') || feature('surface.scripts')
+                                                ? ['href' => feature('surface.marketplace') ? route('marketplace.index') : route('scripts.index'), 'icon' => 'squares-plus', 'label' => __('Marketplace'), 'desc' => __('Templates & script presets')]
+                                                : null,
+                                        ])),
+                                    ]);
+                                @endphp
+                                <div class="p-1.5">
+                                    @foreach ($moreGroups as $groupLabel => $items)
+                                        <p @class([
+                                            'px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist',
+                                            'pt-1.5' => $loop->first,
+                                            'mt-1.5 border-t border-brand-ink/[0.07] pt-3' => ! $loop->first,
+                                        ])>{{ $groupLabel }}</p>
+                                        @foreach ($items as $item)
+                                            <x-dropdown-link :href="$item['href']" :description="$item['desc']">
+                                                <x-slot name="icon">
+                                                    <x-dynamic-component :component="'heroicon-o-' . $item['icon']" class="{{ $hi }}" />
+                                                </x-slot>
+                                                {{ $item['label'] }}
+                                            </x-dropdown-link>
+                                        @endforeach
+                                    @endforeach
                                 </div>
 
                                 @can('viewPlatformAdmin')
-                                    {{-- Privileged tools as a full-width footer strip. --}}
-                                    <div class="border-t border-brand-ink/10 bg-brand-sand/20 p-3">
-                                        <p class="flex items-center gap-1.5 px-1 pb-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
+                                    {{-- Privileged tools as a compact footer strip. --}}
+                                    @php
+                                        $adminTools = [
+                                            ['href' => route('admin.overview'), 'icon' => 'squares-2x2', 'label' => __('Overview')],
+                                            ['href' => route('horizon.index'), 'icon' => 'queue-list', 'label' => __('Horizon')],
+                                            ['href' => route('pulse'), 'icon' => 'chart-bar', 'label' => __('Pulse')],
+                                        ];
+                                    @endphp
+                                    <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-2.5 py-2.5">
+                                        <p class="flex items-center gap-1.5 px-1 pb-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                             <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                             {{ __('Platform admin') }}
                                         </p>
-                                        <div class="grid grid-cols-3 gap-2">
-                                            <a href="{{ route('admin.overview') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Overview') }}</span>
-                                            </a>
-                                            <a href="{{ route('horizon.index') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-queue-list class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Horizon') }}</span>
-                                            </a>
-                                            <a href="{{ route('pulse') }}" class="group flex flex-col gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5">
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-ink/[0.045] text-brand-moss ring-1 ring-brand-ink/[0.08] transition group-hover:bg-brand-sage/15 group-hover:text-brand-forest">
-                                                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
-                                                </span>
-                                                <span class="text-xs font-semibold text-brand-ink">{{ __('Pulse') }}</span>
-                                            </a>
+                                        <div class="grid grid-cols-3 gap-1.5">
+                                            @foreach ($adminTools as $tool)
+                                                <a href="{{ $tool['href'] }}" class="group flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2 py-2 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/5 hover:text-brand-ink">
+                                                    <x-dynamic-component :component="'heroicon-o-' . $tool['icon']" class="h-4 w-4 shrink-0 text-brand-mist transition group-hover:text-brand-forest" aria-hidden="true" />
+                                                    {{ $tool['label'] }}
+                                                </a>
+                                            @endforeach
                                         </div>
                                     </div>
                                 @endcan
@@ -534,12 +441,6 @@
                     </x-slot>
                     {{ __('Dashboard') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('infrastructure.index')" :active="request()->routeIs('infrastructure.index')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-rectangle-group class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Infrastructure') }}
-                </x-responsive-nav-link>
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Compute') }}</p>
                 <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
                     <x-slot name="icon">
@@ -547,53 +448,7 @@
                     </x-slot>
                     {{ __('Servers') }}
                 </x-responsive-nav-link>
-                @feature('surface.cloud')
-                    <x-responsive-nav-link :href="route('cloud.index')" :active="request()->routeIs('cloud.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-cube class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Cloud apps') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-cube class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Cloud apps') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
-                @feature('surface.serverless')
-                    <x-responsive-nav-link :href="route('serverless.index')" :active="request()->routeIs('serverless.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-bolt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Serverless') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-bolt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Serverless') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
-                @feature('surface.edge')
-                    <x-responsive-nav-link :href="route('edge.index')" :active="request()->routeIs('edge.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Edge') }}
-                    </x-responsive-nav-link>
-                @else
-                    <x-coming-soon-responsive-nav-link>
-                        <x-slot name="icon">
-                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Edge') }}
-                    </x-coming-soon-responsive-nav-link>
-                @endfeature
-                {{-- Mirrors the desktop dropdown's Services group and
-                     <x-services-index-nav>; keep all three in step. --}}
+                {{-- Mirrors the desktop dropdown's Services group; keep both in step. --}}
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Services') }}</p>
                 @feature('workspace.backups')
                     <x-responsive-nav-link :href="route('backups.overview')" :active="request()->routeIs('backups.*')">
@@ -610,12 +465,21 @@
                         {{ __('Backups') }}
                     </x-coming-soon-responsive-nav-link>
                 @endfeature
-                <x-responsive-nav-link :href="route('realtime.index')" :active="request()->routeIs('realtime.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-signal class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Realtime') }}
-                </x-responsive-nav-link>
+                @feature('surface.realtime')
+                    <x-responsive-nav-link :href="route('realtime.index')" :active="request()->routeIs('realtime.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-signal class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Realtime') }}
+                    </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-signal class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Realtime') }}
+                    </x-coming-soon-responsive-nav-link>
+                @endfeature
                 @feature('surface.queue')
                     <x-responsive-nav-link :href="route('queues.index')" :active="request()->routeIs('queues.*')">
                         <x-slot name="icon">
@@ -623,6 +487,28 @@
                         </x-slot>
                         {{ __('Queues') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-queue-list class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Queues') }}
+                    </x-coming-soon-responsive-nav-link>
+                @endfeature
+                @feature('surface.cache')
+                    <x-responsive-nav-link :href="route('caches.index')" :active="request()->routeIs('caches.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Caches') }}
+                    </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Caches') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>
                 <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
@@ -646,12 +532,6 @@
                     </x-slot>
                     {{ __('Organizations') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('infrastructure.health')" :active="request()->routeIs('infrastructure.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-heart class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Health') }}
-                </x-responsive-nav-link>
                 @feature('surface.status_pages')
                     <x-responsive-nav-link :href="route('status-pages.index')" :active="request()->routeIs('status-pages.*')">
                         <x-slot name="icon">
@@ -660,22 +540,17 @@
                         {{ __('Status') }}
                     </x-responsive-nav-link>
                 @endfeature
-                @feature('surface.marketplace')
-                    <x-responsive-nav-link :href="route('marketplace.index')" :active="request()->routeIs('marketplace.index')">
+                @if (feature('surface.marketplace') || feature('surface.scripts'))
+                    <x-responsive-nav-link
+                        :href="feature('surface.marketplace') ? route('marketplace.index') : route('scripts.index')"
+                        :active="request()->routeIs('marketplace.index', 'scripts.*')"
+                    >
                         <x-slot name="icon">
                             <x-heroicon-o-squares-plus class="{{ $hi }}" />
                         </x-slot>
                         {{ __('Marketplace') }}
                     </x-responsive-nav-link>
-                @endfeature
-                @feature('surface.scripts')
-                    <x-responsive-nav-link :href="route('scripts.index')" :active="request()->routeIs('scripts.*')">
-                        <x-slot name="icon">
-                            <x-heroicon-o-code-bracket-square class="{{ $hi }}" />
-                        </x-slot>
-                        {{ __('Scripts') }}
-                    </x-responsive-nav-link>
-                @endfeature
+                @endif
                 @can('viewPlatformAdmin')
                     <div class="border-t border-brand-ink/10 pt-2 mt-2">
                         <p class="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Admin') }}</p>
@@ -703,14 +578,6 @@
                     <x-heroicon-o-sparkles class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Features') }}
                 </a>
-                <a href="{{ route('roadmap') }}" class="flex items-center gap-2.5 border-l-4 {{ $roadmapActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
-                    <x-heroicon-o-map class="h-5 w-5 shrink-0 opacity-90" />
-                    {{ __('Roadmap') }}
-                </a>
-                <a href="{{ route('changelog') }}" class="flex items-center gap-2.5 border-l-4 {{ $changelogActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
-                    <x-heroicon-o-megaphone class="h-5 w-5 shrink-0 opacity-90" />
-                    {{ __('Changelog') }}
-                </a>
                 <a href="{{ route('pricing') }}" class="flex items-center gap-2.5 border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-credit-card class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Pricing') }}
@@ -720,12 +587,6 @@
                         <x-heroicon-o-book-open class="{{ $hi }}" />
                     </x-slot>
                     {{ __('Docs') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('blog.index')" :active="request()->routeIs('blog.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-newspaper class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Blog') }}
                 </x-responsive-nav-link>
                 <div class="pt-4 mt-2 border-t border-brand-ink/10">
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>
@@ -770,7 +631,7 @@
 @auth
     {{-- Global command palette (⌘K). Mounted alongside the header so it's
          available on EVERY page that renders the header — including the guest
-         marketing pages (changelog, features, pricing, welcome) when viewed
+         marketing pages (features, pricing, welcome) when viewed
          while signed in. Rendered as a sibling of <header> (not nested) so the
          full-screen overlay isn't trapped in the header's stacking context. --}}
     <livewire:command-palette :key="'global-command-palette'" />

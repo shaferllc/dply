@@ -204,8 +204,6 @@ return [
         env('HETZNER_TOKEN'),
     ])),
 
-    'changelog_timeout' => max(30, (int) env('DPLY_CHANGELOG_TIMEOUT', 90)),
-
     /*
     |--------------------------------------------------------------------------
     | Public control-plane URL for TaskRunner signed webhooks

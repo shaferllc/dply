@@ -4,23 +4,20 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Site;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use App\Modules\Serverless\Services\ServerlessSourceStash;
 
 /**
  * Reclaims disk on the control plane by pruning build scratch under
  * storage/app that the deploy flows create but never clean up:
  *
- *   serverless-artifacts/<site>/<slug>-<ts>.zip   — one zip per deploy
- *   serverless-repositories/<build-…|local-launch-…> — git checkout caches
- *   task-runner/temp/*                            — task-runner scratch
+ *   task-runner/temp/*   — task-runner scratch
  *
  * These are local files (no SSH), so the command does the work inline rather
- * than dispatching per-server jobs. Deletion is age-based: artifacts are
- * byproducts kept briefly for failed-deploy post-mortem; repository caches are
- * kept while deploys keep touching them (re-cloned on next use if pruned).
+ * than dispatching per-server jobs. Deletion is age-based.
+ *
+ * The serverless artifact and repository-cache sweeps lived here until that
+ * product moved to its own app.
  *
  * Split-deployment caveat: the scheduler pins this to onOneServer(), but the
  * scratch lives on whichever box ran the build. In a multi-box topology where
@@ -30,43 +27,19 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
 {
     protected $signature = 'dply:prune-local-workspaces
         {--dry-run : Report what would be removed without deleting}
-        {--artifacts-hours= : Override max age (hours) for serverless build artifacts}
-        {--repositories-hours= : Override max age (hours) for serverless repository caches}
         {--task-runner-hours= : Override max age (hours) for task-runner temp}';
 
-    protected $description = 'Reclaim disk by removing stale serverless artifacts, repository caches, and task-runner temp under storage/app.';
+    protected $description = 'Reclaim disk by removing stale task-runner temp under storage/app.';
 
     public function handle(): int
     {
         $dry = (bool) $this->option('dry-run');
         $now = time();
 
-        $artifactsCutoff = $now - $this->ageHours('artifacts-hours', 'artifacts_max_age_hours', 48) * 3600;
-        $repositoriesCutoff = $now - $this->ageHours('repositories-hours', 'repositories_max_age_hours', 168) * 3600;
         $taskRunnerCutoff = $now - $this->ageHours('task-runner-hours', 'task_runner_max_age_hours', 24) * 3600;
 
         $freed = 0;
         $removed = 0;
-
-        // serverless-artifacts/<site-id>/<slug>-<ts>.zip — prune stale zips at
-        // the file level, then drop now-empty per-site directories. Artifacts
-        // still referenced by a site's rollback history are protected from age
-        // pruning no matter how old, so a rollback never loses its zip.
-        [$f, $r] = $this->pruneArtifacts(storage_path('app/serverless-artifacts'), $artifactsCutoff, $dry, $this->retainedArtifactPaths());
-        $freed += $f;
-        $removed += $r;
-
-        // serverless-repositories/<…> — prune whole checkout caches whose most
-        // recent git activity predates the window.
-        [$f, $r] = $this->pruneDirectories(storage_path('app/serverless-repositories'), $repositoriesCutoff, $dry, gitAware: true);
-        $freed += $f;
-        $removed += $r;
-
-        // serverless-uploads/stash-*.tar.gz — project folders uploaded for a
-        // `dply init` dry run that was then abandoned. A site's own source
-        // (site-<id>.tar.gz) is what its next redeploy rebuilds from, so the
-        // stash sweeper leaves it alone regardless of age.
-        $removed += app(ServerlessSourceStash::class)->sweepExpired();
 
         // task-runner/temp/* — short-lived scratch.
         [$f, $r] = $this->pruneDirectories(storage_path('app/task-runner/temp'), $taskRunnerCutoff, $dry, gitAware: false);
@@ -83,47 +56,6 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
         ));
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Per-site artifact dirs hold timestamped zips; delete the stale ones and
-     * remove a site dir once it's empty. Files in $protected (the rollback
-     * history set) are never deleted, regardless of age.
-     *
-     * @param  array<string, true>  $protected  realpath => true
-     * @return array{0: int, 1: int} [bytesFreed, entriesRemoved]
-     */
-    private function pruneArtifacts(string $root, int $cutoff, bool $dry, array $protected): array
-    {
-        if (! File::isDirectory($root)) {
-            return [0, 0];
-        }
-
-        $freed = 0;
-        $removed = 0;
-
-        foreach (File::directories($root) as $siteDir) {
-            foreach (File::allFiles($siteDir) as $file) {
-                $real = realpath($file->getPathname()) ?: $file->getPathname();
-                if (isset($protected[$real]) || $file->getMTime() >= $cutoff) {
-                    continue;
-                }
-
-                $freed += $file->getSize();
-                $removed++;
-                if (! $dry) {
-                    File::delete($file->getPathname());
-                }
-                $this->line("  artifact  {$file->getPathname()}", null, 'v');
-            }
-
-            // Drop the per-site directory once nothing recent remains in it.
-            if (! $dry && File::isEmptyDirectory($siteDir)) {
-                File::deleteDirectory($siteDir);
-            }
-        }
-
-        return [$freed, $removed];
     }
 
     /**
@@ -176,44 +108,6 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
         }
 
         return max($candidates);
-    }
-
-    /**
-     * Every artifact zip a site still references for rollback — both the
-     * DO Functions `artifact_history` entries and the live `artifact_path`
-     * pointer (Lambda + the current DO deploy). These are protected from the
-     * age-based prune so a rollback never loses its on-disk zip.
-     *
-     * @return array<string, true> realpath => true
-     */
-    private function retainedArtifactPaths(): array
-    {
-        $keep = [];
-
-        Site::query()
-            ->whereNotNull('meta')
-            ->select(['id', 'meta'])
-            ->cursor()
-            ->each(function (Site $site) use (&$keep): void {
-                $paths = [];
-
-                $history = data_get($site->meta, 'serverless.artifact_history');
-                if (is_array($history)) {
-                    foreach ($history as $entry) {
-                        $paths[] = is_array($entry) ? ($entry['artifact_path'] ?? null) : null;
-                    }
-                }
-
-                $paths[] = data_get($site->meta, 'serverless.artifact_path');
-
-                foreach ($paths as $path) {
-                    if (is_string($path) && $path !== '') {
-                        $keep[realpath($path) ?: $path] = true;
-                    }
-                }
-            });
-
-        return $keep;
     }
 
     private function directorySize(string $dir): int

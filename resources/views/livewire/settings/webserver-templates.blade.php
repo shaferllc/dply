@@ -318,7 +318,7 @@
                         </div>
                     @else
                         <ul class="divide-y divide-brand-ink/10">
-                            @foreach ($templates as $template)
+                            @foreach ($pagedTemplates as $template)
                                 @php
                                     $engineSlug = $template->engine ?: 'nginx';
                                     $engineClasses = $engineBadgeClasses[$engineSlug] ?? 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss';
@@ -388,6 +388,14 @@
                             @endforeach
                         </ul>
                     @endif
+
+                    <x-list-pager
+                        :page="$templatePageState['page']"
+                        :pages="$templatePageState['pages']"
+                        :total="$templatePageState['total']"
+                        property="template_page"
+                        :label="__('templates')"
+                    />
                 </section>
         </x-organization-shell>
     </div>

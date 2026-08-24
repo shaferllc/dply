@@ -22,6 +22,8 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
+ * @property-read Collection<int, NotificationChannel> $pagedChannels Livewire computed — the current page of $channels.
+ * @property-read int $channelPages Livewire computed — page count for $channels.
  */
 trait ManagesNotificationChannels
 {
@@ -94,6 +96,11 @@ trait ManagesNotificationChannels
     public string $new_webhook_url = '';
 
     public string $search = '';
+
+    /** Rows per page in the channel list. */
+    public const CHANNELS_PER_PAGE = 25;
+
+    public int $channelPage = 1;
 
     public ?string $editing_id = null;
 
@@ -200,6 +207,26 @@ trait ManagesNotificationChannels
     public function updatedSearch(): void
     {
         unset($this->channels);
+        $this->channelPage = 1;
+    }
+
+    /**
+     * @return Collection<int, NotificationChannel>
+     */
+    #[Computed]
+    public function pagedChannels(): Collection
+    {
+        // Clamp: deleting the last row of the last page must not strand you on
+        // an empty one.
+        $this->channelPage = min(max(1, $this->channelPage), $this->channelPages);
+
+        return $this->channels->forPage($this->channelPage, self::CHANNELS_PER_PAGE)->values();
+    }
+
+    #[Computed]
+    public function channelPages(): int
+    {
+        return max(1, (int) ceil($this->channels->count() / self::CHANNELS_PER_PAGE));
     }
 
     /**
@@ -208,7 +235,12 @@ trait ManagesNotificationChannels
     #[Computed]
     public function channels(): Collection
     {
-        $q = $this->owner()->notificationChannels()->withCount('subscriptions')->orderBy('label');
+        $q = $this->owner()->notificationChannels()
+            ->withCount('subscriptions')
+            // Event keys, not just the count: "2 usages" doesn't tell you whether
+            // the thing that pages you is wired up.
+            ->with('subscriptions:id,notification_channel_id,event_key,subscribable_type')
+            ->orderBy('label');
         $s = trim($this->search);
         if ($s !== '') {
             $q->where('label', 'like', '%'.$s.'%');
@@ -377,6 +409,9 @@ trait ManagesNotificationChannels
         } elseif ($channel->type === NotificationChannel::TYPE_WEBHOOK) {
             $this->edit_webhook_url = (string) ($cfg['url'] ?? '');
         }
+
+        $this->resetErrorBag();
+        $this->dispatch('open-modal', 'settings-edit-channel-modal');
     }
 
     protected function clearEditChannelFields(): void
@@ -417,6 +452,7 @@ trait ManagesNotificationChannels
     {
         $this->editing_id = null;
         $this->resetErrorBag();
+        $this->dispatch('close-modal', 'settings-edit-channel-modal');
     }
 
     public function saveEdit(): void
@@ -665,19 +701,38 @@ trait ManagesNotificationChannels
         };
     }
 
-    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels'): View
+    /**
+     * The ONE payload for the shared channels view and its content partial.
+     *
+     * Every surface (profile, organization, team) must come through here.
+     * Settings\NotificationChannels used to hand-roll the same array and drifted:
+     * when the partial started paginating it kept passing `channels` but not
+     * `pagedChannels`/`channelPages`, so /profile/notification-channels 500'd
+     * while the other two surfaces were fine. Surface-specific keys go in
+     * $extra rather than into a second copy of this list.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels', array $extra = []): View
     {
         return view($view, array_merge([
             'backUrl' => null,
             'backLabel' => null,
             'useOrgShell' => false,
+            'useProfileShell' => false,
             'organization' => null,
             'orgShellSection' => 'notifications',
+            'contentPartial' => 'livewire.settings.partials.notification-channels-content',
+            'currentOrganization' => null,
+            'organizationChannels' => collect(),
+            'teamChannelGroups' => collect(),
         ], $this->notificationChannelsViewData(), [
             'channels' => $this->channels,
+            'pagedChannels' => $this->pagedChannels,
+            'channelPages' => $this->channelPages,
             'canManage' => $this->canManage(),
             'types' => NotificationChannel::typesForUi(),
             'typesForEdit' => NotificationChannel::typesForUi($this->editing_id ? $this->edit_type : null),
-        ]));
+        ], $extra));
     }
 }

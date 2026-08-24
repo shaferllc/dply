@@ -16,8 +16,7 @@ use InvalidArgumentException;
 
 /**
  * Create an ordinary site on a server the organization owns — the BYO
- * counterpart to {@see \App\Modules\Serverless\Actions\CreateServerlessFunction}
- * and {@see \App\Modules\Cloud\Actions\CreateCloudSiteFromSource}.
+ * the BYO site-creation action.
  *
  * **Scope, deliberately narrow.** This covers a normal webserver host: PHP,
  * static, or Node, served by the server's webserver. It refuses a functions

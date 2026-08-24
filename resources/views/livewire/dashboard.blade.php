@@ -5,95 +5,14 @@
     $openFindings = (int) ($orgInsights['total_open'] ?? 0);
     $avgHealthScore = $orgInsights['avg_health_score'] ?? null;
 
-    // Card click-through targets. Servers go to the servers list; findings and
-    // health land on the org-wide Infrastructure health view.
-    $serversCardHref = route('servers.index');
-    $insightsCardHref = route('infrastructure.health');
-
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
-    ];
-
-    $platformSurfaces = [
-        [
-            'title' => __('Servers'),
-            'description' => __('Provision infrastructure, review health, and keep your estate ready to ship.'),
-            'href' => route('servers.index'),
-            'icon' => 'server-stack',
-        ],
-        [
-            'title' => __('Sites'),
-            'description' => __('Manage deployed applications, environments, and day-to-day runtime workflows.'),
-            'href' => route('sites.index'),
-            'icon' => 'globe-alt',
-        ],
-        ...(\Laravel\Pennant\Feature::active('surface.projects') ? [[
-            'title' => __('Projects'),
-            'description' => __('Track workspaces and organize app delivery across your infrastructure footprint.'),
-            'href' => route('projects.index'),
-            'icon' => 'rectangle-stack',
-        ]] : []),
-        [
-            'title' => __('Organizations'),
-            'description' => __('Review teams, limits, and the operational context behind your current workspace.'),
-            'href' => route('organizations.index'),
-            'icon' => 'building-office-2',
-        ],
-    ];
-
-    $quickActions = [
-        [
-            'title' => __('Credentials'),
-            'description' => __('Connect DigitalOcean, Hetzner, and other providers before provisioning infrastructure.'),
-            'href' => route('credentials.index'),
-            'icon' => 'key',
-            'tone' => 'sage',
-        ],
-        [
-            'title' => __('Security settings'),
-            'description' => __('Review two-factor, profile security, and access controls for your account.'),
-            'href' => route('profile.security'),
-            'icon' => 'shield-check',
-            'tone' => 'amber',
-        ],
-        [
-            'title' => __('API keys'),
-            'description' => __('Issue organization-scoped API tokens with only the permissions you need.'),
-            'href' => route('profile.api-keys'),
-            'icon' => 'bolt',
-            'tone' => 'violet',
-        ],
-        [
-            'title' => __('Setup guide'),
-            'description' => __('Follow the guided checklist for connecting a provider and launching your first server.'),
-            'href' => route('docs.connect-provider'),
-            'icon' => 'book-open',
-            'tone' => 'sky',
-        ],
-    ];
-
-    $primaryHref = multi_surface_active() ? route('launches.create') : route('servers.create');
-    $primaryLabel = multi_surface_active() ? __('Open launchpad') : __('Add a server');
-    $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights');
-    $shellDescription = __('Run infrastructure, track health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
-    // Sized for the dense one-line panel head, and matching the Marketplace /
-    // Open servers buttons further down so every control on the page is one size.
+    $primaryHref = route('servers.create');
+    $primaryLabel = __('Add a server');
+    $shellDescription = __('Every server in :organization, worst first.', ['organization' => $organizationName]);
+    // Sized for the dense panel head so every control on the page is one size.
     $headerBtn = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors';
-
-    $serversStatClass = $serverCount > 0
-        ? 'group relative rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-3 py-2 transition hover:border-brand-sage/50 focus-within:ring-2 focus-within:ring-brand-sage/40'
-        : 'group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40';
-    $findingsStatClass = $openFindings > 0
-        ? 'group relative rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 transition hover:border-amber-300 focus-within:ring-2 focus-within:ring-brand-sage/40'
-        : 'group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40';
-    $insightsGridClass = $hasWorkspaceInsights
-        ? 'grid gap-0 lg:grid-cols-[1.35fr_0.95fr] lg:divide-x lg:divide-brand-ink/10'
-        : 'grid gap-0';
+    $chipBase = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors';
+    $chipOn = $chipBase.' border-brand-ink bg-brand-ink text-brand-cream';
+    $chipOff = $chipBase.' border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40';
 @endphp
 
 <div class="contents">
@@ -131,57 +50,6 @@
                 </a>
             </x-slot:actions>
 
-            <x-slot:stats>
-                {{-- Dense profile-shell hands the stats slot a bare bordered strip,
-                     so the padding lives here and matches the panel head above. --}}
-                <dl class="grid grid-cols-1 gap-2 px-3 py-2 sm:grid-cols-3 sm:px-4">
-                    <div class="{{ $serversStatClass }}">
-                        <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View servers') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                            <span class="flex min-w-0 items-center gap-1.5">
-                                <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span class="truncate">{{ __('Servers') }}</span>
-                            </span>
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
-                        </dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $serverCount }}</span>
-                            <span class="text-xs text-brand-moss">{{ __('in scope') }}</span>
-                        </dd>
-                    </div>
-                    <div class="{{ $findingsStatClass }}">
-                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('Review open findings') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                            <span class="flex min-w-0 items-center gap-1.5">
-                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span class="truncate">{{ __('Open findings') }}</span>
-                            </span>
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
-                        </dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $openFindings }}</span>
-                            <span class="text-xs text-brand-moss">{{ trans_choice('issue|issues', $openFindings) }}</span>
-                        </dd>
-                    </div>
-                    <div class="group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40">
-                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View infrastructure health') }}"></a>
-                        <dt class="flex items-center justify-between gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                            <span class="flex min-w-0 items-center gap-1.5">
-                                <x-heroicon-o-heart class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span class="truncate">{{ __('Health') }}</span>
-                            </span>
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
-                        </dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</span>
-                            @if ($avgHealthScore !== null)
-                                <span class="text-xs text-brand-moss">/ 100</span>
-                            @endif
-                        </dd>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
             @if ($healthAlert !== null)
                 <div class="border-b border-brand-ink/10 bg-rose-50/80 px-3 py-2 sm:px-4" role="alert">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -203,7 +71,7 @@
                                 </p>
                             </div>
                         </div>
-                        <a href="{{ route('infrastructure.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
+                        <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
                             {{ __('View infrastructure health') }}
                             <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         </a>
@@ -244,339 +112,192 @@
                 </div>
             @endunless
 
-            {{-- Platform surfaces + Quick actions --}}
-            <div class="grid gap-0 border-b border-brand-ink/10 xl:grid-cols-[1.7fr_1fr] xl:divide-x xl:divide-brand-ink/10">
-                <section class="min-w-0" aria-labelledby="dashboard-platform-heading">
-                    <x-workspace-panel-head
-                        dense
-                        class="border-b border-brand-ink/10"
-                        icon="heroicon-o-rectangle-stack"
-                        title-id="dashboard-platform-heading"
-                        :title="__('Platform')"
-                        :note="__('Jump straight into the surface you need — every workspace lives next to the next.')"
+            @if ($serverCount === 0)
+                {{-- Nothing to tabulate yet: the page becomes the one thing to do. --}}
+                <div class="flex flex-col items-center justify-center px-3 py-12 text-center sm:px-4">
+                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No servers yet') }}</p>
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+{{-- multi_surface_active() used to gate a launchpad variant here; the
+                             helper does not exist anywhere in the app, so the zero-server
+                             dashboard fatalled on it. --}}
+                        {{ __('Spin up your first server — bring your own host or provision a VM from a connected cloud provider.') }}
+                    </p>
+                    <a
+                        href="{{ $primaryHref }}"
+                        wire:navigate
+                        class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                     >
-                        @feature('surface.marketplace')
-                            <x-slot:actions>
-                                <a
-                                    href="{{ route('marketplace.index') }}"
-                                    wire:navigate
-                                    class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Marketplace') }}
-                                </a>
-                            </x-slot:actions>
-                        @endfeature
-                    </x-workspace-panel-head>
-                    <div class="grid gap-2 px-3 py-3 sm:grid-cols-2 sm:px-4">
-                        @foreach ($platformSurfaces as $surface)
-                            <a
-                                href="{{ $surface['href'] }}"
-                                wire:navigate
-                                class="group flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md"
-                            >
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $tonePalette['sage'] }}">
-                                    @switch($surface['icon'])
-                                        @case('server-stack')
-                                            <x-heroicon-o-server-stack class="h-4 w-4" aria-hidden="true" />
-                                            @break
-                                        @case('globe-alt')
-                                            <x-heroicon-o-globe-alt class="h-4 w-4" aria-hidden="true" />
-                                            @break
-                                        @case('rectangle-stack')
-                                            <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
-                                            @break
-                                        @case('building-office-2')
-                                            <x-heroicon-o-building-office-2 class="h-4 w-4" aria-hidden="true" />
-                                            @break
-                                    @endswitch
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm font-semibold text-brand-ink">{{ $surface['title'] }}</span>
-                                        <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
-                                    </div>
-                                    <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $surface['description'] }}</p>
-                                </div>
-                            </a>
-                        @endforeach
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ $primaryLabel }}
+                    </a>
+                </div>
+            @else
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <label class="relative min-w-[12rem] flex-1">
+                        <span class="sr-only">{{ __('Filter servers') }}</span>
+                        <x-heroicon-m-magnifying-glass class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-mist" aria-hidden="true" />
+                        <input
+                            type="search"
+                            wire:model.live.debounce.300ms="q"
+                            placeholder="{{ __('Filter by name or IP…') }}"
+                            class="w-full rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        />
+                    </label>
+
+                    <button type="button" wire:click="$set('filter', 'all')" class="{{ $filter === 'all' ? $chipOn : $chipOff }}">
+                        {{ __('All') }}
+                        <span class="font-mono tabular-nums opacity-70">{{ $matchedCount }}</span>
+                    </button>
+                    <button type="button" wire:click="$set('filter', 'attention')" class="{{ $filter === 'attention' ? $chipOn : $chipOff }}">
+                        {{ __('Needs attention') }}
+                        <span @class([
+                            'font-mono tabular-nums',
+                            'text-rose-600' => $attentionCount > 0 && $filter !== 'attention',
+                            'opacity-70' => $attentionCount === 0 || $filter === 'attention',
+                        ])>{{ $attentionCount }}</span>
+                    </button>
+
+                    <div wire:loading.delay wire:target="q,filter" class="text-2xs uppercase tracking-wide text-brand-mist">{{ __('Filtering…') }}</div>
+                </div>
+
+                @if ($rows->isEmpty())
+                    <div class="px-3 py-10 text-center sm:px-4">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Nothing matches') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('No server matches this filter. Clear it to see the whole fleet.') }}</p>
+                        <button type="button" wire:click="clearFilters" class="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            {{ __('Clear filters') }}
+                        </button>
                     </div>
-                </section>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[46rem] border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-brand-ink/10">
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-4">{{ __('Server') }}</th>
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</th>
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Health') }}</th>
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Findings') }}</th>
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last deploy') }}</th>
+                                    <th scope="col" class="px-3 pb-2 pt-1 text-right"><span class="sr-only">{{ __('Actions') }}</span></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/10">
+                                @foreach ($rows as $row)
+                                    @php
+                                        $server = $row['server'];
+                                        $health = $row['health'];
+                                        $worst = $row['worst'];
+                                        $deployStatus = $row['deploy_status'];
 
-                <section class="min-w-0" aria-labelledby="dashboard-shortcuts-heading">
-                    <x-workspace-panel-head
-                        dense
-                        class="border-b border-brand-ink/10"
-                        icon="heroicon-o-bolt"
-                        title-id="dashboard-shortcuts-heading"
-                        :title="__('Shortcuts')"
-                        :note="__('Setup tasks that unblock provisioning, access, and team ops.')"
-                    />
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($quickActions as $action)
-                            <li>
-                                <a
-                                    href="{{ $action['href'] }}"
-                                    wire:navigate
-                                    class="group flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-4"
-                                >
-                                    <div class="flex min-w-0 items-start gap-2.5">
-                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $tonePalette[$action['tone']] }}">
-                                            @switch($action['icon'])
-                                                @case('key')
-                                                    <x-heroicon-o-key class="h-4 w-4" aria-hidden="true" />
-                                                    @break
-                                                @case('shield-check')
-                                                    <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
-                                                    @break
-                                                @case('bolt')
-                                                    <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
-                                                    @break
-                                                @case('book-open')
-                                                    <x-heroicon-o-book-open class="h-4 w-4" aria-hidden="true" />
-                                                    @break
-                                            @endswitch
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $action['title'] }}</p>
-                                            <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ $action['description'] }}</p>
-                                        </div>
-                                    </div>
-                                    <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
-                                </a>
-                            </li>
-                        @endforeach
-                    </ul>
-                </section>
-            </div>
-
-            {{-- Insights rollup + Recent servers --}}
-            <div class="{{ $insightsGridClass }}">
-                @if ($hasWorkspaceInsights)
-                    <section class="min-w-0 border-b border-brand-ink/10 lg:border-b-0" aria-labelledby="dashboard-insights-heading">
-                        <x-workspace-panel-head
-                            dense
-                            class="border-b border-brand-ink/10"
-                            icon="heroicon-o-chart-bar"
-                            title-id="dashboard-insights-heading"
-                            :title="__('What needs attention first')"
-                            :note="__('Severity rollup across every server plus the noisiest ones.')"
-                        >
-                            <x-slot:actions>
-                                <a
-                                    href="{{ route('servers.index') }}"
-                                    wire:navigate
-                                    class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-m-server-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Open servers') }}
-                                </a>
-                            </x-slot:actions>
-                        </x-workspace-panel-head>
-
-                        @if ($orgInsights && ($openFindings > 0 || $avgHealthScore !== null))
-                            @php
-                                $criticalCount = (int) ($orgInsights['open_by_severity']['critical'] ?? 0);
-                                $warningCount = (int) ($orgInsights['open_by_severity']['warning'] ?? 0);
-                                $infoCount = (int) ($orgInsights['open_by_severity']['info'] ?? 0);
-                                $criticalClass = $criticalCount > 0
-                                    ? 'rounded-xl border border-red-200 bg-red-50/80 px-3 py-2'
-                                    : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
-                                $warningClass = $warningCount > 0
-                                    ? 'rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2'
-                                    : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
-                            @endphp
-                            <div class="grid gap-2 px-3 py-3 sm:grid-cols-3 sm:px-4">
-                                <div class="{{ $criticalClass }}">
-                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
-                                    <dd class="mt-1 flex items-baseline gap-1.5">
-                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $criticalCount }}</span>
-                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
-                                    </dd>
-                                </div>
-                                <div class="{{ $warningClass }}">
-                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Warning') }}</dt>
-                                    <dd class="mt-1 flex items-baseline gap-1.5">
-                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $warningCount }}</span>
-                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
-                                    </dd>
-                                </div>
-                                <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Info') }}</dt>
-                                    <dd class="mt-1 flex items-baseline gap-1.5">
-                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $infoCount }}</span>
-                                        <span class="text-xs text-brand-moss">{{ __('open') }}</span>
-                                    </dd>
-                                </div>
-                            </div>
-
-                            @if (! empty($orgInsights['worst_servers']))
-                                <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
-                                    @foreach ($orgInsights['worst_servers'] as $row)
-                                        <li>
-                                            <a
-                                                href="{{ route('servers.insights', $row['id']) }}"
-                                                wire:navigate
-                                                class="flex items-center justify-between gap-4 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4"
-                                            >
-                                                <div class="min-w-0 flex-1">
-                                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</p>
-                                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
-                                                        <span class="inline-flex items-center gap-1">
-                                                            <span class="font-mono tabular-nums text-brand-ink">{{ $row['open'] }}</span>
-                                                            {{ trans_choice('open finding|open findings', $row['open']) }}
-                                                        </span>
-                                                        @if ($row['worst'])
-                                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                                            <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $row['worst'] }}</span>
+                                        // Dot = the row's headline state. Findings and a failed
+                                        // deploy both feed it so one glance down the column reads
+                                        // as the triage order the rows are already sorted in.
+                                        $dotTone = match (true) {
+                                            $deployStatus === 'failed', $worst === 'critical' => 'bg-rose-500',
+                                            $worst === 'warning' => 'bg-amber-500',
+                                            $worst === 'info' => 'bg-sky-500',
+                                            default => 'bg-brand-sage',
+                                        };
+                                        $healthTone = match (true) {
+                                            $health === null => 'bg-brand-ink/15',
+                                            $health >= 80 => 'bg-brand-sage',
+                                            $health >= 50 => 'bg-amber-500',
+                                            default => 'bg-rose-500',
+                                        };
+                                        $findingTone = match ($worst) {
+                                            'critical' => 'border-rose-200 bg-rose-50 text-rose-700',
+                                            'warning' => 'border-amber-200 bg-amber-50 text-amber-800',
+                                            'info' => 'border-sky-200 bg-sky-50 text-sky-700',
+                                            default => 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss',
+                                        };
+                                        $deployTone = match ($deployStatus) {
+                                            'failed' => 'text-rose-700',
+                                            'running' => 'text-sky-700',
+                                            'success' => 'text-brand-moss',
+                                            null => 'text-brand-mist',
+                                            default => 'text-brand-moss',
+                                        };
+                                    @endphp
+                                    <tr wire:key="fleet-{{ $server->id }}" class="transition-colors hover:bg-brand-sand/15">
+                                        <td class="px-3 py-2.5 align-middle sm:px-4">
+                                            <div class="flex items-center gap-2">
+                                                <span class="h-2 w-2 shrink-0 rounded-full {{ $dotTone }}" aria-hidden="true"></span>
+                                                <div class="min-w-0">
+                                                    <a href="{{ route('servers.show', $server) }}" wire:navigate class="block truncate text-sm font-semibold text-brand-ink hover:text-brand-forest">
+                                                        {{ $server->name }}
+                                                    </a>
+                                                    <p class="mt-0.5 truncate font-mono text-2xs text-brand-mist">
+                                                        @if ($server->ip_address)
+                                                            {{ $server->ip_address }}
+                                                            <span aria-hidden="true" class="text-brand-mist/50">·</span>
                                                         @endif
+                                                        {{ $server->sites_count }} {{ trans_choice('site|sites', $server->sites_count) }}
                                                     </p>
                                                 </div>
-                                                <span class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-sage">
-                                                    {{ __('Review') }}
-                                                    <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                                </span>
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                        @else
-                            <div class="flex flex-col items-center justify-center px-3 py-8 text-center sm:px-4">
-                                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                    <x-heroicon-o-sparkles class="h-6 w-6" aria-hidden="true" />
-                                </span>
-                                <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('A clean slate for new infrastructure') }}</p>
-                                <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                                    {{ __('Connect provider credentials, choose a launch path, and insights will start surfacing here as your infrastructure grows.') }}
-                                </p>
-                                <div class="mt-5 inline-flex flex-wrap items-center justify-center gap-2">
-                                    <a
-                                        href="{{ route('credentials.index') }}"
-                                        wire:navigate
-                                        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Connect providers') }}
-                                    </a>
-                                    <x-docs-link doc-route="docs.connect-provider">
-                                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                        {{ __('Read the guide') }}
-                                    </x-docs-link>
-                                </div>
-                            </div>
-                        @endif
-                    </section>
-                @endif
-
-                <section class="min-w-0" aria-labelledby="dashboard-recent-servers-heading">
-                    <x-workspace-panel-head
-                        dense
-                        class="border-b border-brand-ink/10"
-                        icon="heroicon-o-server-stack"
-                        title-id="dashboard-recent-servers-heading"
-                        :title="__('Recent servers')"
-                        :note="__('The five most recently added boxes in your workspace.')"
-                        :count="$serverCount > 0 ? $serverCount : null"
-                    />
-
-                    @if ($servers->isEmpty())
-                        <div class="flex flex-col items-center justify-center px-3 py-8 text-center sm:px-4">
-                            <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                            </span>
-                            <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No servers yet') }}</p>
-                            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                                @if (multi_surface_active())
-                                    {{ __('Start with the launchpad — BYO, Docker, serverless, Kubernetes, edge, or cloud network.') }}
-                                @else
-                                    {{ __('Spin up your first server — bring your own host or provision a VM from a connected cloud provider.') }}
-                                @endif
-                            </p>
-                            <a
-                                href="{{ $primaryHref }}"
-                                wire:navigate
-                                class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $primaryLabel }}
-                            </a>
-                        </div>
-                    @else
-                        <ul class="divide-y divide-brand-ink/10">
-                            @foreach ($servers as $server)
-                                @php
-                                    $status = (string) ($server->status ?? '');
-                                    $statusTone = match (true) {
-                                        in_array($status, ['ready', 'running', 'active'], true) => 'border-brand-sage/30 bg-brand-sage/15 text-brand-forest',
-                                        in_array($status, ['provisioning', 'pending', 'queued'], true) => 'border-sky-200 bg-sky-50 text-sky-700',
-                                        in_array($status, ['failed', 'error'], true) => 'border-red-200 bg-red-50 text-red-700',
-                                        default => 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss',
-                                    };
-                                @endphp
-                                <li wire:key="server-{{ $server->id }}">
-                                    <a
-                                        href="{{ route('servers.show', $server) }}"
-                                        wire:navigate
-                                        class="flex items-center justify-between gap-4 px-3 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-4"
-                                    >
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                                <span class="truncate text-sm font-semibold text-brand-ink">{{ $server->name }}</span>
-                                                @if ($status !== '')
-                                                    <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
-                                                @endif
                                             </div>
-                                            {{-- One meta line, not two: host/provider facts and the
-                                                 site/age facts wrap together, which costs a row of
-                                                 height only when the column is genuinely too narrow. --}}
-                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
-                                                @if ($server->ip_address)
-                                                    <span class="font-mono text-brand-moss">{{ $server->ip_address }}</span>
-                                                @endif
-                                                <span class="inline-flex items-center gap-1">
-                                                    <x-heroicon-m-cloud class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                                    {{ $server->providerDisplayLabel() }}
-                                                </span>
-                                                @if ($server->region)
-                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
-                                                    <span>{{ $server->region }}</span>
-                                                @endif
-                                                @if ($server->size)
-                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
-                                                    <span class="font-mono">{{ $server->size }}</span>
-                                                @endif
-                                                <span aria-hidden="true" class="text-brand-mist/50">·</span>
-                                                <span class="inline-flex items-center gap-1 text-brand-moss">
-                                                    <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                    {{ $server->sites_count }} {{ trans_choice('site|sites', $server->sites_count) }}
-                                                </span>
-                                                @if ($server->created_at)
-                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
-                                                    <span class="inline-flex items-center gap-1 text-brand-moss">
-                                                        <x-heroicon-m-clock class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                        {{ __('added :time', ['time' => $server->created_at->diffForHumans()]) }}
-                                                    </span>
-                                                @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            <p class="truncate text-xs text-brand-moss">{{ $server->providerDisplayLabel() }}</p>
+                                            <p class="mt-0.5 truncate font-mono text-2xs text-brand-mist">
+                                                {{ $server->region ?: '—' }}@if ($server->size) <span aria-hidden="true" class="text-brand-mist/50">·</span> {{ $server->size }}@endif
                                             </p>
-                                        </div>
-                                        <span class="inline-flex shrink-0 items-center gap-1 self-start text-xs font-semibold text-brand-sage">
-                                            {{ __('Manage') }}
-                                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                        </span>
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
-                        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 text-right sm:px-4">
-                            <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
-                                {{ __('View all servers') }}
-                                <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
-                            </a>
-                        </div>
-                    @endif
-                </section>
-            </div>
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            <div class="h-1.5 w-16 overflow-hidden rounded-full bg-brand-ink/10">
+                                                <div class="h-full rounded-full {{ $healthTone }}" style="width: {{ $health ?? 0 }}%"></div>
+                                            </div>
+                                            <p class="mt-1 font-mono text-2xs tabular-nums text-brand-moss">{{ $health ?? '—' }}</p>
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            @if ($row['open'] > 0)
+                                                <a href="{{ route('servers.insights', $server) }}" wire:navigate class="inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide {{ $findingTone }}">
+                                                    {{ $row['open'] }} {{ $worst ?? __('open') }}
+                                                </a>
+                                            @else
+                                                <span class="text-xs text-brand-mist">{{ __('clean') }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            @if ($deployStatus === null)
+                                                <span class="font-mono text-2xs text-brand-mist">—</span>
+                                            @else
+                                                <p class="text-xs font-medium {{ $deployTone }}">{{ str_replace('_', ' ', $deployStatus) }}</p>
+                                                @if ($row['deploy_at'])
+                                                    <p class="mt-0.5 font-mono text-2xs text-brand-mist">{{ $row['deploy_at']->diffForHumans(short: true) }}</p>
+                                                @endif
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 text-right align-middle sm:px-4">
+                                            <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                                {{ __('Manage') }}
+                                                <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 text-xs text-brand-moss sm:px-4">
+                        <span>
+                            {{ __(':shown of :total shown', ['shown' => $rows->count(), 'total' => $serverCount]) }}
+                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
+                            {{ __('worst first') }}
+                        </span>
+                        <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center gap-1 font-mono tabular-nums hover:text-brand-ink">
+                            {{-- Workspace-wide on purpose: this rollup spans every host and
+                                 every site-scoped finding, so it will not tally to the
+                                 server-scoped counts in the column above. --}}
+                            {{ __(':count open findings across the workspace', ['count' => $openFindings]) }}@if ($avgHealthScore !== null) <span aria-hidden="true" class="text-brand-mist/60">·</span> {{ __('health :score', ['score' => (int) $avgHealthScore]) }}@endif
+                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                        </a>
+                    </div>
+                @endif
+            @endif
         </x-profile-shell>
     </div>
 </div>

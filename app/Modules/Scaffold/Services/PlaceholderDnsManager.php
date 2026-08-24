@@ -245,7 +245,7 @@ class PlaceholderDnsManager
     }
 
     /**
-     * @param  array<string, mixed> $assignment
+     * @param  array<string, mixed>  $assignment
      */
     private function persistAssignment(Site $site, array $assignment): void
     {

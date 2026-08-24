@@ -41,45 +41,7 @@
                     @endif
                 </x-slot:actions>
 
-                {{-- The org page had no glance row at all while the personal one
-                     did. Same three-up shape, counting what matters here: how
-                     many destinations exist, how many are actually wired to
-                     events, and how many page a human. --}}
-                @php
-                    $routedCount = $channels->where('subscriptions_count', '>', 0)->count();
-                    $pagingCount = $channels->filter(fn ($c) => $c->isPaging())->count();
-                @endphp
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Notification channels at a glance') }}">
-                        <div class="bg-white px-3 py-2">
-                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Channels') }}</dt>
-                            <dd class="mt-0.5 flex items-baseline gap-1.5">
-                                <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
-                                <span class="truncate text-xs text-brand-moss">{{ trans_choice('destination|destinations', $channelCount) }}</span>
-                            </dd>
-                        </div>
-                        <div class="bg-white px-3 py-2">
-                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Routed') }}</dt>
-                            <dd class="mt-0.5 flex items-baseline gap-1.5">
-                                <span class="font-mono text-base font-semibold tabular-nums {{ $channelCount > 0 && $routedCount === 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $routedCount }}</span>
-                                <span class="truncate text-xs text-brand-moss">
-                                    {{ $channelCount > 0 && $routedCount < $channelCount
-                                        ? __(':n not subscribed', ['n' => $channelCount - $routedCount])
-                                        : __('subscribed to events') }}
-                                </span>
-                            </dd>
-                        </div>
-                        <div class="bg-white px-3 py-2">
-                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Paging') }}</dt>
-                            <dd class="mt-0.5 flex items-baseline gap-1.5">
-                                <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $pagingCount }}</span>
-                                <span class="truncate text-xs text-brand-moss">{{ trans_choice('wakes on-call|wake on-call', $pagingCount) }}</span>
-                            </dd>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-
-                @include('livewire.settings.partials.notification-channels-content')
+                @include($contentPartial)
             </x-organization-shell>
         </div>
     @else
@@ -113,42 +75,13 @@
                 @endif
             </x-slot:actions>
 
-            @php
-                $orgChannelCount = isset($organizationChannels) ? $organizationChannels->count() : 0;
-                $teamChannelCount = ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count());
-                $teamCount = ($teamChannelGroups ?? collect())->count();
-            @endphp
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('Notification channels at a glance') }}">
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss">{{ trans_choice('channel you own|channels you own', $channelCount) }}</span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $orgChannelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss" title="{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('no current org') }}</span>
-                        </dd>
-                    </div>
-                    <div class="bg-white px-3 py-2">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
-                        <dd class="mt-0.5 flex items-baseline gap-1.5">
-                            <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $teamChannelCount }}</span>
-                            <span class="truncate text-xs text-brand-moss">{{ trans_choice('across :n team|across :n teams', $teamCount, ['n' => $teamCount]) }}</span>
-                        </dd>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
-            @include('livewire.settings.partials.notification-channels-content')
+            @include($contentPartial)
         </x-profile-shell>
     @endif
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- The page root is a plain <div>, not a component, so a named "modals"
+         slot here is orphaned on every Livewire re-render — which left the
+         delete confirmation never appearing. The partial teleports to <body>,
+         so include it directly (same fix as sites/show.blade.php). --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

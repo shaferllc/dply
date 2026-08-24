@@ -315,7 +315,7 @@ return [
             'group' => 'organization',
         ],
         [
-            'route' => 'organizations.teams',
+            'route' => 'organizations.members',
             'slug' => 'org-teams',
             'group' => 'organization',
         ],
@@ -355,7 +355,7 @@ return [
             'group' => 'account',
         ],
         [
-            'route' => 'profile.backup-configurations',
+            'route' => 'organizations.credentials',
             'slug' => 'account-backup-destinations',
             'group' => 'account',
         ],

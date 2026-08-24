@@ -36,25 +36,6 @@
                 ['label' => __('Invoices'), 'icon' => 'document-text'],
             ]"
         >
-            <x-slot:actions>
-                <a
-                    href="{{ route('billing.show', $organization) }}"
-                    wire:navigate
-                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                >
-                    <x-heroicon-o-credit-card class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Billing & plan') }}
-                </a>
-                <a
-                    href="{{ route('billing.analytics', $organization) }}"
-                    wire:navigate
-                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                >
-                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Analytics') }}
-                </a>
-            </x-slot:actions>
-
             {{-- Hairline strip rather than three fleet-stat cards: the same three
                  numbers in roughly a fifth of the vertical space, matching the
                  notification-channels glance row. --}}

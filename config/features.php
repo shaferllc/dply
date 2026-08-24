@@ -42,11 +42,11 @@
 |   workspace.* — server-workspace pages + *_preview teasers
 |   provider.*  — gradual VM provider rollout (plus server_providers catalog)
 |   cache.* / database.* — per-engine install rollout (CacheEngineAvailability, DatabaseEngineAvailability)
-|   global.*    — platform kill switches (vm_enabled, edge_delivery_enabled, …)
+|   global.*    — platform kill switches (vm_enabled, billing_enabled, …)
 |   launch.*    — cross-product wizards
 |
 | Core BYO workspace (Overview, Sites, Metrics, Logs, Firewall, Cron, …) has
-| no workspace.* flag — only roadmap/advanced tabs and previews are gated here.
+| no workspace.* flag — only advanced tabs and previews are gated here.
 |
 | Adding a flag:
 |   1. Add an entry below with an exit-criteria comment.
@@ -224,7 +224,9 @@ return [
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         'docker' => true,
         'docker_preview' => true,
-        'backups' => env('FEATURE_WORKSPACE_BACKUPS', true),
+        // Parked with the rest of the Services tier — see config/features.php
+        // 'surface' block. The pages still exist behind the flag.
+        'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // Parked — see the server_blueprint note above.
@@ -282,51 +284,31 @@ return [
     'surface' => [
 
         /*
-        | Cloud apps are live again (create / index / workspace). Set
-        | FEATURE_SURFACE_CLOUD=false to park it.
+        | Managed databases (index / create / cluster workspace). Set
+        | FEATURE_SURFACE_DATABASES=false to park it.
         |
-        | Edge stays parked. Hard `false` rather than env(..., false) on
-        | purpose: an env var or a stale `features` row flipping it back on
-        | mid-park is the failure we don't want.
-        |
-        |   'edge'  => env('FEATURE_SURFACE_EDGE', true),
-        |
-        | Serverless is live again (create / index / workspace). Set
-        | FEATURE_SURFACE_SERVERLESS=false to park it. Managed delivery
-        | (dply-hosted FaaS, no customer DO token) is FEATURE_SURFACE_SERVERLESS_MANAGED.
-        |
-        | Off means the route groups 404 (routes/web.php `feature:surface.*`)
+        | Off means the route group 404s (routes/web.php `feature:surface.*`)
         | and every nav entry falls to its "Coming soon" branch. Webhooks and
         | scheduled jobs stay live regardless — see the note above.
+        |
+        | The Cloud, Edge and Serverless surfaces lived here until those
+        | products moved to their own app; managed databases rode on
+        | surface.cloud and now carry their own flag.
         */
-        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
-
-        // Creating a container app from the CLI (`dply init --kind cloud`).
-        // Sibling of surface.serverless_cli_create, and on for the same
-        // reason — the flag is the kill switch, not the rollout gate.
-        'cloud_cli_create' => env('FEATURE_SURFACE_CLOUD_CLI_CREATE', true),
+        'databases' => env('FEATURE_SURFACE_DATABASES', true),
 
         // Creating a site on a BYO server from the CLI (`dply init --kind vm`).
-        // Narrower in scope than its siblings: ordinary webserver hosts only —
-        // see App\Services\Sites\CreateVmSite.
+        // Ordinary webserver hosts only — see App\Services\Sites\CreateVmSite.
         'vm_cli_create' => env('FEATURE_SURFACE_VM_CLI_CREATE', true),
-        'edge' => false,
-        'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
-        'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', true),
-
-        // Creating a serverless site from the CLI (`dply init`). On by
-        // default; the flag remains the kill switch for an operator who wants
-        // the product without the write endpoint. Checked inside
-        // ServerlessCreateGate, so turning it off makes a dry run report a
-        // typed blocker and /api/capabilities report the kind uncreatable —
-        // the CLI then says "switched off here", not "not built yet".
-        'serverless_cli_create' => env('FEATURE_SURFACE_SERVERLESS_CLI_CREATE', true),
 
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
         'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
-        'realtime' => env('FEATURE_SURFACE_REALTIME', true),
+        // Parked for this version: the whole Services tier ships as "coming
+        // soon" — nav entries fall to their coming-soon branch and the routes
+        // 404. Flip the env var (or this default) to bring one back.
+        'realtime' => env('FEATURE_SURFACE_REALTIME', false),
         'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', true),
         // dply Queue — the managed job queue. Default off: the control plane
         // exists but the data plane does not yet. Runtime dials and pricing
@@ -334,7 +316,7 @@ return [
         // Exit criteria: SQS-compatible API verified against Laravel's stock
         // `sqs` driver, and queue-doctor reporting the cache / failed-job gaps
         // (docs/adr/dply-queue.md).
-        'queue' => env('FEATURE_SURFACE_QUEUE', true),
+        'queue' => env('FEATURE_SURFACE_QUEUE', false),
         // dply Cache — the managed cache. The shared tier's data plane is
         // live (DynamoDB-compatible endpoint over Postgres); the dedicated
         // tier and the Serverless fold-in are not. Runtime dials live in
@@ -343,7 +325,7 @@ return [
         // which gates cache ENGINES offered for install on BYO servers.
         // Exit criteria: /caches index + show, attach/detach, and the docs
         // page (docs/adr/dply-cache.md, M2).
-        'cache' => env('FEATURE_SURFACE_CACHE', true),
+        'cache' => env('FEATURE_SURFACE_CACHE', false),
     ],
 
     /*
@@ -358,26 +340,13 @@ return [
         // Be careful with this flag.
         'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
-        'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
-        'deploy_contract' => env('FEATURE_GLOBAL_DEPLOY_CONTRACT', true),
-        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', false),
         'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
-        'edge_delivery_enabled' => env('FEATURE_GLOBAL_EDGE_DELIVERY_ENABLED', true),
     ],
 
-    /*
-    | Cloud + Edge surfaces are enabled for the org.
-    */
     'launch' => [
-        // PARKED with surface.cloud / surface.edge. The full-stack wizard is not
-        // independently useful without them: every plan it builds emits an
-        // `edge.create` handoff (FullStackArchitecturePlanner, launchRoute:
-        // 'edge.create'). Those routes stay registered while parked — only the
-        // feature middleware rejects — so the wizard would still render a plan
-        // whose every "launch" button dead-ends on the gate. Restore with them:
-        //   'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', true),
-        'full_stack_wizard' => false,
+        // The full-stack wizard went with the Cloud and Edge products it planned
+        // against — every plan it built ended in an `edge.create` handoff.
         'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', true),
     ],
 

@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
-use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Show;
 use App\Models\Site;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Modules\Scaffold\Services\ScaffoldStep;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 
 /**
  * Drives the app-install (scaffold) pipeline surface — the steps timeline,
@@ -24,7 +25,8 @@ use Illuminate\Support\Facades\Auth;
  */
 trait InteractsWithScaffoldJourney
 {
-    /** Reveal-once gate for the generated admin password (Q7). */
+    /** Reveal-once gate for the generated admin password (Q7). Locked so viewers cannot `$wire.set` it. */
+    #[Locked]
     public bool $scaffoldPasswordRevealed = false;
 
     /** Lightweight poll target — just pulls fresh scaffold meta. */
@@ -37,9 +39,7 @@ trait InteractsWithScaffoldJourney
     {
         // PR 17 (re-auth-required reveal) hardens this; v1 just gates
         // by org admin so non-admins can't read the secret from the UI.
-        $user = Auth::user();
-        $org = $this->site->organization;
-        if ($org === null || ! $org->hasAdminAccess($user)) {
+        if (! $this->userCanRevealScaffoldPassword()) {
             $this->addError('reveal', __('Only org owners or admins can reveal the admin password.'));
 
             return;
@@ -101,6 +101,13 @@ trait InteractsWithScaffoldJourney
     public function scaffoldJourneyData(): array
     {
         $steps = $this->scaffoldSteps();
+        $canReveal = $this->userCanRevealScaffoldPassword();
+
+        // Viewers must never keep a true reveal flag or receive plaintext,
+        // even if the locked property was somehow flipped server-side.
+        if ($this->scaffoldPasswordRevealed && ! $canReveal) {
+            $this->scaffoldPasswordRevealed = false;
+        }
 
         return [
             'steps' => $steps,
@@ -111,7 +118,34 @@ trait InteractsWithScaffoldJourney
             'canRetry' => $this->scaffoldCanRetry(),
             'failedStep' => collect($steps)->firstWhere('state', ScaffoldStep::STATE_FAILED),
             'scaffoldFramework' => ucfirst((string) ($this->site->meta['scaffold']['framework'] ?? 'site')),
+            'revealedScaffoldAdminPassword' => $this->revealedScaffoldAdminPassword($canReveal),
         ];
+    }
+
+    private function userCanRevealScaffoldPassword(): bool
+    {
+        $user = Auth::user();
+        $org = $this->site->organization;
+
+        return $user !== null && $org !== null && $org->hasAdminAccess($user);
+    }
+
+    /**
+     * Decrypt only for an org admin who already passed the reveal action.
+     * Plaintext stays in view data for this render — never a public Livewire property.
+     */
+    private function revealedScaffoldAdminPassword(bool $canReveal): ?string
+    {
+        if (! $this->scaffoldPasswordRevealed || ! $canReveal) {
+            return null;
+        }
+
+        $encrypted = $this->site->meta['scaffold']['admin_password'] ?? null;
+        if (! is_string($encrypted) || $encrypted === '') {
+            return null;
+        }
+
+        return decrypt($encrypted);
     }
 
     protected function siteIsScaffolded(): bool

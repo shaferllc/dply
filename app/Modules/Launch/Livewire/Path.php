@@ -9,7 +9,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Path extends Component
 {
-    public string $path = 'serverless';
+    public string $path = 'kubernetes';
 
     public function mount(string $path): void
     {
@@ -42,25 +42,6 @@ class Path extends Component
     protected function definitions(): array
     {
         return [
-            'serverless' => [
-                'eyebrow' => __('Serverless'),
-                'title' => __('Start with a serverless target'),
-                'description' => __('Use this lane for function-style app execution instead of creating or connecting a machine.'),
-                'items' => [
-                    [
-                        'title' => __('AWS Lambda'),
-                        'description' => __('Use the Lambda and Bref-oriented path for PHP app deploys that run as serverless functions.'),
-                        'href' => route('launches.serverless'),
-                        'cta' => __('Plan Lambda path'),
-                    ],
-                    [
-                        'title' => __('Functions'),
-                        'description' => __('Target a functions namespace with a function-native deployment flow.'),
-                        'href' => route('launches.serverless'),
-                        'cta' => __('Plan Functions path'),
-                    ],
-                ],
-            ],
             'kubernetes' => [
                 'eyebrow' => __('Kubernetes'),
                 'title' => __('Start with a cluster-first setup'),

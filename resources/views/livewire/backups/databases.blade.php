@@ -212,6 +212,27 @@
                     <x-backups-subnav active="databases" />
                 </x-slot:tabs>
 
+                {{-- Coverage: the columns here are the properties a dump needs
+                     before it is worth anything. The list below stays the editor;
+                     this is the scan. --}}
+                @if ($coverageChecks !== [])
+                    <x-backups-coverage-grid
+                        :rows="$coverageChecks"
+                        :entity-label="__('Database')"
+                        :columns="[
+                            'schedule' => __('Schedule'),
+                            'dump' => __('Last dump'),
+                            'offsite' => __('Off-box copy'),
+                            'restore' => __('Restore'),
+                        ]"
+                        :note="__(':covered of :total checks passing across :count databases.', [
+                            'covered' => collect($coverageChecks)->sum('covered'),
+                            'total' => collect($coverageChecks)->sum('applicable'),
+                            'count' => count($coverageChecks),
+                        ])"
+                    />
+                @endif
+
                 {{-- One row per database, with the schedule protecting it folded
                      in. The old layout split "here are your databases" and "here
                      are your schedules" across two tables, so answering "is this
@@ -224,7 +245,7 @@
                         icon="heroicon-o-circle-stack"
                         :title="__('Databases')"
                         :count="$databases->isNotEmpty() ? $databases->count() : null"
-                        :note="__('Add or edit a schedule from the server workspace. Capped at :cap per instant dump.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))])"
+                        :note="__('Edit a schedule or pull a dump. State is in the grid above. Instant dumps capped at :cap.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))])"
                     />
 
                     @if ($databases->isEmpty())
@@ -261,7 +282,7 @@
                                     wire:key="db-{{ $database->id }}"
                                     @class([
                                         'group grid gap-x-4 gap-y-3 border-l-[3px] px-3 py-3 transition-colors hover:bg-brand-sand/15 sm:px-4',
-                                        'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1fr)_auto_auto] lg:items-center',
+                                        'lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_auto_auto] lg:items-center',
                                         'border-brand-rust' => $lastRunFailed,
                                         'border-brand-sage' => ! $lastRunFailed && $schedule?->is_active,
                                         'border-brand-gold' => ! $lastRunFailed && $schedule && ! $schedule->is_active,
@@ -358,32 +379,6 @@
                                             @else
                                                 <span class="text-xs text-brand-mist">{{ __('Not scheduled') }}</span>
                                             @endif
-                                        @endif
-                                    </div>
-
-                                    {{-- Last run + where it landed --}}
-                                    <div class="min-w-0 text-xs">
-                                        @if ($schedule?->last_run_at)
-                                            <p class="truncate text-brand-ink">
-                                                <span class="font-medium">{{ $schedule->last_run_at->diffForHumans(short: true) }}</span>
-                                                @if ($latestBytes)
-                                                    <span class="font-mono tabular-nums text-brand-moss">· {{ \Illuminate\Support\Number::fileSize($latestBytes) }}</span>
-                                                @endif
-                                            </p>
-                                        @elseif ($schedule)
-                                            <p class="text-brand-mist">{{ __('Never run') }}</p>
-                                        @elseif ($latestBytes)
-                                            <p class="truncate font-mono tabular-nums text-brand-moss">{{ \Illuminate\Support\Number::fileSize($latestBytes) }}</p>
-                                        @else
-                                            <p class="text-brand-mist">{{ __('Never dumped') }}</p>
-                                        @endif
-                                        {{-- Only a schedule has a destination; showing
-                                             "Server default" against an unscheduled row
-                                             would imply something ships somewhere. --}}
-                                        @if ($schedule)
-                                            <p class="mt-0.5 truncate text-brand-mist">
-                                                {{ $schedule->backupConfiguration?->name ?? __('Server default') }}
-                                            </p>
                                         @endif
                                     </div>
 

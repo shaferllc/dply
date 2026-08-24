@@ -8,8 +8,6 @@ use App\Models\Concerns\Site\DerivesWorkerEnvironment;
 use App\Models\Concerns\Site\GuardsSiteAccess;
 use App\Models\Concerns\Site\HasSiteRelationships;
 use App\Models\Concerns\Site\ManagesAtomicLayout;
-use App\Models\Concerns\Site\ManagesEdgeHosting;
-use App\Models\Concerns\Site\ManagesServerless;
 use App\Models\Concerns\Site\ResolvesSiteHostnames;
 use App\Models\Concerns\Site\ResolvesSiteRuntime;
 use App\Models\Concerns\Site\ResolvesSiteUrls;
@@ -109,8 +107,6 @@ class Site extends Model
 
     use HasSiteRelationships;
     use ManagesAtomicLayout;
-    use ManagesEdgeHosting;
-    use ManagesServerless;
     use ResolvesSiteHostnames;
     use ResolvesSiteRuntime;
     use ResolvesSiteUrls;
@@ -508,13 +504,11 @@ class Site extends Model
     }
 
     /**
-     * Cloud (container) apps.
+     * Container apps (Docker / Kubernetes hosts).
      *
      * The predicate is `type = Container` OR a non-null `container_backend`:
-     * sites created through the Cloud surface carry the type, while some
-     * imported/legacy rows only ever got the backend column. Extracted from
-     * App\Livewire\Cloud\Index so callers stop re-deriving it — getting one
-     * half of the OR wrong silently hides apps.
+     * some imported/legacy rows only ever got the backend column, so getting
+     * one half of the OR wrong silently hides apps.
      *
      * @param  Builder<Site>  $query
      */

@@ -52,7 +52,7 @@ Creating new API tokens may require **Pro**, depending on how your instance is c
 
 ## Profile versus organization settings
 
-- **Profile** (your user): email, password, two‑factor, OAuth accounts, personal SSH keys, **Git source control** connections.
+- **Profile** (your user): email, password, two‑factor, OAuth accounts, personal SSH keys, **Git source control** connections (personal; the org's shared token lives under Organization → Credentials).
 - **Organization**: servers, sites, server provider credentials, billing, members, org‑scoped SSH keys, notification channels, and API tokens.
 
 Git providers live under **profile** so one GitHub (or GitLab, Bitbucket) connection can serve repos across orgs you belong to.

@@ -8,6 +8,7 @@ use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncWorkerPoolEnvJob;
 use App\Jobs\TestSiteHealthJob;
 use App\Models\ConsoleAction;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploymentEphemeralCredential;
@@ -18,7 +19,6 @@ use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
-use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Jobs\RunSiteInsightsJob;
@@ -26,7 +26,6 @@ use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
-use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
@@ -244,10 +243,6 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'deployment_id' => $deployment->id,
             ], $this->timeout + 120);
 
-            if ($this->site->usesFunctionsRuntime()) {
-                app(ServerlessDeployProgress::class)->seed($this->site);
-            }
-
             // Retrying a failed first serverless deploy: leave the "failed"
             // badge and return to configured-while-deploying so the journey /
             // index read as in-flight, not still broken.
@@ -358,14 +353,6 @@ class RunSiteDeploymentJob implements ShouldQueue
                     }
                 }
 
-                if ($this->site->usesFunctionsRuntime()) {
-                    $progress = app(ServerlessDeployProgress::class);
-                    $progress->checkpoint($this->site);
-                    if ($deployment->fresh()?->status === SiteDeployment::STATUS_FAILED) {
-                        throw new ServerlessDeployCancelledException('Deploy cancelled by operator.');
-                    }
-                }
-
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
                     'git_sha' => $result['sha'],
@@ -444,9 +431,6 @@ class RunSiteDeploymentJob implements ShouldQueue
                     }
                 }
             } catch (\Throwable $e) {
-                if ($this->site->usesFunctionsRuntime()) {
-                    app(ServerlessDeployProgress::class)->flushLog($this->site);
-                }
                 $msg = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($e->getMessage()));
                 $existingLog = trim((string) ($deployment->fresh()?->log_output ?? ''));
                 $deployment->update([
@@ -807,14 +791,13 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         $org = $site->organization;
-        $userIds = collect([$site->user_id])->filter();
-        if ($org) {
-            $userIds = $userIds->merge(
-                $org->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')
-            );
-        }
 
-        $users = User::query()->whereIn('id', $userIds->unique()->all())->get();
+        // Recipients are an organization setting now, not a rule baked in here.
+        // The default is what this block used to hardcode — site owner plus
+        // every owner and admin — so nothing changes until someone edits it.
+        $users = $org
+            ? $org->emailRecipients(Organization::EMAIL_DEPLOY, $site->user)
+            : User::query()->whereIn('id', collect([$site->user_id])->filter()->all())->get();
         $event = $notificationPublisher->publish(
             eventKey: 'site.deployments',
             subject: $deployment->fresh(),

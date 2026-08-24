@@ -13,11 +13,6 @@ final class ProductLineKillSwitches
         return (bool) config('features.global.vm_enabled', true);
     }
 
-    public static function edgeDeliveryEnabled(): bool
-    {
-        return (bool) config('features.global.edge_delivery_enabled', true);
-    }
-
     public static function siteIsVmByo(Site $site): bool
     {
         if ($site->usesEdgeRuntime()) {
@@ -51,10 +46,5 @@ final class ProductLineKillSwitches
     public static function blocksVmServerCreate(): bool
     {
         return ! self::vmEnabled();
-    }
-
-    public static function blocksEdgeDelivery(): bool
-    {
-        return ! self::edgeDeliveryEnabled();
     }
 }

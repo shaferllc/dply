@@ -26,9 +26,8 @@
         'profile.ssh-keys',
         'profile.api-keys',
         'profile.cli',
-        'profile.backup-configurations',
-        'profile.backup-destinations',
         'profile.notification-channels',
+        'profile.notification-channels.bulk-assign',
     );
 
     // Organizations is its own top-level menu item (peer to Account / Guides),
@@ -88,12 +87,6 @@
                                 </x-slot>
                                 {{ __('API keys') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.backup-destinations')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-archive-box class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Backup destinations') }}
-                            </x-dropdown-link>
                             {{-- CLI hidden for now — bringing it back later.
                             <x-dropdown-link :href="route('profile.cli')" wire:navigate>
                                 <x-slot name="icon">
@@ -102,6 +95,12 @@
                                 {{ __('CLI') }}
                             </x-dropdown-link>
                             --}}
+                            <x-dropdown-link :href="route('settings.servers')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-server class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('Servers & sites') }}
+                            </x-dropdown-link>
                             <x-dropdown-link :href="route('profile.notification-channels')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-bell-alert class="h-[1.15rem] w-[1.15rem]" />
@@ -278,14 +277,6 @@
                 <x-heroicon-o-bolt class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('API keys') }}
             </a>
-            <a
-                href="{{ route('profile.backup-destinations') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.backup-destinations') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-archive-box class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Backup destinations') }}
-            </a>
             {{-- CLI hidden for now — bringing it back later.
             <a
                 href="{{ route('profile.cli') }}"
@@ -299,7 +290,10 @@
             <a
                 href="{{ route('profile.notification-channels') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('profile.notification-channels') ? $navOn : $navOff])
+                {{-- …'.*' too: /bulk-assign is a child of this page, and leaving
+                     the parent unlit made the sidebar look like you had navigated
+                     out of Settings entirely. --}}
+                @class([$navBase, request()->routeIs('profile.notification-channels', 'profile.notification-channels.*') ? $navOn : $navOff])
             >
                 <x-heroicon-o-bell-alert class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Notification channels') }}
@@ -310,7 +304,7 @@
             <a
                 href="{{ route('settings.profile') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'settings.servers', 'profile.delete-account') ? $navOn : $navOff])
+                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'profile.delete-account') ? $navOn : $navOff])
             >
                 <x-heroicon-o-user-circle class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Profile') }}
@@ -332,6 +326,17 @@
             >
                 <x-heroicon-o-shield-check class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Security') }}
+            </a>
+            {{-- Servers & sites is its own page, not a tab inside Profile: it
+                 holds organization and team defaults, which are nobody's personal
+                 settings. --}}
+            <a
+                href="{{ route('settings.servers') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('settings.servers') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('Servers & sites') }}
             </a>
             <a
                 href="{{ route('profile.source-control') }}"
@@ -388,52 +393,6 @@
                         </span>
                     </a>
                 @endforeach
-            </nav>
-        </div>
-
-        <div class="mt-5 border-t border-brand-ink/10 pt-4">
-            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
-            <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
-                <a
-                    href="{{ route('docs.index') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.index') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('All docs') }}
-                </a>
-                <a
-                    href="{{ route('docs.connect-provider') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.connect-provider') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-cloud class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Connect a provider') }}
-                </a>
-                <a
-                    href="{{ route('docs.create-first-server') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.create-first-server') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Create your first server') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'org-roles-and-limits' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-user-group class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Roles & plan limits') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'source-control' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-code-bracket-square class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Source control & deploys') }}
-                </a>
             </nav>
         </div>
     @endif

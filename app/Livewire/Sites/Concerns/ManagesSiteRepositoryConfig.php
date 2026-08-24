@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\RemoveSiteRepositoryJob;
-use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
-use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
-use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\DeployRepoPreflight;
+use App\Modules\Deploy\Services\RepositoryCheckout;
+use App\Modules\Deploy\Services\RepositoryRuntimeDetector;
 use App\Modules\Deploy\Services\SiteQuickDeployCommitPoller;
-use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Support\SiteDeployKeyGenerator;
+use Illuminate\Support\Str;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -151,10 +152,10 @@ trait ManagesSiteRepositoryConfig
      */
     private function warnIfRepositoryUnreachable(): void
     {
-        $error = app(\App\Modules\Deploy\Services\DeployRepoPreflight::class)->check($this->site->fresh());
+        $error = app(DeployRepoPreflight::class)->check($this->site->fresh());
         if ($error !== null) {
             $firstLine = trim((string) strtok($error, "\n"));
-            $this->toastError(__('Saved, but the repository check failed: :reason', ['reason' => \Illuminate\Support\Str::limit($firstLine, 180)]));
+            $this->toastError(__('Saved, but the repository check failed: :reason', ['reason' => Str::limit($firstLine, 180)]));
         }
     }
 
@@ -440,6 +441,36 @@ trait ManagesSiteRepositoryConfig
         $this->functionsOverridesTouched = true;
     }
 
+    /**
+     * Target capabilities handed to the runtime detector.
+     *
+     * ServerlessTargetCapabilityResolver resolved this per host (DO Functions
+     * / AWS Lambda) and was deleted with the serverless module
+     * (remove-cloud-edge-serverless). No serverless target survives, so this is
+     * that resolver's "unknown target" branch, inlined: detection still runs
+     * and reports nothing supported rather than fataling.
+     *
+     * @return array<string, mixed>
+     */
+    private static function detectionCapabilities(): array
+    {
+        return [
+            'target' => 'unknown',
+            'supports_runtime_detection' => false,
+            'supports_php_runtime' => false,
+            'supports_node_runtime' => false,
+            'supports_python_runtime' => false,
+            'supports_go_runtime' => false,
+            'default_runtime' => '',
+            'default_php_runtime' => '',
+            'default_python_runtime' => 'python3.12',
+            'default_entrypoint' => '',
+            'default_package' => '',
+            'host_label' => 'Unknown',
+            'features' => [],
+        ];
+    }
+
     private function refreshFunctionsDetection(): void
     {
         if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
@@ -458,7 +489,7 @@ trait ManagesSiteRepositoryConfig
         $checkout = null;
 
         try {
-            $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
+            $checkout = app(RepositoryCheckout::class)->checkout(
                 'preview-site-'.$this->site->id.'-'.md5($repositoryUrl.'|'.$branch.'|'.$this->functions_repository_subdirectory),
                 $repositoryUrl,
                 $branch,
@@ -467,9 +498,9 @@ trait ManagesSiteRepositoryConfig
                 $this->functions_repo_source === 'provider' ? $this->functions_source_control_account_id : null,
             );
 
-            $this->functionsDetection = app(ServerlessRuntimeDetector::class)->detect(
+            $this->functionsDetection = app(RepositoryRuntimeDetector::class)->detect(
                 $checkout['working_directory'],
-                app(ServerlessTargetCapabilityResolver::class)->forServer($this->server),
+                self::detectionCapabilities(),
             );
 
             if (! $this->functionsOverridesTouched) {
@@ -494,7 +525,7 @@ trait ManagesSiteRepositoryConfig
             ];
         } finally {
             if (is_array($checkout)) {
-                app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
+                app(RepositoryCheckout::class)->cleanup($checkout['workspace_path']);
             }
         }
     }

@@ -73,7 +73,7 @@
 
             {{-- Footer --}}
             <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-3">
-                <a href="{{ route('scripts.marketplace', $webserver !== '' ? ['webserver' => $webserver] : []) }}" wire:navigate class="text-xs font-medium text-brand-forest hover:underline">
+                <a href="{{ route('marketplace.index', ['category' => 'scripts']) }}" wire:navigate class="text-xs font-medium text-brand-forest hover:underline">
                     {{ __('Open full marketplace →') }}
                 </a>
                 <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">

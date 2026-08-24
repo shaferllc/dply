@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Modules\Edge\Support\EdgeSiteHasWorker;
 use App\Support\Sites\SiteDatabaseWorkspace;
 use Laravel\Pennant\Feature;
 
@@ -22,10 +21,6 @@ final class SiteSettingsSidebar
      */
     public static function items(Site $site, Server $server): array
     {
-        if ($site->usesEdgeRuntime()) {
-            return self::edgeItems($site);
-        }
-
         $supportsSsh = $server->hostCapabilities()->supportsSsh();
 
         if ($site->isCustom()) {
@@ -52,16 +47,10 @@ final class SiteSettingsSidebar
         // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
         // so the page reads: configure → run → observe → destroy.
         //
-        // The `routing` item below is DIFFERENT from the VM `routing` (which
-        // edits nginx server blocks). Here it manages dply's edge proxy:
-        // hostname & DNS, custom domains pointed at the function, path
-        // redirects, response headers + CORS, the invocation URL. Same group
-        // key ("networking"), different surface.
         $base = $isContainerWorkspace
             ? [
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
-                ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
                 // Access is Routing's sibling: Routing is where the function
                 // lives, Access is who may call it (exposure, shared secret,
                 // CORS, bound parameters). Split out of Runtime.
@@ -79,7 +68,6 @@ final class SiteSettingsSidebar
                 ['id' => 'assets', 'label' => __('Assets'), 'icon' => 'heroicon-o-photo', 'group' => 'runtime'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
-                ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
@@ -252,76 +240,6 @@ final class SiteSettingsSidebar
             ...$background,
             ...array_slice($items, $insertIndex),
         ];
-    }
-
-    /**
-     * Edge-native workspace — git builds, CDN delivery, custom domains.
-     * No VM runtime, SSH, nginx, or certificate automation tabs.
-     *
-     * @return list<array{id: string, label: string, icon: string, group: string}>
-     */
-    private static function edgeItems(Site $site): array
-    {
-        $edgeMeta = $site->edgeMeta();
-        $isPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
-
-        $hasWorker = EdgeSiteHasWorker::for($site);
-
-        // Group order follows first appearance: Deploy → Networking (CDN /
-        // redirects) → Site (app features) → Background → Access → Observe.
-        // Bindings / Crons / Jobs need a per-site Worker (SSR or middleware).
-        $items = [
-            ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
-            ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
-            ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
-            ['id' => 'edge-environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'deploy'],
-            ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
-        ];
-
-        if ($hasWorker) {
-            $items[] = ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'deploy'];
-        }
-
-        $items[] = ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'];
-
-        if (! $isPreviewChild) {
-            $items[] = ['id' => 'edge-delivery', 'label' => __('Delivery'), 'icon' => 'heroicon-o-cloud', 'group' => 'networking'];
-            $items[] = ['id' => 'edge-previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-sparkles', 'group' => 'deploy'];
-        }
-
-        $items = [
-            ...$items,
-            ['id' => 'edge-error-pages', 'label' => __('Error pages'), 'icon' => 'heroicon-o-exclamation-circle', 'group' => 'site'],
-            ['id' => 'edge-forms', 'label' => __('Forms'), 'icon' => 'heroicon-o-inbox', 'group' => 'site'],
-            ['id' => 'edge-snippets', 'label' => __('Snippets'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'site'],
-            ['id' => 'edge-tags', 'label' => __('Tags'), 'icon' => 'heroicon-o-tag', 'group' => 'site'],
-        ];
-
-        if ($hasWorker) {
-            $items[] = ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'];
-            $items[] = ['id' => 'edge-jobs', 'label' => __('Jobs'), 'icon' => 'heroicon-o-rectangle-stack', 'group' => 'background'];
-        }
-
-        $items = [
-            ...$items,
-            ['id' => 'edge-firewall', 'label' => __('Firewall'), 'icon' => 'heroicon-o-shield-check', 'group' => 'access'],
-            ['id' => 'edge-bot-protection', 'label' => __('Bot protection'), 'icon' => 'heroicon-o-finger-print', 'group' => 'access'],
-            ['id' => 'edge-rate-limits', 'label' => __('Rate limits'), 'icon' => 'heroicon-o-no-symbol', 'group' => 'access'],
-            ['id' => 'edge-waiting-room', 'label' => __('Waiting room'), 'icon' => 'heroicon-o-queue-list', 'group' => 'access'],
-            ['id' => 'edge-members', 'label' => __('Members'), 'icon' => 'heroicon-o-user-group', 'group' => 'access'],
-            ['id' => 'edge-alerts', 'label' => __('Alerts'), 'icon' => 'heroicon-o-bell-alert', 'group' => 'observability'],
-            ['id' => 'edge-audit', 'label' => __('Audit log'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
-        ];
-
-        if (! $isPreviewChild) {
-            $items[] = ['id' => 'edge-traffic', 'label' => __('Traffic & analytics'), 'icon' => 'heroicon-o-signal', 'group' => 'observability'];
-            $items[] = ['id' => 'edge-billing', 'label' => __('Billing & usage'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability'];
-        }
-
-        $items[] = ['id' => 'edge-logs', 'label' => __('Build & deploy logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'];
-        $items[] = ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'danger'];
-
-        return $items;
     }
 
     /**

@@ -31,6 +31,9 @@ trait ManagesOrganizationVaultSecrets
 
     public ?string $rotating_secret_id = null;
 
+    /** Key of the secret being rotated — the modal heading, so the row is not needed on screen. */
+    public string $rotating_secret_key = '';
+
     public string $rotate_value = '';
 
     /** @var list<string> Secret ids ticked for a bulk action. */
@@ -39,6 +42,22 @@ trait ManagesOrganizationVaultSecrets
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['secrets', 'residency'], true) ? $tab : 'secrets';
+    }
+
+    public function openNewSecretModal(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->reset('vault_key', 'vault_value', 'vault_notes');
+        $this->resetValidation(['vault_key', 'vault_value', 'vault_notes']);
+        $this->dispatch('open-modal', 'new-secret-modal');
+    }
+
+    public function closeNewSecretModal(): void
+    {
+        $this->reset('vault_key', 'vault_value', 'vault_notes');
+        $this->resetValidation(['vault_key', 'vault_value', 'vault_notes']);
+        $this->dispatch('close-modal', 'new-secret-modal');
     }
 
     public function createVaultSecret(OrganizationSecretManager $manager): void
@@ -64,21 +83,26 @@ trait ManagesOrganizationVaultSecrets
             return;
         }
 
-        $this->reset('vault_key', 'vault_value', 'vault_notes');
+        $this->closeNewSecretModal();
         $this->toastSuccess(__('Secret saved. The value cannot be read back — rotate to replace it.'));
     }
 
     public function startRotateVaultSecret(string $secretId): void
     {
         $this->authorize('update', $this->organization);
-        $this->secretForOrg($secretId);
+
         $this->rotating_secret_id = $secretId;
+        $this->rotating_secret_key = $this->secretForOrg($secretId)->key;
         $this->rotate_value = '';
+        $this->resetValidation(['rotate_value']);
+        $this->dispatch('open-modal', 'rotate-secret-modal');
     }
 
     public function cancelRotateVaultSecret(): void
     {
-        $this->reset('rotating_secret_id', 'rotate_value');
+        $this->reset('rotating_secret_id', 'rotating_secret_key', 'rotate_value');
+        $this->resetValidation(['rotate_value']);
+        $this->dispatch('close-modal', 'rotate-secret-modal');
     }
 
     public function rotateVaultSecret(OrganizationSecretManager $manager): void
@@ -90,8 +114,24 @@ trait ManagesOrganizationVaultSecrets
 
         $secret = $this->secretForOrg((string) $this->rotating_secret_id);
         $manager->rotate($secret, $this->rotate_value);
-        $this->reset('rotating_secret_id', 'rotate_value');
+        $this->cancelRotateVaultSecret();
         $this->toastSuccess(__('Secret rotated. Linked sites pick up the new value on the next deploy.'));
+    }
+
+    public function promptDeleteVaultSecret(string $secretId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->openConfirmActionModal(
+            'deleteVaultSecret',
+            [$secretId],
+            __('Delete secret'),
+            __('Delete :key? It unlinks from every site. Those sites drop the key on the next deploy.', [
+                'key' => $this->secretForOrg($secretId)->key,
+            ]),
+            __('Delete'),
+            true,
+        );
     }
 
     public function deleteVaultSecret(string $secretId, OrganizationSecretManager $manager): void
@@ -113,6 +153,29 @@ trait ManagesOrganizationVaultSecrets
     public function clearVaultSelection(): void
     {
         $this->selected_secret_ids = [];
+    }
+
+    public function promptDeleteSelectedVaultSecrets(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $count = count($this->selected_secret_ids);
+        if ($count === 0) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'deleteSelectedVaultSecrets',
+            [],
+            __('Delete selected secrets'),
+            trans_choice(
+                '{1} Delete :count secret? It unlinks from every site, and those sites drop the key on the next deploy.|[2,*] Delete :count secrets? They unlink from every site, and those sites drop the keys on the next deploy.',
+                $count,
+                ['count' => $count],
+            ),
+            __('Delete'),
+            true,
+        );
     }
 
     /**

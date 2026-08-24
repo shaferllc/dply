@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
-use App\Models\GitProviderToken;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Models\SocialAccount;
 use App\Modules\SourceControl\Contracts\GitIdentity;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Services\Sites\SiteDeployCoordinator;
 use App\Support\GitRemoteRepositoryRef;
 use Illuminate\Support\Facades\Http;
@@ -239,39 +238,25 @@ final class SiteQuickDeployCommitPoller
         return null;
     }
 
+    /**
+     * The identity this site polls with. Delegates to {@see GitIdentityResolver}
+     * rather than querying here: the hand-rolled version looked a pinned account
+     * ID up with `find($id)` and NO ownership filter, so an ID belonging to
+     * another user resolved and its token was used. It also predated org-owned
+     * tokens, so a site whose owner had no working credential could not poll
+     * even when its organization owned one.
+     */
     private function resolveIdentity(Site $site, string $provider): ?GitIdentity
     {
-        $id = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
-        if ($id !== '') {
-            $identity = SocialAccount::query()->find($id) ?? GitProviderToken::query()->find($id);
-            if ($identity instanceof GitIdentity && $identity->accessToken() !== '' && $identity->provider() === $provider) {
-                return $identity;
-            }
+        $owner = $site->user;
+        if ($owner === null) {
+            // No owner to scope personal identities to, but the organization may
+            // still own a token — that is the credential a departed member's
+            // site should keep running on.
+            return app(GitIdentityResolver::class)->forSiteOrganization($site, $provider)[0] ?? null;
         }
 
-        $ownerId = $site->user_id;
-        if ($ownerId === null) {
-            return null;
-        }
-
-        $oauth = SocialAccount::query()
-            ->where('user_id', $ownerId)
-            ->where('provider', $provider)
-            ->whereNotNull('access_token')
-            ->where('access_token', '!=', '')
-            ->orderBy('id')
-            ->first();
-        if ($oauth instanceof GitIdentity) {
-            return $oauth;
-        }
-
-        $pat = GitProviderToken::query()
-            ->where('user_id', $ownerId)
-            ->where('provider', $provider)
-            ->orderBy('id')
-            ->first();
-
-        return ($pat instanceof GitIdentity && $pat->accessToken() !== '') ? $pat : null;
+        return app(GitIdentityResolver::class)->forSite($site, $owner, $provider);
     }
 
     /**

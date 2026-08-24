@@ -27,7 +27,9 @@ use Illuminate\Support\Carbon;
  * @property string $provider
  * @property ?string $provider_id
  * @property ?string $user_id
+ * @property ?string $organization_id
  * @property-read ?User $user
+ * @property-read ?Organization $organization
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -38,6 +40,7 @@ class GitProviderToken extends Model implements GitIdentity
 
     protected $fillable = [
         'user_id',
+        'organization_id',
         'provider',
         'provider_id',
         'label',
@@ -69,6 +72,71 @@ class GitProviderToken extends Model implements GitIdentity
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Org-owned tokens for a provider, freshest first. The deploy resolver asks
+     * for these before falling back to the site owner's personal identities —
+     * they are the ones that survive that person leaving.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public static function forOrganization(string $organizationId, ?string $provider = null)
+    {
+        return static::query()
+            ->where('organization_id', $organizationId)
+            ->when($provider !== null, fn ($q) => $q->where('provider', $provider))
+            ->orderByDesc('created_at');
+    }
+
+    /**
+     * The id/name/host triple every "add a token" form needs. One place, because
+     * the org Credentials page and /profile/source-control both build this and
+     * a hand-rolled copy on the former shipped without 'host' — the form reads
+     * it for the "public :host host" hint.
+     *
+     * @return array{id: string, name: string, host: string}
+     */
+    public static function providerDescriptor(string $id): array
+    {
+        return [
+            'id' => $id,
+            'name' => match ($id) {
+                'github' => 'GitHub',
+                'gitlab' => 'GitLab',
+                'bitbucket' => 'Bitbucket',
+                default => ucfirst($id),
+            },
+            'host' => match ($id) {
+                'github' => 'github.com',
+                'gitlab' => 'gitlab.com',
+                'bitbucket' => 'bitbucket.org',
+                default => '',
+            },
+        ];
+    }
+
+    /** True when this credential belongs to an organization rather than a person. */
+    public function isOrganizationOwned(): bool
+    {
+        return $this->organization_id !== null;
+    }
+
+    /**
+     * Who to name in the UI. Org rows say the org; personal rows stay personal —
+     * an admin should not learn another member's GitHub handle from this page.
+     */
+    public function ownerLabel(): string
+    {
+        return $this->isOrganizationOwned()
+            ? (string) ($this->organization->name ?? __('Organization'))
+            : __('Personal');
+    }
+
     public function accessToken(): string
     {
         if (! array_key_exists('access_token', $this->attributes)) {
@@ -94,7 +162,14 @@ class GitProviderToken extends Model implements GitIdentity
         $provider = ucfirst($this->provider());
         $name = trim((string) ($this->label ?: $this->nickname ?: $this->provider_id));
 
-        return $provider.' token'.($name !== '' ? ' - '.$name : '');
+        // Org rows say so in the picker: choosing a shared credential over your
+        // own is a different decision, and the label is the only place a reader
+        // can tell them apart.
+        $suffix = $this->isOrganizationOwned()
+            ? ' ('.__('shared - :org', ['org' => (string) ($this->organization->name ?? __('organization'))]).')'
+            : '';
+
+        return $provider.' token'.($name !== '' ? ' - '.$name : '').$suffix;
     }
 
     public function apiBaseUrl(): string

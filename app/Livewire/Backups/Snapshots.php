@@ -117,6 +117,7 @@ class Snapshots extends Component
             'latestByServer' => $latestByServer,
             'imageCounts' => $imageCounts,
             'imagedServerIds' => $imagedServerIds,
+            'coverageChecks' => $this->coverage($servers, $latestByServer, $imageCounts, $schedules->groupBy('target_id')),
             'schedulesByTarget' => $schedules->groupBy('target_id'),
             'orphanSchedules' => $schedules
                 ->reject(fn (BackupSchedule $schedule) => $serverIds->contains($schedule->target_id))
@@ -144,5 +145,88 @@ class Snapshots extends Component
                     : 0,
             ],
         ]);
+    }
+
+    /**
+     * How stale a full-disk image is allowed to be before it stops counting as
+     * protection. A six-month-old image restores a six-month-old machine.
+     *
+     * ponytail: one org-wide threshold, no per-server override — split it if
+     * anyone actually wants different staleness rules per box.
+     */
+    private const FRESH_DAYS = 30;
+
+    /**
+     * Coverage as a grid: one row per server, one cell per property a full-disk
+     * image needs before it counts as recovery.
+     *
+     * Same vocabulary as the Databases and Files grids. Providers with no image
+     * API (and every Custom box) read `na` throughout rather than counting as
+     * uncovered — coverage that nobody can act on is a scold, not a metric.
+     *
+     * @param  \Illuminate\Support\Collection<int, Server>  $servers
+     * @param  \Illuminate\Support\Collection<string, ServerImage>  $latestByServer
+     * @param  \Illuminate\Support\Collection<string, int>  $imageCounts
+     * @param  \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, BackupSchedule>>  $schedulesByTarget
+     * @return list<array{key: string, title: string, subtitle: string, url: ?string, applicable: int, covered: int, cells: array<string, array{state: string, label: string, note: ?string}>}>
+     */
+    private function coverage($servers, $latestByServer, $imageCounts, $schedulesByTarget): array
+    {
+        $rows = [];
+
+        foreach ($servers as $server) {
+            $capable = $server->provider->supportsImageSnapshots();
+            $schedules = $schedulesByTarget->get($server->id) ?? collect();
+            $active = $schedules->firstWhere('is_active', true);
+            $latest = $latestByServer->get($server->id);
+            $ready = $latest?->status === ServerImage::STATUS_COMPLETED ? $latest : null;
+            $noImageApi = __('no image API on :provider', ['provider' => \Illuminate\Support\Str::title($server->provider->value)]);
+
+            $cells = [
+                'policy' => match (true) {
+                    ! $capable => ['state' => 'na', 'label' => __('n/a'), 'note' => $noImageApi],
+                    $active !== null => ['state' => 'scheduled', 'label' => $active->cronDescription() ?: $active->cron_expression, 'note' => null],
+                    $schedules->isNotEmpty() => ['state' => 'manual', 'label' => __('paused'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('none'), 'note' => __('Recurring image policies are not wired up yet — images are taken by hand.')],
+                },
+                'image' => match (true) {
+                    ! $capable => ['state' => 'na', 'label' => __('n/a'), 'note' => $noImageApi],
+                    $latest?->status === ServerImage::STATUS_FAILED => ['state' => 'failed', 'label' => __('failed :when', ['when' => $latest->created_at->diffForHumans(short: true)]), 'note' => null],
+                    $ready !== null => ['state' => 'scheduled', 'label' => $ready->created_at->diffForHumans(short: true), 'note' => null],
+                    $latest !== null => ['state' => 'manual', 'label' => __('in progress'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('never'), 'note' => null],
+                },
+                'age' => match (true) {
+                    ! $capable => ['state' => 'na', 'label' => __('n/a'), 'note' => $noImageApi],
+                    $ready === null => ['state' => 'missing', 'label' => __('nothing to restore'), 'note' => null],
+                    $ready->created_at->diffInDays(now()) <= self::FRESH_DAYS => ['state' => 'scheduled', 'label' => __(':days d old', ['days' => (int) $ready->created_at->diffInDays(now())]), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __(':days d old', ['days' => (int) $ready->created_at->diffInDays(now())]), 'note' => __('Older than :days days — it restores the machine as it was then.', ['days' => self::FRESH_DAYS])],
+                },
+            ];
+
+            $applicable = collect($cells)->reject(fn (array $cell) => $cell['state'] === 'na');
+            $count = (int) ($imageCounts[$server->id] ?? 0);
+
+            $rows[] = [
+                'key' => $server->id,
+                'title' => $server->name,
+                'subtitle' => $capable
+                    ? trans_choice(':count image|:count images', $count, ['count' => $count]).' · '.\Illuminate\Support\Str::title($server->provider->value)
+                    : __('cannot be imaged'),
+                'url' => route('servers.backups', $server),
+                'applicable' => $applicable->count(),
+                'covered' => $applicable->where('state', 'scheduled')->count(),
+                'cells' => $cells,
+            ];
+        }
+
+        // Least-covered first; rows with nothing applicable sink to the bottom.
+        usort($rows, fn (array $a, array $b) => [
+            $a['applicable'] === 0 ? 1 : 0, $a['covered'], -$a['applicable'],
+        ] <=> [
+            $b['applicable'] === 0 ? 1 : 0, $b['covered'], -$b['applicable'],
+        ]);
+
+        return $rows;
     }
 }

@@ -13,12 +13,11 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Modules\Remediations\Services\RemediationCatalog;
-use App\Modules\Serverless\Models\FunctionInvocation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * Normalizes a failed source (ConsoleAction / SiteDeployment / FunctionInvocation)
+ * Normalizes a failed source (ConsoleAction / SiteDeployment)
  * into a single {@see ErrorEvent} row. Shared by the model listeners and the
  * backfill command so live capture and historical seeding produce identical rows.
  *
@@ -149,59 +148,6 @@ class ErrorEventRecorder
                 'occurred_at' => $hit['occurred_at'],
             ],
         );
-    }
-
-    /**
-     * Record one failed serverless invocation. This is what puts a broken
-     * function into the same stream as a failed deploy — the Errors tab a
-     * serverless site already mounts, `dply errors`, and the site-error
-     * notifications. `dply serverless errors` stays the raw per-invocation
-     * feed underneath it.
-     *
-     * No-op for a success or an in-flight async row: `success` defaults to
-     * false on insert, so a pending row is not yet a failure.
-     *
-     * Volume is held down by the syncer, which folds a failing streak into one
-     * open event per site (the same fold uptime checks get) — a function
-     * failing on every request would otherwise mint thousands of rows a day.
-     */
-    public function recordFunctionInvocation(FunctionInvocation $invocation): ?ErrorEvent
-    {
-        if ($invocation->success || $invocation->isPending()) {
-            return null;
-        }
-
-        $site = $invocation->site;
-        if ($site === null) {
-            return null;
-        }
-
-        $detail = trim((string) ($invocation->result_excerpt ?? ''));
-        if ($detail === '') {
-            $lines = $invocation->logLines();
-            $detail = trim((string) (end($lines) ?: ''));
-        }
-
-        $status = $invocation->status_code;
-        $target = $invocation->path ?? $invocation->task;
-
-        return $this->upsert($invocation, [
-            'organization_id' => $site->organization_id,
-            // A function has no VM. Leaving server_id null keeps these out of
-            // the server roll-up, which is about a box.
-            'server_id' => null,
-            'site_id' => $site->id,
-            'category' => 'function_invocation',
-            'remediation_code' => $this->remediations->match($detail)['code'] ?? null,
-            'title' => $status !== null
-                ? __('Function returned HTTP :status — :site', ['status' => $status, 'site' => $site->name])
-                : __('Function invocation failed — :site', ['site' => $site->name]),
-            'detail' => $this->invocationDetail($detail, $target),
-            // The Errors tab is where this row is read; the invocation itself
-            // (log lines, result body) lives on the logs workspace.
-            'link_url' => route('serverless.logs', ['site' => $site->id]),
-            'occurred_at' => $invocation->created_at ?? now(),
-        ]);
     }
 
     /** Prefix the failing route/task so the row is actionable without opening it. */

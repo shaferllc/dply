@@ -63,11 +63,21 @@
 
                     <div class="mt-2.5 flex flex-wrap gap-1.5">
                         @foreach ($remediation['actions'] as $action)
-                            @if (! empty($action['route']))
+                            @php
+                                // An org-scoped action needs {organization} bound, and is
+                                // hidden entirely when the reader has no current org —
+                                // route() would throw on the missing parameter.
+                                $actionOrg = ! empty($action['org']) ? auth()->user()?->currentOrganization() : null;
+                                $actionParams = $action['params'] ?? [];
+                                if (! empty($action['org'])) {
+                                    $actionParams = $actionOrg ? array_merge(['organization' => $actionOrg], $actionParams) : null;
+                                }
+                            @endphp
+                            @if (! empty($action['route']) && $actionParams !== null)
                                 {{-- Link action: the fix lives on another page (e.g. an
                                      expired Git token replaced in account settings), not
                                      in an SSH script run on the box. --}}
-                                <a href="{{ route($action['route']) }}" wire:navigate
+                                <a href="{{ route($action['route'], $actionParams) }}" wire:navigate
                                     @class([
                                         'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition',
                                         'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),

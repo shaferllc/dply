@@ -6,9 +6,6 @@ namespace App\Livewire\Concerns;
 
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
-use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
-use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
-use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 use Throwable;
 
 /**
@@ -24,7 +21,6 @@ use Throwable;
  *
  *   - {@see runDetection} — the general {@see RepositoryRuntimePreview}
  *     (dply.yaml manifest + runtime-detection engine). Used by VM + Cloud.
- *   - {@see runServerlessDetection} — the serverless {@see ServerlessRuntimeDetector}
  *     (framework vs. raw-action). Used by serverless create + the VM
  *     functions-host path.
  *
@@ -43,7 +39,6 @@ trait DetectsRepositoryRuntime
      * (runtime, version, framework, build_command, start_command, app_port,
      * confidence, sources, processes, reasons, warnings, has_manifest) — or a
      * single-key `error` / `no_match` shape when detection could not produce
-     * a plan. Serverless results additionally carry `kind => 'serverless'`.
      *
      * @var array<string, mixed>
      */
@@ -115,74 +110,6 @@ trait DetectsRepositoryRuntime
         $this->applyDetectedRuntimePrefills();
     }
 
-    /**
-     * URL-first serverless detection — checks the repo out into the serverless
-     * workspace, runs {@see ServerlessRuntimeDetector}, normalizes the flat
-     * detector array into the same {@see $detectedPlan} shape.
-     *
-     * @param  array<string, mixed>  $capabilities  target capability map from
-     *                                              {@see ServerlessTargetCapabilityResolver}
-     */
-    public function runServerlessDetection(
-        string $url,
-        string $branch,
-        string $subdirectory,
-        array $capabilities,
-        ?string $sourceControlAccountId = null,
-        ?string $refKind = null,
-    ): void {
-        $url = trim($url);
-        $branch = trim($branch) !== '' ? trim($branch) : 'main';
-        $sourceControlAccountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
-        $sourceControlAccountId = $sourceControlAccountId !== '' ? $sourceControlAccountId : null;
-
-        if ($url === '') {
-            $this->detectedPlan = [];
-            $this->applyDetectedRuntimePrefills();
-
-            return;
-        }
-
-        $checkout = null;
-
-        try {
-            $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
-                'preview-create-serverless-'.(string) auth()->id().'-'.md5($url.'|'.$branch.'|'.$subdirectory.'|'.($sourceControlAccountId ?? '')),
-                $url,
-                $branch,
-                $subdirectory,
-                auth()->id(),
-                $sourceControlAccountId,
-                $refKind,
-            );
-
-            $detection = app(ServerlessRuntimeDetector::class)->detect(
-                $checkout['working_directory'],
-                $capabilities,
-            );
-
-            $this->detectedPlan = $this->serverlessDetectionToArray($detection, $url, $branch);
-        } catch (Throwable $e) {
-            $this->detectedPlan = [
-                'error' => $e->getMessage(),
-                'url' => $url,
-                'branch' => $branch,
-                'kind' => 'serverless',
-            ];
-        } finally {
-            if ($checkout !== null) {
-                app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
-            }
-        }
-
-        $this->applyDetectedRuntimePrefills();
-    }
-
-    /**
-     * Reconstruct a clone URL from either `owner/name` shorthand (what the
-     * Cloud + serverless forms store) or a full URL. Empty input passes
-     * through so callers can short-circuit.
-     */
     public function normalizeToCloneUrl(string $repo): string
     {
         $repo = trim($repo);
@@ -228,45 +155,6 @@ trait DetectsRepositoryRuntime
                 ],
                 $plan->processes,
             ),
-        ];
-    }
-
-    /**
-     * Normalize the flat {@see ServerlessRuntimeDetector} array into the panel
-     * shape. An `unknown` framework collapses to a `no_match` so the panel
-     * renders the same "nothing detected" state as the general path.
-     *
-     * @param  array<string, mixed>  $detection
-     * @return array<string, mixed>
-     */
-    protected function serverlessDetectionToArray(array $detection, string $url, string $branch): array
-    {
-        $framework = (string) ($detection['framework'] ?? 'unknown');
-
-        if ($framework === 'unknown' || $framework === '') {
-            return [
-                'url' => $url,
-                'branch' => $branch,
-                'kind' => 'serverless',
-                'no_match' => true,
-            ];
-        }
-
-        return [
-            'url' => $url,
-            'branch' => $branch,
-            'kind' => 'serverless',
-            'runtime' => (string) ($detection['runtime'] ?? ''),
-            'framework' => $framework,
-            'deploy_kind' => (string) ($detection['deploy_kind'] ?? ''),
-            'entrypoint' => (string) ($detection['entrypoint'] ?? ''),
-            'build_command' => (string) ($detection['build_command'] ?? ''),
-            'version' => null,
-            'start_command' => null,
-            'confidence' => (string) ($detection['confidence'] ?? ''),
-            'reasons' => array_values((array) ($detection['reasons'] ?? [])),
-            'warnings' => array_values((array) ($detection['warnings'] ?? [])),
-            'processes' => [],
         ];
     }
 }

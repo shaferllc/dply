@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudDatabaseAttachmentTest;
 
 use App\Enums\SiteType;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\CloudDatabase;
 use App\Models\Organization;

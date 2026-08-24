@@ -31,6 +31,17 @@
         || trim((string) $labelFilter) !== ''
         || trim((string) $roleFilter) !== '';
     $showStats = $hasOrganization && $projectsTotal > 0;
+    // Search/filter chrome earns its space only once the list stops fitting.
+    $showToolbar = $showFilters && $projectsTotal > 8;
+    // Livewire wraps every @if/@foreach in `<!--[if BLOCK]>` markers, so a slot
+    // whose conditions all fail is still a non-empty string — strip them first.
+    $alertHtml = isset($alert) ? trim(preg_replace('/<!--.*?-->/s', '', (string) $alert) ?? '') : '';
+    $summaryLine = collect([
+        trans_choice(':count project|:count projects', $projectsTotal, ['count' => $projectsTotal]),
+        $serversTotal > 0 ? trans_choice(':count server|:count servers', $serversTotal, ['count' => $serversTotal]) : null,
+        $sitesTotal > 0 ? trans_choice(':count site|:count sites', $sitesTotal, ['count' => $sitesTotal]) : null,
+        (! $isProductionSurface && $membersTotal > 0) ? trans_choice(':count member|:count members', $membersTotal, ['count' => $membersTotal]) : null,
+    ])->filter()->implode(' · ');
     $showShellCreate = $showCreateAction && $hasProjectsInScope && $projectsTotal > 0;
     $summaryStats = [
         [
@@ -59,16 +70,15 @@
     }
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-breadcrumb-trail :items="$breadcrumbs" />
 
     <x-profile-shell
+        dense
         :title="__('Projects')"
-        :description="$isProductionSurface
-            ? __('Live projects from the connected control plane — grouping containers for servers and sites.')
-            : (! $hasOrganization
-                ? __('Select an organization from the header to group servers, sites, and member access into projects.')
-                : __('Group servers, sites, and member access for each initiative your team is running.'))"
+        :description="! $hasOrganization
+            ? __('Select an organization from the header.')
+            : ($showStats ? $summaryLine : null)"
         icon="heroicon-o-rectangle-group"
     >
         @if ($showShellCreate || isset($actions))
@@ -89,24 +99,7 @@
             </x-slot:actions>
         @endif
 
-        @if ($showStats)
-            <x-slot:stats>
-                <dl class="grid grid-cols-1 gap-2 {{ count($summaryStats) === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3' }}">
-                    @foreach ($summaryStats as $stat)
-                        <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                                <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
-                                <span class="truncate">{{ $stat['label'] }}</span>
-                            </dt>
-                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
-                            <p class="mt-1 text-xs text-brand-mist">{{ $stat['hint'] }}</p>
-                        </div>
-                    @endforeach
-                </dl>
-            </x-slot:stats>
-        @endif
-
-        @if (isset($alert) && filled(trim((string) $alert)))
+        @if ($alertHtml !== '')
             <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                 {{ $alert }}
             </div>
@@ -151,7 +144,7 @@
                 </div>
             @endif
         @else
-            @if ($showFilters)
+            @if ($showToolbar)
                 <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-3 sm:px-5">
                     <div class="min-w-0 flex-1">
                         <label for="projects_search" class="sr-only">{{ __('Search') }}</label>
@@ -231,11 +224,26 @@
                     @endif
                 </div>
             @else
-                <ul>
-                    @foreach ($rows as $project)
-                        @include('components.partials.project-index-card', ['project' => $project])
-                    @endforeach
-                </ul>
+                @php $th = 'px-3 py-2.5 text-start text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-5'; @endphp
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[38rem] border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-brand-ink/10">
+                                <th scope="col" class="{{ $th }}">{{ __('Project') }}</th>
+                                <th scope="col" class="{{ $th }}">{{ __('Servers') }}</th>
+                                <th scope="col" class="{{ $th }}">{{ __('Sites') }}</th>
+                                <th scope="col" class="{{ $th }} hidden sm:table-cell">{{ __('Members') }}</th>
+                                <th scope="col" class="{{ $th }} hidden lg:table-cell">{{ __('Your role') }}</th>
+                                <th scope="col" class="{{ $th }}"><span class="sr-only">{{ __('Actions') }}</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($rows as $project)
+                                @include('components.partials.project-index-card', ['project' => $project])
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @endif
         @endunless
     </x-profile-shell>

@@ -107,6 +107,18 @@ class ServerDatabase extends Model
     }
 
     /**
+     * Whether dply can produce a dump of this engine at all.
+     *
+     * A row whose engine has no dump path is not unprotected — there is nothing
+     * to schedule. Both the quick-download button and the coverage grid ask this
+     * question, so it lives here rather than as a literal in either view.
+     */
+    public function supportsDump(): bool
+    {
+        return in_array((string) $this->engine, ['mysql', 'mariadb', 'postgres', 'sqlite', 'mongodb'], true);
+    }
+
+    /**
      * Letters + digits only so mysql/postgresql URLs stay readable (no % escapes).
      */
     public static function generateConnectionSafePassword(int $length = 32): string

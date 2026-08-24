@@ -627,6 +627,7 @@ class Hub extends Component
             && $selectedTeam->userCanManageSshKeys($user);
 
         return view('livewire.settings.hub', [
+            'profileBodyPartial' => 'livewire.settings.partials.hub.default',
             'currentOrg' => $org,
             'teams' => $teams,
             'selectedTeam' => $selectedTeam,

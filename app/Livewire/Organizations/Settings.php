@@ -6,6 +6,7 @@ use App\Actions\Organizations\DeleteOrganizationAction;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ApiToken;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Organization;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
@@ -13,7 +14,6 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\WithFileUploads;
@@ -21,8 +21,8 @@ use Livewire\Features\SupportFileUploads\WithFileUploads;
 /**
  * Every organization-level setting an admin can change.
  *
- * The old "Automation & API" tab (email defaults, Cloud alert destinations,
- * Edge data region, API tokens) folded in here in 2026-08: none of it was
+ * The old "Automation & API" tab (email defaults, API tokens) folded in here
+ * in 2026-08: none of it was
  * automation the org *ran*, it was all settings that happened to be about
  * automated things, and splitting them across two admin pages meant no single
  * place answered "what is configured for this org".
@@ -56,13 +56,22 @@ class Settings extends Component
 
     public bool $email_database_credentials_enabled = false;
 
-    public string $edge_data_region = 'default';
+    /**
+     * Recipient mode per email key — see
+     * {@see ManagesOrganizationEmailRecipients}.
+     *
+     * @var array<string, string>
+     */
+    public array $email_recipient_modes = [];
 
-    public string $alert_slack_webhook_url = '';
+    /**
+     * Hand-picked member ids per email key, used in `custom` mode.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $email_recipient_user_ids = [];
 
     /** Comma- or newline-separated emails for the destinations textarea. */
-    public string $alert_extra_emails_input = '';
-
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -99,10 +108,11 @@ class Settings extends Component
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
-        $this->edge_data_region = (string) ($this->organization->edge_data_region ?: 'default');
-        $this->alert_slack_webhook_url = (string) ($this->organization->alert_slack_webhook_url ?: '');
-        $emails = (array) ($this->organization->alert_extra_emails ?? []);
-        $this->alert_extra_emails_input = implode("\n", array_filter($emails, 'is_string'));
+
+        foreach (Organization::emailRecipientKeys() as $key) {
+            $this->email_recipient_modes[$key] = $this->organization->emailRecipientMode($key);
+            $this->email_recipient_user_ids[$key] = $this->organization->emailRecipientUserIds($key);
+        }
     }
 
     public function saveGeneral(): void
@@ -185,6 +195,52 @@ class Settings extends Component
         $this->toastSuccess(__('Icon removed.'));
     }
 
+    /**
+     * Persist who receives one of the org's email defaults.
+     *
+     * Hand-picked ids are intersected with current membership before saving:
+     * two of these emails carry secrets, so a non-member id must never be
+     * storable, not merely ignored at send time.
+     */
+    public function saveEmailRecipients(string $key): void
+    {
+        $this->authorize('update', $this->organization);
+
+        if (! in_array($key, Organization::emailRecipientKeys(), true)) {
+            return;
+        }
+
+        $mode = $this->email_recipient_modes[$key] ?? null;
+        if (! in_array($mode, Organization::emailRecipientModes(), true)) {
+            $mode = Organization::EMAIL_RECIPIENT_DEFAULTS[$key];
+            $this->email_recipient_modes[$key] = $mode;
+        }
+
+        $memberIds = $this->organization->users()->pluck('users.id')->map(fn ($id): string => (string) $id);
+        $picked = collect($this->email_recipient_user_ids[$key] ?? [])
+            ->map(fn ($id): string => (string) $id)
+            ->intersect($memberIds)
+            ->unique()
+            ->values();
+
+        $this->email_recipient_user_ids[$key] = $picked->all();
+
+        $prefs = $this->organization->email_recipient_prefs ?? [];
+        $prefs[$key] = [
+            'mode' => $mode,
+            'user_ids' => $mode === Organization::RECIPIENTS_CUSTOM ? $picked->all() : [],
+        ];
+
+        $this->organization->update(['email_recipient_prefs' => $prefs]);
+        audit_log($this->organization, auth()->user(), 'organization.email_recipients_updated', null, null, [
+            'email' => $key,
+            'mode' => $mode,
+            'recipient_count' => $picked->count(),
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Email recipients updated.'));
+    }
+
     public function updatedDeployEmailNotificationsEnabled(): void
     {
         $this->authorize('update', $this->organization);
@@ -225,91 +281,6 @@ class Settings extends Component
         ]);
         $this->refreshOrganization();
         $this->toastSuccess(__('Database credentials email preference updated.'));
-    }
-
-    public function updatedEdgeDataRegion(): void
-    {
-        $this->authorize('update', $this->organization);
-        // Data residency only applies when the Edge surface is on (the UI is
-        // gated the same way) — block a stale/forged client from writing it.
-        abort_unless(Feature::active('surface.edge'), 404);
-
-        $allowed = ['default', 'eu', 'weur', 'eeur', 'wnam', 'enam', 'apac', 'oc'];
-        if (! in_array($this->edge_data_region, $allowed, true)) {
-            $this->edge_data_region = 'default';
-        }
-
-        $previous = (string) ($this->organization->edge_data_region ?: 'default');
-        $this->organization->update(['edge_data_region' => $this->edge_data_region]);
-
-        audit_log(
-            $this->organization,
-            auth()->user(),
-            'organization.edge_data_region_updated',
-            null,
-            ['edge_data_region' => $previous],
-            ['edge_data_region' => $this->edge_data_region],
-        );
-
-        $this->refreshOrganization();
-        $this->toastSuccess(__('Edge data region updated.'));
-    }
-
-    public function saveAlertDestinations(): void
-    {
-        $this->authorize('update', $this->organization);
-        // Cloud alerts only exist when the Cloud surface is on (the UI is gated
-        // the same way) — block a stale/forged client from writing them anyway.
-        abort_unless(Feature::active('surface.cloud'), 404);
-
-        $this->validate([
-            'alert_slack_webhook_url' => ['nullable', 'url', 'max:500', 'starts_with:https://'],
-            'alert_extra_emails_input' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'alert_slack_webhook_url.starts_with' => __('Slack webhook URLs start with https://'),
-        ]);
-
-        // Parse the textarea: one email per line or comma-separated.
-        $raw = preg_split('/[\s,]+/', $this->alert_extra_emails_input) ?: [];
-        $emails = [];
-        foreach ($raw as $candidate) {
-            $candidate = trim((string) $candidate);
-            if ($candidate === '') {
-                continue;
-            }
-            if (filter_var($candidate, FILTER_VALIDATE_EMAIL) === false) {
-                $this->addError('alert_extra_emails_input', __('Invalid email: :email', ['email' => $candidate]));
-
-                return;
-            }
-            $emails[$candidate] = true;
-        }
-        $emails = array_keys($emails);
-
-        $previous = [
-            'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
-            'alert_extra_emails' => $this->organization->alert_extra_emails,
-        ];
-
-        $this->organization->update([
-            'alert_slack_webhook_url' => trim($this->alert_slack_webhook_url) ?: null,
-            'alert_extra_emails' => $emails,
-        ]);
-
-        audit_log(
-            $this->organization,
-            auth()->user(),
-            'organization.alert_destinations_updated',
-            null,
-            $previous,
-            [
-                'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
-                'alert_extra_emails' => $this->organization->alert_extra_emails,
-            ],
-        );
-
-        $this->refreshOrganization();
-        $this->toastSuccess(__('Alert destinations saved.'));
     }
 
     /**
@@ -392,6 +363,9 @@ class Settings extends Component
     {
         return view('livewire.organizations.settings', [
             'timezones' => DateTimeZone::listIdentifiers(DateTimeZone::ALL),
+            'orgMembers' => $this->organization->users()
+                ->orderBy('name')
+                ->get(['users.id', 'users.name', 'users.email']),
         ]);
     }
 

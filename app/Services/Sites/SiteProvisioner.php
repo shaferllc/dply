@@ -24,7 +24,6 @@ class SiteProvisioner
         private readonly SiteWebserverConfigApplier $webserverConfigApplier,
         private readonly SiteRuntimeProvisionerRegistry $runtimeProvisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
-        private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
         private readonly CertificateRequestService $certificateRequestService,
         private readonly DeploymentPreflightValidator $preflightValidator,
         private readonly DeploymentContractBuilder $contractBuilder,
@@ -368,29 +367,8 @@ class SiteProvisioner
     {
         $site->loadMissing(['server', 'domains']);
 
-        if ($site->usesFunctionsRuntime()) {
-            $result = $this->digitalOceanFunctionsSiteProvisioner->readyResult($site);
-            $site->update([
-                'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-            ]);
-
-            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Serverless host is configured. Run the first deploy to publish a live endpoint.', [
-                'hostname' => $result['hostname'],
-                'url' => $result['url'],
-            ]);
-
-            $this->updateProvisioning($site, [
-                'state' => 'awaiting_first_deploy',
-                'webserver' => $site->webserver(),
-                'ready_hostname' => $result['hostname'],
-                'ready_url' => $result['url'],
-                'checked_at' => $result['checked_at'],
-                'host_checks' => [],
-                'error' => null,
-            ]);
-
-            return $result;
-        }
+        // The DO Functions readiness branch stood here; its provisioner went
+        // with the serverless surface (remove-cloud-edge-serverless).
 
         if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             $site->refresh();

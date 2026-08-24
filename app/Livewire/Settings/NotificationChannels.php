@@ -73,21 +73,12 @@ class NotificationChannels extends Component
                 ->values()
             : collect();
 
-        return view('livewire.settings.notification-channels', array_merge([
-            'backUrl' => null,
-            'backLabel' => null,
-            'useOrgShell' => false,
+        // Shared payload from the trait; only the profile-specific keys here.
+        return $this->renderNotificationChannelsView('livewire.settings.notification-channels', [
             'useProfileShell' => true,
-            'organization' => null,
-            'orgShellSection' => 'notifications',
-        ], $this->notificationChannelsViewData(), [
-            'channels' => $this->channels,
-            'canManage' => $this->canManage(),
-            'types' => NotificationChannel::typesForUi(),
-            'typesForEdit' => NotificationChannel::typesForUi($this->editing_id ? $this->edit_type : null),
             'currentOrganization' => $currentOrganization,
             'organizationChannels' => $organizationChannels,
             'teamChannelGroups' => $teamChannels,
-        ]));
+        ]);
     }
 }

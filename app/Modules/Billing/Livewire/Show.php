@@ -9,13 +9,13 @@ use App\Models\Server;
 use App\Modules\Billing\Services\DesiredBillingState;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Billing\Services\StandardSubscriptionCreator;
+use App\Modules\Billing\Services\StripeInvoiceRows;
 use App\Modules\Billing\Services\SubscriptionPlanResolver;
 use App\Modules\Billing\Services\VatInsightService;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Laravel\Cashier\Invoice;
 use Laravel\Cashier\Subscription;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -28,10 +28,14 @@ use Throwable;
  * methods as $this-><name> in PHP and Blade. PHPStan cannot see that
  * magic, so the contract is stated here.
  *
- * @property-read \Laravel\Cashier\Subscription|null $subscription
+ * @property-read Subscription|null $subscription
  * @property-read string|null $subscriptionInterval
- * @property-read \Illuminate\Support\Collection<int, \App\Models\Server> $billableServers
- * @property-read \App\Modules\Billing\Services\DesiredBillingState $billingState
+ * @property-read Collection<int, Server> $billableServers
+ * @property-read DesiredBillingState $billingState
+ * @property-read list<array{key: string, label: string, price: float, max: ?int}> $planCatalog
+ * @property-read list<array{key: string, label: string, price: float, min: int, max: ?int, current: bool}> $planLadder
+ * @property-read array{label: string, delta: float, servers_until: int}|null $nextTier
+ * @property-read list<array{label: string, quantity: int, unit_cents: int, line_cents: int, detail: ?string}> $tierLineItems
  */
 #[Layout('layouts.app')]
 class Show extends Component
@@ -170,22 +174,6 @@ class Show extends Component
     public function getCanManageBillingProperty(): bool
     {
         return $this->subscription !== null;
-    }
-
-    /**
-     * @return Collection<int, Invoice>
-     */
-    public function getInvoicesProperty(): Collection
-    {
-        if (! $this->organization->hasStripeId()) {
-            return collect();
-        }
-
-        try {
-            return $this->organization->invoices(false, ['limit' => 12]);
-        } catch (Throwable) {
-            return collect();
-        }
     }
 
     /**
@@ -456,6 +444,19 @@ class Show extends Component
      * {@see OrganizationBillingStateComputer::compute()} so hero / preview /
      * line-item accessors share one DesiredBillingState.
      */
+    /**
+     * The five most recent Stripe invoices, rendered inline here — invoices are
+     * a section of billing, not a page of their own. The full history stays at
+     * the Invoices route for orgs with years of them.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function recentInvoices(): Collection
+    {
+        return StripeInvoiceRows::for($this->organization, 5)->take(5);
+    }
+
     #[Computed]
     public function billingState(): DesiredBillingState
     {
@@ -485,7 +486,6 @@ class Show extends Component
     /**
      * Servers excluded from billing with a human-readable reason — surfaces
      * the "why isn't this server on my bill?" question right in the table.
-     *
      */
     public function getExcludedServersProperty(): Collection
     {
@@ -497,12 +497,15 @@ class Show extends Component
             ->orderBy('name')
             ->get()
             ->reject(fn (Server $s) => in_array($s->id, $billableIds, true))
+            // Serverless / Functions hosts left this app for their own product;
+            // listing them as "not billed here" is answering a question nobody
+            // in dply can still ask.
+            ->reject(fn (Server $s) => $s->isServerlessHost())
             ->map(function (Server $server) use ($cutoff, $minAge): array {
                 $reason = match (true) {
                     $server->isManagedProductHost() => match (true) {
                         $server->isDplyCloudHost() => __('Billed as dply Cloud app'),
                         $server->isDplyEdgeHost() => __('Billed as dply Edge site'),
-                        $server->isServerlessHost() => __('Billed as serverless function'),
                         default => __('Billed as managed product'),
                     },
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
@@ -516,11 +519,17 @@ class Show extends Component
     }
 
     /**
-     * Structured line items for the "Your bill" hero. One entry for the flat
-     * plan (chosen by server count) plus one per managed product in use. Cents
-     * preserved so the view can choose monthly/yearly presentation.
+     * Structured line items that sum to the monthly total. One entry for the
+     * flat plan (chosen by server count) plus one per managed product in use.
+     * Cents preserved so the view can choose monthly/yearly presentation.
      *
-     * @return list<array{label: string, quantity: int, unit_cents: int, line_cents: int}>
+     * Realtime, Queue and Logs were missing here, which is why the hero showed
+     * a $9.00 breakdown under a $24.00 total — the $15.00 Realtime line had
+     * nowhere to render. The Cloud / Edge / serverless branches that used to
+     * sit here are gone with those surfaces (remove-cloud-edge-serverless);
+     * their subtotals are permanently zero.
+     *
+     * @return list<array{label: string, quantity: int, unit_cents: int, line_cents: int, detail: ?string}>
      */
     public function getTierLineItemsProperty(): array
     {
@@ -538,119 +547,61 @@ class Show extends Component
             ],
         ];
 
-        if ($state->serverlessCount > 0) {
-            $unit = (int) config('subscription.standard.serverless_cents', 200);
-            $items[] = [
-                'label' => __('dply serverless function'),
-                'quantity' => $state->serverlessCount,
-                'unit_cents' => $unit,
-                'line_cents' => $state->serverlessSubtotalCents,
-            ];
-        }
-
-        if ($state->serverlessUsageSubtotalCents > 0) {
-            $items[] = [
-                'label' => __('dply serverless usage'),
-                'quantity' => 1,
-                'unit_cents' => $state->serverlessUsageSubtotalCents,
-                'line_cents' => $state->serverlessUsageSubtotalCents,
-                'detail' => __('Metered invocations, managed databases & caches'),
-            ];
-        }
-
-        if ($state->managedServerSubtotalCents > 0) {
+        if ($state->managedServerCount > 0) {
             $items[] = [
                 'label' => __('dply managed server'),
                 'quantity' => $state->managedServerCount,
-                'unit_cents' => $state->managedServerCount > 0
-                    ? (int) round($state->managedServerSubtotalCents / $state->managedServerCount)
-                    : $state->managedServerSubtotalCents,
+                'unit_cents' => intdiv($state->managedServerSubtotalCents, $state->managedServerCount),
                 'line_cents' => $state->managedServerSubtotalCents,
-                'detail' => __('All-in cost-plus — dply-hosted VM (provider cost + margin)'),
+                'detail' => __('Billed cost-plus on dply-owned infrastructure'),
             ];
         }
 
-        if ($state->cloudCount > 0) {
-            $unit = (int) config('subscription.standard.cloud_cents', 500);
+        if ($state->realtimeSubtotalCents > 0) {
             $items[] = [
-                'label' => __('dply Cloud app'),
-                'quantity' => $state->cloudCount,
-                'unit_cents' => $unit,
-                'line_cents' => $state->cloudSubtotalCents,
+                'label' => __('Managed Realtime'),
+                'quantity' => $state->realtimeCount,
+                'unit_cents' => $state->realtimeCount > 0
+                    ? intdiv($state->realtimeSubtotalCents, $state->realtimeCount)
+                    : 0,
+                'line_cents' => $state->realtimeSubtotalCents,
+                'detail' => trans_choice(':count app|:count apps', $state->realtimeCount, ['count' => $state->realtimeCount]),
             ];
         }
 
-        if ($state->cloudResourceSubtotalCents > 0) {
+        if ($state->queueSubtotalCents > 0) {
             $items[] = [
-                'label' => __('dply Cloud resources'),
+                'label' => __('Managed Queue'),
+                'quantity' => $state->queueCount,
+                'unit_cents' => $state->queueCount > 0
+                    ? intdiv($state->queueSubtotalCents, $state->queueCount)
+                    : 0,
+                'line_cents' => $state->queueSubtotalCents,
+                'detail' => trans_choice(':count namespace|:count namespaces', $state->queueCount, ['count' => $state->queueCount]),
+            ];
+        }
+
+        if ($state->queueUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('Queue worker usage'),
                 'quantity' => 1,
-                'unit_cents' => $state->cloudResourceSubtotalCents,
-                'line_cents' => $state->cloudResourceSubtotalCents,
-                'detail' => __('Metered compute, workers & databases'),
+                'unit_cents' => $state->queueUsageSubtotalCents,
+                'line_cents' => $state->queueUsageSubtotalCents,
+                'detail' => __('Metered compute and job operations'),
             ];
         }
 
-        $edgeBaseCount = $state->edgeBaseCount();
-        if ($edgeBaseCount > 0) {
-            $unit = (int) config('subscription.standard.edge_cents', 200);
+        if ($state->serverLogUsageSubtotalCents > 0) {
             $items[] = [
-                'label' => __('dply Edge site'),
-                'quantity' => $edgeBaseCount,
-                'unit_cents' => $unit,
-                'line_cents' => $edgeBaseCount * $unit,
-            ];
-        }
-
-        if ($state->edgeSsrCount > 0) {
-            $ssrUnit = (int) config('subscription.standard.edge_ssr_cents', 700);
-            $items[] = [
-                'label' => __('dply Edge SSR site'),
-                'quantity' => $state->edgeSsrCount,
-                'unit_cents' => $ssrUnit,
-                'line_cents' => $state->edgeSsrCount * $ssrUnit,
-            ];
-        }
-
-        if ($state->edgeUsageSubtotalCents > 0) {
-            $items[] = [
-                'label' => __('dply Edge delivery usage'),
+                'label' => __('Logs ingest'),
                 'quantity' => 1,
-                'unit_cents' => $state->edgeUsageSubtotalCents,
-                'line_cents' => $state->edgeUsageSubtotalCents,
-                'detail' => $this->formatEdgeUsageDetail($state->edgeUsageEstimate),
+                'unit_cents' => $state->serverLogUsageSubtotalCents,
+                'line_cents' => $state->serverLogUsageSubtotalCents,
+                'detail' => __('Metered above your plan allowance'),
             ];
         }
 
         return $items;
-    }
-
-    /**
-     * @param  array<string, mixed>  $estimate
-     */
-    private function formatEdgeUsageDetail(array $estimate): ?string
-    {
-        $requests = (int) ($estimate['requests'] ?? 0);
-        $egress = (int) ($estimate['bytes_egress'] ?? 0);
-
-        if ($requests === 0 && $egress === 0) {
-            return null;
-        }
-
-        $parts = [];
-        if ($requests > 0) {
-            $parts[] = number_format($requests).' '.__('requests');
-        }
-        if ($egress > 0) {
-            $parts[] = number_format($egress / (1024 ** 3), 2).' GB '.__('egress');
-        }
-
-        $periodStart = (string) ($estimate['period_start'] ?? '');
-        $periodEnd = (string) ($estimate['period_end'] ?? '');
-        if ($periodStart !== '' && $periodEnd !== '') {
-            $parts[] = $periodStart.' → '.$periodEnd;
-        }
-
-        return implode(' · ', $parts);
     }
 
     /**
@@ -672,6 +623,75 @@ class Show extends Component
             ],
             app(SubscriptionPlanResolver::class)->all(),
         );
+    }
+
+    /**
+     * The tier ladder with the current rung marked, plus the server range each
+     * rung covers. The catalog is ordered cheapest-first by max_servers, so a
+     * rung's floor is the previous rung's ceiling + 1.
+     *
+     * @return list<array{key: string, label: string, price: float, min: int, max: ?int, current: bool}>
+     */
+    public function getPlanLadderProperty(): array
+    {
+        $current = $this->billingState->planKey;
+        $floor = 1;
+        $ladder = [];
+
+        foreach ($this->planCatalog as $plan) {
+            $max = $plan['max'] === null ? null : (int) $plan['max'];
+            $ladder[] = [
+                'key' => $plan['key'],
+                'label' => $plan['label'],
+                'price' => $plan['price'],
+                'min' => $floor,
+                'max' => $max,
+                'current' => $plan['key'] === $current,
+            ];
+            $floor = $max === null ? $floor : $max + 1;
+        }
+
+        return $ladder;
+    }
+
+    /**
+     * The rung above the current one, and what crossing into it costs.
+     *
+     * This is the fact the billing page could never tell you: adding one more
+     * server is a price change, billed prorated the same day, and today it
+     * looks like an ordinary "Add a server" click. Null on the top tier or when
+     * the fleet is not yet at its ceiling.
+     *
+     * @return array{label: string, delta: float, servers_until: int}|null
+     */
+    public function getNextTierProperty(): ?array
+    {
+        $ladder = $this->planLadder;
+        $index = null;
+
+        foreach ($ladder as $i => $rung) {
+            if ($rung['current']) {
+                $index = $i;
+                break;
+            }
+        }
+
+        if ($index === null || ! isset($ladder[$index + 1])) {
+            return null;
+        }
+
+        $here = $ladder[$index];
+        $next = $ladder[$index + 1];
+
+        if ($here['max'] === null) {
+            return null;
+        }
+
+        return [
+            'label' => $next['label'],
+            'delta' => round($next['price'] - $here['price'], 2),
+            'servers_until' => max(0, $here['max'] - $this->billingState->serverCount() + 1),
+        ];
     }
 
     public function getYearlyTotalCentsProperty(): int

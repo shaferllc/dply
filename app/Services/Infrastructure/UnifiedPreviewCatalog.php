@@ -8,7 +8,6 @@ use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Support\Preview\UnifiedPreviewHostname;
-use Illuminate\Support\Collection;
 
 /**
  * Org-wide inventory of managed preview hostnames across BYO + Edge.
@@ -64,22 +63,6 @@ final class UnifiedPreviewCatalog
         }
 
         foreach ($sites as $site) {
-            if ($site->usesEdgeRuntime()) {
-                $hostname = strtolower(trim($site->edgeHostname()));
-                if ($hostname !== '') {
-                    $rows[] = $this->row(
-                        hostname: $hostname,
-                        site: $site,
-                        product: 'edge',
-                        kind: $site->isEdgePreview() ? 'branch_preview' : 'primary',
-                        apex: $this->hostnames->apexFromHostname($hostname) ?? '',
-                        parentName: $this->edgePreviewParentName($site, $sitesById),
-                    );
-                }
-
-                continue;
-            }
-
             if ($site->usesFunctionsRuntime()) {
                 continue;
             }
@@ -132,24 +115,5 @@ final class UnifiedPreviewCatalog
                 : null,
             'parent_name' => $parentName,
         ];
-    }
-
-    /**
-     * @param  Collection<string, Site>  $sitesById
-     */
-    private function edgePreviewParentName(Site $site, $sitesById): ?string
-    {
-        if (! $site->isEdgePreview()) {
-            return null;
-        }
-
-        $parentId = $site->edgeMeta()['preview_parent_site_id'] ?? null;
-        if (! is_string($parentId) || $parentId === '') {
-            return null;
-        }
-
-        $parent = $sitesById->get($parentId);
-
-        return $parent !== null ? (string) $parent->name : null;
     }
 }

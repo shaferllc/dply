@@ -80,9 +80,7 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Queue** | Managed job queue — SQS-compatible endpoint over a Postgres store, plus dply-owned worker fleets that autoscale on queue pressure (`docs/adr/dply-queue.md`, `docs/adr/managed-queue-workers.md`). |
 | **Notifications** | Notification channels + event dispatch (server errors, webserver ops). Also owns the **Laravel notification drivers** under `Channels/<Provider>/` (Intercom, PagerDuty, MicrosoftTeams) registered by `NotificationsServiceProvider` — the module's only provider, added when the first driver landed. |
 | **Marketplace** | Script/runbook marketplace + imports. |
-| **Roadmap** | Public roadmap + admin kanban + post-deploy AI auto-update. |
 | **Docs** | `/docs` front-matter docs system (manifest, contextual sidebar). |
-| **Blog** | Public build-in-public devlog at `/blog` — markdown in `content/blog/*.md` on the marketing shell. |
 | **Feedback** | Global feedback/bug slide-over + admin review. |
 | **Referrals** | Referral codes + Stripe-credit rewards. |
 | **Projects** | `Workspace` grouping container UI. |

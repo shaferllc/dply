@@ -268,7 +268,7 @@ env:
                 </div>
             @else
                 <ul class="divide-y divide-brand-ink/10">
-                    @foreach ($cliTokens as $token)
+                    @foreach ($pagedCliTokens as $token)
                         <li wire:key="cli-token-{{ $token->id }}" class="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                             <div class="min-w-0">
                                 <p class="font-mono text-sm text-brand-ink">{{ $token->token_prefix }}…</p>
@@ -291,6 +291,14 @@ env:
                         </li>
                     @endforeach
                 </ul>
+
+                <x-list-pager
+                    :page="$cliTokenPageState['page']"
+                    :pages="$cliTokenPageState['pages']"
+                    :total="$cliTokenPageState['total']"
+                    property="cli_token_page"
+                    :label="__('sessions')"
+                />
             @endif
         @endif
     </x-profile-shell>

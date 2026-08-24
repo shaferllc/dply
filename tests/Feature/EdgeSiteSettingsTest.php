@@ -31,7 +31,7 @@ test('edge site workspace route renders full app layout shell', function () {
         ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']))
         ->assertOk()
         ->assertSee('Deploy history', false)
-        ->assertSee('Infrastructure control for teams that ship', false)
+        ->assertSee('images/dply-mark-dark.svg', false) // marketing footer = full shell
         ->assertSee('dply-docs-open', false);
 });
 

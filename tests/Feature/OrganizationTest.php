@@ -67,7 +67,11 @@ test('organization show is displayed for member', function () {
 
     $response->assertOk();
     $response->assertSee($org->name);
-    $response->assertSee('Sections');
+    // The overview is a ledger of workspace facts, one row per label.
+    $response->assertSee('Plan');
+    $response->assertSee('Fleet');
+    $response->assertSee('People');
+    $response->assertSee('Automation');
     $response->assertSee('Members');
 });
 
@@ -152,4 +156,32 @@ test('organization switch returns 403 for non member', function () {
         return;
     }
     $this->assertNotEquals((string) $org->id, session('current_organization_id'), 'Non-member must not be able to switch to organization.');
+});
+
+test('route-bound organization reuses the memoized currentOrganization instance', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $this->actingAs($user);
+    session(['current_organization_id' => $org->id]);
+
+    $memoized = $user->currentOrganization();
+    $bound = (new Organization)->resolveRouteBinding($org->id);
+
+    expect($bound)->toBe($memoized);
+});
+
+test('route binding still resolves an organization outside the session scope', function () {
+    $user = User::factory()->create();
+    $own = Organization::factory()->create();
+    $own->users()->attach($user->id, ['role' => 'owner']);
+    $other = Organization::factory()->create();
+
+    $this->actingAs($user);
+    session(['current_organization_id' => $own->id]);
+
+    $bound = (new Organization)->resolveRouteBinding($other->id);
+
+    expect($bound?->id)->toBe($other->id);
 });

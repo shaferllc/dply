@@ -16,7 +16,6 @@ class SiteEnvPusher
         protected DotEnvFileWriter $writer,
         protected SiteEnvWriteGuard $guard,
         protected SecretResidencyResolver $residency,
-        protected OnBoxSecretManifestBuilder $onBox,
     ) {}
 
     /**
@@ -114,10 +113,7 @@ class SiteEnvPusher
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
 
         try {
-            $written = $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
-            $this->resolveOnBoxSecrets($ssh, $site, $written, $mergedVars);
-
-            return $written;
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
         } finally {
             // Defence-in-depth: the success path rm's $tmp inside the sudo
             // script below, but any throw before that point would otherwise
@@ -277,63 +273,6 @@ class SiteEnvPusher
         }
 
         return $path;
-    }
-
-    /**
-     * Tier 3+ on-box resolution: when the rendered env carries on-box directives
-     * (left by {@see SecretResidencyResolver} only when onbox is enabled — so
-     * this is inert by default), stage the manifest + shim and run the shim to
-     * fetch each value ON THE BOX and rewrite the .env in place. dply never sees
-     * those values.
-     *
-     * GUARDED + UNVALIDATED-ON-LIVE-BOX: directives never appear unless
-     * secret_vault.residency.onbox_enabled is true, so default deploys never
-     * reach this. Enabling on-box is a deliberate step that must be validated on
-     * a real server (the shim needs jq + curl / the AWS CLI present).
-     *
-     * @param  array<string, mixed>  $mergedVars
-     */
-    private function resolveOnBoxSecrets(SshConnection $ssh, Site $site, string $envPath, array $mergedVars): void
-    {
-        $hasDirective = false;
-        foreach ($mergedVars as $value) {
-            if (($value) && str_contains($value, OnBoxSecretManifestBuilder::DIRECTIVE_PREFIX)) {
-                $hasDirective = true;
-                break;
-            }
-        }
-        if (! $hasDirective) {
-            return;
-        }
-
-        $manifestJson = json_encode($this->onBox->buildFor($site), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        $manifestTmp = '/tmp/dply-onbox-'.Str::lower(Str::random(20)).'.json';
-        $shimTmp = '/tmp/dply-resolve-secrets-'.Str::lower(Str::random(12)).'.sh';
-        $shim = (string) file_get_contents(resource_path('secrets/dply-resolve-secrets.sh'));
-
-        try {
-            $ssh->putFile($manifestTmp, $manifestJson);
-            $ssh->putFile($shimTmp, $shim);
-
-            // The shim rewrites $envPath in place and deletes the manifest itself.
-            $script = sprintf(
-                'set -e; chmod 600 %s; chmod +x %s; sudo -n bash %s %s %s',
-                escapeshellarg($manifestTmp),
-                escapeshellarg($shimTmp),
-                escapeshellarg($shimTmp),
-                escapeshellarg($manifestTmp),
-                escapeshellarg($envPath),
-            );
-            $out = $ssh->exec($script, 120);
-            $this->assertExitOk($ssh, $out, 'resolving on-box secrets');
-        } finally {
-            // Best-effort cleanup of the shim + any manifest the shim didn't remove.
-            try {
-                $ssh->exec('rm -f '.escapeshellarg($shimTmp).' '.escapeshellarg($manifestTmp));
-            } catch (\Throwable) {
-                // ignore — cleanup is best-effort
-            }
-        }
     }
 
     /**

@@ -20,25 +20,28 @@
 @php
     $serversIndexUrl ??= route('servers.index');
     $filtersActive = $statusFilter !== '' || $sort !== 'created_at';
-    $isProductionSurface = $emptyState === 'production';
-    $summaryStats = [
-        ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['total'] ?? 0, 'tone' => 'text-brand-sage'],
-        ['icon' => 'heroicon-o-check-circle', 'label' => __('Active'), 'value' => $summary['active'] ?? 0, 'tone' => 'text-brand-sage'],
-        ['icon' => 'heroicon-o-arrow-path', 'label' => __('Provisioning'), 'value' => $summary['provisioning'] ?? 0, 'tone' => ($summary['provisioning'] ?? 0) > 0 ? 'text-amber-500' : 'text-brand-mist'],
-        ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'] ?? 0, 'tone' => ($summary['attention'] ?? 0) > 0 ? 'text-amber-500' : 'text-brand-mist'],
-        ['icon' => 'heroicon-o-lock-closed', 'label' => __('SSL'), 'value' => $summary['secured'] ?? 0, 'tone' => 'text-brand-sage'],
-        ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['servers'] ?? 0, 'tone' => 'text-brand-sage'],
-    ];
+    // One count line instead of six stat tiles — the cards carry per-site status.
+    // Search/filter chrome earns its space only once the list stops fitting on
+    // screen; below that the table itself is the filter.
+    $showToolbar = ($summary['total'] ?? 0) > 8;
+    // Livewire wraps every @if/@foreach in `<!--[if BLOCK]>` markers, so a slot
+    // whose conditions all fail is still a non-empty string — strip them first.
+    $alertHtml = isset($alert) ? trim(preg_replace('/<!--.*?-->/s', '', (string) $alert) ?? '') : '';
+    $summaryLine = collect([
+        trans_choice(':count site|:count sites', $summary['total'] ?? 0, ['count' => $summary['total'] ?? 0]),
+        ($summary['active'] ?? 0) > 0 ? __(':count active', ['count' => $summary['active']]) : null,
+        ($summary['provisioning'] ?? 0) > 0 ? __(':count provisioning', ['count' => $summary['provisioning']]) : null,
+        ($summary['attention'] ?? 0) > 0 ? __(':count need attention', ['count' => $summary['attention']]) : null,
+    ])->filter()->implode(' · ');
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-breadcrumb-trail :items="$breadcrumbs" />
 
     <x-profile-shell
+        dense
         :title="__('Sites')"
-        :description="$isProductionSurface
-            ? __('Live sites from the connected control plane — Manage opens the real workspace with Production data.')
-            : __('Every hostname routes through a server—search, filter, and open any site from one view.')"
+        :description="$hasSitesInScope ? $summaryLine : null"
         icon="heroicon-o-globe-alt"
     >
         <x-slot:actions>
@@ -53,27 +56,13 @@
             </a>
         </x-slot:actions>
 
-        <x-slot:stats>
-            <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                @foreach ($summaryStats as $stat)
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                        <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                            <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
-                            <span class="truncate">{{ $stat['label'] }}</span>
-                        </dt>
-                        <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-        </x-slot:stats>
-
         @if (session('success'))
             <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                 <x-alert tone="success">{{ session('success') }}</x-alert>
             </div>
         @endif
 
-        @if (isset($alert) && filled(trim((string) $alert)))
+        @if ($alertHtml !== '')
             <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                 {{ $alert }}
             </div>
@@ -104,6 +93,7 @@
                 @endif
             </div>
         @else
+            @if ($showToolbar)
             <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-3 sm:px-5">
                 <div class="min-w-0 flex-1">
                     <label for="sites_search" class="sr-only">{{ __('Search') }}</label>
@@ -156,6 +146,7 @@
                     </x-slot>
                 </x-dropdown>
             </div>
+            @endif
 
             @if ($rows->isEmpty())
                 <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
@@ -171,11 +162,48 @@
                     </button>
                 </div>
             @else
-                <ul>
-                    @foreach ($rows as $site)
-                        @include('components.partials.site-index-card', ['site' => $site])
-                    @endforeach
-                </ul>
+                @php
+                    $th = 'px-3 py-2.5 text-start text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-5';
+                    $sortCols = [
+                        ['key' => 'name', 'label' => __('Site'), 'class' => ''],
+                        ['key' => null, 'label' => __('Hostname'), 'class' => ''],
+                        ['key' => 'status', 'label' => __('Status'), 'class' => ''],
+                        ['key' => null, 'label' => __('Server'), 'class' => 'hidden lg:table-cell'],
+                        ['key' => 'deployed', 'label' => __('Deployed'), 'class' => 'hidden sm:table-cell'],
+                    ];
+                @endphp
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[40rem] border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-brand-ink/10">
+                                @foreach ($sortCols as $col)
+                                    <th scope="col" class="{{ $th }} {{ $col['class'] }}">
+                                        @if ($col['key'])
+                                            <button
+                                                type="button"
+                                                wire:click="$set('sort', '{{ $sort === $col['key'] ? 'created_at' : $col['key'] }}')"
+                                                class="inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-brand-ink"
+                                            >
+                                                {{ $col['label'] }}
+                                                @if ($sort === $col['key'])
+                                                    <x-heroicon-m-chevron-down class="h-3 w-3 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                @endif
+                                            </button>
+                                        @else
+                                            {{ $col['label'] }}
+                                        @endif
+                                    </th>
+                                @endforeach
+                                <th scope="col" class="{{ $th }}"><span class="sr-only">{{ __('Actions') }}</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($rows as $site)
+                                @include('components.partials.site-index-card', ['site' => $site])
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @endif
         @endunless
     </x-profile-shell>

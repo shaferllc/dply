@@ -80,7 +80,7 @@ dply/
 │   └── realtime-worker/  # Cloudflare Worker (managed Pusher-compatible relay)
 ├── resources/
 │   ├── css/              # app.css + deploy-pipeline.css (Tailwind 4)
-│   ├── js/               # app.js, passkeys, file-browser-editor, roadmap-admin-dnd
+│   ├── js/               # app.js, passkeys, file-browser-editor, deploy-pipeline-dnd
 │   └── views/livewire/   # Blade templates co-located by Livewire component
 ├── routes/               # web.php, api.php, auth.php, ai.php, channels.php, console.php
 ├── tests/
@@ -96,7 +96,7 @@ dply/
 - `vite@^7.3.3` — bundler via `laravel-vite-plugin`
 - `laravel-echo@^2.3.1` + `pusher-js@^8.4.3` — real-time client (connects to Reverb or Cloudflare relay)
 - `codemirror@^6.0.1` + `@codemirror/*` — in-app code/config editors (PHP, YAML, JSON, XML, Nginx)
-- `sortablejs@^1.15.7` — drag-and-drop (roadmap admin)
+- `sortablejs@^1.15.7` — drag-and-drop (deploy pipeline)
 
 ### Backend
 - `laravel/framework@^13.0` — application framework
@@ -131,7 +131,7 @@ dply/
 
 - See `AGENTS.md` for agent/AI collaboration conventions (no `CLAUDE.md` present — `AGENTS.md` is the equivalent).
 - Prod has three separate `.env` files: web app (`shared/.env`), worker (`shared/.env` on worker box), and local dev (`.env`). These drift — `check-env-drift.sh` + `ENV_SYNC.md` document the problem.
-- The app self-deploys itself via `AtomicSiteDeployer` (dashboard Deploy / `dply:site:deploy`), the sole deployer. The old `deploy.sh` shell deployer is retired — it's now `commit.sh`, which only stages, AI-generates a commit message + CHANGELOG entry, commits, and pushes (no deploy).
+- The app self-deploys itself via `AtomicSiteDeployer` (dashboard Deploy / `dply:site:deploy`), the sole deployer. The old `deploy.sh` shell deployer is retired — it's now `commit.sh`, which only stages, AI-generates a commit message, commits, and pushes (no deploy).
 - CI runs Pest against PostgreSQL 16; local dev uses SQLite (`database.sqlite`).
 - Feature flags (Pennant) gate nearly every new surface; `pennant:purge` is required when flipping a `workspace.*` default.
 - Local packages at `packages/log-parser` and `packages/nginx-config` are path-symlinked via `composer.json`.

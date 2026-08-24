@@ -79,7 +79,7 @@
                 @endphp
                 <li wire:key="deployment-{{ $deployment->id }}" class="group relative transition-colors hover:bg-brand-sand/15">
                     <a
-                        href="{{ \App\Support\Serverless\ServerlessWorkspaceUrl::deploymentShow($site, $deployment) }}"
+                        href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}"
                         wire:navigate
                         class="absolute inset-0 z-0"
                         aria-label="{{ __('View deployment :id', ['id' => $deployment->id]) }}"
@@ -166,17 +166,6 @@
                             {{-- Footer: deploy id + failure helper --}}
                             <div class="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                                 <span class="font-mono text-2xs text-brand-mist">{{ $deployment->id }}</span>
-                                @if ($isFailed && ops_copilot_active())
-                                    <a
-                                        href="{{ route('infrastructure.copilot', ['site' => $site->id]) }}"
-                                        wire:navigate
-                                        class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-2xs font-semibold text-brand-forest hover:text-brand-sage"
-                                    >
-                                        {{ __('Explain failure') }}
-                                        <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                    </a>
-                                @endif
-
                                 {{-- A running deploy has no delete control: the pipeline is
                                      still writing to the row. Cancel it, then delete. --}}
                                 @unless ($isRunning)

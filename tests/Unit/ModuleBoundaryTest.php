@@ -56,9 +56,6 @@ const BASELINE = [
     'App\Modules\Feedback\Livewire\Admin\Index' => [
         'App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin',
     ],
-    'App\Modules\Roadmap\Livewire\Admin\Index' => [
-        'App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin',
-    ],
 ];
 
 /**

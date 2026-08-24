@@ -8,7 +8,6 @@ use App\Modules\Deploy\Console\AbortSiteDeployCommand;
 use App\Modules\Deploy\Console\DeploySiteCommand;
 use App\Modules\Deploy\Console\EnableSiteQuickDeployCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
-use App\Modules\Deploy\Console\PredeployCommand;
 use App\Modules\Deploy\Console\RedeploySiteSystemdCommand;
 use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
@@ -44,7 +43,6 @@ class DeployServiceProvider extends ServiceProvider
                 DeploySiteCommand::class,
                 EnableSiteQuickDeployCommand::class,
                 FlushDeployDigestCommand::class,
-                PredeployCommand::class,
                 RedeploySiteSystemdCommand::class,
                 PollQuickDeployCommitsCommand::class,
                 RunDueDeploymentSchedulesCommand::class,

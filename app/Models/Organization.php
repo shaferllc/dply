@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\ManagesOrganizationBeta;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;
 use App\Models\Concerns\ManagesOrganizationQuotas;
@@ -90,6 +91,7 @@ class Organization extends Model
     use Billable, HasFactory, HasUlids;
 
     use ManagesOrganizationBeta;
+    use ManagesOrganizationEmailRecipients;
     use ManagesOrganizationMembership;
     use ManagesOrganizationPreferences;
     use ManagesOrganizationQuotas;
@@ -107,6 +109,7 @@ class Organization extends Model
         'deploy_email_notifications_enabled',
         'email_server_credentials_enabled',
         'email_database_credentials_enabled',
+        'email_recipient_prefs',
         'server_site_preferences',
         'default_site_script_id',
         'cron_maintenance_until',
@@ -130,6 +133,7 @@ class Organization extends Model
     protected function casts(): array
     {
         return [
+            'email_recipient_prefs' => 'array',
             'trial_ends_at' => 'datetime',
             'beta_joined_at' => 'datetime',
             'is_internal' => 'boolean',
@@ -219,11 +223,6 @@ class Organization extends Model
      * noise. Deliberately an exists() rather than a count — the caller only
      * needs the boolean.
      */
-    public function hasCloudApps(): bool
-    {
-        return $this->sites()->cloudApps()->exists();
-    }
-
     /** The org's secret-residency encryption key (per-org age keypair), if minted. *
      * @return HasOne<OrgSecretKey, $this>
      */
@@ -357,6 +356,31 @@ class Organization extends Model
     public function notificationChannels(): MorphMany
     {
         return $this->morphMany(NotificationChannel::class, 'owner');
+    }
+
+    /**
+     * Hand back the instance $user->currentOrganization() already memoized when
+     * the route binds that same org, so a page render holds ONE Organization
+     * object for the row. Two instances each lazy-load their own `subscriptions`
+     * relation and their own serverIds() memo — the debug bar showed both
+     * queries firing twice on an org-scoped page (route-bound $org in the
+     * component, memoized org in the shell/command palette).
+     *
+     * Admin routes that bind a foreign org fall through to the default lookup.
+     */
+    public function resolveRouteBinding($value, $field = null): ?static
+    {
+        $user = auth()->user();
+        $current = $user instanceof User ? $user->currentOrganization() : null;
+        $key = $field ?? $this->getRouteKeyName();
+
+        if ($current instanceof static && (string) $current->getAttribute($key) === (string) $value) {
+            return $current;
+        }
+
+        $resolved = parent::resolveRouteBinding($value, $field);
+
+        return $resolved instanceof static ? $resolved : null;
     }
 
     /**

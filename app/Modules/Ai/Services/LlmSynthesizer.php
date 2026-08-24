@@ -36,14 +36,6 @@ final class LlmSynthesizer
     }
 
     /**
-     * @param  array<string, mixed> $context
-     */
-    public function synthesizeOpsCopilot(array $context): LlmSynthesisResult
-    {
-        return $this->call($this->promptBuilder->opsCopilotSystem($context));
-    }
-
-    /**
      * @param  array<string, mixed> $report
      */
     public function synthesizeSharedHost(array $report): LlmSynthesisResult
@@ -70,29 +62,6 @@ final class LlmSynthesizer
             rawContent: $result->rawContent,
             metadata: $result->metadata,
         );
-    }
-
-    /**
-     * Generic JSON completion for callers that need the raw decoded object plus
-     * token usage rather than the narrative/suggestions shape `call()` returns
-     * (e.g. the roadmap updater, which applies a structured plan).
-     *
-     * @return array{data: array<string, mixed>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int, raw: string}
-     */
-    public function completeJson(string $userPrompt, ?string $systemOverride = null): array
-    {
-        $result = $this->complete(
-            $systemOverride ?? 'You are a precise assistant for the dply hosting platform. Respond with valid JSON only.',
-            $userPrompt,
-        );
-
-        return [
-            'data' => $this->parseJsonContent($result['content']),
-            'prompt_tokens' => $result['prompt_tokens'],
-            'completion_tokens' => $result['completion_tokens'],
-            'latency_ms' => $result['latency_ms'],
-            'raw' => $result['content'],
-        ];
     }
 
     private function call(string $userPrompt): LlmSynthesisResult

@@ -3,10 +3,9 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\DeploymentMethod;
+use App\Jobs\DetectSiteCloudflareTlsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
-use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -32,8 +31,8 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
-use App\Services\Servers\ServerPhpManager;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\Sites\SiteShowViewData;
 use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Contracts\View\View;
@@ -49,8 +48,6 @@ class Show extends Component
     use DispatchesToastNotifications;
     use HandlesSiteRemovalFlow;
     use InteractsWithScaffoldJourney;
-    use ManagesEdgeRedeploy;
-    use ManagesServerlessRuntime;
     use ManagesSiteDeployExecution;
     use ManagesSiteDeployHooks;
     use ManagesSiteDeploymentSettings;
@@ -89,7 +86,6 @@ class Show extends Component
 
         $this->dashboard_tab = $value;
     }
-
 
     /** Recorded in site meta for Rails apps (e.g. production, staging). */
     public string $rails_env = 'production';
@@ -138,21 +134,12 @@ class Show extends Component
             return;
         }
 
-        $functionsConfig = $this->site->functionsConfig();
+        // The serverless runtime block that stood here hydrated functions_*
+        // properties from the ManagesServerlessRuntime trait and
+        // Site::functionsConfig(), all deleted with the surface
+        // (remove-cloud-edge-serverless).
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
-        $this->functions_repo_source = (string) ($functionsConfig['repo_source'] ?? 'manual');
-        $this->functions_source_control_account_id = (string) ($functionsConfig['source_control_account_id'] ?? '');
-        $this->functions_repository_selection = '';
-        $this->functions_repository_subdirectory = (string) ($functionsConfig['repository_subdirectory'] ?? '');
-        $this->functions_runtime = (string) ($functionsConfig['runtime'] ?? '');
-        $this->functions_entrypoint = (string) ($functionsConfig['entrypoint'] ?? '');
-        $this->functions_build_command = (string) ($functionsConfig['build_command'] ?? '');
-        $this->functions_artifact_output_path = (string) ($functionsConfig['artifact_output_path'] ?? '');
-        $this->syncServerlessRuntimeFromSite();
-        $this->functionsDetection = is_array($functionsConfig['detected_runtime'] ?? null)
-            ? $functionsConfig['detected_runtime']
-            : [];
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_path_override = (string) ($this->site->env_file_path ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
@@ -288,7 +275,7 @@ class Show extends Component
         return $this->site->shouldShowPhpOctaneRolloutSettings();
     }
 
-    /** Overview SSL card: probe in flight (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}). */
+    /** Overview SSL card: probe in flight (see {@see DetectSiteCloudflareTlsJob}). */
     public bool $ssl_recheck_running = false;
 
     /** `checked_at` seen at dispatch, so the poll can tell when a fresh result lands. */
@@ -307,7 +294,7 @@ class Show extends Component
 
         $this->ssl_recheck_requested_at = $this->site->cloudflareTlsCheckedAt();
         $this->ssl_recheck_running = true;
-        \App\Jobs\DetectSiteCloudflareTlsJob::dispatch($this->site->id);
+        DetectSiteCloudflareTlsJob::dispatch($this->site->id);
     }
 
     /** Driven by wire:poll while a recheck is in flight; resolves once meta updates. */
@@ -348,7 +335,7 @@ class Show extends Component
             $this->server->workspace_id !== null
             && (string) $this->server->workspace_id === (string) $this->site->workspace_id
         ) {
-            $workspace = app(\App\Support\Workspaces\WorkspaceRegistry::class)->for($this->site);
+            $workspace = app(WorkspaceRegistry::class)->for($this->site);
 
             if ($workspace !== null) {
                 if (! $this->site->relationLoaded('workspace')) {
@@ -434,10 +421,6 @@ class Show extends Component
             } else {
                 $relations['deployments'] = fn ($q) => $q->limit(1);
             }
-        }
-
-        if ($this->site->usesEdgeRuntime()) {
-            $relations['edgeDeployments'] = fn ($q) => $q->limit($ready ? 10 : 1);
         }
 
         $this->site->load($relations);

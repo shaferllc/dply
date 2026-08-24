@@ -13,7 +13,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
-use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
 use App\Services\Sites\EnsuresDefaultUptimeMonitors;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\SiteUptimeHistorySummary;
@@ -86,7 +85,6 @@ class Monitor extends Component
 
     /** Function-activity chart window: 1h | 24h | 7d (serverless only). */
     #[Url]
-    public string $statsRange = '24h';
 
     public function mount(Server $server, Site $site): void
     {
@@ -106,10 +104,6 @@ class Monitor extends Component
         $workerResolver = app(UptimeProbeWorkerResolver::class);
         $this->newProbeWorker = $workerResolver->forSite($this->site);
         $this->newProbeRegion = app(UptimeProbeRegionResolver::class)->forSite($this->site);
-
-        if (! FunctionStatsRangeQuery::isValidRange($this->statsRange)) {
-            $this->statsRange = FunctionStatsRangeQuery::defaultRange();
-        }
 
         if (! in_array($this->monitorTab, self::MONITOR_TABS, true)) {
             $this->monitorTab = 'monitors';
@@ -138,16 +132,6 @@ class Monitor extends Component
     {
         $this->monitorTab = in_array($tab, self::MONITOR_TABS, true) ? $tab : 'monitors';
     }
-
-    public function setStatsRange(string $range): void
-    {
-        $this->statsRange = FunctionStatsRangeQuery::isValidRange($range)
-            ? $range
-            : FunctionStatsRangeQuery::defaultRange();
-    }
-
-    /** Re-renders, which re-queries the function-activity series. */
-    public function refreshStats(): void {}
 
     /** Reset the form to add-mode defaults and open the modal. */
     public function startAddMonitor(): void
@@ -389,11 +373,6 @@ class Monitor extends Component
         $runtimeTarget = $this->site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
-        // Function-activity dashboard — serverless functions only.
-        $functionStats = $this->site->usesFunctionsRuntime()
-            ? app(FunctionStatsRangeQuery::class)->forSite($this->site, $this->statsRange)
-            : null;
-
         // Inline history for the expanded monitor only — keeps the page cheap
         // when nothing is expanded.
         $expandedHistory = null;
@@ -420,7 +399,6 @@ class Monitor extends Component
             'section' => $section,
             'runtimePublication' => $runtimePublication,
             'runtimeMode' => $runtimeMode,
-            'functionStats' => $functionStats,
             'expandedHistory' => $expandedHistory,
             'operationalState' => $operationalState,
             'uptimeNotifChannels' => $onAlertsTab ? $this->assignableUptimeNotificationChannels() : collect(),

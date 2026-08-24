@@ -126,7 +126,6 @@
                 @if ($deployment->status === 'failed')
                     @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $deployment])
                     <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-                        <x-ops-copilot-callout :site="$site" :show="true" />
                     </div>
                 @endif
 

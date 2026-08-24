@@ -43,49 +43,6 @@
                 </span>
             </x-slot>
             <x-slot name="actions">
-                @if ($readyForWorkspace && $site->usesEdgeRuntime())
-                    {{-- Existing Edge sites keep their workspace while the Edge
-                         surface is parked, but the index they'd return to is
-                         gated — don't offer a button that lands on the gate. --}}
-                    @feature('surface.edge')
-                        <x-outline-link :href="route('edge.index')" wire:navigate>
-                            <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('All Edge sites') }}
-                        </x-outline-link>
-                    @endfeature
-                    @if ($liveUrlForHeader = ($edgeLiveUrl ?? $site->edgeLiveUrl()))
-                        <a
-                            href="{{ $liveUrlForHeader }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink hover:bg-brand-sand/40"
-                            title="{{ __('Open the live edge site in a new tab') }}"
-                        >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
-                            {{ preg_replace('#^https?://#', '', $liveUrlForHeader) }}
-                        </a>
-                    @endif
-                    @can('update', $site)
-                        <button
-                            type="button"
-                            wire:click="redeployEdge"
-                            wire:loading.attr="disabled"
-                            wire:target="redeployEdge"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                        >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
-                            <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
-                            <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
-                        </button>
-                    @endcan
-                @elseif ($readyForWorkspace && $site->workspace)
-                    @feature('surface.projects')
-                        <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
-                            <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Open project') }}
-                        </x-outline-link>
-                    @endfeature
-                @endif
                 @if ($showWebserverConfigEditor && ! $site->isCustom() && ! $site->usesEdgeRuntime())
                     <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>
                         <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
@@ -184,7 +141,6 @@
                         @include('livewire.sites.partials.show.finish-setup-banner')
                     @endif
 
-                    <x-ops-copilot-callout :site="$site" compact class="mt-6" />
 
                     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">
 

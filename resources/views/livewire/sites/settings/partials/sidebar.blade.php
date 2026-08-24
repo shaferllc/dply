@@ -2,20 +2,11 @@
     $card = 'dply-card overflow-hidden';
     $navLink = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors';
 
-    $sidebarEdgeLiveUrl = $site->usesEdgeRuntime() ? $site->edgeLiveUrl() : null;
     $sidebarPrimaryHostname = optional($site->primaryDomain())->hostname
         ?? ($runtimePublication['hostname'] ?? null)
         ?? $site->name;
-    // A function has no domain row and no testing hostname, so visitUrl() is
-    // always null for one — resolve its live hostname / proxy path instead so
-    // the URL row links somewhere real rather than echoing the site name.
-    $sidebarVisitUrl = $sidebarEdgeLiveUrl
-        ?: ($site->usesFunctionsRuntime() ? $site->serverlessPublicUrl() : null)
-        ?: $site->visitUrl();
+    $sidebarVisitUrl = $site->visitUrl();
     $sidebarUrlSeed = (string) ($sidebarPrimaryHostname ?: $site->name ?: $site->id);
-    $sidebarCanRedeployEdge = is_string($sidebarEdgeLiveUrl)
-        && $sidebarEdgeLiveUrl !== ''
-        && method_exists($this, 'redeployEdge');
 @endphp
 
 {{-- The <aside> stays the grid column (col-span-3); only its CARD contents are
@@ -50,28 +41,11 @@
     @persist('site-sidebar-'.$site->id)
     <div class="{{ $card }}">
         <div class="ws-hide-collapsed border-b border-brand-ink/10 p-4 sm:p-5">
-            {{-- The @feature guards keep these "back to the index" links from
-                 pointing at a parked surface: the workspace stays reachable for
-                 existing sites, but its index is gated. --}}
-            @if ($site->usesEdgeRuntime() && feature('surface.edge'))
-                <a href="{{ route('edge.index') }}" wire:navigate
-                    class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
-                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Back to Edge sites') }}
-                </a>
-            @elseif ($site->usesFunctionsRuntime() && feature('surface.serverless'))
-                <a href="{{ route('serverless.index') }}" wire:navigate
-                    class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
-                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Back to Serverless') }}
-                </a>
-            @else
                 <a href="{{ route('servers.sites', $server) }}" wire:navigate
                     class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Back to sites') }}
                 </a>
-            @endif
             <div class="flex items-start gap-3">
                 {{-- Avatar + pencil opens the logo edit menu in place (nested
                      LogoMenu component, so it works from every workspace page). --}}
@@ -148,23 +122,6 @@
                     <span class="text-xs text-brand-mist">—</span>
                 @endif
             </div>
-
-            @if ($sidebarCanRedeployEdge)
-                @can('update', $site)
-                    <button
-                        type="button"
-                        wire:click="redeployEdge"
-                        wire:loading.attr="disabled"
-                        wire:target="redeployEdge"
-                        class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                    >
-                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" aria-hidden="true" />
-                        <x-spinner wire:loading wire:target="redeployEdge" variant="white" size="sm" />
-                        <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
-                        <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
-                    </button>
-                @endcan
-            @endif
         </div>
         <nav
             id="site-settings-sidebar"
@@ -252,21 +209,13 @@
                                 'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
                                 default => ['server' => $server, 'site' => $site],
                             };
-                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
-                                $item['route'],
-                                $site,
-                                $routeArgs + ($item['route_query'] ?? []),
-                            ) ?? route($item['route'], $routeArgs + ($item['route_query'] ?? []));
+                            $href = route($item['route'], $routeArgs + ($item['route_query'] ?? []));
                         } else {
                             $sectionQuery = array_merge(
                                 $item['id'] === 'routing' ? ['tab' => $routingTab] : [],
                                 $item['id'] === 'laravel-stack' ? ['laravel_tab' => $laravel_tab ?? 'commands'] : [],
                             );
-                            $href = \App\Support\Serverless\ServerlessWorkspaceUrl::forSitesRoute(
-                                'sites.show',
-                                $site,
-                                ['section' => $item['id']] + $sectionQuery,
-                            ) ?? route('sites.show', array_merge([
+                            $href = route('sites.show', array_merge([
                                 'server' => $server,
                                 'site' => $site,
                                 'section' => $item['id'],
@@ -327,25 +276,6 @@
             @endforeach
         </nav>
         <div class="ws-hide-collapsed border-t border-brand-ink/10 p-3">
-            @if ($site->usesEdgeRuntime())
-                <a
-                    href="{{ route('edge.index') }}"
-                    wire:navigate
-                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
-                >
-                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
-                    {{ __('Back to Edge sites') }}
-                </a>
-            @elseif ($site->usesFunctionsRuntime())
-                <a
-                    href="{{ route('serverless.index') }}"
-                    wire:navigate
-                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
-                >
-                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
-                    {{ __('Back to Serverless') }}
-                </a>
-            @else
                 <a
                     href="{{ route('servers.sites', $server) }}"
                     wire:navigate
@@ -354,7 +284,6 @@
                     <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
                     {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
                 </a>
-            @endif
         </div>
     </div>
     @endpersist

@@ -25,7 +25,6 @@ return [
     ],
 
     'features' => [
-        'ops_copilot' => env('DPLY_AI_OPS_COPILOT_ENABLED', true),
         'shared_host' => env('DPLY_AI_SHARED_HOST_ENABLED', true),
         'docs_ask' => env('DPLY_AI_DOCS_ASK_ENABLED', true),
     ],

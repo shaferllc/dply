@@ -248,21 +248,6 @@ trait TracksProvisioningStatus
             return true;
         }
 
-        // Subsequent redeploys flip the site to STATUS_EDGE_PROVISIONING /
-        // STATUS_EDGE_FAILED. Without this carve-out a failed-first-deploy
-        // would land in the workspace showing a misleading "Open live site"
-        // header (no site ever went live). Both transient + failed states
-        // stay in the provisioning shell until a deploy actually publishes
-        // — `active_deployment_id` is only set by PublishEdgeDeploymentJob
-        // on a successful publish, so it's a reliable "has ever been live"
-        // signal that persists across re-deploys.
-        if (in_array($this->status, [self::STATUS_EDGE_PROVISIONING, self::STATUS_EDGE_FAILED], true)) {
-            $activeDeploymentId = $this->edgeMeta()['active_deployment_id'] ?? null;
-            if (is_string($activeDeploymentId) && $activeDeploymentId !== '') {
-                return true;
-            }
-        }
-
         // Same idea for serverless: a failed first deploy must not open the
         // normal function workspace. `last_deploy_at` is only set on success,
         // so it's the "has ever been live" signal (redeploy failures on an

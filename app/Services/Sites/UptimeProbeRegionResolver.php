@@ -74,8 +74,12 @@ final class UptimeProbeRegionResolver
     /** @return list<string> */
     private function functionRegionCandidates(Site $site): array
     {
+        // Site::serverlessConfig() went with the serverless surface
+        // (remove-cloud-edge-serverless), so there are no function URLs left to
+        // parse a region out of; the server region and the nyc1 default carry
+        // this now.
         $candidates = [];
-        $config = $site->serverlessConfig();
+        $config = [];
         foreach (['action_url', 'api_host'] as $key) {
             $value = $config[$key] ?? null;
             if (is_string($value) && trim($value) !== '') {

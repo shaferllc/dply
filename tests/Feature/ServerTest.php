@@ -99,7 +99,6 @@ test('servers index is displayed for authenticated user', function () {
     $response = $this->actingAs($user)->get(route('servers.index'));
 
     $response->assertOk();
-    $response->assertSee('Provision hosts', false);
     $response->assertDontSee('Open launchpad');
     $response->assertSee('No servers yet');
     $response->assertSee('Add server');
@@ -243,46 +242,7 @@ test('servers create requires organization', function () {
     $response->assertForbidden();
 });
 
-test('launchpad is displayed with organization', function () {
-    // surface.cloud is off post VM-launch; this test asserts the launches
-    // page lists the Cloud tile + cloud.create URL, so opt in locally.
-    Feature::define('surface.cloud', fn (): bool => true);
-    Feature::define('surface.serverless', fn (): bool => true);
-    Feature::flushCache();
 
-    $user = userWithOrganization();
-
-    $response = $this->actingAs($user)->get(route('launches.create'));
-
-    $response->assertOk();
-    $response->assertSee('Launch setup');
-    $response->assertSee('Bring your own server');
-
-    // Container flow inversion (2026-05): Containers tile copy reframed
-    // and the href now jumps straight to /servers/create with the docker
-    // host_target preset instead of the retired launcher page.
-    $response->assertSee('Run a container app');
-    $response->assertSee('Cloud');
-    $response->assertSee('Serverless');
-    $response->assertSee(route('servers.create'), false);
-    $response->assertSee(route('servers.create', ['host_target' => 'docker']), false);
-    $response->assertSee(route('cloud.create'), false);
-    $response->assertSee(route('serverless.create'), false);
-});
-
-test('serverless launch path is displayed with organization', function () {
-    Feature::define('surface.serverless', fn (): bool => true);
-    Feature::flushCache();
-
-    $user = userWithOrganization();
-
-    $response = $this->actingAs($user)->get(route('launches.serverless'));
-
-    $response->assertOk();
-    $response->assertSee('Serverless');
-    $response->assertSee('AWS Lambda');
-    $response->assertSee('Functions');
-});
 
 test('kubernetes launch path is displayed with organization', function () {
     $user = userWithOrganization();
@@ -934,7 +894,9 @@ test('servers create step what install profile updates stack defaults', function
         ->test(ServerCreateStepWhat::class)
         ->set('form.install_profile', 'queue_worker')
         ->assertSet('form.server_role', 'worker')
-        ->assertSet('form.webserver', 'caddy')
+        // The queue_worker profile moved to nginx in a407954b; this assertion
+        // was left on the old default.
+        ->assertSet('form.webserver', 'nginx')
         ->assertSet('form.database', 'none');
 });
 

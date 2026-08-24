@@ -36,12 +36,7 @@ class SourceControl extends Component
     public function getProvidersProperty(): array
     {
         $enabled = OAuthController::getEnabledProviders();
-        $hostFor = fn (string $id): string => match ($id) {
-            'github' => 'github.com',
-            'gitlab' => 'gitlab.com',
-            'bitbucket' => 'bitbucket.org',
-            default => '',
-        };
+        $hostFor = fn (string $id): string => GitProviderToken::providerDescriptor($id)['host'];
 
         // Even if a provider's OAuth app isn't configured, the operator can
         // still add a PAT — surface all three core hosts when at least one
@@ -51,11 +46,7 @@ class SourceControl extends Component
             ['github', 'gitlab', 'bitbucket'],
         ));
 
-        $names = [
-            'github' => 'GitHub',
-            'gitlab' => 'GitLab',
-            'bitbucket' => 'Bitbucket',
-        ];
+
 
         $out = [];
         foreach ($providerIds as $id) {
@@ -71,7 +62,7 @@ class SourceControl extends Component
 
             $out[] = [
                 'id' => $id,
-                'name' => $names[$id] ?? ucfirst($id),
+                'name' => GitProviderToken::providerDescriptor($id)['name'],
                 'accounts' => $accounts,
                 'pats' => $pats,
                 'oauth_enabled' => $oauthEnabled,
@@ -255,6 +246,8 @@ class SourceControl extends Component
 
     public function render(): View
     {
-        return view('livewire.settings.source-control');
+        return view('livewire.settings.source-control', [
+            'bodyPartial' => 'livewire.settings.partials.source-control.body',
+        ]);
     }
 }

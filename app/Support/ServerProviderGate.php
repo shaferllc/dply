@@ -71,24 +71,29 @@ final class ServerProviderGate
      * @var list<string>
      */
     private const COMING_SOON = [
+        // PARKED 2026-08-22 — the credential picker was 13 "— coming soon" rows
+        // to 5 usable ones, which reads as a roadmap, not a chooser. Restore a
+        // line here the moment its provider is close enough to advertise; the
+        // gate needs no other change, because visible() is enabled() || comingSoon().
+        //
         // Hyperscale
-        'aws',
-        'gcp',
-        'azure',
-        'oracle',
+        // 'aws',
+        // 'gcp',
+        // 'azure',
+        // 'oracle',
         // VPS & cloud
-        'upcloud',
+        // 'upcloud',
         // Other providers
-        'ovh',
+        // 'ovh',
         // DNS & CDN
-        'gandi',
-        'namecheap',
-        'vercel_dns',
+        // 'gandi',
+        // 'namecheap',
+        // 'vercel_dns',
         // Platforms
-        'ghcr',
+        // 'ghcr',
         // Migrate from
-        'ploi',
-        'forge',
+        // 'ploi',
+        // 'forge',
     ];
 
     public static function enabled(string $provider): bool
@@ -123,6 +128,9 @@ final class ServerProviderGate
             return false;
         }
 
+        // COMING_SOON is parked empty — see the constant. Restoring a line there
+        // makes this reachable again without touching anything else.
+        // @phpstan-ignore function.impossibleType
         return in_array($provider, self::COMING_SOON, true);
     }
 

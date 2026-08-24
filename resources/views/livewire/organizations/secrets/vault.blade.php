@@ -1,12 +1,31 @@
             <section class="border-b border-brand-ink/10">
+                {{-- Adding a secret is a decision, not a thing to scroll past: the
+                     form lives in a modal behind this button rather than sitting
+                     permanently expanded under the list. --}}
                 <x-workspace-panel-head
                     dense
                     icon="heroicon-o-lock-closed"
                     :title="__('Shared secrets')"
+                    :count="count($vaultRows) ?: null"
                     :note="__('Store a value once, then link it onto any site. Values cannot be read back — rotate to replace. They apply on the next deploy, not a standalone env push.')"
-                />
+                >
+                    @can('update', $organization)
+                        <x-slot:actions>
+                            <button
+                                type="button"
+                                wire:click="openNewSecretModal"
+                                class="inline-flex h-6 items-center gap-1 rounded-lg bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                            >
+                                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('New secret') }}
+                            </button>
+                        </x-slot:actions>
+                    @endcan
+                </x-workspace-panel-head>
 
                 @if ($vaultRows !== [])
+                    @php($bulkSelectable = count($vaultRows) > 1)
+                    @if ($bulkSelectable)
                     @can('update', $organization)
                         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
                             <label class="inline-flex items-center gap-2 text-xs font-semibold text-brand-moss">
@@ -29,8 +48,8 @@
                                     </button>
                                     <button
                                         type="button"
+                                        wire:click="promptDeleteSelectedVaultSecrets"
                                         class="inline-flex h-6 items-center rounded-md bg-rose-600 px-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-700"
-                                        wire:click="openConfirmActionModal('deleteSelectedVaultSecrets', @js([]), @js(__('Delete selected secrets')), @js(trans_choice('{1} Delete :count secret? It unlinks from every site, and those sites drop the key on the next deploy.|[2,*] Delete :count secrets? They unlink from every site, and those sites drop the keys on the next deploy.', count($selected_secret_ids), ['count' => count($selected_secret_ids)])), @js(__('Delete')), true)"
                                     >
                                         {{ __('Delete selected') }}
                                     </button>
@@ -38,22 +57,24 @@
                             @endif
                         </div>
                     @endcan
+                    @endif
 
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($vaultRows as $row)
-                            <li class="px-3 py-2 sm:px-4" wire:key="vault-{{ $row['id'] }}">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div class="flex min-w-0 items-start gap-2.5">
-                                        @can('update', $organization)
-                                            <input
-                                                type="checkbox"
-                                                class="mt-0.5 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
-                                                value="{{ $row['id'] }}"
-                                                wire:model.live="selected_secret_ids"
-                                                aria-label="{{ __('Select :key', ['key' => $row['key']]) }}"
-                                            />
-                                        @endcan
-                                        <div class="min-w-0">
+                            <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4" wire:key="vault-{{ $row['id'] }}">
+                                <div class="flex min-w-0 items-start gap-2.5">
+                                    @if ($bulkSelectable)
+                                    @can('update', $organization)
+                                        <input
+                                            type="checkbox"
+                                            class="mt-0.5 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage"
+                                            value="{{ $row['id'] }}"
+                                            wire:model.live="selected_secret_ids"
+                                            aria-label="{{ __('Select :key', ['key' => $row['key']]) }}"
+                                        />
+                                    @endcan
+                                    @endif
+                                    <div class="min-w-0">
                                         <p class="font-mono text-sm font-semibold text-brand-ink">{{ $row['key'] }}</p>
                                         <p class="truncate text-xs text-brand-moss">
                                             {{ $row['notes'] ?: __('No note') }}
@@ -64,74 +85,42 @@
                                             @endif
                                             <span class="text-brand-mist">· {{ __('write-only') }}</span>
                                         </p>
-                                        </div>
                                     </div>
-                                    @can('update', $organization)
-                                        <div class="flex flex-wrap items-center gap-1.5">
-                                            <button
-                                                type="button"
-                                                wire:click="startRotateVaultSecret('{{ $row['id'] }}')"
-                                                class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                            >
-                                                {{ __('Rotate') }}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="inline-flex h-6 items-center px-1.5 text-xs font-semibold text-rose-700 hover:text-rose-900"
-                                                wire:click="openConfirmActionModal('deleteVaultSecret', @js([$row['id']]), @js(__('Delete secret')), @js(__('Delete :key? It unlinks from every site. Those sites drop the key on the next deploy.', ['key' => $row['key']])), @js(__('Delete')), true)"
-                                            >
-                                                {{ __('Delete') }}
-                                            </button>
-                                        </div>
-                                    @endcan
                                 </div>
-
-                                @if ($rotating_secret_id === $row['id'])
-                                    <div class="mt-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-2.5">
-                                        <x-input-label for="rotate_value_{{ $row['id'] }}" :value="__('New value')" />
-                                        <x-text-input id="rotate_value_{{ $row['id'] }}" type="password" wire:model="rotate_value" class="mt-1 block w-full font-mono" autocomplete="new-password" />
-                                        <x-input-error :messages="$errors->get('rotate_value')" class="mt-1" />
-                                        <div class="mt-2 flex flex-wrap gap-1.5">
-                                            <x-primary-button type="button" wire:click="rotateVaultSecret" wire:loading.attr="disabled" wire:target="rotateVaultSecret">
-                                                {{ __('Save new value') }}
-                                            </x-primary-button>
-                                            <x-secondary-button type="button" wire:click="cancelRotateVaultSecret">{{ __('Cancel') }}</x-secondary-button>
-                                        </div>
+                                @can('update', $organization)
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            wire:click="startRotateVaultSecret('{{ $row['id'] }}')"
+                                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Rotate') }}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            wire:click="promptDeleteVaultSecret('{{ $row['id'] }}')"
+                                            class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                        >
+                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Delete') }}
+                                        </button>
                                     </div>
-                                @endif
+                                @endcan
                             </li>
                         @endforeach
                     </ul>
                 @else
-                    <p class="px-3 py-4 text-sm text-brand-moss sm:px-4">{{ __('No shared secrets yet. Create one, then link it from a site\'s Environment page.') }}</p>
-                @endif
-
-                @can('update', $organization)
-                    <div class="border-t border-brand-ink/10 px-3 py-3 sm:px-4">
-                        <h3 class="text-xs font-semibold text-brand-ink">{{ __('Add a secret') }}</h3>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Keys may be reused. Add a note when the key already exists so you can tell them apart.') }}</p>
-                        <div class="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                            <div>
-                                <x-input-label for="vault_key" :value="__('Key')" />
-                                <x-text-input id="vault_key" wire:model="vault_key" class="mt-1 block w-full font-mono uppercase" placeholder="STRIPE_SECRET" />
-                                <x-input-error :messages="$errors->get('vault_key')" class="mt-1" />
-                            </div>
-                            <div>
-                                <x-input-label for="vault_value" :value="__('Value')" />
-                                <x-text-input id="vault_value" type="password" wire:model="vault_value" class="mt-1 block w-full font-mono" autocomplete="new-password" />
-                                <x-input-error :messages="$errors->get('vault_value')" class="mt-1" />
-                            </div>
-                            <div class="sm:col-span-2">
-                                <x-input-label for="vault_notes" :value="__('Notes')" />
-                                <x-text-input id="vault_notes" wire:model="vault_notes" class="mt-1 block w-full" placeholder="{{ __('Required when this key already exists') }}" />
-                                <x-input-error :messages="$errors->get('vault_notes')" class="mt-1" />
-                            </div>
-                        </div>
-                        <div class="mt-2.5">
-                            <x-primary-button type="button" wire:click="createVaultSecret" wire:loading.attr="disabled" wire:target="createVaultSecret">
-                                {{ __('Save secret') }}
-                            </x-primary-button>
-                        </div>
+                    <div class="px-3 py-6 text-center sm:px-4">
+                        <p class="text-sm text-brand-moss">{{ __('No shared secrets yet.') }}</p>
+                        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-mist">
+                            {{ __('Store a value here once, then link it from a site\'s Environment page.') }}
+                        </p>
+                        @can('update', $organization)
+                            <button type="button" wire:click="openNewSecretModal" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                {{ __('Add the first one') }} →
+                            </button>
+                        @endcan
                     </div>
-                @endcan
+                @endif
             </section>

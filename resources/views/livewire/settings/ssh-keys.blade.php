@@ -38,35 +38,6 @@
             @endif
         </x-slot:actions>
 
-        <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5" aria-label="{{ __('SSH keys at a glance') }}">
-                <div class="bg-white px-3 py-2">
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Keys') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalKeys }}</span>
-                        <span class="truncate text-xs text-brand-moss">{{ __('on your account') }}</span>
-                    </dd>
-                </div>
-                <div @class([
-                    'px-3 py-2',
-                    'bg-brand-sage/10' => $autoProvisionCount > 0,
-                    'bg-white' => $autoProvisionCount === 0,
-                ])>
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Auto-deploy') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $autoProvisionCount }}</span>
-                        <span class="truncate text-xs text-brand-moss">{{ __('on new servers') }}</span>
-                    </dd>
-                </div>
-                <div class="bg-white px-3 py-2">
-                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Reachable') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $reachableServers }}</span>
-                        <span class="truncate text-xs text-brand-moss">{{ trans_choice('deploy target|deploy targets', $reachableServers) }}</span>
-                    </dd>
-                </div>
-            </dl>
-        </x-slot:stats>
 
         @if ($setup_source === 'servers.create')
             {{-- Pre-flight hint when arriving from the BYO server flow. --}}
@@ -103,8 +74,40 @@
         @endif
 
         @if ($sshKeysAll->isNotEmpty())
-            <div class="flex flex-col gap-2 border-b border-brand-ink/10 px-3 py-2 sm:flex-row sm:items-center sm:justify-end sm:px-4">
-                <div class="w-full sm:max-w-xs">
+            {{-- Same strip as the Credentials page: filters on the left, search on
+                 the right. "Auto" is worth a chip because it is the one property
+                 that changes what happens without you asking. --}}
+            <section aria-label="{{ __('Filter keys') }}" class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 bg-brand-cream/40 px-3 py-2 sm:px-4">
+                @php
+                    $autoFilter = request()->query('auto') === '1';
+                @endphp
+                <a
+                    href="{{ request()->fullUrlWithQuery(['auto' => null]) }}"
+                    @class([
+                        'inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition-colors',
+                        'border-brand-ink bg-brand-ink text-brand-cream' => ! $autoFilter,
+                        'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $autoFilter,
+                    ])
+                >
+                    {{ __('All') }}
+                    <span class="font-mono tabular-nums {{ $autoFilter ? 'text-brand-mist' : 'opacity-70' }}">{{ $totalKeys }}</span>
+                </a>
+                @if ($autoProvisionCount > 0)
+                    <a
+                        href="{{ request()->fullUrlWithQuery(['auto' => '1']) }}"
+                        @class([
+                            'inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition-colors',
+                            'border-brand-ink bg-brand-ink text-brand-cream' => $autoFilter,
+                            'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $autoFilter,
+                        ])
+                    >
+                        <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Auto-deploy') }}
+                        <span class="font-mono tabular-nums {{ $autoFilter ? 'opacity-70' : 'text-brand-mist' }}">{{ $autoProvisionCount }}</span>
+                    </a>
+                @endif
+
+                <div class="ms-auto w-full sm:w-64">
                     <label for="ssh_keys_search" class="sr-only">{{ __('Search') }}</label>
                     <div class="relative">
                         <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-brand-mist">
@@ -116,11 +119,11 @@
                             wire:model.live.debounce.300ms="ssh_keys_search"
                             placeholder="{{ __('Search keys by name…') }}"
                             autocomplete="off"
-                            class="h-7 w-full rounded-md border-brand-ink/15 bg-white py-0 ps-8 pe-2.5 text-xs text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            class="h-6 w-full rounded-md border-brand-ink/15 bg-white py-0 ps-8 pe-2.5 text-xs text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                         />
                     </div>
                 </div>
-            </div>
+            </section>
         @endif
 
         @if ($sshKeysAll->isEmpty())
@@ -150,56 +153,106 @@
                 <button type="button" wire:click="$set('ssh_keys_search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
             </div>
         @else
-            <ul class="divide-y divide-brand-ink/10">
-                @foreach ($sshKeys as $key)
-                    <li wire:key="ssh-key-{{ $key->id }}" class="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-brand-sand/15 sm:px-4">
-                        <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span class="truncate text-sm font-semibold text-brand-ink">{{ $key->name }}</span>
-                            @if ($key->provision_on_new_servers)
-                                <span class="inline-flex items-center gap-0.5 rounded border border-brand-sage/30 bg-brand-sage/15 px-1 py-px text-2xs font-semibold uppercase tracking-wide text-brand-forest">
-                                    <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                    {{ __('Auto') }}
-                                </span>
-                            @endif
-                            <span class="truncate text-xs text-brand-mist">
-                                {{ $key->provision_on_new_servers
-                                    ? __('Added automatically to new servers.')
-                                    : __('Manual deploy only.') }}
-                            </span>
-                        </div>
-                        <div class="flex shrink-0 items-center justify-end gap-1">
-                            @if ($reachableServers > 0)
-                                <button
-                                    type="button"
-                                    wire:click="startDeploy(@js($key->id))"
-                                    class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Deploy') }}
-                                </button>
-                            @endif
-                            <button
-                                type="button"
-                                wire:click="startEdit(@js($key->id))"
-                                class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Edit') }}
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('deleteKey', ['{{ $key->id }}'], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)"
-                                class="inline-flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
-                                aria-label="{{ __('Delete SSH key') }}"
-                            >
-                                <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Delete') }}
-                            </button>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
+            {{-- One sand-headed table, matching Credentials and Notification
+                 channels. The per-row sentence ("Added automatically to new
+                 servers." on every single row) is gone: the Auto chip already
+                 says it, and the space now carries the fingerprint — the only
+                 thing that tells two similarly-named keys apart. --}}
+            @php
+                $rows = $autoFilter
+                    ? $pagedSshKeys->filter(fn ($k) => (bool) $k->provision_on_new_servers)->values()
+                    : $pagedSshKeys;
+                $th = 'px-3 py-1.5 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-4';
+                $td = 'px-3 py-2 align-middle sm:px-4';
+                $act = 'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold shadow-sm transition-colors';
+                $actNeutral = $act.' border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40';
+                $actDanger = $act.' border-rose-200 bg-white text-rose-700 hover:bg-rose-50';
+            @endphp
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-brand-sand/35">
+                        <tr>
+                            <th class="{{ $th }}">{{ __('Name') }}</th>
+                            <th class="{{ $th }}">{{ __('Type') }}</th>
+                            <th class="{{ $th }}">{{ __('On new servers') }}</th>
+                            <th class="{{ $th }} text-right"><span class="sr-only">{{ __('Actions') }}</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-brand-ink/10">
+                        @foreach ($rows as $key)
+                            @php
+                                $fingerprint = $key->fingerprint();
+                                $type = $key->keyType();
+                            @endphp
+                            <tr wire:key="ssh-key-{{ $key->id }}" class="transition-colors hover:bg-brand-sand/15">
+                                <td class="{{ $td }}">
+                                    <span class="flex min-w-0 items-center gap-2">
+                                        <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-sand/45 text-brand-moss ring-1 ring-brand-ink/10">
+                                            <x-heroicon-o-key class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate font-medium text-brand-ink">{{ $key->name }}</span>
+                                            @if ($fingerprint !== '')
+                                                <span class="mt-px block truncate font-mono text-2xs text-brand-mist" title="{{ $fingerprint }}">{{ $fingerprint }}</span>
+                                            @endif
+                                        </span>
+                                    </span>
+                                </td>
+                                <td class="{{ $td }} text-xs text-brand-moss">
+                                    @if ($type !== '')
+                                        <span class="rounded bg-brand-sand/55 px-1.5 py-px font-semibold uppercase tracking-wide">{{ $type }}</span>
+                                    @else
+                                        <span class="text-brand-mist">—</span>
+                                    @endif
+                                </td>
+                                <td class="{{ $td }}">
+                                    @if ($key->provision_on_new_servers)
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/35 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold text-brand-forest">
+                                            <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            {{ __('Added automatically') }}
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-brand-mist">{{ __('Manual deploy only') }}</span>
+                                    @endif
+                                </td>
+                                <td class="{{ $td }} text-right">
+                                    <div class="inline-flex flex-nowrap items-center gap-1.5">
+                                        @if ($reachableServers > 0)
+                                            <button type="button" wire:click="startDeploy(@js($key->id))" class="{{ $actNeutral }}">
+                                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                                                {{ __('Deploy') }}
+                                            </button>
+                                        @endif
+                                        <button type="button" wire:click="startEdit(@js($key->id))" class="{{ $actNeutral }}">
+                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                                            {{ __('Edit') }}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('deleteKey', ['{{ $key->id }}'], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)"
+                                            class="{{ $actDanger }}"
+                                        >
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                                            {{ __('Delete') }}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         @endif
+
+        <x-list-pager
+            :page="$sshKeyPageState['page']"
+            :pages="$sshKeyPageState['pages']"
+            :total="$sshKeyPageState['total']"
+            property="ssh_key_page"
+            :label="__('keys')"
+        />
+
     </x-profile-shell>
 
     {{-- Edit modal --}}
@@ -215,6 +268,7 @@
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit') }}</p>
                         <h3 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('SSH key') }}</h3>
                     </div>
+
                 </div>
                 <div class="space-y-4 px-6 py-5">
                     <div>

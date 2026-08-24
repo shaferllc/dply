@@ -89,6 +89,22 @@ trait ResolvesSiteUrls
         return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
     }
 
+    /**
+     * Live URL for a container workspace (Docker, Kubernetes), read from the
+     * meta the deploy writes.
+     *
+     * Restored after the Cloud removal deleted it wholesale: the partial that
+     * calls it — livewire/sites/partials/container-dashboard — serves Docker and
+     * Kubernetes sites too, not just Cloud, so every container workspace 500'd.
+     * The old Cloud-branded `dply_subdomain` branch is gone with the product.
+     */
+    public function containerLiveUrl(): ?string
+    {
+        $url = $this->meta['container']['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
     public function visitUrl(): ?string
     {
         if ($this->provisionedUrl() !== null) {
@@ -180,17 +196,10 @@ trait ResolvesSiteUrls
             return GitCloneUrl::normalize($direct);
         }
 
-        if (! $this->usesEdgeRuntime()) {
-            return null;
-        }
-
-        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
-        $repo = trim((string) ($source['repo'] ?? ''));
-        if ($repo === '') {
-            return null;
-        }
-
-        return GitCloneUrl::normalize($repo);
+        // Edge sites carried their remote in meta.edge.source instead of the
+        // column; that fallback is gone with the surface
+        // (remove-cloud-edge-serverless).
+        return null;
     }
 
     /**

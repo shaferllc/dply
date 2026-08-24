@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
-use App\Support\Cloud\GcpAccessToken;
+use App\Support\Providers\GcpAccessToken;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 

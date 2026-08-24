@@ -2,12 +2,18 @@
 
 namespace Tests\Feature\CredentialTest;
 
+use App\Livewire\Credentials\AddProviderCredentialModal;
 use App\Livewire\Credentials\Index as CredentialsIndex;
+use App\Models\BackupConfiguration;
+use App\Models\BackupSchedule;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Support\ServerProviderGate;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
@@ -59,8 +65,11 @@ test('organization credentials page is displayed', function () {
     $response = $this->actingAs($user)->get(route('organizations.credentials', $org));
 
     $response->assertOk();
-    $response->assertSee('Provider credentials');
-    $response->assertSee('Server providers');
+    $response->assertSee('Credentials');
+    $response->assertSee('Connect a provider');
+    // The page lists what you have; the provider catalog lives in the modal's
+    // picker rather than as 26 cards on the page (redesigned 2026-08-22).
+    $response->assertDontSee('Not connected');
 });
 
 test('credentials index forbidden for deployer', function () {
@@ -74,13 +83,13 @@ test('credentials index forbidden for deployer', function () {
     $response->assertForbidden();
 });
 
-test('credentials index refreshes provider cards after credential created in modal', function () {
+test('the credential table lists a saved token by name', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
     Livewire::actingAs($user)
         ->test(CredentialsIndex::class, ['organization' => $org])
-        ->assertSee('Not connected');
+        ->assertSee('No credentials yet.');
 
     $credential = ProviderCredential::factory()->create([
         'user_id' => $user->id,
@@ -92,7 +101,80 @@ test('credentials index refreshes provider cards after credential created in mod
     Livewire::actingAs($user)
         ->test(CredentialsIndex::class, ['organization' => $org])
         ->dispatch('provider-credential-created', provider: 'digitalocean', credentialId: $credential->id)
-        ->assertSee('1 credential');
+        ->assertSee('Production DO')
+        ->assertSee('DigitalOcean')
+        ->assertDontSee('No credentials yet.');
+});
+
+/*
+ * The row filters narrow YOUR credentials. The capability tabs they replaced
+ * filtered the catalog, so "DNS" hid providers you had not connected either way.
+ */
+test('the filters narrow the table to your own rows', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id, 'organization_id' => $org->id,
+        'provider' => 'digitalocean', 'name' => 'Compute token',
+    ]);
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id, 'organization_id' => $org->id,
+        'provider' => 'namecheap', 'name' => 'Registrar token',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->assertSee('Compute token')
+        ->assertSee('Registrar token')
+        // Namecheap is DNS-only; DigitalOcean does compute AND dns, so the
+        // compute filter is the one that separates them.
+        ->call('setFilter', 'compute')
+        ->assertSet('filter', 'compute')
+        ->assertSee('Compute token')
+        ->assertDontSee('Registrar token')
+        ->call('setFilter', 'dns')
+        ->assertSee('Registrar token')
+        ->assertSee('Compute token');
+});
+
+test('an unknown filter falls back to showing everything', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->call('setFilter', 'not-a-filter')
+        ->assertSet('filter', 'all');
+});
+
+test('a rejected token surfaces the provider error and sorts to the top', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id, 'organization_id' => $org->id,
+        'provider' => 'digitalocean', 'name' => 'Healthy token',
+        'last_validated_at' => now(),
+    ]);
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id, 'organization_id' => $org->id,
+        'provider' => 'cloudflare', 'name' => 'Broken token',
+        'validation_error' => 'Invalid API token (10000)',
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        // validation_error was stored and counted but never displayed.
+        ->assertSee('Invalid API token (10000)')
+        ->assertSee("Can't connect");
+
+    $rows = $component->instance()->rows();
+    expect($rows[0]['name'])->toBe('Broken token');
+
+    $component->call('setFilter', 'attention')
+        ->assertSee('Broken token')
+        ->assertDontSee('Healthy token');
 });
 
 test('credentials store validates required fields', function () {
@@ -276,4 +358,128 @@ test('compute vm providers are grouped under vps and cloud not infrastructure hu
     expect($groupById['upcloud'] ?? null)->toBe($vpsGroup);
     expect($groupById['linode'] ?? null)->toBe($vpsGroup);
     expect(array_column($nav, 'label'))->not->toContain(__('Infrastructure'));
+});
+
+/*
+ * Backup destinations had no delete anywhere in the app until 2026-08-22 — you
+ * could add a bucket and never remove it.
+ */
+test('a backup destination can be removed, and its schedules fall back to the server', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $destination = BackupConfiguration::factory()->forOrganization($org)->create(['name' => 'acme-backups']);
+    // No factory for BackupSchedule; these four columns are the table's only
+    // non-nullable ones without a default.
+    $schedule = BackupSchedule::create([
+        'target_type' => 'database',
+        'target_id' => (string) Str::ulid(),
+        'cron_expression' => '0 3 * * *',
+        'backup_configuration_id' => $destination->id,
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->assertSee('acme-backups')
+        ->call('promptDeleteDestination', (string) $destination->id)
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalMethod', 'deleteDestination');
+
+    // The confirm has to name what breaks, not just ask "are you sure?". The
+    // dialog renders from a layout slot, so read the message off the component.
+    expect($component->instance()->confirmActionModalMessage)
+        ->toContain('keep its dumps on the server');
+
+    $component->call('deleteDestination', (string) $destination->id)
+        ->assertDontSee('acme-backups');
+
+    expect(BackupConfiguration::find($destination->id))->toBeNull()
+        // No FK backs this column, so an orphaned pointer would fail mid-ship.
+        ->and($schedule->fresh()->backup_configuration_id)->toBeNull();
+});
+
+test('a destination from another organization cannot be removed', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $foreign = BackupConfiguration::factory()->forOrganization(Organization::factory()->create())->create();
+
+    expect(fn () => Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->call('deleteDestination', (string) $foreign->id))
+        ->toThrow(ModelNotFoundException::class);
+
+    expect(BackupConfiguration::find($foreign->id))->not->toBeNull();
+});
+
+test('parked coming-soon providers are gone from the picker', function () {
+    // COMING_SOON is commented out in ServerProviderGate; visible() is then
+    // enabled() alone, so only shipping providers reach the nav.
+    $labels = collect(CredentialsIndex::credentialProviderNav())
+        ->flatMap(fn (array $g) => $g['items'])
+        ->pluck('label');
+
+    // Which providers are enabled varies by env config, so the invariant is the
+    // assertion: nothing in the picker is a placeholder any more.
+    expect($labels)->not->toBeEmpty()
+        ->and($labels)->toContain('DigitalOcean');
+
+    expect(collect(CredentialsIndex::credentialProviderNav())
+        ->flatMap(fn (array $g) => $g['items'])
+        ->filter(fn (array $i) => ! empty($i['comingSoon'])))
+        ->toBeEmpty();
+
+    expect(ServerProviderGate::comingSoon('namecheap'))->toBeFalse()
+        ->and(ServerProviderGate::comingSoon('aws'))->toBeFalse();
+});
+
+/*
+ * The panel inside the add-credential modal belongs to AddProviderCredentialModal,
+ * not to Index — so its Remove button set confirm state on a component whose view
+ * rendered no dialog, and the click did nothing (fixed 2026-08-22).
+ */
+test('the modal panel confirms a credential removal against its own component', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Production DO',
+    ]);
+
+    $modal = Livewire::actingAs($user)
+        ->test(AddProviderCredentialModal::class)
+        ->call('promptDestroyCredential', (string) $credential->id)
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalMethod', 'destroy');
+
+    // The message names the credential rather than asking "Remove this credential?".
+    expect($modal->instance()->confirmActionModalMessage)->toContain('Production DO');
+
+    $modal->call('destroy', (string) $credential->id);
+
+    expect(ProviderCredential::find($credential->id))->toBeNull();
+});
+
+test('a member cannot prompt a credential removal', function () {
+    $owner = userWithOrganization();
+    $org = $owner->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+    ]);
+
+    $member = User::factory()->create();
+    $org->users()->attach($member->id, ['role' => 'member']);
+    session(['current_organization_id' => $org->id]);
+
+    Livewire::actingAs($member)
+        ->test(AddProviderCredentialModal::class)
+        ->call('promptDestroyCredential', (string) $credential->id)
+        ->assertForbidden();
+
+    expect(ProviderCredential::find($credential->id))->not->toBeNull();
 });

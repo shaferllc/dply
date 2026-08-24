@@ -4,24 +4,21 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Modules\Providers\Services\AwsEc2Service;
+use App\Modules\Imports\Services\Forge\ForgeImportDriver;
+use App\Modules\Imports\Services\Ploi\PloiImportDriver;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
 use App\Modules\Providers\Services\AwsEc2ServiceFactory;
 use App\Modules\Providers\Services\AzureComputeService;
-use App\Modules\Providers\Cloudflare\CloudflareDnsService;
-use App\Modules\Providers\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Providers\Services\GcpDnsService;
 use App\Modules\Providers\Services\HetznerService;
-use App\Modules\Imports\Services\Forge\ForgeImportDriver;
-use App\Modules\Imports\Services\Ploi\PloiImportDriver;
 use App\Modules\Providers\Services\LinodeService;
 use App\Modules\Providers\Services\OracleComputeService;
 use App\Modules\Providers\Services\OvhService;
 use App\Modules\Providers\Services\UpCloudService;
 use App\Modules\Providers\Services\VultrService;
-use App\Support\Cloud\GcpAccessToken;
-use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Services\Providers\ProviderCredentialHealth;
+use App\Support\Providers\GcpAccessToken;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
@@ -810,10 +807,6 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
-                if (($this->capability ?? null) === 'cdn') {
-                    $accountId = (new CloudflareEdgeCredentialValidator)->validate($credential);
-                    EdgeOrgCredentialConfig::merge($credential, ['account_id' => $accountId]);
-                }
             } elseif ($provider === 'ploi') {
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
@@ -910,6 +903,23 @@ trait ManagesProviderCredentials
                 ]);
             }
         }
+    }
+
+    public function promptDestroyCredential(string $id): void
+    {
+        $credential = ProviderCredential::findOrFail($id);
+        $this->authorize('delete', $credential);
+
+        $this->openConfirmActionModal(
+            'destroy',
+            [$id],
+            __('Remove credential'),
+            __('Remove :name? Anything using this token stops working until you replace it.', [
+                'name' => $credential->name !== '' ? $credential->name : __('this credential'),
+            ]),
+            __('Remove'),
+            true,
+        );
     }
 
     public function destroy(string|int $id): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Providers\Services;
 
 use App\Models\ProviderCredential;
-use App\Support\Cloud\OciRequestSigner;
+use App\Support\Providers\OciRequestSigner;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;

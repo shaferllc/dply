@@ -332,6 +332,23 @@ trait ResolvesSiteRuntime
         return $resolved !== null ? strtolower($resolved['framework']) : '';
     }
 
+    /**
+     * Which product this site is, as one word: `serverless` or `vm`.
+     *
+     * Callers keep re-deriving this from the runtime profile, and API payloads
+     * expose it so the CLI (`dply sites`) and other clients can say what a site
+     * IS without knowing the column layout.
+     *
+     * Lived on the ManagesEdgeHosting concern and was deleted with it
+     * (remove-cloud-edge-serverless), which broke the sites index, the sites
+     * API, the MCP list-sites tool and notification scoping — none of them edge
+     * features. The `edge` and `cloud` branches are gone with those surfaces.
+     */
+    public function siteKind(): string
+    {
+        return $this->usesFunctionsRuntime() ? 'serverless' : 'vm';
+    }
+
     public function usesFunctionsRuntime(): bool
     {
         return in_array($this->runtimeProfile(), Site::SERVERLESS_RUNTIME_PROFILES, true);
@@ -484,12 +501,7 @@ trait ResolvesSiteRuntime
 
     public function usesContainerRuntime(): bool
     {
-        return $this->type === SiteType::Container
-            || in_array($this->container_backend, [
-                'digitalocean_app_platform',
-                'aws_app_runner',
-                'dply_cloud',
-            ], true);
+        return $this->type === SiteType::Container;
     }
 
     public function usesEdgeRuntime(): bool

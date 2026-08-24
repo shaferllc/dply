@@ -8,17 +8,24 @@
     $filteredCount = $organizations->count();
     // Header Add only when the list already has items — empty state owns the CTA.
     $showShellAdd = $orgTotal > 0;
+    // Search earns its space only once the list stops fitting on screen.
+    $showOrgSearch = $orgTotal > 8 || $hasOrgSearch;
+    $summaryLine = collect([
+        trans_choice(':count organization|:count organizations', $orgTotal, ['count' => $orgTotal]),
+        $rollupMembers > 0 ? trans_choice(':count member|:count members', $rollupMembers, ['count' => $rollupMembers]) : null,
+        $rollupServers > 0 ? trans_choice(':count server|:count servers', $rollupServers, ['count' => $rollupServers]) : null,
+        $rollupSites > 0 ? trans_choice(':count site|:count sites', $rollupSites, ['count' => $rollupSites]) : null,
+    ])->filter()->implode(' · ');
 @endphp
 
 <div>
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <x-dashboard-breadcrumb doc-route="docs.markdown" doc-slug="org-roles-and-limits" :current="__('Organizations')" current-icon="building-office-2" />
 
         <x-profile-shell
+            dense
             :title="__('Organizations')"
-            :description="$orgTotal === 0
-                ? __('You\'re not in any organization yet. Spin one up to start grouping servers, teams, and billing.')
-                : __('Switch workspaces, review usage, and open the organization you need.')"
+            :description="$orgTotal === 0 ? null : $summaryLine"
             icon="heroicon-o-building-office-2"
         >
             <x-slot:actions>
@@ -33,39 +40,6 @@
                     </a>
                 @endif
             </x-slot:actions>
-
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-2">
-                    <div @class([
-                        'rounded-xl border px-4 py-3',
-                        'border-brand-sage/30 bg-brand-sage/8' => $orgTotal > 0,
-                        'border-brand-ink/10 bg-white/80' => $orgTotal === 0,
-                    ])>
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Workspaces') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgTotal }}</span>
-                            <span class="text-xs text-brand-moss">{{ __('total') }}</span>
-                        </dd>
-                        <p class="mt-1 text-xs text-brand-mist">{{ __('You belong to') }}</p>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $rollupMembers }}</span>
-                            <span class="text-xs text-brand-moss">{{ trans_choice('person|people', $rollupMembers) }}</span>
-                        </dd>
-                        <p class="mt-1 text-xs text-brand-mist">{{ __('Across all orgs') }}</p>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Footprint') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $rollupServers + $rollupSites }}</span>
-                            <span class="text-xs text-brand-moss">{{ __('resources') }}</span>
-                        </dd>
-                        <p class="mt-1 text-xs text-brand-mist">{{ $rollupServers }} {{ trans_choice('server|servers', $rollupServers) }} · {{ $rollupSites }} {{ trans_choice('site|sites', $rollupSites) }}</p>
-                    </div>
-                </dl>
-            </x-slot:stats>
 
             @if (session('success'))
                 <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
@@ -92,7 +66,7 @@
                     </a>
                 </div>
             @else
-                @if ($orgTotal > 1 || $hasOrgSearch)
+                @if ($showOrgSearch)
                     <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
                         <div class="w-full sm:max-w-sm">
                             <label for="org_search" class="sr-only">{{ __('Search') }}</label>
@@ -122,101 +96,76 @@
                         <button type="button" wire:click="$set('search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
                     </div>
                 @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($organizations as $org)
-                            @php
-                                $initials = collect(preg_split('/\s+/', trim($org->name)))->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');
-                                if ($initials === '') {
-                                    $initials = mb_strtoupper(mb_substr((string) $org->name, 0, 2));
-                                }
-                                $isCurrent = $currentOrgId == $org->id;
-                            @endphp
-                            <li wire:key="org-{{ $org->id }}" @class([
-                                'flex flex-col gap-4 px-5 py-4 transition-colors hover:bg-brand-sand/15 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-6',
-                                'bg-brand-sage/5' => $isCurrent,
-                            ])>
-                                <div class="flex min-w-0 flex-1 items-start gap-4">
-                                    <span @class([
-                                        'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold tracking-tight ring-1',
-                                        'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => $isCurrent,
-                                        'bg-brand-sand/40 text-brand-ink ring-brand-ink/10' => ! $isCurrent,
-                                    ]) aria-hidden="true">
-                                        <span class="select-none">{{ $initials }}</span>
-                                    </span>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                            <a href="{{ route('organizations.show', $org) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">{{ $org->name }}</a>
-                                            @if ($isCurrent)
-                                                <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">
-                                                    <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                                    {{ __('Current') }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-m-user-group class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <span class="font-mono tabular-nums text-brand-ink">{{ $org->users_count }}</span>
-                                                {{ trans_choice('member|members', $org->users_count) }}
-                                            </span>
-                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-m-squares-2x2 class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <span class="font-mono tabular-nums text-brand-ink">{{ $org->teams_count }}</span>
-                                                {{ trans_choice('team|teams', $org->teams_count) }}
-                                            </span>
-                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-m-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <span class="font-mono tabular-nums text-brand-ink">{{ $org->servers_count }}</span>
-                                                {{ trans_choice('server|servers', $org->servers_count) }}
-                                            </span>
-                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-m-globe-alt class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <span class="font-mono tabular-nums text-brand-ink">{{ $org->sites_count }}</span>
-                                                {{ trans_choice('site|sites', $org->sites_count) }}
-                                            </span>
-                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <span class="font-mono tabular-nums text-brand-ink">{{ $org->workspaces_count }}</span>
-                                                {{ trans_choice('project|projects', $org->workspaces_count) }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                                    @if (! $isCurrent)
-                                        <button
-                                            type="button"
-                                            wire:click="switchOrganization('{{ $org->id }}')"
-                                            wire:loading.attr="disabled"
-                                            wire:target="switchOrganization('{{ $org->id }}')"
-                                            class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
-                                        >
-                                            <span wire:loading.remove wire:target="switchOrganization('{{ $org->id }}')" class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-arrow-path-rounded-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Switch') }}
-                                            </span>
-                                            <span wire:loading wire:target="switchOrganization('{{ $org->id }}')" class="inline-flex items-center gap-1.5">
-                                                <x-spinner variant="forest" size="sm" />
-                                                {{ __('Switching…') }}
-                                            </span>
-                                        </button>
-                                    @endif
-                                    <a
-                                        href="{{ route('organizations.show', $org) }}"
-                                        wire:navigate
-                                        class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
-                                    >
-                                        {{ __('Overview') }}
-                                        <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                    </a>
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
+                    @php $th = 'px-3 py-2.5 text-start text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-5'; @endphp
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[44rem] border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-brand-ink/10">
+                                    <th scope="col" class="{{ $th }}">{{ __('Organization') }}</th>
+                                    <th scope="col" class="{{ $th }}">{{ __('Members') }}</th>
+                                    <th scope="col" class="{{ $th }} hidden sm:table-cell">{{ __('Teams') }}</th>
+                                    <th scope="col" class="{{ $th }}">{{ __('Servers') }}</th>
+                                    <th scope="col" class="{{ $th }}">{{ __('Sites') }}</th>
+                                    <th scope="col" class="{{ $th }} hidden lg:table-cell">{{ __('Projects') }}</th>
+                                    <th scope="col" class="{{ $th }}"><span class="sr-only">{{ __('Actions') }}</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($organizations as $org)
+                                    @php $isCurrent = $currentOrgId == $org->id; @endphp
+                                    <tr wire:key="org-{{ $org->id }}" @class([
+                                        'group border-b border-brand-ink/10 transition-colors last:border-b-0 hover:bg-brand-sand/15',
+                                        'bg-brand-sage/5' => $isCurrent,
+                                    ])>
+                                        <td class="max-w-[18rem] px-3 py-2.5 sm:px-5">
+                                            <div class="flex items-center gap-2">
+                                                <a href="{{ route('organizations.show', $org) }}" wire:navigate class="min-w-0 truncate font-semibold text-brand-ink transition-colors hover:text-brand-sage" title="{{ $org->name }}">
+                                                    {{ $org->name }}
+                                                </a>
+                                                @if ($isCurrent)
+                                                    <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">
+                                                        {{ __('Current') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-brand-moss sm:px-5">{{ $org->users_count }}</td>
+                                        <td class="hidden whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-brand-moss sm:table-cell sm:px-5">{{ $org->teams_count }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-brand-moss sm:px-5">{{ $org->servers_count }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-brand-moss sm:px-5">{{ $org->sites_count }}</td>
+                                        <td class="hidden whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-brand-moss sm:px-5 lg:table-cell">{{ $org->workspaces_count }}</td>
+                                        <td class="px-3 py-2.5 sm:px-5">
+                                            <div class="flex items-center justify-end gap-1.5 transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                                                @if (! $isCurrent)
+                                                    <button
+                                                        type="button"
+                                                        wire:click="switchOrganization('{{ $org->id }}')"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="switchOrganization('{{ $org->id }}')"
+                                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                                                    >
+                                                        <span wire:loading.remove wire:target="switchOrganization('{{ $org->id }}')">{{ __('Switch') }}</span>
+                                                        <span wire:loading wire:target="switchOrganization('{{ $org->id }}')" class="inline-flex items-center gap-1.5">
+                                                            <x-spinner variant="forest" size="sm" />
+                                                            {{ __('Switching…') }}
+                                                        </span>
+                                                    </button>
+                                                @endif
+                                                <a
+                                                    href="{{ route('organizations.show', $org) }}"
+                                                    wire:navigate
+                                                    class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream transition hover:bg-brand-forest sm:px-3"
+                                                >
+                                                    {{ __('Overview') }}
+                                                    <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 @endif
             @endif
         </x-profile-shell>

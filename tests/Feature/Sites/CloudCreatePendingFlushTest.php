@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\CloudCreatePendingFlushTest;
 
 use App\Enums\SiteType;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Jobs\PollCloudStatusJob;
 use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;

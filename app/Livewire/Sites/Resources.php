@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Modules\Database\Actions\CreateCloudDatabase;
-use App\Modules\Cloud\Actions\CreateCloudWorker;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
-use App\Models\CloudWorker;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\WorkerPool;
@@ -24,11 +21,11 @@ use Livewire\Component;
 
 /**
  * "Resources" tab — one page where the operator sees every backing
- * service attached to a Cloud site (databases, queue workers, the
+ * service attached to a site (databases, the
  * scheduler), attaches more with one modal, and detaches in place.
  *
  * Existing surfaces remain authoritative for the per-resource detail
- * pages (Cloud → Databases, the workers operations); this page is
+ * pages (Databases, the workers operations); this page is
  * the high-leverage "what's wired to this site" view that Laravel
  * Cloud popularised. Only renders for container sites — VM / serverless
  * sites use their own runtime panels.
@@ -37,7 +34,6 @@ use Livewire\Component;
  * PHPStan cannot see that magic, so the contract is stated here.
  *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CloudDatabase> $attachedDatabases
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CloudWorker> $workers
  */
 #[Layout('layouts.app')]
 class Resources extends Component
@@ -53,13 +49,13 @@ class Resources extends Component
 
     /**
      * Container (Cloud) sites get the full attach/detach CRUD against
-     * CloudWorker/CloudDatabase. VM sites get a read-only roll-up of their
+     * CloudDatabase pivots. VM sites get a read-only roll-up of their
      * Supervisor + systemd workers that links out to the Workers page to
      * manage. Set in mount() from the runtime.
      */
     public bool $isContainer = true;
 
-    /** Modal pane: '' (closed) | 'attach' (root picker) | 'database-existing' | 'database-new' | 'worker' | 'scheduler'. */
+    /** Modal pane: '' (closed) | 'attach' (root picker) | 'database-existing' | 'database-new'. */
     public string $modal = '';
 
     // database-existing form
@@ -72,14 +68,9 @@ class Resources extends Component
 
     public string $new_database_size = 'small';
 
-    // worker form
-    public string $worker_name = '';
 
-    public string $worker_command = CloudWorker::DEFAULT_WORKER_COMMAND;
 
-    public string $worker_size = 'small';
 
-    public int $worker_instance_count = 1;
 
     public function mount(Server $server, Site $site): void
     {
@@ -91,7 +82,7 @@ class Resources extends Component
         // its own (it inherits the parent's). Don't expose a Resources surface.
         abort_if($site->isDerivedWorker(), 404);
 
-        // Container (Cloud) sites have CloudWorker rows + CloudDatabase pivots
+        // Container sites have CloudDatabase pivots
         // and get the full attach/detach surface. VM sites are admitted too —
         // they show a read-only roll-up of their Supervisor + systemd workers
         // (their databases/services live on other panels). Serverless keeps its
@@ -137,7 +128,7 @@ class Resources extends Component
         Gate::authorize('update', $this->site);
 
         $this->resetForms();
-        $this->modal = in_array($pane, ['attach', 'database-existing', 'database-new', 'worker', 'scheduler'], true)
+        $this->modal = in_array($pane, ['attach', 'database-existing', 'database-new'], true)
             ? $pane
             : 'attach';
     }
@@ -174,24 +165,6 @@ class Resources extends Component
             ->whereIn('status', [CloudDatabase::STATUS_ACTIVE, CloudDatabase::STATUS_PROVISIONING])
             ->orderBy('name')
             ->get();
-    }
-
-    /**
-     * @return Collection<int, CloudWorker>
-     */
-    #[Computed]
-    public function workers(): Collection
-    {
-        return CloudWorker::query()
-            ->where('site_id', $this->site->id)
-            ->orderBy('type')
-            ->orderBy('name')
-            ->get();
-    }
-
-    public function hasScheduler(): bool
-    {
-        return $this->workers->contains(fn (CloudWorker $w): bool => $w->isScheduler());
     }
 
     public function attachExistingDatabase(): void
@@ -258,74 +231,12 @@ class Resources extends Component
         $this->toastSuccess(__('Detach queued — DB_* env vars will be removed and the site redeployed.'));
     }
 
-    public function attachWorker(string $type): void
-    {
-        Gate::authorize('update', $this->site);
-        if (! in_array($type, [CloudWorker::TYPE_WORKER, CloudWorker::TYPE_SCHEDULER], true)) {
-            return;
-        }
-        if ($type === CloudWorker::TYPE_WORKER) {
-            $maxInstances = CloudWorker::maxInstanceCountForSize($this->worker_size);
-            $this->validate([
-                'worker_name' => 'required|string|max:60',
-                'worker_command' => 'required|string|max:255',
-                'worker_size' => 'required|in:small,medium,large,xlarge',
-                'worker_instance_count' => 'required|integer|min:1|max:'.$maxInstances,
-            ], [
-                'worker_instance_count.max' => __(
-                    'The :size worker tier allows at most :max instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
-                    ['size' => $this->worker_size, 'max' => $maxInstances],
-                ),
-            ]);
-        }
-
-        try {
-            (new CreateCloudWorker)->handle($this->site, [
-                'type' => $type,
-                'name' => $type === CloudWorker::TYPE_SCHEDULER ? 'scheduler' : $this->worker_name,
-                'command' => $type === CloudWorker::TYPE_SCHEDULER ? CloudWorker::SCHEDULER_COMMAND : $this->worker_command,
-                'size' => $type === CloudWorker::TYPE_SCHEDULER ? 'small' : $this->worker_size,
-                'instance_count' => $type === CloudWorker::TYPE_SCHEDULER ? 1 : $this->worker_instance_count,
-            ]);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-
-            return;
-        }
-
-        $this->toastSuccess(__(':type added — backend sync queued.', ['type' => ucfirst($type)]));
-        $this->closeModal();
-    }
-
-    public function detachWorker(string $workerId): void
-    {
-        Gate::authorize('update', $this->site);
-
-        $worker = CloudWorker::query()
-            ->where('id', $workerId)
-            ->where('site_id', $this->site->id)
-            ->first();
-        if ($worker === null) {
-            return;
-        }
-
-        $worker->update(['status' => CloudWorker::STATUS_DELETING]);
-        $worker->delete();
-
-        SyncCloudWorkersJob::dispatch((string) $this->site->id);
-        $this->toastSuccess(__('Worker removed — backend sync queued.'));
-    }
-
     private function resetForms(): void
     {
         $this->attach_database_id = null;
         $this->new_database_name = '';
         $this->new_database_engine = CloudDatabase::ENGINE_POSTGRES;
         $this->new_database_size = 'small';
-        $this->worker_name = '';
-        $this->worker_command = CloudWorker::DEFAULT_WORKER_COMMAND;
-        $this->worker_size = 'small';
-        $this->worker_instance_count = 1;
         $this->resetValidation();
     }
 

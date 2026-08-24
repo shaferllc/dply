@@ -166,7 +166,7 @@ class Overview extends Component
                 'archivedSites' => $archives->unique('site_id')->count(),
                 'recent' => $archivedSites,
             ],
-            'gaps' => $this->gaps($servers, $sites, $schedules, $serverIds),
+            'matrix' => $this->coverageMatrix($servers, $sites, $schedules, $serverIds),
             'activity' => $activity,
             'recentRuns' => $recentRuns,
             'destinations' => $destinations,
@@ -174,78 +174,148 @@ class Overview extends Component
     }
 
     /**
-     * What each server is missing, capability-aware.
+     * Coverage as a grid: one row per server, one cell per artifact type.
      *
      * Coverage answers "am I protected at all"; this answers "protected against
-     * what". A server with a nightly dump but no image can lose its whole
-     * machine configuration; a server with an image but no dump restores to a
-     * crash-consistent database. Rows only ever suggest captures that server can
-     * actually do — a Custom box has no provider image API, and saying so is
-     * information, while nagging about it would not be. See
-     * docs/adr/backups-as-a-product.md, decisions 11 and 12.
+     * what, and by what". Each cell carries one of four states, and the fourth
+     * one is the point: a Redis cache box has no database to dump and a Custom
+     * box has no provider image API, so those cells read `na` rather than
+     * counting against the server. A cell that has been captured once by hand
+     * but has no schedule reads `manual` — it looks like protection in a run
+     * feed and is not, which is exactly the case a flat missing/present split
+     * hides. See docs/adr/backups-as-a-product.md, decisions 11 and 12.
      *
      * @param  Collection<int, Server>  $servers
      * @param  Collection<int, Site>  $sites
      * @param  Collection<int, BackupSchedule>  $schedules
      * @param  Collection<int, string>  $serverIds
-     * @return list<array{server: Server, missing: list<string>, note: ?string, protected: bool}>
+     * @return list<array{key: string, title: string, subtitle: string, url: string, applicable: int, covered: int, cells: array<string, array{state: string, label: string, note: ?string}>}>
      */
-    private function gaps($servers, $sites, $schedules, $serverIds): array
+    private function coverageMatrix($servers, $sites, $schedules, $serverIds): array
     {
         $byServer = $schedules->groupBy('server_id');
         $sitesByServer = $sites->groupBy('server_id');
-        // Only flag a missing dump on a server that actually hosts a database —
-        // telling an Edge box it has no SQL backup is noise, not a gap.
+
         $databaseCounts = ServerDatabase::query()
             ->whereIn('server_id', $serverIds)
             ->selectRaw('server_id, count(*) as total')
             ->groupBy('server_id')
             ->pluck('total', 'server_id');
-        $imagedServerIds = ServerImage::query()
-            ->whereIn('server_id', $servers->pluck('id'))
-            ->where('status', ServerImage::STATUS_COMPLETED)
-            ->distinct()
-            ->pluck('server_id')
-            ->all();
 
-        $gaps = [];
+        // Last successful capture per server, per type — what turns an empty
+        // cell into a "manual, not repeating" one.
+        $lastDump = ServerDatabaseBackup::query()
+            ->join('server_databases', 'server_databases.id', '=', 'server_database_backups.server_database_id')
+            ->whereIn('server_databases.server_id', $serverIds)
+            ->where('server_database_backups.status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->groupBy('server_databases.server_id')
+            ->selectRaw('server_databases.server_id as server_id, max(server_database_backups.created_at) as last_at')
+            ->toBase()
+            ->pluck('last_at', 'server_id');
+
+        $lastArchive = SiteFileBackup::query()
+            ->join('sites', 'sites.id', '=', 'site_file_backups.site_id')
+            ->whereIn('sites.server_id', $serverIds)
+            ->where('site_file_backups.status', SiteFileBackup::STATUS_COMPLETED)
+            ->groupBy('sites.server_id')
+            ->selectRaw('sites.server_id as server_id, max(site_file_backups.created_at) as last_at')
+            ->toBase()
+            ->pluck('last_at', 'server_id');
+
+        $lastImage = ServerImage::query()
+            ->whereIn('server_id', $serverIds)
+            ->where('status', ServerImage::STATUS_COMPLETED)
+            ->groupBy('server_id')
+            ->selectRaw('server_id, max(created_at) as last_at')
+            ->toBase()
+            ->pluck('last_at', 'server_id');
+
+        $rows = [];
 
         foreach ($servers as $server) {
             /** @var Collection<int, BackupSchedule> $own */
             $own = $byServer->get($server->id) ?? collect();
             $kinds = $own->pluck('target_type')->unique();
 
-            $missing = [];
-            if (($databaseCounts[$server->id] ?? 0) > 0
-                && ! $kinds->contains(BackupSchedule::TARGET_DATABASE)) {
-                $missing[] = __('database dump');
-            }
-            // Only a server that actually hosts sites can be missing a file archive.
-            if (($sitesByServer->get($server->id)?->count() ?? 0) > 0
-                && ! $kinds->contains(BackupSchedule::TARGET_SITE_FILES)) {
-                $missing[] = __('file archive');
-            }
-
+            $siteCount = $sitesByServer->get($server->id)?->count() ?? 0;
             $canImage = $server->provider->supportsImageSnapshots();
-            if ($canImage && ! in_array($server->id, $imagedServerIds, true)) {
-                $missing[] = __('server image');
-            }
 
-            if ($missing === []) {
-                continue;
-            }
+            $cells = [
+                'database' => $this->coverageCell(
+                    applicable: ($databaseCounts[$server->id] ?? 0) > 0,
+                    scheduled: $kinds->contains(BackupSchedule::TARGET_DATABASE),
+                    lastAt: $lastDump[$server->id] ?? null,
+                    note: __('no database on this server'),
+                ),
+                'files' => $this->coverageCell(
+                    applicable: $siteCount > 0,
+                    scheduled: $kinds->contains(BackupSchedule::TARGET_SITE_FILES),
+                    lastAt: $lastArchive[$server->id] ?? null,
+                    note: __('no sites on this server'),
+                ),
+                'image' => $this->coverageCell(
+                    applicable: $canImage,
+                    // An image is a one-shot artifact, not a schedule target, so
+                    // a completed one counts as covered rather than "manual".
+                    scheduled: isset($lastImage[$server->id]),
+                    lastAt: $lastImage[$server->id] ?? null,
+                    note: __('images n/a on :provider', ['provider' => Str::title($server->provider->value)]),
+                ),
+            ];
 
-            $gaps[] = [
-                'server' => $server,
-                'missing' => $missing,
-                'note' => $canImage ? null : __('images n/a on :provider', [
-                    'provider' => Str::title($server->provider->value),
-                ]),
-                'protected' => $own->isNotEmpty(),
+            $applicable = collect($cells)->reject(fn (array $cell) => $cell['state'] === 'na');
+
+            $rows[] = [
+                'key' => $server->id,
+                'title' => $server->name,
+                'subtitle' => $this->serverMeta($databaseCounts[$server->id] ?? 0, $siteCount),
+                'url' => route('servers.backups', $server),
+                'applicable' => $applicable->count(),
+                'covered' => $applicable->where('state', 'scheduled')->count(),
+                'cells' => $cells,
             ];
         }
 
-        return $gaps;
+        // Least-covered first: the rows worth reading are the empty ones. A row
+        // with nothing applicable sinks to the bottom — there is no action on it.
+        usort($rows, fn (array $a, array $b) => [
+            $a['applicable'] === 0 ? 1 : 0, $a['covered'], -$a['applicable'],
+        ] <=> [
+            $b['applicable'] === 0 ? 1 : 0, $b['covered'], -$b['applicable'],
+        ]);
+
+        return $rows;
+    }
+
+    /**
+     * @return array{state: string, label: string, note: ?string}
+     */
+    private function coverageCell(bool $applicable, bool $scheduled, mixed $lastAt, string $note): array
+    {
+        if (! $applicable) {
+            return ['state' => 'na', 'label' => __('n/a'), 'note' => $note];
+        }
+
+        $at = $lastAt !== null ? Carbon::parse($lastAt) : null;
+
+        return match (true) {
+            $scheduled => ['state' => 'scheduled', 'label' => $at?->diffForHumans(short: true) ?? __('scheduled'), 'note' => null],
+            $at !== null => ['state' => 'manual', 'label' => __('manual · :when', ['when' => $at->diffForHumans(short: true)]), 'note' => null],
+            default => ['state' => 'missing', 'label' => __('missing'), 'note' => null],
+        };
+    }
+
+    private function serverMeta(int $databases, int $sites): string
+    {
+        $parts = [];
+        if ($databases > 0) {
+            $parts[] = trans_choice(':count database|:count databases', $databases, ['count' => $databases]);
+        }
+        if ($sites > 0) {
+            $parts[] = trans_choice(':count site|:count sites', $sites, ['count' => $sites]);
+        }
+
+        return $parts === [] ? __('no databases or sites') : implode(' · ', $parts);
     }
 
     /**

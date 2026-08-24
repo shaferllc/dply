@@ -114,8 +114,8 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <dt class="font-semibold text-brand-ink">{{ __('Admin password:') }}</dt>
                             <dd>
-                                @if ($scaffoldPasswordRevealed)
-                                    <code class="rounded-lg bg-white px-3 py-1 font-mono text-sm text-brand-ink ring-1 ring-brand-ink/15">{{ decrypt($site->meta['scaffold']['admin_password']) }}</code>
+                                @if ($revealedScaffoldAdminPassword)
+                                    <code class="rounded-lg bg-white px-3 py-1 font-mono text-sm text-brand-ink ring-1 ring-brand-ink/15">{{ $revealedScaffoldAdminPassword }}</code>
                                 @else
                                     <button
                                         wire:click="revealScaffoldPassword"

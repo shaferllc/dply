@@ -6,7 +6,6 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Modules\Cloud\Backends\CloudRouter;
 
 /**
  * Pure read-only previewer for the cascade triggered when an operator
@@ -64,19 +63,6 @@ final class PrimaryHostnameRenamePlanner
                 'key' => 'reissue_cert',
                 'label' => __('Re-issue SSL cert (existing covers :old only)', ['old' => $old]),
                 'detail' => ['cert_ids' => array_map(fn (SiteCertificate $c) => (string) $c->id, $staleCerts)],
-            ];
-        }
-
-        $backend = CloudRouter::backendFor($site);
-        if ($backend !== null) {
-            $optIn[] = [
-                'key' => 'cycle_backend',
-                'label' => __('Detach :old / attach :new on :backend', [
-                    'old' => $old,
-                    'new' => $new,
-                    'backend' => $this->backendLabel((string) $site->container_backend),
-                ]),
-                'detail' => ['backend' => (string) $site->container_backend],
             ];
         }
 

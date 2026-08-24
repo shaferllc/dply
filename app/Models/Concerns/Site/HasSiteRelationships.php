@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns\Site;
 
-use App\Models\EdgeDeployment;
-use App\Models\EdgeSiteAccessRule;
-use App\Models\EdgeSiteEnvVar;
-use App\Models\EdgeSiteMember;
-use App\Models\FunctionAction;
 use App\Models\InsightFinding;
 use App\Models\InsightSetting;
 use App\Models\NotificationSubscription;
@@ -93,10 +88,6 @@ use Illuminate\Support\Collection;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploymentSchedule> $deploymentSchedules
  * @property-read ?SiteDeployPipeline $activeDeployPipeline
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteFileBackup> $fileBackups
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeDeployment> $edgeDeployments
- * @property-read ?EdgeSiteAccessRule $edgeSiteAccessRule
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteEnvVar> $edgeEnvVars
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteMember> $edgeSiteMembers
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploySyncGroup> $deploySyncGroups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationSubscription> $notificationSubscriptions
  * @property-read ?InsightSetting $insightSetting
@@ -282,21 +273,6 @@ trait HasSiteRelationships
     public function domains(): HasMany
     {
         return $this->hasMany(SiteDomain::class);
-    }
-
-    /**
-     * The OpenWhisk actions on this serverless function-Site. A Site is an
-     * OpenWhisk package: one `kind=code` action for a plain function, more
-     * once the package model lands. Code actions sort before sequences. *
-     *
-     * @return HasMany<FunctionAction, $this>
-     */
-    /** @return HasMany<FunctionAction, $this> */
-    public function functionActions(): HasMany
-    {
-        return $this->hasMany(FunctionAction::class)
-            ->orderByRaw("CASE WHEN kind = 'code' THEN 0 ELSE 1 END")
-            ->orderBy('name');
     }
 
     /** @return HasMany<SitePreviewDomain, $this> */
@@ -523,30 +499,6 @@ trait HasSiteRelationships
     public function fileBackups(): HasMany
     {
         return $this->hasMany(SiteFileBackup::class)->orderByDesc('created_at');
-    }
-
-    /** @return HasMany<EdgeDeployment, $this> */
-    public function edgeDeployments(): HasMany
-    {
-        return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
-    }
-
-    /** @return HasOne<EdgeSiteAccessRule, $this> */
-    public function edgeSiteAccessRule(): HasOne
-    {
-        return $this->hasOne(EdgeSiteAccessRule::class);
-    }
-
-    /** @return HasMany<EdgeSiteEnvVar, $this> */
-    public function edgeEnvVars(): HasMany
-    {
-        return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
-    }
-
-    /** @return HasMany<EdgeSiteMember, $this> */
-    public function edgeSiteMembers(): HasMany
-    {
-        return $this->hasMany(EdgeSiteMember::class);
     }
 
     /** @return BelongsToMany<SiteDeploySyncGroup, $this> */

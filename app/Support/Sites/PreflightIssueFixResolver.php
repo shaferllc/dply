@@ -54,7 +54,7 @@ final class PreflightIssueFixResolver
                 : self::link(__('Open server databases'), route('servers.databases', $server)),
             'scheduler' => self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site])),
             'queue', 'workers' => $site->usesFunctionsRuntime()
-                ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
+                ? self::link(__('Open daemons'), route('sites.daemons', ['server' => $server, 'site' => $site]))
                 : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
             'runtime_revision' => self::link(
                 __('Open deploy settings'),

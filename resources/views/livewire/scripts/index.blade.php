@@ -7,11 +7,12 @@
 @endphp
 
 <div class="contents">
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <x-breadcrumb-trail :items="[
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <x-breadcrumb-trail :items="array_values(array_filter([
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            feature('surface.marketplace') ? ['label' => __('Marketplace'), 'href' => route('marketplace.index'), 'icon' => 'rectangle-group'] : null,
             ['label' => __('Scripts'), 'icon' => 'code-bracket'],
-        ]" />
+        ]))" />
 
         <x-profile-shell
             :title="__('Scripts')"
@@ -21,12 +22,12 @@
             @if ($showShellActions)
                 <x-slot:actions>
                     <a
-                        href="{{ route('scripts.marketplace') }}"
+                        href="{{ route('marketplace.index', ['category' => 'scripts']) }}"
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Script presets') }}
+                        {{ __('Browse marketplace') }}
                     </a>
                     @if ($canCreateScript)
                         <a
@@ -79,12 +80,12 @@
                     </p>
                     <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
                         <a
-                            href="{{ route('scripts.marketplace') }}"
+                            href="{{ route('marketplace.index', ['category' => 'scripts']) }}"
                             wire:navigate
                             class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             <x-heroicon-o-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Script presets') }}
+                            {{ __('Browse marketplace') }}
                         </a>
                         @if ($canCreateScript)
                             <a

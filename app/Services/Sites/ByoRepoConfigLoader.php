@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Modules\Edge\Services\Config\EdgeRepoConfig;
-use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
+use App\Services\Sites\RepoConfig\RepoConfig;
+use App\Services\Sites\RepoConfig\RepoConfigLoader;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Parses shared dply.yaml sections for BYO VM sites — reuses Edge routing
+ * Parses shared dply.yaml sections for BYO VM sites — reuses the shared routing
  * normalization and adds BYO-specific cron commands + deploy hook scripts.
  */
 final class ByoRepoConfigLoader
@@ -17,12 +17,12 @@ final class ByoRepoConfigLoader
     public const MANAGED_HOOK_PREFIX = "# @dply-managed dply.yaml\n";
 
     public function __construct(
-        private EdgeRepoConfigLoader $edgeLoader,
+        private RepoConfigLoader $loader,
     ) {}
 
     /**
      * @return array{
-     *     config: EdgeRepoConfig,
+     *     config: RepoConfig,
      *     crons: list<array{schedule: string, command: string, user: ?string}>,
      *     server_crons: list<array{schedule: string, command: string, user: ?string}>,
      *     deploy_hooks: list<array{phase: string, script: string, timeout: int, sort_order: int}>,
@@ -32,7 +32,7 @@ final class ByoRepoConfigLoader
      */
     public function parse(string $sourcePath, string $raw): array
     {
-        $config = $this->edgeLoader->parse($sourcePath, $raw);
+        $config = $this->loader->parse($sourcePath, $raw);
         $decoded = $this->decodeRoot($sourcePath, $raw);
         $parsed = is_array($decoded) ? $decoded : [];
         $warnings = $config->warnings;
@@ -73,7 +73,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{schedule: string, command: string, user: ?string}>
      */
@@ -118,7 +118,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{phase: string, script: string, timeout: int, sort_order: int}>
      */
@@ -176,7 +176,7 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
      * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
      */

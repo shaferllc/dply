@@ -1,7 +1,7 @@
 @props(['server', 'database', 'activeKey' => null])
 
 @php
-    $supported = in_array((string) $database->engine, ['mysql', 'mariadb', 'postgres', 'sqlite', 'mongodb'], true);
+    $supported = $database->supportsDump();
     $capLabel = \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000));
     // This row is building when the component's in-flight target key matches it.
     $processing = $activeKey === 'db:'.$database->id;

@@ -4,70 +4,98 @@ namespace App\Livewire\Credentials;
 
 use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesGitProviderTokens;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
 use App\Models\BackupConfiguration;
+use App\Models\BackupSchedule;
+use App\Models\GitProviderToken;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\Site;
+use App\Models\RedisSnapshot;
+use App\Models\ServerDatabaseBackup;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
  * The organization's Credentials page: every secret this org hands to a third
- * party. Two families live here, and they are genuinely different shapes —
- * {@see ProviderCredential} is one API token per cloud/DNS/CDN provider, while
- * {@see BackupConfiguration} is a named bucket or remote with its own config,
- * many per provider.
+ * party, in one table.
  *
- * They are deliberately NOT merged into `credentialProviderNav()`: that list is
- * also what the server-create flow reads to decide where a VM can be
- * provisioned, and an S3 bucket is not somewhere you can boot a server.
+ * Two families live here and they ARE different shapes — {@see ProviderCredential}
+ * is one API token per cloud/DNS/CDN provider, while {@see BackupConfiguration}
+ * is a named bucket or remote with its own config, many per provider. They are
+ * still listed together, because from the reader's side both answer the same
+ * question: what have we handed out, and does it still work? {@see rows()} is
+ * the projection that makes them comparable; nothing merges in the database.
+ *
+ * They remain separate in `credentialProviderNav()`: that list is also what the
+ * server-create flow reads to decide where a VM can be provisioned, and an S3
+ * bucket is not somewhere you can boot a server.
+ *
+ * The page used to render the whole provider catalog — 18 API providers plus 8
+ * storage backends, 26 cards — while your own credentials were reachable only
+ * by clicking a provider card to open a modal. The catalog now lives solely in
+ * that modal's picker, which already listed every provider in a <select>.
  */
 class Index extends Component
 {
     use DispatchesToastNotifications;
+
     // Brings BOTH create modes — "connect existing" and "provision a new
     // bucket" — so a storage card here can create the bucket, not just record
     // keys for one you made elsewhere.
     use ManagesBackupDestinationModal;
+    // Same add-a-token flow as /profile/source-control, but the row it writes
+    // belongs to the organization — see gitProviderTokenOwnerAttributes().
+    use ManagesGitProviderTokens;
     use ManagesProviderCredentials;
 
     /**
-     * Valid values for the capability tab (`?tab=`). Used to filter the provider sidebar.
+     * Row filters. Unlike the old capability tabs these narrow YOUR credentials,
+     * not the catalog — "DNS" used to hide providers you had not connected
+     * either way, which filtered nothing a reader could act on.
      *
      * @var list<string>
      */
-    private const TABS = ['all', 'server', 'dns', 'cdn', 'imports', 'storage'];
+    private const FILTERS = ['all', 'compute', 'dns', 'cdn', 'storage', 'git', 'attention'];
 
     public ?Organization $organization = null;
 
-    /** @var string Provider key from {@see credentialProviderNav()} */
-    public string $active_provider = 'digitalocean';
-
-    /** @var string One of {@see self::TABS}: filters the provider sidebar by capability. */
-    public string $tab = 'all';
-
     /**
-     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
-     * can't match a magic `$set`, so the tab's inline spinner never fired and a
-     * switch looked frozen for the whole round-trip.
+     * Per-request memo for {@see rows()}. Not a public property, so Livewire
+     * never hydrates it — each request starts cold and reads fresh.
+     *
+     * @var ?list<array<string, mixed>>
      */
-    public function setTab(string $value): void
+    private ?array $rowsMemo = null;
+
+    #[Url(as: 'filter', except: 'all')]
+    public string $filter = 'all';
+
+    public function setFilter(string $value): void
     {
-        if ($value === '' || $value === $this->tab) {
-            return;
-        }
-
-        $this->tab = $value;
-
-        // Direct assignment doesn't fire Livewire's updated hook, and that hook
-        // validates the tab and repoints active_provider — call it explicitly.
-        $this->updatedTab($value);
+        $this->filter = in_array($value, self::FILTERS, true) ? $value : 'all';
     }
 
+    /**
+     * The add-credential modal saves into a different component, so without a
+     * listener here its event never reaches this one and the table behind the
+     * modal stays stale. Reset to "all" as well: a new row that lands outside
+     * the active filter would otherwise look like the save did nothing.
+     */
+    #[On('provider-credential-created')]
+    public function credentialCreated(): void
+    {
+        $this->filter = 'all';
+    }
 
     public function mount(?Organization $organization = null): void
     {
@@ -81,56 +109,12 @@ class Index extends Component
 
         $this->authorize('viewAny', ProviderCredential::class);
 
-        // Tab first — the capability filter constrains which providers are available, so
-        // we honor `?tab=` before we resolve `active_provider` against the filtered list.
-        $tabParam = request()->query('tab');
-        if (is_string($tabParam) && in_array($tabParam, self::TABS, true)) {
-            $this->tab = $tabParam;
-        }
-
-        $ids = self::credentialProviderIds($this->capabilityForTab());
-        if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
-            $this->active_provider = $ids[0];
-        }
-
+        // `?provider=` used to select a catalog card. It now opens that
+        // provider's form straight away, which is what the link always meant.
         $q = request()->query('provider');
-        if (is_string($q) && ServerProviderGate::visible($q) && in_array($q, $ids, true)) {
-            $this->active_provider = $q;
+        if (is_string($q) && $q !== '' && ServerProviderGate::visible($q)) {
+            $this->dispatch('open-add-provider-credential-modal', provider: $q);
         }
-    }
-
-    public function updatedActiveProvider(mixed $value): void
-    {
-        $ids = self::credentialProviderIds($this->capabilityForTab());
-        if (! is_string($value) || ! in_array($value, $ids, true)) {
-            $this->active_provider = $ids[0] ?? 'digitalocean';
-        }
-    }
-
-    public function updatedTab(mixed $value): void
-    {
-        if (! is_string($value) || ! in_array($value, self::TABS, true)) {
-            $this->tab = 'all';
-        }
-
-        $ids = self::credentialProviderIds($this->capabilityForTab());
-        if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
-            $this->active_provider = $ids[0];
-        }
-    }
-
-    /**
-     * Resolve the capability filter for the current `tab` value. `null` means no filter.
-     */
-    private function capabilityForTab(): ?string
-    {
-        return match ($this->tab) {
-            'server' => 'compute',
-            'dns' => 'dns',
-            'cdn' => 'cdn',
-            'imports' => 'import',
-            default => null,
-        };
     }
 
     /**
@@ -248,11 +232,6 @@ class Index extends Component
         return $ids;
     }
 
-    public function resolveActiveProviderLabel(): string
-    {
-        return self::providerLabel($this->active_provider);
-    }
-
     public static function providerLabel(string $providerId): string
     {
         foreach (self::credentialProviderNav() as $group) {
@@ -267,68 +246,8 @@ class Index extends Component
     }
 
     /**
-     * Per-provider credential counts, resolved in a single grouped query and
-     * memoised for the request. The provider nav calls credentialCountFor()
-     * once per provider in two places, so without this each card fired its own
-     * COUNT (N×2 duplicate queries).
-     *
-     * @var array<string, int>|null
-     */
-    private ?array $credentialCountsMemo = null;
-
-    /** @return array<string, int> provider => count */
-    protected function credentialCounts(): array
-    {
-        if ($this->credentialCountsMemo !== null) {
-            return $this->credentialCountsMemo;
-        }
-
-        $org = $this->organization ?: auth()->user()->currentOrganization();
-        $query = $org
-            ? ProviderCredential::query()->where('organization_id', $org->id)
-            : auth()->user()->providerCredentials()->whereNull('organization_id');
-
-        return $this->credentialCountsMemo = $query
-            ->toBase()
-            ->select('provider')
-            ->selectRaw('count(*) as aggregate')
-            ->groupBy('provider')
-            ->pluck('aggregate', 'provider')
-            ->map(fn ($n): int => (int) $n)
-            ->all();
-    }
-
-    public function credentialCountFor(string $provider): int
-    {
-        return $this->credentialCounts()[$provider] ?? 0;
-    }
-
-    /**
-     * Storage destinations grouped by provider, memoised for the request the
-     * same way credential counts are — the card grid asks per provider.
-     *
-     * @var \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, BackupConfiguration>>|null
-     */
-    private $storageByProviderMemo = null;
-
-    /** @return \Illuminate\Support\Collection<int, BackupConfiguration> */
-    public function storageDestinationsFor(string $provider)
-    {
-        if ($this->storageByProviderMemo === null) {
-            $org = $this->organization ?: Auth::user()?->currentOrganization();
-
-            $this->storageByProviderMemo = $org instanceof Organization
-                ? $org->backupConfigurations()->orderBy('name')->get()->groupBy('provider')
-                : collect();
-        }
-
-        return $this->storageByProviderMemo->get($provider) ?? collect();
-    }
-
-    /**
-     * Open the shared add-destination modal with a provider preselected. The
-     * card grid is the entry point, so the provider is always known by the time
-     * we get here.
+     * Open the shared add-destination modal. The provider is optional now that
+     * the entry point is a header button rather than a per-provider card.
      */
     public function openStorageModal(string $provider = ''): void
     {
@@ -344,6 +263,73 @@ class Index extends Component
         }
 
         $this->showDestinationModal = true;
+    }
+
+    /**
+     * Destinations had no delete anywhere in the app — you could add a bucket
+     * and never remove it. Confirm names what breaks, because the schedules
+     * pointing at it are the reason not to do this by accident.
+     */
+    public function promptDeleteDestination(string $destinationId): void
+    {
+        $destination = $this->destinationForOrg($destinationId);
+        $this->authorize('delete', $destination);
+
+        $schedules = BackupSchedule::where('backup_configuration_id', $destination->id)->count();
+
+        $this->openConfirmActionModal(
+            'deleteDestination',
+            [$destinationId],
+            __('Remove backup destination'),
+            $schedules > 0
+                ? trans_choice(
+                    'Remove :name? :count schedule still ships here and will keep its dumps on the server that made them instead.|Remove :name? :count schedules still ship here and will keep their dumps on the server that made them instead.',
+                    $schedules,
+                    ['name' => $destination->name, 'count' => $schedules],
+                )
+                : __('Remove :name? Nothing ships here yet. Backups already stored in it are not deleted — remove them at the provider.', ['name' => $destination->name]),
+            __('Remove'),
+            true,
+        );
+    }
+
+    public function deleteDestination(string $destinationId): void
+    {
+        $destination = $this->destinationForOrg($destinationId);
+        $this->authorize('delete', $destination);
+
+        $snapshot = ['name' => $destination->name, 'provider' => $destination->provider];
+        // destinationForOrg() already scoped the lookup to this org and aborted
+        // if there wasn't one, so this is the same organization it belongs to.
+        $org = $this->currentOrg();
+
+        DB::transaction(function () use ($destination): void {
+            // server_database_backups has an FK with nullOnDelete, so the DB
+            // clears that one. These two columns are plain nullable char(26)
+            // with no constraint behind them — left alone they would point at a
+            // row that no longer exists and the next run would fail mid-ship.
+            BackupSchedule::where('backup_configuration_id', $destination->id)
+                ->update(['backup_configuration_id' => null]);
+            RedisSnapshot::where('backup_configuration_id', $destination->id)
+                ->update(['backup_configuration_id' => null]);
+
+            $destination->delete();
+        });
+
+        if ($org !== null) {
+            audit_log($org, Auth::user(), 'backup.destination.deleted', null, $snapshot, null);
+        }
+
+        $this->toastSuccess(__('Backup destination removed.'));
+    }
+
+    /** Scoped lookup: an id from another organization 404s rather than deleting. */
+    private function destinationForOrg(string $destinationId): BackupConfiguration
+    {
+        $org = $this->currentOrg();
+        abort_if($org === null, 404);
+
+        return $org->backupConfigurations()->whereKey($destinationId)->firstOrFail();
     }
 
     /** This page scopes to an explicit organization, not the session's current one. */
@@ -365,55 +351,379 @@ class Index extends Component
             'provider' => $destination->provider,
         ]);
 
-        // Drop the memo so the card grid reflects the new row on this render.
-        $this->storageByProviderMemo = null;
+        // The rows() memo is filled during render(), which has not run yet in
+        // this request, so there is nothing to invalidate here. Reset the filter
+        // for the same reason credentialCreated() does — a destination saved
+        // while "DNS" is active would otherwise vanish on save.
+        $this->filter = 'all';
+    }
+
+    /**
+     * One row per secret, whichever family it comes from. The two models keep
+     * their own tables and their own forms — this is a read projection so the
+     * page can list them together and sort them by the only thing a reader
+     * cares about first: whether it still works.
+     *
+     * @return list<array{kind: string, id: string, provider: string, providerLabel: string, name: string, usedFor: string, caps: list<string>, status: string, statusLabel: string, error: ?string, addedAt: ?Carbon}>
+     */
+    public function rows(): array
+    {
+        // render() asks for the rows twice — once filtered for the table, once
+        // whole for the chip counts — and every call re-ran all four queries.
+        // Memoised per request: rows() is only reached from render(), which runs
+        // after any action has already written, so there is nothing stale to see.
+        if ($this->rowsMemo !== null) {
+            return $this->rowsMemo;
+        }
+
+        $org = $this->currentOrg();
+        if ($org === null) {
+            return $this->rowsMemo = $this->tokenRows(
+                auth()->user()->providerCredentials()->whereNull('organization_id')->latest()->get()
+            );
+        }
+
+        $rows = array_merge(
+            $this->tokenRows(ProviderCredential::where('organization_id', $org->id)->latest()->get()),
+            $this->storageRows($org),
+            $this->gitRows($org),
+        );
+
+        // Anything broken floats, then anything expiring, then newest first.
+        $rank = ['bad' => 0, 'warn' => 1, 'ok' => 2, 'unknown' => 3];
+        usort($rows, function (array $a, array $b) use ($rank): int {
+            $byStatus = ($rank[$a['status']] ?? 9) <=> ($rank[$b['status']] ?? 9);
+
+            return $byStatus !== 0
+                ? $byStatus
+                : ($b['addedAt']?->getTimestamp() ?? 0) <=> ($a['addedAt']?->getTimestamp() ?? 0);
+        });
+
+        return $this->rowsMemo = $rows;
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return list<array<string, mixed>>
+     */
+    private function tokenRows($credentials): array
+    {
+        return $credentials->map(function (ProviderCredential $credential): array {
+            $caps = $credential->capabilities();
+
+            if ($credential->isUnhealthy()) {
+                $status = 'bad';
+                $statusLabel = __('Can\'t connect');
+            } elseif ($credential->last_validated_at !== null) {
+                $status = 'ok';
+                $statusLabel = __('Verified :time', ['time' => $credential->last_validated_at->diffForHumans()]);
+            } else {
+                // Never checked is not the same as healthy, and saying "Verified"
+                // for a token nobody has called would be a lie.
+                $status = 'unknown';
+                $statusLabel = __('Not checked');
+            }
+
+            return [
+                'kind' => 'token',
+                'id' => (string) $credential->id,
+                'provider' => $credential->provider,
+                'providerLabel' => self::providerLabel($credential->provider),
+                'name' => $credential->name !== '' ? (string) $credential->name : __('Untitled token'),
+                'usedFor' => $caps === []
+                    ? __('API access')
+                    : collect($caps)->map(fn (string $c): string => self::capabilityLabel($c))->implode(' · '),
+                'caps' => $caps,
+                'status' => $status,
+                'statusLabel' => $statusLabel,
+                'error' => $credential->validation_error,
+                'lastWrite' => null,
+                'addedAt' => $credential->created_at,
+            ];
+        })->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function storageRows(Organization $org): array
+    {
+        $destinations = $org->backupConfigurations()->orderBy('name')->get();
+        if ($destinations->isEmpty()) {
+            return [];
+        }
+
+        // One grouped count rather than a query per row — the schedule count is
+        // the "used for" answer, so every row would otherwise ask for its own.
+        $scheduleCounts = BackupSchedule::query()
+            ->whereIn('backup_configuration_id', $destinations->pluck('id'))
+            ->toBase()
+            ->select('backup_configuration_id')
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy('backup_configuration_id')
+            ->pluck('aggregate', 'backup_configuration_id');
+
+        // "3 schedules" says what is aimed at a bucket; it does not say whether
+        // anything ever landed. One more grouped query answers that, and it is
+        // the only thing the standalone destinations page showed that this row
+        // did not — so it comes along rather than justifying a second page.
+        $writeStats = ServerDatabaseBackup::query()
+            ->whereHas('serverDatabase', fn ($q) => $q->whereIn('server_id', $org->servers()->select('id')))
+            ->whereIn('backup_configuration_id', $destinations->pluck('id'))
+            ->where('status', ServerDatabaseBackup::STATUS_COMPLETED)
+            ->selectRaw('backup_configuration_id, count(*) as total, sum(bytes) as bytes, max(created_at) as last_write')
+            ->groupBy('backup_configuration_id')
+            ->toBase()
+            ->get()
+            ->keyBy('backup_configuration_id');
+
+        return $destinations->map(function (BackupConfiguration $destination) use ($scheduleCounts, $writeStats): array {
+            $schedules = (int) ($scheduleCounts[$destination->id] ?? 0);
+            $expiring = ! $destination->hasDurableCredentials();
+            $writes = $writeStats->get($destination->id);
+            $lastWriteAt = $writes?->last_write ? Carbon::parse($writes->last_write) : null;
+
+            return [
+                'kind' => 'storage',
+                'id' => (string) $destination->id,
+                'provider' => $destination->provider,
+                'providerLabel' => BackupConfiguration::labelForProvider($destination->provider),
+                'name' => $destination->name !== '' ? (string) $destination->name : __('Untitled destination'),
+                'usedFor' => $schedules > 0
+                    ? __('Backups').' · '.trans_choice(':count schedule|:count schedules', $schedules, ['count' => $schedules])
+                    : __('Backups').' · '.__('not used yet'),
+                // Rendered under the name: "last write 2d · 4.1 GB", or nothing
+                // at all for a destination that has never been written to.
+                'lastWrite' => $lastWriteAt === null
+                    ? null
+                    : __('last write :time', ['time' => $lastWriteAt->diffForHumans(short: true)])
+                        .((int) ($writes->bytes ?? 0) > 0 ? ' · '.\Illuminate\Support\Number::fileSize((int) $writes->bytes) : ''),
+                'caps' => ['storage'],
+                'status' => $expiring ? 'warn' : 'ok',
+                'statusLabel' => $expiring ? __('Token expires') : __('Ready'),
+                'error' => $expiring
+                    ? __('This uses a short-lived access token — add a refresh token to keep schedules working.')
+                    : null,
+                'addedAt' => $destination->created_at,
+            ];
+        })->all();
+    }
+
+    /**
+     * Organization-owned Git tokens — the machine-user credential sites deploy
+     * with. Personal Git connections are deliberately absent: they are also the
+     * member's own GitHub access, and live on /profile/source-control.
+     * See docs/adr/org-owned-git-credentials.md.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function gitRows(Organization $org): array
+    {
+        $tokens = GitProviderToken::forOrganization((string) $org->id)->get();
+        if ($tokens->isEmpty()) {
+            return [];
+        }
+
+        // One grouped count: how many sites deploy with each token, so removing
+        // one is a decision rather than a guess.
+        $siteCounts = Site::query()
+            ->where('organization_id', $org->id)
+            ->get(['id', 'meta'])
+            ->groupBy(fn (Site $site) => (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? ''))
+            ->map->count();
+
+        return $tokens->map(function (GitProviderToken $token) use ($siteCounts): array {
+            $sites = (int) ($siteCounts[(string) $token->id] ?? 0);
+            $expired = $token->expires_at?->isPast() ?? false;
+            $rejected = filled($token->validation_error);
+
+            return [
+                'kind' => 'git',
+                'id' => (string) $token->id,
+                'provider' => $token->provider,
+                'providerLabel' => ucfirst($token->provider),
+                'name' => $token->nickname !== null && $token->nickname !== ''
+                    ? (string) $token->nickname
+                    : __('Untitled token'),
+                'usedFor' => $sites > 0
+                    ? __('Git').' · '.trans_choice(':count site|:count sites', $sites, ['count' => $sites])
+                    : __('Git').' · '.__('not used yet'),
+                'caps' => ['git'],
+                'status' => $rejected || $expired ? 'bad' : 'ok',
+                'statusLabel' => $rejected ? __('Rejected') : ($expired ? __('Expired') : __('Ready')),
+                'error' => $rejected
+                    ? (string) $token->validation_error
+                    : ($expired ? __('Expired :time — replace it to keep deploys working', ['time' => $token->expires_at->diffForHumans()]) : null),
+                'lastWrite' => null,
+                'addedAt' => $token->created_at,
+            ];
+        })->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function gitProviderTokenOwnerAttributes(): array
+    {
+        $org = $this->currentOrg();
+        abort_unless($org instanceof Organization, 404);
+        $this->authorize('update', $org);
+
+        return ['organization_id' => $org->id];
+    }
+
+    /** Opening the form is an admin action, same as creating a cloud credential. */
+    public function startAddOrganizationPat(string $provider): void
+    {
+        $org = $this->currentOrg();
+        if (! $org instanceof Organization || ! $org->hasAdminAccess(auth()->user())) {
+            $this->toastError(__('Only organization admins can add a shared Git token.'));
+
+            return;
+        }
+
+        $this->startAddPat($provider);
+    }
+
+    protected function afterGitProviderTokenSaved(string $provider): void
+    {
+        // A token saved while a capability filter is active would otherwise
+        // vanish on save — same reason credentialCreated() resets it.
+        $this->filter = 'all';
+        $this->rowsMemo = null;
+        $this->toastSuccess(__('Shared :provider token added.', ['provider' => ucfirst($provider)]));
+    }
+
+    public function promptDeleteGitToken(string $tokenId): void
+    {
+        $token = $this->organizationGitToken($tokenId);
+        $this->authorize('delete', $token);
+
+        $sites = Site::query()
+            ->where('organization_id', $token->organization_id)
+            ->get(['id', 'meta'])
+            ->filter(fn (Site $site) => (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '') === (string) $token->id)
+            ->count();
+
+        $this->openConfirmActionModal(
+            'deleteGitToken',
+            [$tokenId],
+            __('Remove shared token'),
+            // Quote the real number: sites pinned to this token fall back to
+            // their owner's personal credential, which may not exist.
+            $sites > 0
+                ? trans_choice(
+                    'Remove :name? :count site deploys with it and will fall back to its owner\'s personal Git credential.|Remove :name? :count sites deploy with it and will fall back to their owners\' personal Git credentials.',
+                    $sites,
+                    ['name' => $token->nickname ?? __('this token'), 'count' => $sites],
+                )
+                : __('Remove :name? No site is pinned to it right now.', ['name' => $token->nickname ?? __('this token')]),
+            __('Remove'),
+            true,
+        );
+    }
+
+    public function deleteGitToken(string $tokenId): void
+    {
+        $token = $this->organizationGitToken($tokenId);
+        $this->authorize('delete', $token);
+
+        $snapshot = [
+            'token_id' => (string) $token->id,
+            'provider' => $token->provider,
+            'nickname' => $token->nickname,
+        ];
+        $organization = $token->organization;
+        $token->delete();
+        $this->rowsMemo = null;
+
+        if ($organization !== null) {
+            audit_log($organization, auth()->user(), 'git_token.deleted', null, $snapshot, null);
+        }
+
+        $this->toastSuccess(__('Shared Git token removed.'));
+    }
+
+    /**
+     * Scoped lookup: a token id from another organization must not resolve here
+     * even for an admin of this one.
+     */
+    private function organizationGitToken(string $tokenId): GitProviderToken
+    {
+        $org = $this->currentOrg();
+        abort_unless($org instanceof Organization, 404);
+
+        return GitProviderToken::query()
+            ->where('organization_id', $org->id)
+            ->whereKey($tokenId)
+            ->firstOrFail();
+    }
+
+    /** Rows left after the active filter. */
+    public function visibleRows(): array
+    {
+        $rows = $this->rows();
+
+        return match ($this->filter) {
+            'storage' => array_values(array_filter($rows, fn (array $r): bool => $r['kind'] === 'storage')),
+            'git' => array_values(array_filter($rows, fn (array $r): bool => $r['kind'] === 'git')),
+            'attention' => array_values(array_filter($rows, fn (array $r): bool => in_array($r['status'], ['bad', 'warn'], true))),
+            'all' => $rows,
+            default => array_values(array_filter(
+                $rows,
+                fn (array $r): bool => in_array($this->filter, $r['caps'], true),
+            )),
+        };
+    }
+
+    /**
+     * Counts for the filter chips. A chip with nothing behind it is noise, so
+     * the view hides any that come back zero.
+     *
+     * @return array<string, int>
+     */
+    public function filterCounts(): array
+    {
+        $rows = $this->rows();
+
+        return [
+            'all' => count($rows),
+            'compute' => count(array_filter($rows, fn (array $r): bool => in_array('compute', $r['caps'], true))),
+            'dns' => count(array_filter($rows, fn (array $r): bool => in_array('dns', $r['caps'], true))),
+            'cdn' => count(array_filter($rows, fn (array $r): bool => in_array('cdn', $r['caps'], true))),
+            'storage' => count(array_filter($rows, fn (array $r): bool => $r['kind'] === 'storage')),
+            'git' => count(array_filter($rows, fn (array $r): bool => $r['kind'] === 'git')),
+            'attention' => count(array_filter($rows, fn (array $r): bool => in_array($r['status'], ['bad', 'warn'], true))),
+        ];
+    }
+
+    public static function capabilityLabel(string $capability): string
+    {
+        return match ($capability) {
+            'compute' => __('Compute'),
+            'dns' => __('DNS'),
+            'cdn' => __('CDN'),
+            'app_platform' => __('App Platform'),
+            'import' => __('Import'),
+            'storage' => __('Storage'),
+            default => ucfirst(str_replace('_', ' ', $capability)),
+        };
+    }
+
+    private function currentOrg(): ?Organization
+    {
+        $org = $this->organization ?: Auth::user()?->currentOrganization();
+
+        return $org instanceof Organization ? $org : null;
     }
 
     public function render(): View
     {
-        $org = $this->organization ?: auth()->user()->currentOrganization();
-        $credentials = $org
-            ? ProviderCredential::where('organization_id', $org->id)->latest()->get()
-            : auth()->user()->providerCredentials()->whereNull('organization_id')->latest()->get();
-
-        // The storage family is its own tab: showing buckets under a "Compute"
-        // or "DNS" filter would be a category error.
-        $showStorage = in_array($this->tab, ['all', 'storage'], true);
+        $org = $this->currentOrg();
 
         return view('livewire.credentials.index', [
-            'credentials' => $credentials,
-            'providerNav' => $this->tab === 'storage'
-                ? []
-                : self::credentialProviderNav($this->capabilityForTab()),
-            'storageNav' => $showStorage ? self::storageProviderNav() : [],
-            'storageCount' => $org instanceof Organization ? $org->backupConfigurations()->count() : 0,
-            'activeProviderLabel' => $this->resolveActiveProviderLabel(),
+            'rows' => $this->visibleRows(),
+            'counts' => $this->filterCounts(),
             'organization' => $org,
             'useOrgShell' => $org instanceof Organization,
-            'activeProviderComingSoon' => ServerProviderGate::comingSoon($this->active_provider),
         ])->layout($org instanceof Organization ? 'layouts.app' : 'layouts.settings');
-    }
-
-    /**
-     * The storage family, shaped like {@see credentialProviderNav()} so the card
-     * grid can render both with the same markup.
-     *
-     * @return list<array{label: string, items: list<array{id: string, label: string, comingSoon: bool}>}>
-     */
-    public static function storageProviderNav(): array
-    {
-        $items = [];
-        foreach (BackupConfiguration::providers() as $provider) {
-            $items[] = [
-                'id' => $provider,
-                'label' => BackupConfiguration::labelForProvider($provider),
-                'comingSoon' => ! BackupConfiguration::isProviderAvailable($provider),
-            ];
-        }
-
-        return [[
-            'label' => __('Backup storage'),
-            'items' => $items,
-        ]];
     }
 }
