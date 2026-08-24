@@ -10,7 +10,7 @@ declare(strict_types=1);
 | Every managed preview URL is minted on one of these zones. The list lives
 | here — not in .env — so adding a zone is a code change, not a deploy-time
 | secret. DNS for VM testing hostnames is Cloudflare (platform token:
-| DPLY_TESTING_CF_API_TOKEN, else DPLY_EDGE_CF_API_TOKEN) with Namecheap as
+| CLOUDFLARE_KEY) with Namecheap as
 | fallback. Edge and Serverless keep their own apexes.
 |
 | Tests (APP_ENV=testing) use local *.test apexes so the suite never talks
@@ -23,9 +23,24 @@ return [
 
     'provider' => 'cloudflare',
 
+    /*
+     * THE Cloudflare token. One key, one account, one place to look.
+     *
+     * dply used to read four config paths for "the Cloudflare token" and take
+     * whichever was non-empty first. Two were dead (config/edge.php does not
+     * exist, so edge.cloudflare.api_token was always null; the serverless key
+     * had no consumers at all) and the winner was services.cloudflare.key,
+     * documented as the MAIL transport key even though nothing reads it for
+     * mail any more. A correctly-scoped token could therefore lose to a stale
+     * one in a variable nobody remembered setting.
+     *
+     * CLOUDFLARE_API_TOKEN is canonical. The older names still resolve so an
+     * existing deployment keeps working, but they are deprecated — set
+     * CLOUDFLARE_API_TOKEN and delete the rest.
+     */
     'cloudflare_api_token' => env(
-        'DPLY_TESTING_CF_API_TOKEN',
-        env('CLOUDFLARE_KEY', env('CLOUDFLARE_API_KEY', env('DPLY_EDGE_CF_API_TOKEN'))),
+        'CLOUDFLARE_API_TOKEN',
+        env('DPLY_TESTING_CF_API_TOKEN', env('CLOUDFLARE_KEY', env('CLOUDFLARE_API_KEY'))),
     ),
 
     'vm_apex' => $testing ? 'dply.test' : 'on-dply.cc',

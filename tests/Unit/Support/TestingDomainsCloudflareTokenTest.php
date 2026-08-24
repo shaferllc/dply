@@ -3,93 +3,66 @@
 declare(strict_types=1);
 
 use App\Support\TestingDomains;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 
 /**
- * Zone-aware Cloudflare token selection.
+ * One Cloudflare token, one config path.
  *
- * The bug this guards: the first configured token is CLOUDFLARE_KEY, which was
- * historically provisioned for the MAIL transport and often belongs to a
- * different Cloudflare account than the one owning the testing zones. Picking
- * by position produced "Zone [on-dply.cc] was not found in this Cloudflare
- * account" on an otherwise correct setup.
+ * dply used to read four config paths and return the first non-empty one,
+ * which meant a correctly-scoped token could lose to a stale CLOUDFLARE_KEY
+ * and nothing in the failure said which had been used. These lock the
+ * collapsed behaviour in place.
  */
-beforeEach(function () {
-    Cache::flush();
+test('the token comes from the single canonical config path', function () {
+    config(['testing_domains.cloudflare_api_token' => 'the-one-token']);
 
+    expect(TestingDomains::cloudflareApiToken())->toBe('the-one-token')
+        ->and(TestingDomains::cloudflareIsConfigured())->toBeTrue();
+});
+
+test('legacy config paths no longer influence the choice', function () {
     config([
-        // Deliberately the WRONG account, and deliberately first.
-        'services.cloudflare.key' => 'mail-token',
-        'testing_domains.cloudflare_api_token' => 'zone-owner-token',
-        'edge.cloudflare.api_token' => '',
-        'serverless.testing_dns.cloudflare_api_token' => '',
+        'testing_domains.cloudflare_api_token' => 'the-one-token',
+        // These used to outrank it. They must now be inert.
+        'services.cloudflare.key' => 'stale-mail-token',
+        'edge.cloudflare.api_token' => 'dead-edge-token',
+        'serverless.testing_dns.cloudflare_api_token' => 'dead-serverless-token',
     ]);
+
+    expect(TestingDomains::cloudflareApiToken())->toBe('the-one-token');
 });
 
-/** Only `zone-owner-token` can see on-dply.cc. */
-function fakeCloudflareZoneLookup(): void
-{
-    Http::fake(function ($request) {
-        $ownsZone = $request->hasHeader('Authorization', 'Bearer zone-owner-token');
+test('an unexpanded env placeholder is treated as no token, not sent as a bearer', function () {
+    config(['testing_domains.cloudflare_api_token' => '${CLOUDFLARE_API_TOKEN}']);
 
-        return Http::response([
-            'success' => true,
-            'result' => $ownsZone
-                ? [['id' => 'zone123', 'name' => 'on-dply.cc', 'status' => 'active']]
-                : [],
-        ]);
-    });
-}
-
-test('the token that can see the zone wins over the one that merely comes first', function () {
-    fakeCloudflareZoneLookup();
-
-    expect(TestingDomains::cloudflareApiTokenForZone('on-dply.cc'))->toBe('zone-owner-token');
+    expect(TestingDomains::cloudflareApiToken())->toBe('')
+        ->and(TestingDomains::cloudflareIsConfigured())->toBeFalse();
 });
 
-test('the blind accessor still returns the first token — which is the bug being routed around', function () {
-    fakeCloudflareZoneLookup();
+test('the zone-scoped accessor returns the same single token', function () {
+    config(['testing_domains.cloudflare_api_token' => 'the-one-token']);
 
-    expect(TestingDomains::cloudflareApiToken())->toBe('mail-token');
+    expect(TestingDomains::cloudflareApiTokenForZone('on-dply.cc'))->toBe('the-one-token')
+        ->and(TestingDomains::cloudflareApiTokenForZone(''))->toBe('the-one-token');
 });
 
-test('the decision is cached, so provisioning does not re-probe every token', function () {
-    fakeCloudflareZoneLookup();
+test('the token list contains exactly the one token, or nothing', function () {
+    config(['testing_domains.cloudflare_api_token' => 'the-one-token']);
+    expect(TestingDomains::cloudflareTokens())->toBe(['the-one-token']);
 
-    TestingDomains::cloudflareApiTokenForZone('on-dply.cc');
-    $afterFirst = count(Http::recorded());
-
-    TestingDomains::cloudflareApiTokenForZone('on-dply.cc');
-
-    expect(count(Http::recorded()))->toBe($afterFirst)
-        ->and($afterFirst)->toBeGreaterThan(0);
+    config(['testing_domains.cloudflare_api_token' => '']);
+    expect(TestingDomains::cloudflareTokens())->toBe([]);
 });
 
-test('clearing the cache makes it probe again', function () {
-    fakeCloudflareZoneLookup();
+test('the configured token is described as the platform token', function () {
+    config(['testing_domains.cloudflare_api_token' => 'the-one-token']);
 
-    TestingDomains::cloudflareApiTokenForZone('on-dply.cc');
-    $afterFirst = count(Http::recorded());
-
-    TestingDomains::forgetCloudflareTokenForZone('on-dply.cc');
-    TestingDomains::cloudflareApiTokenForZone('on-dply.cc');
-
-    expect(count(Http::recorded()))->toBeGreaterThan($afterFirst);
+    expect(TestingDomains::describeCloudflareToken('the-one-token'))
+        ->toContain('CLOUDFLARE_API_TOKEN');
 });
 
-test('when no token can see the zone it falls back to the first, so the caller gets a real API error', function () {
-    Http::fake(fn () => Http::response(['success' => true, 'result' => []]));
+test('any other token is flagged as not the configured one', function () {
+    config(['testing_domains.cloudflare_api_token' => 'the-one-token']);
 
-    // Not silently empty: an empty token would surface as a confusing
-    // "no token configured" instead of Cloudflare's own zone-not-found.
-    expect(TestingDomains::cloudflareApiTokenForZone('on-dply.cc'))->toBe('mail-token');
-});
-
-test('a blank zone short-circuits without any API call', function () {
-    Http::fake();
-
-    expect(TestingDomains::cloudflareApiTokenForZone(''))->toBe('mail-token');
-
-    Http::assertNothingSent();
+    expect(TestingDomains::describeCloudflareToken('something-else'))
+        ->toContain('NOT the configured');
 });

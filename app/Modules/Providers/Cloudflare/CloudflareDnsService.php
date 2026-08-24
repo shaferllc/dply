@@ -20,16 +20,68 @@ class CloudflareDnsService
     /**
      * @param  ProviderCredential|non-empty-string  $credentialOrToken
      */
+    /** Human label for whichever token this was built from, for error messages. */
+    private string $tokenOrigin = '';
+
     public function __construct(ProviderCredential|string $credentialOrToken)
     {
         $token = $credentialOrToken instanceof ProviderCredential
             ? $credentialOrToken->getApiToken()
             : $credentialOrToken;
+
+        // A ProviderCredential is a CUSTOMER's connected account. Recording that
+        // here is the whole point: "zone not found" against a dply-owned zone is
+        // almost always a customer token being used where a platform token
+        // belongs, and the old message could not tell the two apart.
+        $this->tokenOrigin = $credentialOrToken instanceof ProviderCredential
+            ? 'customer credential "'.$credentialOrToken->name.'" (org '.((string) $credentialOrToken->organization_id).')'
+            : '';
+
         $token = is_string($token) ? trim($token) : '';
         if ($token === '') {
             throw new \InvalidArgumentException('Cloudflare API token is required.');
         }
         $this->bearerToken = $token;
+    }
+
+    /**
+     * Identify the token in an error WITHOUT leaking it: a short digest plus
+     * the last four characters is enough to match against a Cloudflare
+     * dashboard entry, and is useless to anyone reading a log.
+     */
+    private function tokenFingerprint(): string
+    {
+        return 'sha256:'.substr(hash('sha256', $this->bearerToken), 0, 8)
+            .' …'.substr($this->bearerToken, -4);
+    }
+
+    /**
+     * Why a zone lookup came back empty, in terms an operator can act on.
+     *
+     * Names the token (by origin when known, otherwise by matching it against
+     * the platform config keys) and lists what that token CAN see — the fastest
+     * way to spot "this is the mail token" or "this is the customer's account".
+     */
+    private function zoneNotFoundMessage(string $zoneName): string
+    {
+        $origin = $this->tokenOrigin !== ''
+            ? $this->tokenOrigin
+            : \App\Support\TestingDomains::describeCloudflareToken($this->bearerToken);
+
+        $visible = '';
+        try {
+            $zones = $this->listZoneNames();
+            $visible = $zones === []
+                ? ' That token can see NO zones at all.'
+                : ' That token can see: '.implode(', ', array_slice($zones, 0, 8))
+                    .(count($zones) > 8 ? ' (+'.(count($zones) - 8).' more)' : '').'.';
+        } catch (\Throwable) {
+            // Listing is a nicety; never let it mask the real failure.
+        }
+
+        return 'Zone ['.$zoneName.'] was not found in this Cloudflare account. '
+            .'Token used: '.$origin.' ['.$this->tokenFingerprint().'].'.$visible
+            .' Add the zone to that token’s Zone Resources, or point dply at a token from the account that owns it.';
     }
 
     public function verifyToken(): void
@@ -63,8 +115,7 @@ class CloudflareDnsService
             return null;
         }
 
-        $first = $results[0];
-        $id = is_array($first) ? ($first['id'] ?? null) : null;
+        $id = $results[0]['id'] ?? null;
 
         return is_string($id) && $id !== '' ? $id : null;
     }
@@ -110,7 +161,7 @@ class CloudflareDnsService
     {
         $zoneId = $this->findZoneId($zoneName);
         if ($zoneId === null) {
-            throw new \RuntimeException('Zone ['.$zoneName.'] was not found in this Cloudflare account. Add it to the API token’s Zone Resources, or use a token from the account that owns that zone.');
+            throw new \RuntimeException($this->zoneNotFoundMessage($zoneName));
         }
 
         $fqdn = $this->fqdn($zoneName, $relativeRecordName);
@@ -173,7 +224,7 @@ class CloudflareDnsService
     {
         $zoneId = $this->findZoneId($zoneName);
         if ($zoneId === null) {
-            throw new \RuntimeException('Zone ['.$zoneName.'] was not found in this Cloudflare account. Add it to the API token’s Zone Resources, or use a token from the account that owns that zone.');
+            throw new \RuntimeException($this->zoneNotFoundMessage($zoneName));
         }
 
         $fqdn = $this->fqdn($zoneName, $relativeRecordName);

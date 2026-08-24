@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Cache;
 
 /**
  * Dply-owned testing / preview zones from config/product/testing_domains.php.
@@ -18,103 +17,68 @@ final class TestingDomains
         return $provider !== '' ? $provider : 'cloudflare';
     }
 
+    /**
+     * The one Cloudflare token dply uses for its own testing zones.
+     *
+     * Deliberately a single config path (see config/product/testing_domains.php).
+     * This used to consult four, in priority order, and return the first
+     * non-empty one — which silently preferred a stale CLOUDFLARE_KEY over a
+     * correctly-scoped token and made "which token is this?" unanswerable.
+     */
     public static function cloudflareApiToken(): string
     {
-        return self::cloudflareTokens()[0] ?? '';
-    }
+        $token = trim((string) config('testing_domains.cloudflare_api_token', ''));
 
-    /**
-     * Prefer a token that can actually see this zone. Queue workers often
-     * still hold an older Edge token that is Zone:Read-only or scoped to
-     * a different account than CLOUDFLARE_KEY.
-     *
-     * Never pick blindly by position: the first configured token is
-     * CLOUDFLARE_KEY, which was historically provisioned for the MAIL
-     * transport (see the note in config/services.php) and frequently belongs
-     * to a different Cloudflare account than the one owning the testing
-     * zones. That mismatch surfaces as "Zone [x] was not found in this
-     * Cloudflare account" on an otherwise correct configuration.
-     *
-     * Results are cached per zone+token-set: this runs on the provisioning
-     * path, each miss costs one Cloudflare round-trip per token tried, and
-     * the answer only changes when a token or its Zone Resources change.
-     * The token set is part of the key, so editing env invalidates it.
-     */
-    public static function cloudflareApiTokenForZone(string $zone): string
-    {
-        $zone = strtolower(trim($zone));
-        $tokens = self::cloudflareTokens();
-        if ($tokens === []) {
-            return '';
-        }
-
-        if ($zone === '') {
-            return $tokens[0];
-        }
-
-        $cacheKey = 'testing_domains:cf_token_for_zone:'.$zone.':'.substr(hash('sha256', implode('|', $tokens)), 0, 16);
-
-        $resolved = Cache::remember(
-            $cacheKey,
-            now()->addMinutes(30),
-            function () use ($tokens, $zone): ?string {
-                foreach ($tokens as $token) {
-                    try {
-                        if ((new \App\Modules\Providers\Cloudflare\CloudflareDnsService($token))->zoneExists($zone)) {
-                            return $token;
-                        }
-                    } catch (\Throwable) {
-                        continue;
-                    }
-                }
-
-                // Cache the miss too — a zone nobody can see is usually a
-                // config problem that will not fix itself within the TTL, and
-                // re-probing every token on every provision is expensive.
-                return null;
-            },
-        );
-
-        return $resolved ?? $tokens[0];
-    }
-
-    /** Drop the cached zone→token decisions (after rotating a token). */
-    public static function forgetCloudflareTokenForZone(string $zone = ''): void
-    {
-        $tokens = self::cloudflareTokens();
-        if ($tokens === []) {
-            return;
-        }
-        $suffix = substr(hash('sha256', implode('|', $tokens)), 0, 16);
-
-        foreach ($zone !== '' ? [strtolower(trim($zone))] : self::vm() as $z) {
-            Cache::forget('testing_domains:cf_token_for_zone:'.$z.':'.$suffix);
-        }
+        // Unexpanded `${VAR}` from .env is not a token — never send it as a
+        // Bearer, or Cloudflare answers 400 and the real cause stays hidden.
+        return str_starts_with($token, '${') ? '' : $token;
     }
 
     /**
      * @return list<string>
+     *
+     * @deprecated There is exactly one token now; kept so callers that expected
+     *             a list keep working. Prefer {@see self::cloudflareApiToken()}.
      */
     public static function cloudflareTokens(): array
     {
-        $tokens = [];
-        foreach ([
-            trim((string) config('services.cloudflare.key', '')),
-            trim((string) config('testing_domains.cloudflare_api_token', '')),
-            trim((string) config('edge.cloudflare.api_token', '')),
-            trim((string) config('serverless.testing_dns.cloudflare_api_token', '')),
-        ] as $token) {
-            // Unexpanded `${VAR}` from .env is not a token — skip it so a
-            // worker that missed interpolation does not send it as Bearer.
-            if ($token === '' || str_starts_with($token, '${')) {
-                continue;
-            }
-            if (! in_array($token, $tokens, true)) {
-                $tokens[] = $token;
-            }
+        $token = self::cloudflareApiToken();
+
+        return $token === '' ? [] : [$token];
+    }
+
+    /**
+     * Kept for call-site compatibility: with a single configured token there is
+     * nothing left to choose between, so this is now just the token.
+     *
+     * The zone-probing this used to do (try each token, keep whichever could
+     * see the zone) existed only to paper over the multi-variable mess. With
+     * one token, a zone it cannot see is a real misconfiguration — and
+     * CloudflareDnsService now says exactly which token failed and what it can
+     * see, which is more useful than silently swapping to another one.
+     */
+    public static function cloudflareApiTokenForZone(string $zone): string
+    {
+        return self::cloudflareApiToken();
+    }
+
+    /**
+     * Describe the configured token for an error message — never the token.
+     */
+    public static function describeCloudflareToken(string $token): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return 'no token';
         }
 
-        return $tokens;
+        $configured = self::cloudflareApiToken();
+        if ($configured !== '' && hash_equals($configured, $token)) {
+            return 'the platform token (CLOUDFLARE_API_TOKEN)';
+        }
+
+        return 'a token that is NOT the configured CLOUDFLARE_API_TOKEN '
+            .'(a customer credential, or stale env on this worker)';
     }
 
     public static function cloudflareIsConfigured(): bool

@@ -673,7 +673,7 @@ class TestingHostnameProvisioner
                 'Dply has no PLATFORM DNS credential that can write its testing zones ('
                 .implode(', ', array_slice($pool, 0, 3)).(count($pool) > 3 ? ', …' : '').'). '
                 .'These zones live in dply\'s own accounts, so a customer credential cannot serve them. '
-                .'Set DPLY_TESTING_CF_API_TOKEN (or CLOUDFLARE_KEY) to a token whose Zone Resources include them, '
+                .'Set CLOUDFLARE_KEY to a token whose Zone Resources include them, '
                 .'or configure Namecheap / services.digitalocean.token.'
             );
         }
