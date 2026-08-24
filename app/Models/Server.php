@@ -106,6 +106,17 @@ class Server extends Model
 
     public const STATUS_DISCONNECTED = 'disconnected';
 
+    /**
+     * Mid-resize at the provider. Transient and self-clearing: {@see \App\Jobs\ResizeServerJob}
+     * stashes the prior status in meta['resize']['previous_status'] and restores
+     * it when the sequence ends, however it ends.
+     *
+     * Deliberately NOT "ready" — the machine is powered off for most of a
+     * resize, so anything gated on isReady() (deploys, SSH work) must stay off
+     * it until it is back.
+     */
+    public const STATUS_RESIZING = 'resizing';
+
     public const HOST_KIND_VM = 'vm';
 
     public const HOST_KIND_DOCKER = 'docker';

@@ -10,6 +10,10 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Servers\Resize\DigitalOceanResizeDriver;
+use App\Services\Servers\Resize\ServerResizeDriver;
+use App\Services\Servers\ServerResizeOptions;
+use App\Modules\Notifications\Services\ServerResizeNotificationDispatcher;
 use App\Models\User;
 use App\Notifications\ServerResizeNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -160,4 +164,84 @@ test('an illegal target fails before anything is touched and notifies the failur
     // No power-off was issued for a target that was never legal.
     Http::assertNotSent(fn ($request) => str_contains($request->url(), '/actions')
         && ($request->data()['type'] ?? null) === 'power_off');
+});
+
+test('the server reports resizing while it runs, and goes back afterwards', function (): void {
+    Notification::fake();
+    fakeDropletResize();
+    [$owner, , $server] = orgWithSitesOnDroplet();
+
+    // An object holder, not a by-ref closure capture: the reference does not
+    // survive into the container factory.
+    $probe = new \stdClass;
+    $probe->status = null;
+
+    // driverFor() resolves drivers out of the container, so swapping the
+    // DigitalOcean one is enough to observe the row mid-sequence.
+    app()->bind(DigitalOceanResizeDriver::class, fn () => new class($probe) implements ServerResizeDriver
+    {
+        public function __construct(private \stdClass $probe) {}
+
+        public function supports(Server $server): bool
+        {
+            return true;
+        }
+
+        public function requiresPowerCycle(): bool
+        {
+            return true;
+        }
+
+        public function catalog(Server $server): array
+        {
+            return [
+                'current' => ['slug' => 's-1vcpu-2gb', 'vcpus' => 1, 'memory_mb' => 2048, 'disk_gb' => 50, 'region' => 'nyc1'],
+                'options' => [[
+                    'slug' => 's-2vcpu-4gb', 'vcpus' => 2, 'memory_mb' => 4096, 'disk_gb' => 50,
+                    'price_monthly' => 24.0, 'grows_disk' => false, 'direction' => 'up',
+                ]],
+            ];
+        }
+
+        public function execute(Server $server, array $target, callable $progress): void
+        {
+            $this->probe->status = $server->fresh()->status;
+            $progress('resizing');
+        }
+    });
+
+    (new ResizeServerJob($server, 's-2vcpu-4gb', false, $owner->id))
+        ->handle(app(ServerResizeOptions::class), app(ServerResizeNotificationDispatcher::class));
+
+    expect($probe->status)->toBe(Server::STATUS_RESIZING)
+        ->and($server->fresh()->status)->toBe(Server::STATUS_READY)
+        ->and($server->fresh()->meta['resize']['state'])->toBe('completed');
+});
+
+test('a failed resize does not strand the row in resizing', function (): void {
+    Notification::fake();
+    Http::fake([
+        'https://api.digitalocean.com/v2/droplets/12345' => Http::response([
+            'droplet' => [
+                'id' => 12345, 'size_slug' => 's-1vcpu-2gb',
+                'vcpus' => 1, 'memory' => 2048, 'disk' => 50,
+                'region' => ['slug' => 'nyc1'],
+            ],
+        ]),
+        'https://api.digitalocean.com/v2/sizes*' => Http::response([
+            'sizes' => [[
+                'slug' => 's-2vcpu-4gb', 'vcpus' => 2, 'memory' => 4096, 'disk' => 50,
+                'regions' => ['nyc1'], 'available' => true, 'price_monthly' => 24.0,
+            ]],
+        ]),
+        // Power-off is refused, so the sequence dies on its first leg.
+        'https://api.digitalocean.com/v2/droplets/12345/actions' => Http::response(['message' => 'nope'], 500),
+    ]);
+    [$owner, , $server] = orgWithSitesOnDroplet();
+
+    (new ResizeServerJob($server, 's-2vcpu-4gb', false, $owner->id))
+        ->handle(app(ServerResizeOptions::class), app(ServerResizeNotificationDispatcher::class));
+
+    expect($server->fresh()->status)->toBe('ready')
+        ->and($server->fresh()->meta['resize']['state'])->toBe('failed');
 });

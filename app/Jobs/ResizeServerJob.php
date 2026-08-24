@@ -38,6 +38,14 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 1;
 
+    /**
+     * Bound the uniqueness lock. Without this the lock has no expiry, so a
+     * worker killed mid-resize (deploy, OOM, laptop lid) leaves it held
+     * forever and every later resize of that server is silently dropped —
+     * the button appears to do nothing at all. One hour matches $timeout.
+     */
+    public int $uniqueFor = 3600;
+
     public function __construct(
         public Server $server,
         public string $targetSize,
@@ -77,17 +85,25 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
         // of the org gets that their sites are about to drop.
         $notifier->started($server, $fromSize, $target['slug'], $driver->requiresPowerCycle(), $actor);
 
+        // Surface it on the server row itself: the index, the workspace hero
+        // and the Settings tile all read `status`, and a box that is powered
+        // off must not keep claiming to be ready.
+        $previousStatus = (string) $server->status;
+        $this->markState($server, 'powering_off', previousStatus: $previousStatus);
+        $server->update(['status' => Server::STATUS_RESIZING]);
+
         try {
-            $driver->execute($server, $target, function (string $state) use ($server): void {
-                $this->markState($server, $state);
+            $driver->execute($server, $target, function (string $state) use ($server, $previousStatus): void {
+                $this->markState($server, $state, previousStatus: $previousStatus);
             });
         } catch (\Throwable $e) {
-            $this->fail($server, $notifier, $fromSize, $e, $actor);
+            $this->fail($server, $notifier, $fromSize, $e, $actor, $previousStatus);
 
             return;
         }
 
-        $this->markState($server, 'completed');
+        $this->markState($server, 'completed', previousStatus: $previousStatus);
+        $this->restoreStatus($server, $previousStatus);
         $notifier->completed($server, $fromSize, $target['slug'], $actor);
 
         // Reuse the existing reconcile path: re-reads size/region/specs from
@@ -101,6 +117,7 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
         string $fromSize,
         \Throwable $e,
         ?User $actor,
+        ?string $previousStatus = null,
     ): void {
         Log::error('server.resize_failed', [
             'server_id' => $server->id,
@@ -108,7 +125,12 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
             'error' => $e->getMessage(),
         ]);
 
-        $this->markState($server, 'failed', $e->getMessage());
+        $this->markState($server, 'failed', $e->getMessage(), $previousStatus);
+        // Never strand the row in `resizing`: the sequence has stopped, so the
+        // health probe (dispatched below) owns the truth from here.
+        if ($previousStatus !== null) {
+            $this->restoreStatus($server, $previousStatus);
+        }
         $notifier->failed($server, $fromSize, $this->targetSize, $e->getMessage(), $actor);
 
         // The machine may be powered off mid-sequence. Reconcile anyway so the
@@ -120,7 +142,7 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
      * Breadcrumb on the server row so the Settings card can show progress
      * without a separate table.
      */
-    private function markState(Server $server, string $state, ?string $error = null): void
+    private function markState(Server $server, string $state, ?string $error = null, ?string $previousStatus = null): void
     {
         $meta = $server->meta ?? [];
         $meta['resize'] = [
@@ -128,8 +150,23 @@ class ResizeServerJob implements ShouldBeUnique, ShouldQueue
             'target_size' => $this->targetSize,
             'grow_disk' => $this->growDisk,
             'error' => $error,
+            // Kept so a crashed run can be un-stuck by hand without guessing
+            // what the row said before.
+            'previous_status' => $previousStatus ?? ($meta['resize']['previous_status'] ?? null),
             'at' => now()->toIso8601String(),
         ];
         $server->update(['meta' => $meta]);
+    }
+
+    /**
+     * Put the row back to whatever it said before the resize. Restoring rather
+     * than forcing `ready` keeps an already-broken server broken instead of
+     * quietly declaring it healthy.
+     */
+    private function restoreStatus(Server $server, string $previousStatus): void
+    {
+        if ($server->fresh()?->status === Server::STATUS_RESIZING) {
+            $server->update(['status' => $previousStatus]);
+        }
     }
 }

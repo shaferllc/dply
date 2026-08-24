@@ -602,6 +602,7 @@ class Index extends Component
                 Server::STATUS_PENDING => __('Pending'),
                 Server::STATUS_PROVISIONING => __('Provisioning'),
                 Server::STATUS_READY => __('Ready'),
+                Server::STATUS_RESIZING => __('Resizing'),
                 Server::STATUS_ERROR => __('Error'),
                 Server::STATUS_DISCONNECTED => __('Disconnected'),
             ],
