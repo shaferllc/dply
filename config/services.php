@@ -177,9 +177,10 @@ return [
 
         'ssh_user' => env('DIGITALOCEAN_SSH_USER', 'root'),
         /*
-         * Optional personal access token for listing regions & sizes on the server create
-         * wizard when no org credential is selected (read-only catalog). Provisioning still
-         * uses the selected ProviderCredential.
+         * App-level token for the read-only region/size catalog on create (and
+         * similar pickers). Always preferred over a customer credential so a
+         * stale org token cannot empty the wizard. Droplet create still uses
+         * the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
         'auto_testing_hostname_enabled' => true,

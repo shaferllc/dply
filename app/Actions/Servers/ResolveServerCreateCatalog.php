@@ -18,7 +18,12 @@ use App\Modules\Providers\Services\VultrService;
 use Illuminate\Support\Collection;
 
 /**
- * Region/plan options for the server create wizard (API-backed per credential).
+ * Region/plan options for the server create wizard.
+ *
+ * DigitalOcean / Vultr / Linode plans come from the app-level catalog token
+ * (`DIGITALOCEAN_TOKEN` / `VULTR_TOKEN` / `LINODE_TOKEN`) whenever one is
+ * configured. The selected ProviderCredential is only used to create the
+ * droplet — a stale customer token must not empty the size picker.
  */
 final class ResolveServerCreateCatalog
 {
@@ -32,6 +37,7 @@ final class ResolveServerCreateCatalog
      *     region_label: string,
      *     size_label: string,
      *     error?: string|null,
+     *     source?: 'platform'|'credential',
      *     kubernetes_clusters?: list<array<string, mixed>>
      * }
      */
@@ -60,6 +66,16 @@ final class ResolveServerCreateCatalog
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
+        // Regions/sizes are a global provider catalog. When the app-level
+        // token is set, use it and stop — do not fall through to the
+        // customer's ProviderCredential (that token is for create only).
+        $platformCatalog = $this->catalogFromGlobalToken($type, $credentials, $selectedRegion);
+        if ($platformCatalog !== null) {
+            $platformCatalog['source'] = 'platform';
+
+            return $platformCatalog;
+        }
+
         $credential = ($providerCredentialId !== '' && $providerCredentialId !== '0')
             ? $credentials->firstWhere('id', $providerCredentialId)
             : null;
@@ -81,18 +97,6 @@ final class ResolveServerCreateCatalog
         }
 
         if (! $credential) {
-            if ($type === 'digitalocean' && filled((string) config('services.digitalocean.token'))) {
-                return $this->catalogDigitalOcean($credentials, null, $selectedRegion);
-            }
-
-            if ($type === 'vultr' && filled((string) config('services.vultr.token'))) {
-                return $this->catalogVultr($credentials, null, $selectedRegion);
-            }
-
-            if ($type === 'linode' && filled((string) config('services.linode.token'))) {
-                return $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'));
-            }
-
             return array_merge($empty, [
                 'credentials' => $credentials,
                 'error' => $this->missingCatalogCredentialError($type, $fallbackToGlobalCatalog),
@@ -117,16 +121,7 @@ final class ResolveServerCreateCatalog
             default => array_merge($empty, ['credentials' => $credentials]),
         };
 
-        if ($fallbackToGlobalCatalog && ($catalog['sizes'] ?? []) === []) {
-            $global = $this->catalogFromGlobalToken($type, $credentials, $selectedRegion);
-            if ($global !== null && ($global['sizes'] ?? []) !== []) {
-                return $global;
-            }
-
-            if ($global !== null && empty($catalog['error']) && ! empty($global['error'])) {
-                $catalog['error'] = $global['error'];
-            }
-        }
+        $catalog['source'] = 'credential';
 
         return $catalog;
     }
@@ -138,17 +133,39 @@ final class ResolveServerCreateCatalog
     private function catalogFromGlobalToken(string $type, Collection $credentials, string $selectedRegion): ?array
     {
         return match ($type) {
-            'digitalocean' => filled((string) config('services.digitalocean.token'))
+            'digitalocean' => $this->platformToken('digitalocean') !== ''
                 ? $this->catalogDigitalOcean($credentials, null, $selectedRegion)
                 : null,
-            'vultr' => filled((string) config('services.vultr.token'))
+            'vultr' => $this->platformToken('vultr') !== ''
                 ? $this->catalogVultr($credentials, null, $selectedRegion)
                 : null,
-            'linode' => filled((string) config('services.linode.token'))
+            'linode' => $this->platformToken('linode') !== ''
                 ? $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'))
                 : null,
             default => null,
         };
+    }
+
+    private function platformToken(string $type): string
+    {
+        $candidates = match ($type) {
+            'digitalocean' => [
+                config('services.digitalocean.token'),
+                config('dply.digitalocean_token'),
+            ],
+            'vultr' => [config('services.vultr.token')],
+            'linode' => [config('services.linode.token')],
+            default => [],
+        };
+
+        foreach ($candidates as $token) {
+            $token = is_string($token) ? trim($token) : '';
+            if ($token !== '') {
+                return $token;
+            }
+        }
+
+        return '';
     }
 
     private function missingCatalogCredentialError(string $type, bool $wantedGlobalFallback): ?string
@@ -179,10 +196,10 @@ final class ResolveServerCreateCatalog
         $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
-            $token = config('services.digitalocean.token');
+            $token = $this->platformToken('digitalocean');
             $do = match (true) {
                 $credential !== null => new DigitalOceanService($credential),
-                filled((string) $token) => new DigitalOceanService((string) $token),
+                $token !== '' => new DigitalOceanService($token),
                 default => throw new \RuntimeException('No DigitalOcean token for catalog.'),
             };
 
@@ -532,10 +549,10 @@ final class ResolveServerCreateCatalog
         $regions = [];
         $sizes = [];
         try {
-            $token = config('services.linode.token');
+            $token = $this->platformToken('linode');
             $svc = match (true) {
                 $credential !== null => new LinodeService($credential),
-                filled((string) $token) => new LinodeService((string) $token),
+                $token !== '' => new LinodeService($token),
                 default => throw new \RuntimeException('No Linode token for catalog.'),
             };
             foreach ($svc->getRegions() as $reg) {
@@ -591,10 +608,10 @@ final class ResolveServerCreateCatalog
         $sizes = [];
         $selectedRegion = trim($selectedRegion);
         try {
-            $token = config('services.vultr.token');
+            $token = $this->platformToken('vultr');
             $svc = match (true) {
                 $credential !== null => new VultrService($credential),
-                filled((string) $token) => new VultrService((string) $token),
+                $token !== '' => new VultrService($token),
                 default => throw new \RuntimeException('No Vultr token for catalog.'),
             };
             foreach ($svc->getRegions() as $reg) {

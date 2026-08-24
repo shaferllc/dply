@@ -786,6 +786,157 @@ test('servers create step where shows provider account + region + size pickers',
         ->assertSee('Account')
         ->assertSee('Region & size');
 });
+test('selecting a provider credential loads regions and droplet sizes', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+        'https://api.digitalocean.com/v2/regions*' => Http::response([
+            'regions' => [['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true]],
+        ], 200),
+        'https://api.digitalocean.com/v2/sizes*' => Http::response([
+            'sizes' => [[
+                'slug' => 's-1vcpu-1gb',
+                'memory' => 1024,
+                'vcpus' => 1,
+                'disk' => 25,
+                'price_monthly' => 6,
+                'available' => true,
+                'regions' => ['sfo3'],
+            ]],
+        ], 200),
+    ]);
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Account A',
+        'credentials' => ['api_token' => 'token-a'],
+    ]);
+    $chosen = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Account B',
+        'credentials' => ['api_token' => 'token-b'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSet('form.provider_credential_id', '')
+        ->assertDontSee('Region & size')
+        ->set('form.provider_credential_id', (string) $chosen->id)
+        ->assertSee('Region & size')
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertSee('San Francisco 3')
+        ->assertSee('s-1vcpu-1gb');
+});
+test('stale user token still loads regions from the platform catalog', function () {
+    config(['services.digitalocean.token' => 'dop_v1_platform']);
+
+    Http::fake(function (\Illuminate\Http\Client\Request $request) {
+        $authorization = $request->header('Authorization')[0] ?? '';
+
+        if (str_contains($authorization, 'bad-token')) {
+            return Http::response(['message' => 'Unable to authenticate you'], 401);
+        }
+
+        if (str_contains($request->url(), '/account')) {
+            return Http::response(['account' => ['uuid' => 'abc']], 200);
+        }
+
+        if (str_contains($request->url(), '/regions')) {
+            return Http::response([
+                'regions' => [['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true]],
+            ], 200);
+        }
+
+        return Http::response([
+            'sizes' => [[
+                'slug' => 's-1vcpu-1gb',
+                'memory' => 1024,
+                'vcpus' => 1,
+                'disk' => 25,
+                'price_monthly' => 6,
+                'available' => true,
+                'regions' => ['sfo3'],
+            ]],
+        ], 200);
+    });
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Broken DO',
+        'credentials' => ['api_token' => 'bad-token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('San Francisco 3')
+        ->assertSee('s-1vcpu-1gb')
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertDontSee('Couldn’t load regions and sizes');
+});
+
+test('rejected provider credential shows reconnect instead of select-account placeholder', function () {
+    config([
+        'services.digitalocean.token' => null,
+        'dply.digitalocean_token' => null,
+    ]);
+
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Unable to authenticate you'], 401),
+        'https://api.digitalocean.com/v2/regions*' => Http::response(['message' => 'Unable to authenticate you'], 401),
+        'https://api.digitalocean.com/v2/sizes*' => Http::response(['message' => 'Unable to authenticate you'], 401),
+    ]);
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Broken DO',
+        'credentials' => ['api_token' => 'bad-token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertSee('DigitalOcean rejected this API token')
+        ->assertSee('Add a new token');
+});
 
 test('servers create step where shows role-aware size guidance for redis', function () {
     Http::fake([

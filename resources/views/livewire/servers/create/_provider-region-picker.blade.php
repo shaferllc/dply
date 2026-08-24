@@ -70,7 +70,15 @@
     >
         @if ($regionOptions->isEmpty())
             <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
-                {{ __('Select an account first to load regions.') }}
+                @if (! empty($catalog['error']))
+                    {{ ($catalog['source'] ?? '') === 'platform'
+                        ? __('Regions will appear once the platform catalog can be reached.')
+                        : __('Regions will appear once this account can be reached.') }}
+                @elseif (filled($form->provider_credential_id ?? null))
+                    {{ __('No regions came back for this account.') }}
+                @else
+                    {{ __('Select an account first to load regions.') }}
+                @endif
             </div>
         @else
             <button

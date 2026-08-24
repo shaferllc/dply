@@ -225,6 +225,7 @@ trait ServerCreateActions
             $this->form->type,
             $this->form->provider_credential_id,
             $selectedRegion,
+            fallbackToGlobalCatalog: true,
         );
 
         $this->memoServerCreateCatalogKey = $memoKey;

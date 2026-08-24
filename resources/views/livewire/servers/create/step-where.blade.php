@@ -374,6 +374,40 @@
                                 </x-slot:actions>
                             @endif
                         </x-workspace-panel-head>
+                        @php
+                            $catalogError = isset($catalog['error']) && is_string($catalog['error']) && $catalog['error'] !== ''
+                                ? $catalog['error']
+                                : null;
+                            $catalogFromPlatform = ($catalog['source'] ?? '') === 'platform';
+                            $catalogAuthFailed = $catalogError !== null
+                                && \App\Support\Providers\ProviderAuthFailure::detected($catalogError);
+                            $catalogProvider = str_replace('_kubernetes', '', (string) $form->type);
+                        @endphp
+                        @if ($catalogError !== null)
+                            <div class="border-b border-brand-ink/10 px-4 py-3.5 sm:px-5">
+                                <div class="rounded-xl border border-rose-300 bg-rose-50/90 p-3 ring-1 ring-rose-200">
+                                    <p class="text-sm font-semibold text-rose-950">
+                                        {{ $catalogAuthFailed && ! $catalogFromPlatform
+                                            ? \App\Support\Providers\ProviderAuthFailure::title($catalogProvider)
+                                            : __('Couldn’t load regions and sizes') }}
+                                    </p>
+                                    <p class="mt-1 text-xs leading-relaxed text-rose-900">
+                                        {{ $catalogAuthFailed && ! $catalogFromPlatform
+                                            ? \App\Support\Providers\ProviderAuthFailure::message($catalogProvider)
+                                            : $catalogError }}
+                                    </p>
+                                    @if (! $catalogFromPlatform)
+                                        <x-add-provider-credential-link
+                                            :provider="$catalogProvider"
+                                            class="!mt-2.5 !inline-flex !items-center !gap-1.5 !rounded-md !bg-rose-800 !px-2.5 !py-1.5 !text-xs !font-semibold !text-white !shadow-sm hover:!bg-rose-900 hover:!no-underline hover:!text-white"
+                                        >
+                                            <x-heroicon-o-key class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Add a new token') }}
+                                        </x-add-provider-credential-link>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                         <div class="grid grid-cols-1 gap-4 px-4 py-3.5 sm:grid-cols-2 sm:items-start sm:px-5">
                             @include('livewire.servers.create._provider-region-picker', [
                                 'existingServersByRegion' => $existingServersByRegion ?? [],
