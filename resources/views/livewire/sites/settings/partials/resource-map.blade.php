@@ -67,9 +67,17 @@
     // Available types grouped by their (human) category label, so the global
     // dropdown shows which column each pick will land in. Spans every group —
     // even hidden ones — so a hidden pathway is still reachable from here.
+    // CDN is a deep link to a feature-flagged page, so it only belongs in the
+    // menu when that page is actually reachable — offering a link that bounces
+    // straight back is worse than not listing it.
+    $cdnAvailable = \Laravel\Pennant\Feature::for($site->organization)->active('workspace.site_cdn');
+
     $availableByGroup = [];
     foreach ($hubGroups as $g) {
         foreach ($g['types'] as $t) {
+            if ($t['type'] === 'cdn' && ! $cdnAvailable) {
+                continue;
+            }
             if (! $isShownAsCard($t)) {
                 $availableByGroup[$g['label']][] = $t;
             }
@@ -132,6 +140,9 @@
                                         'logging' => $sectionUrl('logs'),
                                         'scheduler' => route('sites.schedule', ['server' => $server, 'site' => $site]),
                                         'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
+                                        // The edge is configured on its own page, not through
+                                        // the binding modal — there is no binding row behind it.
+                                        'cdn' => route('sites.cdn', ['server' => $server, 'site' => $site]),
                                         default => null,
                                     };
                                     // Queue has no local store (file/array). Cache and

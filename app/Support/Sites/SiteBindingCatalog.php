@@ -143,6 +143,18 @@ final class SiteBindingCatalog
                 'env' => ['SLACK_BOT_TOKEN', 'GOOGLE_DRIVE_CLIENT_ID'],
                 'runtimes' => ['vm'],
             ],
+            // Not a binding: the CDN's state lives in Site.meta['cdn'] behind its
+            // own page, and this entry deep-links there the way scheduler and
+            // workers do. It sits in delivery because that is where someone
+            // looks for "what serves my traffic" — the edge is in front of the
+            // webserver, so it belongs beside mail and the rest of delivery
+            // rather than buried in a networking sub-page nobody opens.
+            'cdn' => [
+                'group' => 'delivery', 'label' => 'CDN / Edge', 'icon' => 'heroicon-o-globe-alt',
+                'purpose' => 'Put Cloudflare in front of this site — cache, purge and edge TLS.',
+                'env' => [],
+                'runtimes' => ['vm'],
+            ],
             'scheduler' => [
                 'group' => 'runtime', 'label' => 'Scheduler', 'icon' => 'heroicon-o-clock',
                 'purpose' => 'Run the Laravel scheduler (cron) for this site.',
