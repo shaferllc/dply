@@ -18,6 +18,7 @@ use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\SupervisorDeployRestarter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
+use App\Support\Servers\ServerInstalledServices;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
@@ -328,6 +329,36 @@ trait ResolvesSiteRuntime
     public function siteKind(): string
     {
         return 'vm';
+    }
+
+    /**
+     * Whether the PHP-FPM control surface actually applies to this site: it
+     * runs PHP *and* its server has PHP installed.
+     *
+     * The Runtime tab used three different notions of "is this a PHP site" —
+     * runtimeHealthProbeKind() === 'fpm', usesDedicatedPhpFpmPool(), and
+     * type === SiteType::Php — and none of them consulted the host. So a PHP
+     * site on a php_version=none box rendered an FPM pool that could never be
+     * read, a permanently "disabled" OPcache card, and a table of PHP limits,
+     * all describing an interpreter that isn't installed. Those read as
+     * transient errors rather than "this server does not run PHP".
+     *
+     * Fails open when the server isn't loaded or has no stack summary yet, so
+     * a host we cannot read keeps the panels it has always had.
+     */
+    public function runsPhpOnItsServer(): bool
+    {
+        if ((string) ($this->runtimeKey() ?? '') !== 'php') {
+            return false;
+        }
+
+        $server = $this->server;
+
+        if ($server === null) {
+            return true;
+        }
+
+        return ServerInstalledServices::hasAny($server, ['php', 'unknown']);
     }
 
     public function usesDockerRuntime(): bool

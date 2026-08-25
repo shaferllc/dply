@@ -6,7 +6,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Support\Sites\SiteDatabaseWorkspace;
 use Laravel\Pennant\Feature;
-use App\Support\Servers\ServerInstalledServices;
 
 /**
  * Sidebar nav items for the site workspace (Settings, Web server config, etc.).
@@ -343,7 +342,7 @@ final class SiteSettingsSidebar
             // A php site on a box with no php has nothing to tune — the tab
             // offered FPM pools and OPcache for an interpreter that isn't
             // there. The runtime picker on Overview is how you get out of it.
-            'php' => self::serverHasPhp($site) ? 'php' : null,
+            'php' => $site->runsPhpOnItsServer() ? 'php' : null,
             'ruby' => 'ruby',
             'static' => 'static',
             default => $runtime !== '' && array_key_exists($runtime, self::miseCatalog())
@@ -361,22 +360,6 @@ final class SiteSettingsSidebar
         }
 
         return $tabs;
-    }
-
-    /**
-     * Whether this site's server actually has PHP. Fails open when the server
-     * isn't loaded or has no stack summary yet, so an unknown host keeps the
-     * PHP tab it has always had rather than losing it on a missing fact.
-     */
-    private static function serverHasPhp(Site $site): bool
-    {
-        $server = $site->server;
-
-        if ($server === null) {
-            return true;
-        }
-
-        return ServerInstalledServices::hasAny($server, ['php', 'unknown']);
     }
 
     /** @return array<string, array<string, mixed>> */

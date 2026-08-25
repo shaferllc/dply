@@ -174,7 +174,7 @@
      Gated on the server actually having PHP: probing an FPM pool on a
      php_version=none box can only ever report "Couldn't read the pool", which
      reads as a transient error rather than "there is no PHP here". --}}
-@if ($site->runtimeHealthProbeKind() === 'fpm' && \App\Support\Servers\ServerInstalledServices::has($server, 'php'))
+@if ($site->runsPhpOnItsServer() && $site->runtimeHealthProbeKind() === 'fpm')
     @php
         $pool = $site->phpFpmPoolSettings();
         $socketPath = $site->phpFpmListenSocketPath();
@@ -339,7 +339,7 @@
 @endif
 
 {{-- OPcache --}}
-@if ($site->usesDedicatedPhpFpmPool())
+@if ($site->runsPhpOnItsServer() && $site->usesDedicatedPhpFpmPool())
     @php
         $oc = is_array($opcacheStatus) ? $opcacheStatus : null;
         $ocEnabled = $oc !== null && ! empty($oc['enabled']);
@@ -466,7 +466,7 @@
 @endif
 
 {{-- Effective PHP limits --}}
-@if ($site->type === \App\Enums\SiteType::Php)
+@if ($site->runsPhpOnItsServer())
     @php
         $phpRuntime = is_array($site->meta['php_runtime'] ?? null) ? $site->meta['php_runtime'] : [];
         $phpExec = isset($phpRuntime['max_execution_time']) && $phpRuntime['max_execution_time'] !== '' ? $phpRuntime['max_execution_time'].'s' : null;

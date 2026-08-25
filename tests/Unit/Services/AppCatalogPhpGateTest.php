@@ -106,7 +106,11 @@ test('a php site on a php-less server loses the PHP tab and is marked not instal
         'runtime' => 'php',
     ]);
 
-    // No PHP tab: it offered FPM pools and OPcache for an absent interpreter.
+    // One predicate now drives every PHP surface: the FPM pool panel, the
+    // OPcache card, the PHP limits table and the PHP tab. Before, each used its
+    // own notion of "is this a PHP site" and none consulted the host.
+    expect($site->fresh()->runsPhpOnItsServer())->toBeFalse();
+
     expect(\App\Support\SiteSettingsSidebar::runtimeTabsFor($site->fresh()))
         ->not->toHaveKey('php');
 
@@ -114,4 +118,42 @@ test('a php site on a php-less server loses the PHP tab and is marked not instal
     expect(array_keys($server->fresh()->availableSiteRuntimes()))
         ->toContain('node')
         ->and(array_keys($server->fresh()->availableSiteRuntimes()))->not->toContain('php');
+});
+
+test('a php site on a server that does have php keeps its panels', function () {
+    $server = Server::factory()->ready()->create([
+        'meta' => ['webserver' => 'nginx', 'php_version' => '8.3'],
+    ]);
+    $run = ServerProvisionRun::create(['server_id' => $server->id, 'attempt' => 1, 'status' => 'succeeded']);
+    ServerProvisionArtifact::create([
+        'server_provision_run_id' => $run->id,
+        'type' => 'stack_summary',
+        'key' => 'stack-summary',
+        'label' => 'Stack summary',
+        'content' => '',
+        'metadata' => ['webserver' => 'nginx', 'php_version' => '8.3'],
+    ]);
+    ServerInstalledServices::forgetStackSummary((string) $server->id);
+
+    $site = \App\Models\Site::factory()->create([
+        'server_id' => $server->id,
+        'type' => \App\Enums\SiteType::Php,
+        'runtime' => 'php',
+    ]);
+
+    expect($site->fresh()->runsPhpOnItsServer())->toBeTrue()
+        ->and(\App\Support\SiteSettingsSidebar::runtimeTabsFor($site->fresh()))->toHaveKey('php');
+});
+
+test('a node site never shows php panels regardless of host', function () {
+    $server = Server::factory()->ready()->create([
+        'meta' => ['webserver' => 'nginx', 'php_version' => '8.3', 'runtime_defaults' => ['node' => '22']],
+    ]);
+    $site = \App\Models\Site::factory()->create([
+        'server_id' => $server->id,
+        'type' => \App\Enums\SiteType::Node,
+        'runtime' => 'node',
+    ]);
+
+    expect($site->fresh()->runsPhpOnItsServer())->toBeFalse();
 });
