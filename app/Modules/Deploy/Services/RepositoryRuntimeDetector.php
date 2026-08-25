@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
+use App\Modules\Deploy\Contracts\RepositoryFiles;
+
 /**
  * Classifies a checked-out repository for serverless deployment.
  *
@@ -84,18 +86,18 @@ final class RepositoryRuntimeDetector
      *     laravel_reverb?: bool
      * }
      */
-    public function detect(string $workingDirectory, array $capabilities): array
+    public function detect(RepositoryFiles $files, array $capabilities): array
     {
-        $packageJson = $this->readJson($workingDirectory.'/package.json');
-        $composerJson = $this->readJson($workingDirectory.'/composer.json');
+        $packageJson = $this->readJson($files, 'package.json');
+        $composerJson = $this->readJson($files, 'composer.json');
 
         // ---- 1. Framework markers ------------------------------------------
-        $laravel = $this->detectLaravel($workingDirectory, $composerJson, $packageJson, $capabilities);
+        $laravel = $this->detectLaravel($files, $composerJson, $packageJson, $capabilities);
         if ($laravel !== null) {
             return $laravel;
         }
 
-        $pythonStack = $this->detectPythonStack($workingDirectory, $capabilities);
+        $pythonStack = $this->detectPythonStack($files, $capabilities);
         if ($pythonStack !== null && $this->isFrameworkPython($pythonStack['framework'])) {
             return $pythonStack;
         }
@@ -105,7 +107,7 @@ final class RepositoryRuntimeDetector
             return $nodeFramework;
         }
 
-        $goFramework = $this->detectGoStack($workingDirectory, $capabilities);
+        $goFramework = $this->detectGoStack($files, $capabilities);
         if ($goFramework !== null) {
             return $goFramework;
         }
@@ -113,7 +115,7 @@ final class RepositoryRuntimeDetector
         if ($composerJson !== null && $this->looksLikeSymfony($composerJson)) {
             return $this->phpResult('symfony', 'medium', 'public/build', [
                 'Detected Symfony via symfony/framework-bundle or symfony/symfony in composer.json.',
-            ], $capabilities, 'framework', $workingDirectory, $composerJson, $packageJson);
+            ], $capabilities, 'framework', $files, $composerJson, $packageJson);
         }
 
         // ---- 2. Generic language projects (no recognised framework) --------
@@ -125,11 +127,11 @@ final class RepositoryRuntimeDetector
         if ($composerJson !== null) {
             return $this->phpResult('php_generic', 'medium', '.', [
                 'Detected composer.json without strong framework matches.',
-            ], $capabilities, 'raw', $workingDirectory, $composerJson, $packageJson);
+            ], $capabilities, 'raw', $files, $composerJson, $packageJson);
         }
 
         // ---- 3. OpenWhisk project.yml → raw multi-action package -----------
-        if (is_file($workingDirectory.'/project.yml') || is_file($workingDirectory.'/project.yaml')) {
+        if ($files->exists('project.yml') || $files->exists('project.yaml')) {
             return [
                 'framework' => 'raw',
                 'deploy_kind' => 'raw',
@@ -148,13 +150,13 @@ final class RepositoryRuntimeDetector
         }
 
         // ---- 4. Single root entry point → raw single OpenWhisk action ------
-        $rawAction = $this->detectRawAction($workingDirectory, $capabilities);
+        $rawAction = $this->detectRawAction($files, $capabilities);
         if ($rawAction !== null) {
             return $rawAction;
         }
 
         // ---- 5. Static site ------------------------------------------------
-        if (is_file($workingDirectory.'/index.html')) {
+        if ($files->exists('index.html')) {
             return [
                 'framework' => 'static',
                 'deploy_kind' => 'static',
@@ -196,9 +198,9 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectLaravel(string $workingDirectory, ?array $composerJson, ?array $packageJson, array $capabilities): ?array
+    private function detectLaravel(RepositoryFiles $files, ?array $composerJson, ?array $packageJson, array $capabilities): ?array
     {
-        if (! $this->looksLikeLaravel($workingDirectory, $composerJson)) {
+        if (! $this->looksLikeLaravel($files, $composerJson)) {
             return null;
         }
 
@@ -216,7 +218,7 @@ final class RepositoryRuntimeDetector
             }
         }
 
-        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+        $frontend = $this->frontendCompileCommand($files, $packageJson);
         if ($frontend !== '') {
             $reasons[] = 'Detected a frontend compile step — will install JS deps and run the build after Composer.';
         }
@@ -228,7 +230,7 @@ final class RepositoryRuntimeDetector
             'runtime' => $unsupportedForTarget ? '' : $this->phpRuntime($composerJson, $capabilities),
             'entrypoint' => $unsupportedForTarget ? '' : (string) ($capabilities['default_entrypoint'] ?? 'public/index.php'),
             'entry_file' => '',
-            'build_command' => $this->phpBuildCommand($workingDirectory, $packageJson),
+            'build_command' => $this->phpBuildCommand($files, $packageJson),
             'artifact_output_path' => '.',
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => 'high',
@@ -249,13 +251,13 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectRawAction(string $workingDirectory, array $capabilities): ?array
+    private function detectRawAction(RepositoryFiles $files, array $capabilities): ?array
     {
         $matched = [];
         foreach (self::RAW_ENTRY_CANDIDATES as $language => $candidates) {
             foreach ($candidates as $candidate) {
-                $path = $workingDirectory.'/'.$candidate;
-                if (is_file($path) && $this->hasMainSymbol($language, (string) file_get_contents($path))) {
+                $contents = $files->read($candidate);
+                if ($contents !== null && $this->hasMainSymbol($language, $contents)) {
                     $matched[$language] = $candidate;
                     break;
                 }
@@ -288,7 +290,7 @@ final class RepositoryRuntimeDetector
             // OpenWhisk exec.main — the handler symbol the runtime calls.
             'entrypoint' => 'main',
             'entry_file' => $entryFile,
-            'build_command' => $this->rawBuildCommand($language, $workingDirectory),
+            'build_command' => $this->rawBuildCommand($language, $files),
             'artifact_output_path' => '.',
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => 'high',
@@ -354,12 +356,12 @@ final class RepositoryRuntimeDetector
         };
     }
 
-    private function rawBuildCommand(string $language, string $workingDirectory): string
+    private function rawBuildCommand(string $language, RepositoryFiles $files): string
     {
         return match ($language) {
-            'node' => is_file($workingDirectory.'/package.json') ? 'npm install' : '',
-            'python' => is_file($workingDirectory.'/requirements.txt') ? 'pip install -r requirements.txt' : '',
-            'php' => is_file($workingDirectory.'/composer.json') ? 'composer install --no-dev --optimize-autoloader' : '',
+            'node' => $files->exists('package.json') ? 'npm install' : '',
+            'python' => $files->exists('requirements.txt') ? 'pip install -r requirements.txt' : '',
+            'php' => $files->exists('composer.json') ? 'composer install --no-dev --optimize-autoloader' : '',
             // Go is compiled by the DigitalOcean Functions remote builder.
             default => '',
         };
@@ -386,7 +388,7 @@ final class RepositoryRuntimeDetector
         array $reasons,
         array $capabilities,
         string $deployKind,
-        string $workingDirectory,
+        RepositoryFiles $files,
         ?array $composerJson,
         ?array $packageJson,
     ): array {
@@ -396,7 +398,7 @@ final class RepositoryRuntimeDetector
             $warnings[] = 'This repository looks like a PHP project, but the selected serverless target does not advertise a PHP runtime.';
         }
 
-        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+        $frontend = $this->frontendCompileCommand($files, $packageJson);
         if ($frontend !== '') {
             $reasons[] = 'Detected a frontend compile step — will install JS deps and run the build after Composer.';
         }
@@ -408,7 +410,7 @@ final class RepositoryRuntimeDetector
             'runtime' => $unsupportedForTarget ? '' : $this->phpRuntime($composerJson, $capabilities),
             'entrypoint' => $unsupportedForTarget ? '' : (string) ($capabilities['default_entrypoint'] ?? 'public/index.php'),
             'entry_file' => '',
-            'build_command' => $this->phpBuildCommand($workingDirectory, $packageJson),
+            'build_command' => $this->phpBuildCommand($files, $packageJson),
             'artifact_output_path' => $artifactOutputPath,
             'package' => (string) ($capabilities['default_package'] ?? 'default'),
             'confidence' => $confidence,
@@ -507,10 +509,10 @@ final class RepositoryRuntimeDetector
     /**
      * @param  array<string, mixed>|null  $packageJson
      */
-    private function phpBuildCommand(string $workingDirectory, ?array $packageJson): string
+    private function phpBuildCommand(RepositoryFiles $files, ?array $packageJson): string
     {
         $composer = 'composer install --no-dev --optimize-autoloader';
-        $frontend = $this->frontendCompileCommand($workingDirectory, $packageJson);
+        $frontend = $this->frontendCompileCommand($files, $packageJson);
 
         return $frontend === '' ? $composer : $composer.' && '.$frontend;
     }
@@ -523,7 +525,7 @@ final class RepositoryRuntimeDetector
      *
      * @param  array<string, mixed>|null  $packageJson
      */
-    private function frontendCompileCommand(string $workingDirectory, ?array $packageJson): string
+    private function frontendCompileCommand(RepositoryFiles $files, ?array $packageJson): string
     {
         if ($packageJson === null) {
             return '';
@@ -536,30 +538,30 @@ final class RepositoryRuntimeDetector
         $scripts = is_array($packageJson['scripts'] ?? null) ? $packageJson['scripts'] : [];
 
         $hasVite = in_array('vite', $dependencies, true)
-            || is_file($workingDirectory.'/vite.config.js')
-            || is_file($workingDirectory.'/vite.config.ts')
-            || is_file($workingDirectory.'/vite.config.mjs');
+            || $files->exists('vite.config.js')
+            || $files->exists('vite.config.ts')
+            || $files->exists('vite.config.mjs');
         $hasMix = in_array('laravel-mix', $dependencies, true)
-            || is_file($workingDirectory.'/webpack.mix.js');
+            || $files->exists('webpack.mix.js');
         $hasWebpack = in_array('webpack', $dependencies, true)
-            || is_file($workingDirectory.'/webpack.config.js');
+            || $files->exists('webpack.config.js');
         $hasBuildScript = isset($scripts['build']) && is_string($scripts['build']) && trim($scripts['build']) !== '';
 
         if (! $hasVite && ! $hasMix && ! $hasWebpack && ! $hasBuildScript) {
             return '';
         }
 
-        $manager = $this->jsPackageManager($workingDirectory, $packageJson);
+        $manager = $this->jsPackageManager($files, $packageJson);
 
         return match ($manager) {
-            'pnpm' => is_file($workingDirectory.'/pnpm-lock.yaml')
+            'pnpm' => $files->exists('pnpm-lock.yaml')
                 ? 'pnpm install --frozen-lockfile && pnpm run build'
                 : 'pnpm install && pnpm run build',
-            'yarn' => is_file($workingDirectory.'/yarn.lock')
+            'yarn' => $files->exists('yarn.lock')
                 ? 'yarn install --frozen-lockfile && yarn build'
                 : 'yarn install && yarn build',
             'bun' => 'bun install && bun run build',
-            default => is_file($workingDirectory.'/package-lock.json')
+            default => $files->exists('package-lock.json')
                 ? 'npm ci && npm run build'
                 : 'npm install && npm run build',
         };
@@ -568,7 +570,7 @@ final class RepositoryRuntimeDetector
     /**
      * @param  array<string, mixed>  $packageJson
      */
-    private function jsPackageManager(string $workingDirectory, array $packageJson): string
+    private function jsPackageManager(RepositoryFiles $files, array $packageJson): string
     {
         $pinned = (string) ($packageJson['packageManager'] ?? '');
         if ($pinned !== '') {
@@ -578,13 +580,13 @@ final class RepositoryRuntimeDetector
             }
         }
 
-        if (is_file($workingDirectory.'/pnpm-lock.yaml')) {
+        if ($files->exists('pnpm-lock.yaml')) {
             return 'pnpm';
         }
-        if (is_file($workingDirectory.'/yarn.lock')) {
+        if ($files->exists('yarn.lock')) {
             return 'yarn';
         }
-        if (is_file($workingDirectory.'/bun.lockb') || is_file($workingDirectory.'/bun.lock')) {
+        if ($files->exists('bun.lockb') || $files->exists('bun.lock')) {
             return 'bun';
         }
 
@@ -676,13 +678,13 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectGoStack(string $workingDirectory, array $capabilities): ?array
+    private function detectGoStack(RepositoryFiles $files, array $capabilities): ?array
     {
-        if (! is_file($workingDirectory.'/go.mod')) {
+        if (! $files->exists('go.mod')) {
             return null;
         }
 
-        $goMod = (string) file_get_contents($workingDirectory.'/go.mod');
+        $goMod = (string) ($files->read('go.mod') ?? '');
         if (! str_contains($goMod, 'github.com/gin-gonic/gin')) {
             return null;
         }
@@ -709,13 +711,13 @@ final class RepositoryRuntimeDetector
     /**
      * @param  array<string, mixed>|null  $composerJson
      */
-    private function looksLikeLaravel(string $workingDirectory, ?array $composerJson): bool
+    private function looksLikeLaravel(RepositoryFiles $files, ?array $composerJson): bool
     {
-        if (is_file($workingDirectory.'/artisan') && is_file($workingDirectory.'/bootstrap/app.php')) {
+        if ($files->exists('artisan') && $files->exists('bootstrap/app.php')) {
             return true;
         }
 
-        if (is_file($workingDirectory.'/routes/web.php') && is_file($workingDirectory.'/public/index.php')) {
+        if ($files->exists('routes/web.php') && $files->exists('public/index.php')) {
             return true;
         }
 
@@ -728,21 +730,21 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectPythonStack(string $workingDirectory, array $capabilities): ?array
+    private function detectPythonStack(RepositoryFiles $files, array $capabilities): ?array
     {
-        $hasManagePy = is_file($workingDirectory.'/manage.py');
-        $hasPyProject = is_file($workingDirectory.'/pyproject.toml');
-        $hasRequirements = is_file($workingDirectory.'/requirements.txt');
-        $hasPipfile = is_file($workingDirectory.'/Pipfile');
-        $hasPyLock = is_file($workingDirectory.'/uv.lock') || is_file($workingDirectory.'/poetry.lock');
+        $hasManagePy = $files->exists('manage.py');
+        $hasPyProject = $files->exists('pyproject.toml');
+        $hasRequirements = $files->exists('requirements.txt');
+        $hasPipfile = $files->exists('Pipfile');
+        $hasPyLock = $files->exists('uv.lock') || $files->exists('poetry.lock');
 
         if (! $hasManagePy && ! $hasPyProject && ! $hasRequirements && ! $hasPipfile && ! $hasPyLock) {
             return null;
         }
 
-        $reqBlob = strtolower($hasRequirements ? (string) file_get_contents($workingDirectory.'/requirements.txt') : '');
-        $pipBlob = $hasPipfile ? strtolower((string) file_get_contents($workingDirectory.'/Pipfile')) : '';
-        $pyProjectBlob = $hasPyProject ? strtolower((string) file_get_contents($workingDirectory.'/pyproject.toml')) : '';
+        $reqBlob = strtolower($hasRequirements ? (string) ($files->read('requirements.txt') ?? '') : '');
+        $pipBlob = $hasPipfile ? strtolower((string) ($files->read('Pipfile') ?? '')) : '';
+        $pyProjectBlob = $hasPyProject ? strtolower((string) ($files->read('pyproject.toml') ?? '')) : '';
         $combined = $reqBlob.' '.$pipBlob.' '.$pyProjectBlob;
 
         $supportsPython = (bool) ($capabilities['supports_python_runtime'] ?? true);
@@ -805,13 +807,15 @@ final class RepositoryRuntimeDetector
     /**
      * @return array<string, mixed>|null
      */
-    private function readJson(string $path): ?array
+    private function readJson(RepositoryFiles $files, string $path): ?array
     {
-        if (! is_file($path)) {
+        $raw = $files->read($path);
+
+        if ($raw === null) {
             return null;
         }
 
-        $decoded = json_decode((string) file_get_contents($path), true);
+        $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? $decoded : null;
     }

@@ -263,7 +263,7 @@ class AtomicSiteDeployer
 
             $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
 
-            app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+            app(VmSiteStackDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
 
             // Same reconcile as the simple deployer: make the build steps match
             // what detection just found in the checkout, so a Node repo stops

@@ -48,19 +48,6 @@ final class SiteDeployStepsRuntimeReconciler
         ],
     ];
 
-    /**
-     * The two detectors disagree on Node framework names — RepositoryRuntimeDetector
-     * emits `nextjs`, RuntimeAwareDeployStepDefaults expects `next` — so the
-     * build step for a Next.js repo silently went missing. Normalise here.
-     *
-     * @var array<string, string>
-     */
-    private const FRAMEWORK_ALIASES = [
-        'nextjs' => 'next',
-        'nuxtjs' => 'nuxt',
-        'node_generic' => '',
-    ];
-
     public function __construct(
         private readonly RuntimeAwareDeployStepDefaults $defaults,
     ) {}
@@ -113,8 +100,9 @@ final class SiteDeployStepsRuntimeReconciler
             );
         }
 
+        // Framework names are normalised by defaultsFor() itself, so there is
+        // one vocabulary rather than a translation table per call site.
         $framework = strtolower(trim((string) ($detected['framework'] ?? '')));
-        $framework = self::FRAMEWORK_ALIASES[$framework] ?? $framework;
 
         $replacements = $this->defaults->defaultsFor($language, $framework !== '' ? $framework : null);
 

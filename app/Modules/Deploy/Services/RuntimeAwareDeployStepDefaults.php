@@ -49,6 +49,8 @@ class RuntimeAwareDeployStepDefaults
      */
     public function defaultsFor(?string $runtime, ?string $framework = null): array
     {
+        $framework = self::canonicalFramework($framework);
+
         $steps = match ($runtime) {
             'php' => $this->phpSteps($framework),
             'node' => $this->nodeSteps($framework),
@@ -116,6 +118,31 @@ class RuntimeAwareDeployStepDefaults
     /**
      * @return list<array<string, mixed>>
      */
+    /**
+     * One vocabulary for framework names.
+     *
+     * RepositoryRuntimeDetector emits `nextjs`; the step tables below key on
+     * `next`. Unreconciled, a Next.js repo got `npm ci` and NO build step — a
+     * silent half-deploy. Normalising here rather than at each call site means
+     * every consumer of the defaults gets it, not just whoever remembered.
+     */
+    private static function canonicalFramework(?string $framework): ?string
+    {
+        $framework = strtolower(trim((string) $framework));
+
+        if ($framework === '') {
+            return null;
+        }
+
+        return match ($framework) {
+            'nextjs' => 'next',
+            'nuxtjs' => 'nuxt',
+            'sveltekit', 'svelte-kit' => 'sveltekit',
+            'node_generic', 'php_generic', 'python_generic', 'go_generic' => null,
+            default => $framework,
+        };
+    }
+
     private function nodeSteps(?string $framework): array
     {
         $steps = [

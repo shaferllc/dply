@@ -266,7 +266,7 @@ class SiteGitDeployer
         // does this from its release dir; without it, simple deploys never
         // populate meta.vm_runtime.detected and the framework reads as unknown
         // even for obvious Laravel apps (esp. when the app-picker was skipped).
-        app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
+        app(VmSiteStackDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
 
         // ── RECONCILE ── the pipeline is seeded once at site creation and never
         // revisited, so a site created as PHP kept a composer_install step even

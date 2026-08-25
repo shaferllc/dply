@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services;
 use App\Enums\SiteType;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use App\Modules\Deploy\Support\LocalRepositoryFiles;
 
 final class LocalRuntimeDetector
 {
@@ -41,7 +42,7 @@ final class LocalRuntimeDetector
      */
     public function detect(string $workingDirectory, string $slug): array
     {
-        $appDetection = $this->serverlessRuntimeDetector->detect($workingDirectory, [
+        $appDetection = $this->serverlessRuntimeDetector->detect(new LocalRepositoryFiles($workingDirectory), [
             'supports_php_runtime' => true,
             'supports_node_runtime' => true,
             'supports_python_runtime' => true,
