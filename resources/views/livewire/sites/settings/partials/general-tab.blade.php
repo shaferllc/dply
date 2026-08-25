@@ -20,11 +20,17 @@
             'app' => $app,
         ], fn ($v) => $v !== ''));
         $chooseAppUrl = $chooseAppLink();
-        $setupOptions = [
-            ['icon' => 'heroicon-o-sparkles', 'title' => __('Install an app'), 'body' => __('WordPress, Laravel, Statamic & more.'), 'app' => ''],
+        // "Install an app" is dropped when the server has no installer to offer
+        // (every one in AppCatalog is PHP, so a Node/static box has none) —
+        // otherwise the shortcut deep-links into an empty picker. $hasAppInstallers
+        // comes from SiteSettingsViewData, which asks AppCatalog for this server.
+        $setupOptions = array_values(array_filter([
+            ($hasAppInstallers ?? true)
+                ? ['icon' => 'heroicon-o-sparkles', 'title' => __('Install an app'), 'body' => __('WordPress, Laravel, Statamic & more.'), 'app' => '']
+                : null,
             ['icon' => 'heroicon-o-code-bracket', 'title' => __('Connect a Git repo'), 'body' => __('Deploy an existing application.'), 'app' => 'git'],
             ['icon' => 'heroicon-o-minus-circle', 'title' => __('Start blank'), 'body' => __('Keep the splash page for now.'), 'app' => 'blank'],
-        ];
+        ]));
     @endphp
     <section class="mb-4 overflow-hidden rounded-2xl border border-brand-sage/30 bg-gradient-to-br from-brand-sage/10 via-white to-white shadow-sm">
         <div class="px-3 py-3 sm:px-4">
@@ -45,7 +51,7 @@
                 </a>
             </div>
 
-            <div class="mt-2.5 grid gap-1.5 sm:grid-cols-3">
+            <div class="mt-2.5 grid gap-1.5 {{ count($setupOptions) === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }}">
                 @foreach ($setupOptions as $option)
                     <a href="{{ $chooseAppLink($option['app']) }}" wire:navigate
                         class="group flex items-start gap-2 rounded-xl border border-brand-ink/8 bg-white/80 p-2 shadow-sm ring-1 ring-brand-ink/[0.02] transition hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md">

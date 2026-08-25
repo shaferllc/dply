@@ -66,3 +66,14 @@ test('php installers are hidden on a server with no php', function () {
         ->and($withoutPhp)->toContain('static')
         ->and($withoutPhp)->toContain('blank');
 });
+
+test('the setup card hides "Install an app" when the server has no installer', function () {
+    // Drives $hasAppInstallers in SiteSettingsViewData, which the general-tab
+    // setup card uses to drop a shortcut that would open an empty picker.
+    $hasInstallers = fn (array $keys): bool => collect($keys)
+        ->intersect(['wordpress', 'laravel', 'statamic', 'symfony', 'craft', 'drupal'])
+        ->isNotEmpty();
+
+    expect($hasInstallers(catalogKeysFor('8.3')))->toBeTrue()
+        ->and($hasInstallers(catalogKeysFor('none')))->toBeFalse();
+});

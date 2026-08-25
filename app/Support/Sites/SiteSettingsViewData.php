@@ -13,6 +13,7 @@ use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Services\Sites\AppCatalog;
 use App\Support\Deployment\DeploymentContract;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
@@ -245,9 +246,19 @@ final class SiteSettingsViewData
             ? self::recentDeploymentsWithPhaseResults($site)
             : collect();
         $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
+        // Whether the app picker has any real installer to offer on THIS server.
+        // AppCatalog gates its (all-PHP) installers on the box actually having
+        // PHP, so a Node/static host has none — and the "Install an app" shortcut
+        // would deep-link into a picker that can't show a single installer.
+        // Coming-soon installers still render in the picker (greyed), so they
+        // count — the shortcut is only pointless when there is no scaffold tile
+        // at all, which is exactly the php-less case.
+        $hasAppInstallers = collect(app(AppCatalog::class)->forServer($server))
+            ->contains(fn (array $tile): bool => ($tile['kind'] ?? '') === 'scaffold');
 
         return array_merge(
             compact(
+                'hasAppInstallers',
                 'functionsHost',
                 'supportsMachinePhp',
                 'supportsWebserverProvisioning',
