@@ -101,3 +101,56 @@ test('no detection means no change', function () {
 
     expect(app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site))->toBeNull();
 });
+
+test('a go repo replaces php build steps too', function () {
+    // Go / Ruby / Python / Static all emit TYPE_CUSTOM steps, so recognition
+    // has to compare the full signature, not just the step type.
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'go', 'framework' => 'gin'],
+    );
+
+    $note = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    expect($note)->toContain('go');
+
+    $commands = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_BUILD)->pluck('custom_command')->all();
+
+    expect($commands)->toContain('go build -o bin/app ./...');
+});
+
+test('a rails repo replaces php build steps', function () {
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'ruby', 'framework' => 'rails'],
+    );
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    $commands = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_BUILD)->pluck('custom_command')->all();
+
+    expect($commands)->toContain('bundle install --deployment --without development:test');
+});
+
+test('a hand-written custom step is never discarded even when it looks like a default', function () {
+    // A custom step whose command is NOT one the defaults emit is a human's.
+    $site = siteWithBuildSteps([SiteDeployStep::TYPE_COMPOSER_INSTALL], ['language' => 'node', 'framework' => 'nextjs']);
+
+    $pipeline = $site->deployPipelines()->first();
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'step_type' => SiteDeployStep::TYPE_CUSTOM,
+        'custom_command' => './scripts/our-bespoke-build.sh',
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'sort_order' => 99,
+        'timeout_seconds' => 600,
+    ]);
+
+    $note = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh());
+
+    expect($note)->toContain('customised');
+    expect($site->fresh()->deployPipelines()->with('steps')->first()->steps->pluck('custom_command')->all())
+        ->toContain('./scripts/our-bespoke-build.sh');
+});

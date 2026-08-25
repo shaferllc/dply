@@ -28,26 +28,6 @@ use App\Modules\Deploy\Services\RuntimeAwareDeployStepDefaults;
  */
 final class SiteDeployStepsRuntimeReconciler
 {
-    /**
-     * Build-phase step types that a language's defaults can produce, used to
-     * recognise "this pipeline was auto-seeded for language X".
-     *
-     * @var array<string, list<string>>
-     */
-    private const LANGUAGE_BUILD_STEPS = [
-        'php' => [
-            SiteDeployStep::TYPE_COMPOSER_INSTALL,
-        ],
-        'node' => [
-            SiteDeployStep::TYPE_NPM_CI,
-            SiteDeployStep::TYPE_NPM_INSTALL,
-            SiteDeployStep::TYPE_NPM_RUN,
-            SiteDeployStep::TYPE_YARN_INSTALL,
-            SiteDeployStep::TYPE_PNPM_INSTALL,
-            SiteDeployStep::TYPE_BUN_INSTALL,
-        ],
-    ];
-
     public function __construct(
         private readonly RuntimeAwareDeployStepDefaults $defaults,
     ) {}
@@ -61,7 +41,12 @@ final class SiteDeployStepsRuntimeReconciler
         $detected = $site->resolvedRuntimeAppDetection() ?? [];
         $language = strtolower(trim((string) ($detected['language'] ?? '')));
 
-        if ($language === '' || ! array_key_exists($language, self::LANGUAGE_BUILD_STEPS)) {
+        // The defaults service owns what it can emit, per language, so this
+        // covers php / node / python / ruby / go / static without a second copy
+        // of that knowledge here.
+        $signatures = $this->defaults->knownBuildSignatures();
+
+        if ($language === '' || ! array_key_exists($language, $signatures)) {
             return null;
         }
 
@@ -78,21 +63,23 @@ final class SiteDeployStepsRuntimeReconciler
             return null;
         }
 
-        $ownTypes = self::LANGUAGE_BUILD_STEPS[$language];
+        $signatureOf = fn (SiteDeployStep $s): string => RuntimeAwareDeployStepDefaults::signature(
+            (string) $s->step_type,
+            $s->custom_command,
+        );
 
         // Already correct for the detected language: leave it alone.
-        if ($buildSteps->every(fn (SiteDeployStep $s) => in_array($s->step_type, $ownTypes, true))) {
+        if ($buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $signatures[$language], true))) {
             return null;
         }
 
-        $knownForeign = array_merge(...array_values(array_diff_key(
-            self::LANGUAGE_BUILD_STEPS,
-            [$language => true],
-        )));
+        $knownForeign = array_merge(...array_values(array_diff_key($signatures, [$language => true])));
 
         // Anything unrecognised means a human edited this pipeline. Say so
-        // rather than throwing their work away.
-        if (! $buildSteps->every(fn (SiteDeployStep $s) => in_array($s->step_type, $knownForeign, true))) {
+        // rather than throwing their work away. Signature (type + command)
+        // matters here: python/ruby/go/static all emit TYPE_CUSTOM, so the type
+        // alone cannot tell an auto-seeded `go build` from a hand-written one.
+        if (! $buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $knownForeign, true))) {
             return sprintf(
                 '[dply] Detected a %s project, but the build steps are customised — leaving them untouched. '
                 .'Update them on the site\'s Pipeline tab if the deploy fails.',

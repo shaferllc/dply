@@ -119,6 +119,68 @@ class RuntimeAwareDeployStepDefaults
      * @return list<array<string, mixed>>
      */
     /**
+     * Frameworks whose defaults differ from their language's baseline.
+     *
+     * Declared here because this service owns the step tables; anything that
+     * needs to recognise "these steps were auto-seeded" asks via
+     * {@see knownBuildSignatures()} rather than re-deriving the knowledge.
+     *
+     * @var array<string, list<string|null>>
+     */
+    private const FRAMEWORKS_BY_LANGUAGE = [
+        'php' => [null, 'laravel'],
+        'node' => [null, 'next', 'nuxt', 'sveltekit', 'remix', 'astro', 'nest'],
+        'python' => [null, 'django', 'flask', 'fastapi'],
+        'ruby' => [null, 'rails', 'jekyll'],
+        'go' => [null],
+        'static' => [null, 'hugo', 'eleventy'],
+    ];
+
+    /**
+     * Every build step this service could have auto-seeded, per language, as
+     * "step_type|custom_command" signatures.
+     *
+     * Python, Ruby, Go and Static all emit TYPE_CUSTOM steps, so step type
+     * alone cannot tell an auto-seeded `go build` from a hand-written one.
+     * Comparing the full signature can: if a pipeline's build steps are all
+     * signatures this service emits for some other language, nobody edited
+     * them and they are safe to replace.
+     *
+     * @return array<string, list<string>>
+     */
+    public function knownBuildSignatures(): array
+    {
+        $signatures = [];
+
+        foreach (self::FRAMEWORKS_BY_LANGUAGE as $language => $frameworks) {
+            $seen = [];
+
+            foreach ($frameworks as $framework) {
+                foreach ($this->defaultsFor($language, $framework) as $step) {
+                    if (($step['phase'] ?? null) !== SiteDeployStep::PHASE_BUILD) {
+                        continue;
+                    }
+
+                    $seen[self::signature(
+                        (string) $step['step_type'],
+                        isset($step['custom_command']) ? (string) $step['custom_command'] : null,
+                    )] = true;
+                }
+            }
+
+            $signatures[$language] = array_keys($seen);
+        }
+
+        return $signatures;
+    }
+
+    /** Stable identity for a build step: its type plus any custom command. */
+    public static function signature(string $stepType, ?string $customCommand): string
+    {
+        return $stepType.'|'.trim((string) $customCommand);
+    }
+
+    /**
      * One vocabulary for framework names.
      *
      * RepositoryRuntimeDetector emits `nextjs`; the step tables below key on
