@@ -63,26 +63,13 @@
         return $t['attached'];
     };
 
-    // Whether a type is reason enough for its whole pathway to appear. Same as
-    // isShownAsCard() except for publication: its placeholder must not keep the
-    // Runtime hub on screen forever on a site with nothing attached at all —
-    // that is the "wall of empty ghost cards" this map exists to avoid. Once
-    // the group is visible for a real reason, the placeholder is still drawn,
-    // because there it tells you what the next deploy will fill in.
-    $countsForVisibility = function ($t) use ($isShownAsCard, $hasPublication) {
-        if ($t['type'] === 'publication') {
-            return $hasPublication;
-        }
-
-        return $isShownAsCard($t);
-    };
 
     // Only draw a group pathway (hub + column + its trunk edge) once it actually
     // has a card to show. Empty pathways stay hidden until you add a resource to
     // them from the global "Add resource" dropdown, which then makes them appear.
     $visibleGroups = array_filter(
         $hubGroups,
-        fn ($g) => collect($g['types'])->contains(fn ($t) => $countsForVisibility($t))
+        fn ($g) => collect($g['types'])->contains(fn ($t) => $isShownAsCard($t))
     );
     $groupCount = count($visibleGroups);
 
@@ -520,11 +507,20 @@
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        {{-- "shown", not "attached": this counts the cards below, and
-                             Publication is always drawn while never being attached —
-                             so "1 attached" would claim an attachment that never
-                             happened on a site with nothing attached at all. --}}
-                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice('{0}nothing yet|{1}:count resource|[2,*]:count resources', $gShown, ['count' => $gShown]) }}</p>
+                        {{-- The runtime hub names what the site actually runs on. Its
+                             cards are runtime-OWNED (publication is written by the
+                             deploy, never attached by an operator), so a count of
+                             "attached" resources was both wrong and useless there —
+                             it read "1 attached" for a thing nobody attached, on a
+                             site whose runtime it never mentioned. Every other group
+                             does hold attachable resources, so those keep the count. --}}
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">
+                            @if ($groupKey === 'runtime')
+                                <span class="capitalize">{{ $site->runtimeKey() ?: __('no runtime') }}</span>@if ($site->runtimeVersion())<span class="font-mono"> {{ $site->runtimeVersion() }}</span>@endif
+                            @else
+                                {{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gShown, ['count' => $gShown]) }}
+                            @endif
+                        </p>
                     </div>
                 </div>
 
