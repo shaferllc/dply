@@ -14,8 +14,8 @@ use App\Support\Sites\PhpVersionUpgradePlanner;
 use Throwable;
 
 /**
- * Install the PHP version Composer asked for, make it the CLI default, and
- * switch this site onto it so the next deploy's `composer install` and FPM
+ * Install the PHP version Composer asked for and switch THIS SITE onto it, so
+ * the next deploy's `composer install` and FPM
  * pool both use the new runtime.
  */
 class UpgradePhpAction implements RemediationActionInterface
@@ -56,15 +56,13 @@ class UpgradePhpAction implements RemediationActionInterface
                 onOutput: $stream,
             );
 
-            $emit->step('fix', sprintf('Setting PHP %s as the CLI default …', $target));
-            $php->applyPackageAction(
-                $server,
-                'set_cli_default',
-                $target,
-                $this->progress($emit),
-                actingUserId: $userId,
-                onOutput: $stream,
-            );
+            // Deliberately NOT set_cli_default. A server hosts many sites and
+            // each pins its own PHP: SitePhpCliGuard prefixes every composer /
+            // artisan step with /usr/bin/php<version> for THAT site (installing
+            // it on demand). Flipping the server-wide CLI default to fix one
+            // site changed the PHP every other site's build ran under — so
+            // upgrading a site to 8.5 could break a neighbour that needs 8.4.
+            // Installing the version and pointing this site at it is enough.
         } catch (Throwable $e) {
             return $e->getMessage();
         }

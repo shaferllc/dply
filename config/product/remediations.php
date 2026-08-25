@@ -209,12 +209,15 @@ BASH,
 
     // Composer refused to install because the box's PHP is older than a
     // package requires (Laravel 13 / Symfony 8 → >=8.4.1 is the usual case).
-    // Installing the catalog version and switching the site is the fix —
-    // adding a pipeline step would not change the runtime.
+    // Installing the catalog version and switching THIS SITE is the fix —
+    // adding a pipeline step would not change the runtime. Deliberately not a
+    // server-wide CLI default: SitePhpCliGuard already prefixes each site's
+    // composer/artisan steps with its own /usr/bin/php<version>, so one site
+    // needing 8.5 must not move a neighbour that needs 8.4.
     'php_version_too_low' => [
         'signature' => '/your php version\s+\([^)]+\) does not satisfy that requirement|requires php\s*(>=|>|\^|~)?\s*\d+\.\d+[^\n]*does not satisfy that requirement/i',
         'title' => 'This app needs a newer PHP than the server is running',
-        'explanation' => 'Composer could not install dependencies because the current PHP is older than a package requires. dply can install the needed version, make it the CLI default, and switch this site onto it.',
+        'explanation' => 'Composer could not install dependencies because this site\'s PHP is older than a package requires. dply can install the needed version and switch this site onto it. Other sites on the server keep the version they are on — each site pins its own.',
         'actions' => [
             [
                 'key' => 'upgrade_php',
