@@ -116,7 +116,11 @@
          new bucket" provisions one using a connected cloud token. --}}
     @include('livewire.servers.partials.backups._add-destination-modal')
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Included directly, not via a "modals" layout slot. The x-slot here sat
+         inside the plain <div> page root — the organization shell component
+         closed further up — so Blade dropped it and the confirm modal never
+         rendered. Remove therefore did nothing: promptDestroyCredential() set
+         the modal state and no dialog appeared to confirm it. Same fix, and the
+         same reason, as organizations/api-tokens and organizations/secrets. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

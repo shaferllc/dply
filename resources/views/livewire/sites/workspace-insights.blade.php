@@ -186,7 +186,10 @@
         </div>
     @endif
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Included directly, not via a "modals" layout slot: this page's root is
+         a plain <div>, so Blade has no component to bind the slot to and drops
+         it — the confirm dialog never renders and the destructive action
+         silently does nothing. Same fix as credentials/index,
+         organizations/api-tokens and organizations/secrets. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>
