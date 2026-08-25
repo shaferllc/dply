@@ -35,6 +35,7 @@ class DoctorCloudflareCommand extends Command
 {
     protected $signature = 'dply:doctor:cloudflare
         {zone? : Zone to check (defaults to the VM testing apex)}
+        {--raw : Print Cloudflare\'s own response, incl. the token id}
         {--json : Output as JSON}';
 
     protected $description = 'Check the platform Cloudflare token used for testing hostnames.';
@@ -51,6 +52,7 @@ class DoctorCloudflareCommand extends Command
                 'origin' => TestingDomains::describeCloudflareToken($token),
                 'fingerprint' => 'sha256:'.substr(hash('sha256', $token), 0, 8),
                 'last4' => substr($token, -4),
+                'auth_scheme' => (new CloudflareDnsService($token))->authScheme(),
             ],
             'authenticates' => null,
             'zones_visible' => null,
@@ -79,6 +81,23 @@ class DoctorCloudflareCommand extends Command
             }
         }
 
+        if ($this->option('raw') && $token !== '') {
+            $raw = (new CloudflareDnsService($token))->rawDiagnostics();
+            $report['raw'] = $raw;
+
+            if (! $this->option('json')) {
+                $this->components->info('Raw Cloudflare response');
+                $this->components->twoColumnDetail('token id', (string) ($raw['token_id'] ?? '—'));
+                $this->components->twoColumnDetail('token status', (string) ($raw['token_status'] ?? '—'));
+                if ($raw['verify_error'] !== null) {
+                    $this->components->twoColumnDetail('verify note', (string) $raw['verify_error']);
+                }
+                $this->components->twoColumnDetail('GET /zones status', (string) ($raw['zones_status'] ?? '—'));
+                $this->line((string) json_encode($raw['zones_body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                $this->newLine();
+            }
+        }
+
         if ($this->option('json')) {
             $this->line((string) json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
@@ -97,7 +116,7 @@ class DoctorCloudflareCommand extends Command
 
         if ($report['token_configured'] !== true) {
             $this->components->error('No Cloudflare token configured.');
-            $this->components->info('Set CLOUDFLARE_KEY, then: php artisan config:clear');
+            $this->components->info('Set CLOUDFLARE_DNS_API_TOKEN, then: php artisan config:clear');
 
             return self::FAILURE;
         }
@@ -106,6 +125,12 @@ class DoctorCloudflareCommand extends Command
         $this->components->twoColumnDetail('token', (string) $t['origin']);
         $this->components->twoColumnDetail('fingerprint', $t['fingerprint'].'  …'.$t['last4']);
         $this->components->twoColumnDetail(
+            'auth scheme',
+            $t['auth_scheme'] === 'global-api-key'
+                ? 'Global API Key (X-Auth-Email + X-Auth-Key)'
+                : 'API token (Bearer)',
+        );
+        $this->components->twoColumnDetail(
             'authenticates',
             $report['authenticates'] === true ? '<fg=green>yes</>' : '<fg=red>NO</>',
         );
@@ -113,9 +138,23 @@ class DoctorCloudflareCommand extends Command
         if ($report['authenticates'] !== true) {
             $this->newLine();
             $this->components->error('The token was rejected by Cloudflare: '.(string) $report['error']);
-            $this->components->info('The token is wrong, revoked, or truncated. Re-issue it and set CLOUDFLARE_KEY.');
+            $this->components->info('The token is wrong, revoked, or truncated. Re-issue it and set CLOUDFLARE_DNS_API_TOKEN.');
 
             return self::FAILURE;
+        }
+
+        // The credential collision this whole class of failure comes from: if
+        // DNS and mail resolve to the SAME value, CLOUDFLARE_KEY is still doing
+        // both jobs and the Email Sending credential is being sent to the DNS
+        // API, where it authenticates as nobody and lists no zones.
+        $mailKey = trim((string) config('mail.mailers.cloudflare.key', ''));
+        if ($mailKey !== '' && hash_equals($mailKey, TestingDomains::cloudflareApiToken())) {
+            $this->newLine();
+            $this->components->warn(
+                'DNS and MAIL are using the SAME Cloudflare credential. An Email Sending key is not a '
+                .'DNS token — it authenticates but sees no zones. Split them in .env: '
+                .'CLOUDFLARE_DNS_API_TOKEN for DNS, CLOUDFLARE_MAIL_KEY for mail, then remove the shared CLOUDFLARE_KEY.'
+            );
         }
 
         $zones = is_array($report['zones_visible']) ? $report['zones_visible'] : [];

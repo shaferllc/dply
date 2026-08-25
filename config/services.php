@@ -35,8 +35,41 @@ return [
     ],
 
     'cloudflare' => [
-        'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-        'key' => env('CLOUDFLARE_KEY'),
+        /*
+         * DNS credentials ONLY. Mail lives in config/mail.php under the
+         * 'cloudflare' mailer (CLOUDFLARE_MAIL_ACCOUNT_ID / CLOUDFLARE_MAIL_KEY).
+         *
+         * These two keys used to be shared: Laravel's
+         * MailManager::createCloudflareTransport() falls back to
+         * services.cloudflare.account_id and .key, so the Email Sending
+         * credential was also what the DNS client sent as a Bearer token. It
+         * authenticated as nobody and every zone list came back empty, which
+         * reads exactly like a Zone Resources problem and is not one.
+         *
+         * No fallback to CLOUDFLARE_KEY, deliberately. A shared name is what
+         * caused the bug; leaving it as a fallback would let the collision
+         * quietly persist. Setting CLOUDFLARE_DNS_API_TOKEN is required.
+         */
+        'account_id' => env('CLOUDFLARE_DNS_ACCOUNT_ID'),
+        'key' => env('CLOUDFLARE_DNS_API_TOKEN'),
+
+        /*
+         * Set ONLY when `key` above is a legacy Global API Key.
+         *
+         * Cloudflare has two auth schemes and they are not interchangeable:
+         *   - API token  → Authorization: Bearer <token>
+         *   - Global key → X-Auth-Email: <email> + X-Auth-Key: <key>
+         *
+         * A Global API Key sent as a Bearer token is NOT rejected outright: it
+         * authenticates as nobody, and every list comes back EMPTY. That looks
+         * identical to a Zone Resources problem and sends you into the token
+         * editor for hours. Setting CLOUDFLARE_EMAIL switches the client to
+         * the legacy header pair instead.
+         *
+         * Prefer a scoped API token and leave this unset — a Global API Key
+         * carries full access to the whole account, including billing.
+         */
+        'email' => env('CLOUDFLARE_EMAIL'),
         'provider' => 'cloudflare',
         'vm_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_VM_APEX', 'on-dply.cc'),
         'edge_apex' => $testing ? 'edge.test' : env('CLOUDFLARE_EDGE_APEX', 'on-dply.site'),

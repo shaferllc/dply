@@ -42,7 +42,7 @@ test('the error identifies the platform token by name', function () {
     fakeZoneMiss();
 
     expect(fn () => (new CloudflareDnsService('platform-token-aaaa'))->upsertARecord('on-dply.cc', 'x', '1.2.3.4'))
-        ->toThrow(RuntimeException::class, 'CLOUDFLARE_KEY');
+        ->toThrow(RuntimeException::class, 'CLOUDFLARE_DNS_API_TOKEN');
 });
 
 test('a customer credential is called out as a customer credential', function () {

@@ -19,9 +19,9 @@ final class TestingDomains
     /**
      * The one Cloudflare token dply uses for its own testing zones.
      *
-     * Deliberately a single config path (services.cloudflare.key / CLOUDFLARE_KEY).
+     * Deliberately a single config path (services.cloudflare.key / CLOUDFLARE_DNS_API_TOKEN).
      * This used to consult four, in priority order, and return the first
-     * non-empty one — which silently preferred a stale CLOUDFLARE_KEY over a
+     * non-empty one — which silently preferred a stale mail key over a
      * correctly-scoped token and made "which token is this?" unanswerable.
      */
     public static function cloudflareApiToken(): string
@@ -73,10 +73,10 @@ final class TestingDomains
 
         $configured = self::cloudflareApiToken();
         if ($configured !== '' && hash_equals($configured, $token)) {
-            return 'the platform token (CLOUDFLARE_KEY)';
+            return 'the platform DNS token (CLOUDFLARE_DNS_API_TOKEN)';
         }
 
-        return 'a token that is NOT the configured CLOUDFLARE_KEY '
+        return 'a token that is NOT the configured CLOUDFLARE_DNS_API_TOKEN '
             .'(a customer credential, or stale env on this worker)';
     }
 

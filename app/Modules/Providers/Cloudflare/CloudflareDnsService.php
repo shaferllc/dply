@@ -23,6 +23,12 @@ class CloudflareDnsService
     /** Human label for whichever token this was built from, for error messages. */
     private string $tokenOrigin = '';
 
+    /**
+     * Set only for legacy Global API Key auth, which needs the account email
+     * alongside the key. Empty means a modern API token (Bearer).
+     */
+    private string $authEmail = '';
+
     public function __construct(ProviderCredential|string $credentialOrToken)
     {
         $token = $credentialOrToken instanceof ProviderCredential
@@ -42,6 +48,24 @@ class CloudflareDnsService
             throw new \InvalidArgumentException('Cloudflare API token is required.');
         }
         $this->bearerToken = $token;
+
+        // Legacy Global API Key auth, but ONLY for the platform key: a
+        // customer's ProviderCredential is always a scoped API token, and
+        // pairing it with dply's account email would authenticate as the wrong
+        // identity. Opt-in by configuring services.cloudflare.email.
+        if (! $credentialOrToken instanceof ProviderCredential) {
+            $platformKey = trim((string) config('services.cloudflare.key', ''));
+            $email = trim((string) config('services.cloudflare.email', ''));
+            if ($email !== '' && $platformKey !== '' && hash_equals($platformKey, $token)) {
+                $this->authEmail = $email;
+            }
+        }
+    }
+
+    /** Which Cloudflare auth scheme this instance uses. */
+    public function authScheme(): string
+    {
+        return $this->authEmail !== '' ? 'global-api-key' : 'api-token';
     }
 
     /**
@@ -366,7 +390,15 @@ class CloudflareDnsService
     private function request(string $method, string $path, array $queryOrBody = []): Response
     {
         $url = self::BASE.$path;
-        $client = Http::withToken($this->bearerToken)->acceptJson();
+
+        // Two mutually exclusive schemes — sending a Global API Key as a Bearer
+        // token authenticates as nobody and silently returns empty lists.
+        $client = $this->authEmail !== ''
+            ? Http::withHeaders([
+                'X-Auth-Email' => $this->authEmail,
+                'X-Auth-Key' => $this->bearerToken,
+            ])->acceptJson()
+            : Http::withToken($this->bearerToken)->acceptJson();
 
         return match (strtolower($method)) {
             'get' => $client->get($url, $queryOrBody),
@@ -375,6 +407,54 @@ class CloudflareDnsService
             'delete' => $client->delete($url),
             default => throw new \InvalidArgumentException("Unsupported HTTP method: {$method}"),
         };
+    }
+
+    /**
+     * Raw diagnostics straight from Cloudflare, for when the permissions LOOK
+     * right but the zone list comes back empty.
+     *
+     * Returns the token's own identity (id + status) alongside the unfiltered
+     * /zones body. The token id is the decisive field: the Cloudflare dashboard
+     * shows it next to each token, so comparing it settles "is the token in
+     * .env the same one I edited?" — a question a fingerprint cannot answer,
+     * because you cannot hash the copy in the dashboard.
+     *
+     * Never throws: this runs when something is already wrong.
+     *
+     * @return array{token_id: ?string, token_status: ?string, verify_error: ?string, zones_status: ?int, zones_body: mixed}
+     */
+    public function rawDiagnostics(): array
+    {
+        $out = [
+            'token_id' => null,
+            'token_status' => null,
+            'verify_error' => null,
+            'zones_status' => null,
+            'zones_body' => null,
+        ];
+
+        try {
+            // Account-owned tokens (cfat_…) are rejected here even when valid,
+            // so a failure is informative, not fatal.
+            $verify = $this->request('get', '/user/tokens/verify');
+            $out['token_id'] = is_string($verify->json('result.id')) ? $verify->json('result.id') : null;
+            $out['token_status'] = is_string($verify->json('result.status')) ? $verify->json('result.status') : null;
+            if ($out['token_id'] === null) {
+                $out['verify_error'] = (string) ($verify->json('errors.0.message') ?? 'no token id returned');
+            }
+        } catch (\Throwable $e) {
+            $out['verify_error'] = $e->getMessage();
+        }
+
+        try {
+            $zones = $this->request('get', '/zones', ['per_page' => 50]);
+            $out['zones_status'] = $zones->status();
+            $out['zones_body'] = $zones->json();
+        } catch (\Throwable $e) {
+            $out['zones_body'] = ['exception' => $e->getMessage()];
+        }
+
+        return $out;
     }
 
     private function assertApiSuccess(Response $response, string $action): void

@@ -51,6 +51,21 @@ return [
 
         'cloudflare' => [
             'transport' => 'cloudflare',
+
+            /*
+             * Mail credentials, named for mail.
+             *
+             * MailManager::createCloudflareTransport() falls back to
+             * services.cloudflare.account_id / .key when these are absent —
+             * the same two keys dply's DNS client reads. That shared namespace
+             * is how the Email Sending credential ended up being sent to the
+             * DNS API as a Bearer token, where it authenticates as nobody and
+             * returns an empty zone list on every call.
+             *
+             * Setting them here keeps mail and DNS on separate credentials.
+             */
+            'account_id' => env('CLOUDFLARE_MAIL_ACCOUNT_ID'),
+            'key' => env('CLOUDFLARE_MAIL_KEY'),
         ],
 
         'ses' => [

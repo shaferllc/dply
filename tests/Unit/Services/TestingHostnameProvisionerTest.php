@@ -100,7 +100,7 @@ test('testing hostnames are cloudflare-only — no digitalocean or namecheap fal
     $site = new Site(['name' => 'Marketing API', 'slug' => 'marketing-api']);
 
     expect(fn () => app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($site))
-        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_API_TOKEN');
+        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_DNS_API_TOKEN');
 });
 
 test('testing hostname prefers primary preview domain over legacy meta', function () {
@@ -161,5 +161,5 @@ test('the platform failure names the platform, not the customer account', functi
     $method->setAccessible(true);
 
     expect(fn () => $method->invoke(app(\App\Services\Sites\TestingHostnameProvisioner::class), $site))
-        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_API_TOKEN');
+        ->toThrow(\RuntimeException::class, 'CLOUDFLARE_DNS_API_TOKEN');
 });

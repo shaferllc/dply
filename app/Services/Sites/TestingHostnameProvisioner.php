@@ -624,10 +624,10 @@ class TestingHostnameProvisioner
         $token = TestingDomains::cloudflareApiToken();
         if ($token === '') {
             throw new \RuntimeException(
-                'Testing hostnames require CLOUDFLARE_API_TOKEN. The testing zones ('
+                'Testing hostnames require CLOUDFLARE_DNS_API_TOKEN. The testing zones ('
                 .implode(', ', array_slice($pool, 0, 3)).(count($pool) > 3 ? ', …' : '')
                 .') live in dply\'s own Cloudflare account, so only dply\'s platform token can write them. '
-                .'Set CLOUDFLARE_API_TOKEN to a token whose Zone Resources include those zones.'
+                .'Set CLOUDFLARE_DNS_API_TOKEN to a token whose Zone Resources include those zones.'
             );
         }
 

@@ -8,7 +8,7 @@ use App\Support\TestingDomains;
  * One Cloudflare token, one config path.
  *
  * dply used to read four config paths and return the first non-empty one,
- * which meant a correctly-scoped token could lose to a stale CLOUDFLARE_KEY
+ * which meant the DNS token could lose to the MAIL credential
  * and nothing in the failure said which had been used. These lock the
  * collapsed behaviour in place.
  */
@@ -32,7 +32,7 @@ test('legacy config paths no longer influence the choice', function () {
 });
 
 test('an unexpanded env placeholder is treated as no token, not sent as a bearer', function () {
-    config(['services.cloudflare.key' => '${CLOUDFLARE_KEY}']);
+    config(['services.cloudflare.key' => '${CLOUDFLARE_DNS_API_TOKEN}']);
 
     expect(TestingDomains::cloudflareApiToken())->toBe('')
         ->and(TestingDomains::cloudflareIsConfigured())->toBeFalse();
@@ -57,7 +57,7 @@ test('the configured token is described as the platform token', function () {
     config(['services.cloudflare.key' => 'the-one-token']);
 
     expect(TestingDomains::describeCloudflareToken('the-one-token'))
-        ->toContain('CLOUDFLARE_KEY');
+        ->toContain('CLOUDFLARE_DNS_API_TOKEN');
 });
 
 test('any other token is flagged as not the configured one', function () {
@@ -65,4 +65,22 @@ test('any other token is flagged as not the configured one', function () {
 
     expect(TestingDomains::describeCloudflareToken('something-else'))
         ->toContain('NOT the configured');
+});
+
+test('DNS and mail are separate env vars with no shared fallback', function () {
+    // The original bug: Laravel's MailManager falls back to
+    // services.cloudflare.account_id/.key, so one CLOUDFLARE_KEY fed BOTH the
+    // Email Sending transport and the DNS client. An Email Sending credential
+    // sent to the DNS API authenticates as nobody and lists zero zones.
+    $services = file_get_contents(config_path('services.php'));
+    $mail = file_get_contents(config_path('mail.php'));
+
+    // DNS reads only its own var.
+    expect($services)->toContain("env('CLOUDFLARE_DNS_API_TOKEN')")
+        ->and($services)->not->toContain("env('CLOUDFLARE_DNS_API_TOKEN', env('CLOUDFLARE_KEY'))");
+
+    // Mail is pinned in the mailer config so the framework never reaches into
+    // services.cloudflare for it.
+    expect($mail)->toContain("env('CLOUDFLARE_MAIL_KEY')")
+        ->and($mail)->toContain("env('CLOUDFLARE_MAIL_ACCOUNT_ID')");
 });
