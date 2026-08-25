@@ -111,7 +111,16 @@ trait ManagesDatabaseEngineLifecycle
             ->where('engine', $engine)
             ->first();
 
-        if ($existing && $existing->status === ServerDatabaseEngine::STATUS_RUNNING) {
+        // Refuse only when the engine is ACTUALLY there. Trusting the stored
+        // status alone made a stale RUNNING row unrecoverable: dply insisted the
+        // engine was installed, the box disagreed, and the UI offered no way
+        // through. When the capability probe has run and says the engine is
+        // absent, let the install proceed and fix the record.
+        $probeSaysPresent = ! $this->capabilitiesLoaded
+            || ! array_key_exists($engine, $this->capabilities_state)
+            || (bool) $this->capabilities_state[$engine];
+
+        if ($existing && $existing->status === ServerDatabaseEngine::STATUS_RUNNING && $probeSaysPresent) {
             $this->toastError(__(':engine is already installed.', ['engine' => $engine]));
 
             return;
@@ -124,6 +133,12 @@ trait ManagesDatabaseEngineLifecycle
             'is_default' => ServerDatabaseEngine::query()->where('server_id', $this->server->id)->doesntExist(),
             'port' => ServerDatabaseEngine::defaultPortFor($engine),
         ]);
+
+        // A stale RUNNING row that the probe contradicts is a valid retry state —
+        // otherwise the check below would bounce the very case this exists for.
+        if ($row->status === ServerDatabaseEngine::STATUS_RUNNING && ! $probeSaysPresent) {
+            $row->forceFill(['status' => ServerDatabaseEngine::STATUS_PENDING])->save();
+        }
 
         // Re-run install only when the row is in a state that makes sense to retry from.
         if (! in_array($row->status, [
@@ -642,11 +657,64 @@ trait ManagesDatabaseEngineLifecycle
             }
         }
 
+        // The other direction, which was missing: a row claiming RUNNING for an
+        // engine the probe cannot find. Nothing ever verified stored status
+        // against the box, so a failed/skipped install left a permanent lie —
+        // and installDatabaseEngine() refuses with "already installed" on a
+        // RUNNING row, so the engine could never be installed from the UI again.
+        // (Seen in the wild: a server whose Postgres was silently swapped for
+        // SQLite by the low-memory provisioning fallback still had a RUNNING
+        // postgres row.)
+        $correctedEngines = [];
+        $rows = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('status', [
+                ServerDatabaseEngine::STATUS_RUNNING,
+                ServerDatabaseEngine::STATUS_STOPPED,
+            ])
+            ->get();
+
+        foreach ($rows as $row) {
+            $engine = (string) $row->engine;
+
+            // Only correct engines the probe actually reports on, and never
+            // sqlite (a file-based engine the probe treats differently). An
+            // engine missing from the probe map means "not checked", not
+            // "absent" — demoting on that would invent failures.
+            if ($engine === 'sqlite' || ! array_key_exists($engine, $detected)) {
+                continue;
+            }
+
+            if ($detected[$engine]) {
+                continue;
+            }
+
+            $row->forceFill([
+                'status' => ServerDatabaseEngine::STATUS_FAILED,
+                'error_message' => __('Not found on the server during a recheck — the stored status was stale. Install it again to reconcile.'),
+            ])->save();
+
+            $correctedEngines[] = $engine;
+        }
+
+        $notes = [];
         if ($seededEngines !== []) {
-            $labels = implode(', ', array_map(fn ($e) => ucfirst($e), $seededEngines));
-            $this->toastSuccess(__('Rechecked engines — adopted :engines as already installed.', ['engines' => $labels]));
-        } else {
+            $notes[] = __('adopted :engines as already installed', [
+                'engines' => implode(', ', array_map(fn ($e) => ucfirst($e), $seededEngines)),
+            ]);
+        }
+        if ($correctedEngines !== []) {
+            $notes[] = __(':engines is recorded as installed but is not on the server', [
+                'engines' => implode(', ', array_map(fn ($e) => ucfirst($e), $correctedEngines)),
+            ]);
+        }
+
+        if ($notes === []) {
             $this->toastSuccess(__('Rechecked the server for database engines.'));
+        } elseif ($correctedEngines !== []) {
+            $this->toastError(__('Rechecked engines — :notes.', ['notes' => implode('; ', $notes)]));
+        } else {
+            $this->toastSuccess(__('Rechecked engines — :notes.', ['notes' => implode('; ', $notes)]));
         }
     }
 
