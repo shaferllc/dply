@@ -592,11 +592,19 @@ final class RepositoryRuntimeDetector
     }
 
     /**
+     * Map a decoded package.json to a Node framework (next / nuxt / express / …).
+     *
+     * Public because it is pure — it touches no filesystem — so callers that
+     * read package.json some other way can reuse it. VM deploys are the reason:
+     * the checkout lives on the remote box, so {@see \App\Services\Sites\VmSiteRuntimeDetectionPersister}
+     * cats the file over SSH and feeds the decoded array in here rather than
+     * duplicating the dependency-to-framework mapping.
+     *
      * @param  array<string, mixed>|null  $packageJson
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    private function detectNodeStack(?array $packageJson, array $capabilities): ?array
+    public function detectNodeStack(?array $packageJson, array $capabilities): ?array
     {
         if ($packageJson === null) {
             return null;
