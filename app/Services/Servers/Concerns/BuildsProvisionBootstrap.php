@@ -738,6 +738,19 @@ EOF',
         $webRoot = $layout['web_root'];
 
         if ($web === 'nginx') {
+            // No PHP on the box means no socket to point at: emitting the
+            // location block anyway renders `fastcgi_pass unix:;`, which fails
+            // `nginx -t` and so blocks every later reload on the server —
+            // including the one that would write the site's own vhost.
+            $phpLocation = $phpSocket === null ? '' : <<<NGINX
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:{$phpSocket};
+    }
+
+NGINX;
+
             $configs['nginx-starter'] = [
                 'label' => 'Nginx default site',
                 'path' => '/etc/nginx/sites-available/dply',
@@ -751,12 +764,7 @@ server {
     location / {
         try_files \$uri \$uri/ =404;
     }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:{$phpSocket};
-    }
-}
+{$phpLocation}}
 NGINX,
             ];
         }
@@ -770,6 +778,15 @@ NGINX,
         }
 
         if ($web === 'apache') {
+            // Same guard as nginx above — an empty socket renders
+            // `proxy:unix:|fcgi://localhost/`, which fails `apachectl configtest`.
+            $phpHandler = $phpSocket === null ? '' : <<<APACHE
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:{$phpSocket}|fcgi://localhost/"
+    </FilesMatch>
+
+APACHE;
+
             $configs['apache-starter'] = [
                 'label' => 'Apache default site',
                 'path' => '/etc/apache2/sites-available/dply.conf',
@@ -782,10 +799,7 @@ NGINX,
         Require all granted
         DirectoryIndex index.php index.html
     </Directory>
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:{$phpSocket}|fcgi://localhost/"
-    </FilesMatch>
-</VirtualHost>
+{$phpHandler}</VirtualHost>
 APACHE,
             ];
         }

@@ -81,3 +81,33 @@ test('docker role stays container focused', function () {
     $this->assertStringNotContainsString('Installing Composer', $script);
     $this->assertStringNotContainsString('Installing PHP 8.3', $script);
 });
+
+test('it omits the php handler from starter vhosts when the server has no php', function () {
+    $builder = app(ServerProvisionCommandBuilder::class);
+
+    $content = function (string $webserver, ?string $phpVersion) use ($builder): string {
+        $artifacts = $builder->buildArtifacts(new Server([
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => $webserver,
+                'php_version' => $phpVersion,
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]));
+
+        return (string) collect($artifacts)
+            ->firstWhere('key', $webserver.'-starter')['content'];
+    };
+
+    // A server provisioned without PHP has no fpm socket to point at. Rendering
+    // the handler anyway produced `fastcgi_pass unix:;`, which fails `nginx -t`
+    // and blocked every later reload on the box — including the site's own vhost.
+    expect($content('nginx', 'none'))
+        ->not->toContain('unix:')
+        ->and($content('nginx', 'none'))->not->toContain('fastcgi_pass')
+        ->and($content('apache', 'none'))->not->toContain('proxy:unix:');
+
+    expect($content('nginx', '8.3'))->toContain('fastcgi_pass unix:/run/php/php8.3-fpm.sock;')
+        ->and($content('apache', '8.3'))->toContain('proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost/');
+});
