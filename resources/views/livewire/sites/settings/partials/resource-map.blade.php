@@ -477,7 +477,6 @@
             @foreach ($visibleGroups as $groupKey => $group)
                 @php
                     $col = $loop->iteration;
-                    $gAttached = collect($group['types'])->where('attached', true)->count();
 
                     // Only render the resources that are actually present as cards
                     // (anything attached, plus publication which is purely
@@ -485,6 +484,14 @@
                     // single global "Add resource" dropdown in the header and pop
                     // out here once attached — no wall of empty ghost cards.
                     $cardTypes = collect($group['types'])->filter($isShownAsCard)->values();
+
+                    // Count the cards actually rendered below, not the attached
+                    // flag. Publication is drawn whether or not it is "attached"
+                    // (it is runtime-owned, never operator-attached), so counting
+                    // the flag made the Runtime hub read "nothing attached"
+                    // directly above a visible Publication card. Identical to the
+                    // old count for every other group, where card == attached.
+                    $gAttached = $cardTypes->count();
                 @endphp
 
                 {{-- Group hub --}}
@@ -962,8 +969,14 @@
                                                 <a href="{{ $pubHref }}" target="_blank" rel="noopener" class="truncate font-mono text-brand-forest hover:underline">{{ $pubUrl }}</a>
                                             </span>
                                         @else
-                                            <span title="{{ __('Set automatically on deploy') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
-                                                <x-heroicon-o-cpu-chip class="h-3 w-3" /> {{ __('Managed by the runtime') }}
+                                            {{-- Name the runtime that will fill this in. "Managed by
+                                                 the runtime" was true and useless — which runtime, and
+                                                 when? Same key/version idiom the dashboard header and
+                                                 general tab already use. --}}
+                                            <span title="{{ __('The deploy writes this once the site is served.') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
+                                                <x-heroicon-o-cpu-chip class="h-3 w-3" />
+                                                <span class="capitalize">{{ $site->runtimeKey() ?: __('the runtime') }}</span>@if ($site->runtimeVersion())<span class="font-mono normal-case"> {{ $site->runtimeVersion() }}</span>@endif
+                                                <span>· {{ __('set on deploy') }}</span>
                                             </span>
                                         @endif
                                     @else

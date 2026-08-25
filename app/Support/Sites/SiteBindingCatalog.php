@@ -167,9 +167,14 @@ final class SiteBindingCatalog
                 'env' => [],
                 'runtimes' => ['vm'],
             ],
+            // Not operator-attachable: the deploy runtime writes this into
+            // Site.meta['runtime_target']['publication'] and owns it from
+            // there ({@see \App\Modules\Deploy\Services\SiteResourceBindingResolver}).
+            // The purpose line says what it *is* rather than who manages it —
+            // "runtime-managed publication target" told a reader nothing.
             'publication' => [
                 'group' => 'runtime', 'label' => 'Publication', 'icon' => 'heroicon-o-newspaper',
-                'purpose' => 'Runtime-managed publication target.',
+                'purpose' => 'The URL this site is served at — filled in by the runtime on deploy.',
                 'env' => [],
                 'runtimes' => ['vm'],
             ],
