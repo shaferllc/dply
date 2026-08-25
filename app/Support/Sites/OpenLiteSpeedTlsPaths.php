@@ -131,7 +131,18 @@ final class OpenLiteSpeedTlsPaths
         }
 
         // Unclaimed hostnames fall back to the single-cert resolver's directory so
-        // they still get a :443 block (legacy behaviour for sites with one cert).
+        // they still get a :443 block (legacy behaviour for sites with one cert)
+        // — but ONLY when that certificate could actually be valid for them.
+        //
+        // The unconditional version of this made every uncertificated custom
+        // domain unreachable: a hostname with no cert of its own was handed the
+        // site's default cert (often the shared *.testing-zone wildcard), so
+        // nginx answered :443 for it while presenting a certificate for someone
+        // else's name. Browsers reject that outright — the domain failed to
+        // load over HTTPS, and the :80 block had already been turned into a
+        // redirect to that same broken HTTPS. Leaving a hostname unassigned
+        // costs it TLS until a cert is issued; {@see \App\Services\Sites\Concerns\BuildsNginxServerBlocks}
+        // then keeps serving it over plain HTTP, which at least works.
         $unassigned = array_values(array_filter($hostnames, static fn (string $h): bool => ! isset($assigned[$h])));
         if ($unassigned !== []) {
             $single = self::resolve($site);
@@ -139,7 +150,9 @@ final class OpenLiteSpeedTlsPaths
                 $defaultDir = basename(dirname($single['certFile']));
                 if ($defaultDir !== '' && $defaultDir !== '.') {
                     foreach ($unassigned as $h) {
-                        $byDir[$defaultDir][] = $h;
+                        if (self::certDirCovers($defaultDir, $h)) {
+                            $byDir[$defaultDir][] = $h;
+                        }
                     }
                 }
             }
@@ -155,6 +168,32 @@ final class OpenLiteSpeedTlsPaths
         }
 
         return $groups;
+    }
+
+    /**
+     * Whether a certbot live directory could hold a certificate valid for
+     * $hostname, judged by name alone.
+     *
+     * Certbot names the directory after the cert's first domain, so the
+     * directory name is the one piece of coverage information available
+     * without reading the certificate off the box. Exact match, or the
+     * hostname sitting under the directory's zone (the shared wildcard case)
+     * — anything else is a different name and would present a mismatched
+     * certificate.
+     */
+    private static function certDirCovers(string $certDir, string $hostname): bool
+    {
+        $certDir = strtolower(trim($certDir));
+        $hostname = strtolower(trim($hostname));
+
+        if ($certDir === '' || $hostname === '') {
+            return false;
+        }
+
+        // Certbot appends -0001, -0002… when a lineage name is already taken.
+        $certDir = (string) preg_replace('/-\d{4}$/', '', $certDir);
+
+        return $hostname === $certDir || str_ends_with($hostname, '.'.$certDir);
     }
 
     public static function siteExpectsTls(Site $site): bool

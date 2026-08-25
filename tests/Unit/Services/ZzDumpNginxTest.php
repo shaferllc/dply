@@ -8,6 +8,9 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SitePreviewDomain;
 use App\Services\Sites\NginxSiteConfigBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('dump nginx', function () {
     $site = Site::factory()->create([
