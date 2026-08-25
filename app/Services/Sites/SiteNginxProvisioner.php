@@ -528,6 +528,34 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         return $present;
     }
 
+
+    /**
+     * Whether `*.<zone>` covers a hostname.
+     *
+     * A wildcard matches exactly one label: `*.on-dply.cc` covers
+     * `site.on-dply.cc` but neither `on-dply.cc` itself nor
+     * `a.b.on-dply.cc` — and certainly not an unrelated domain.
+     */
+    protected static function wildcardCoversHostname(string $zone, string $hostname): bool
+    {
+        $zone = strtolower(trim($zone, ". \t\n\r"));
+        $hostname = strtolower(trim($hostname, ". \t\n\r"));
+
+        if ($zone === '' || $hostname === '') {
+            return false;
+        }
+
+        $suffix = '.'.$zone;
+
+        if (! str_ends_with($hostname, $suffix)) {
+            return false;
+        }
+
+        $label = substr($hostname, 0, -strlen($suffix));
+
+        return $label !== '' && ! str_contains($label, '.');
+    }
+
     /**
      * The on-disk cert/key pair for the per-server wildcard that covers this
      * site's testing hostname, or null when the site isn't wildcard-covered.
@@ -546,6 +574,21 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
         if ($dir === '') {
             return null;
+        }
+
+        // The wildcard is only a salvage if it actually covers every hostname
+        // this vhost answers on. coveringServerWildcard() looks up the site's
+        // TESTING zone and knows nothing about custom domains, so a site with a
+        // customer domain was handed *.on-dply.cc — nginx then served a cert
+        // that could not match the requested name, and every browser refused
+        // the connection outright. Serving no TLS is recoverable; serving a
+        // mismatched cert is a hard failure the operator cannot see from dply.
+        $zone = strtolower(trim((string) ($wildcard->zone ?: $site->testingZone())));
+
+        foreach ($site->webserverHostnames() as $hostname) {
+            if (! self::wildcardCoversHostname($zone, (string) $hostname)) {
+                return null;
+            }
         }
 
         return [
