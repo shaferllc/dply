@@ -14,6 +14,7 @@ use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
+use App\Services\Sites\SiteSystemdProvisioner;
 
 class SiteGitDeployer
 {
@@ -275,6 +276,20 @@ class SiteGitDeployer
         $reconcileNote = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
         if ($reconcileNote !== null) {
             $log .= "\n".$reconcileNote."\n";
+        }
+
+        // ── PROCESS ── install/refresh the systemd unit that actually RUNS a
+        // reverse-proxied app. Nothing in either deployer did this, so a Node
+        // site deployed its code, wrote a vhost proxying to its port, and then
+        // failed its own health check with 502 because no process was ever
+        // started. PHP/static sites are skipped by the provisioner itself.
+        try {
+            $units = app(SiteSystemdProvisioner::class)->provision($site->fresh() ?? $site);
+            if ($units !== []) {
+                $log .= "\n[dply] PROCESS → ".implode(', ', $units)."\n";
+            }
+        } catch (\Throwable $e) {
+            $log .= "\n[dply] PROCESS → could not install the service unit: ".$e->getMessage()."\n";
         }
 
         // ── ENV ── compose the .env (env cache + attached resource bindings'
