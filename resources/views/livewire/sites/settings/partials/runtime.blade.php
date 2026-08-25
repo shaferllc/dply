@@ -170,8 +170,11 @@
     </div>
 </section>
 
-{{-- Live runtime health (deferred via wire:init): FPM pool or app-server port --}}
-@if ($site->runtimeHealthProbeKind() === 'fpm')
+{{-- Live runtime health (deferred via wire:init): FPM pool or app-server port.
+     Gated on the server actually having PHP: probing an FPM pool on a
+     php_version=none box can only ever report "Couldn't read the pool", which
+     reads as a transient error rather than "there is no PHP here". --}}
+@if ($site->runtimeHealthProbeKind() === 'fpm' && \App\Support\Servers\ServerInstalledServices::has($server, 'php'))
     @php
         $pool = $site->phpFpmPoolSettings();
         $socketPath = $site->phpFpmListenSocketPath();

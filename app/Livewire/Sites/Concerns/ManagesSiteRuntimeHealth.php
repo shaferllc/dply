@@ -366,7 +366,7 @@ trait ManagesSiteRuntimeHealth
      * rather than dead-ending someone whose preset didn't include what they
      * need — which is exactly how a PHP site ended up on a Node-only box.
      *
-     * @return list<array{key: string, label: string, version: ?string, installed: bool}>
+     * @return list<array{key: string, label: string, version: ?string, installed: bool, current_but_missing: bool}>
      */
     public function siteRuntimeOptions(): array
     {
@@ -386,16 +386,6 @@ trait ManagesSiteRuntimeHealth
             };
         };
 
-        // The site's current runtime is always selectable, even if the server
-        // no longer reports it — otherwise the <select> renders with no matching
-        // option and the first item silently looks like the current choice.
-        $current = (string) ($this->site->runtime ?? '');
-        if ($current !== '' && ! array_key_exists($current, $available)) {
-            $available[$current] = $this->site->runtime_version !== null
-                ? (string) $this->site->runtime_version
-                : null;
-        }
-
         $options = [];
         foreach ($available as $key => $version) {
             $options[] = [
@@ -403,6 +393,23 @@ trait ManagesSiteRuntimeHealth
                 'label' => $labelFor((string) $key),
                 'version' => $version !== null ? (string) $version : null,
                 'installed' => true,
+                'current_but_missing' => false,
+            ];
+        }
+
+        // The site's current runtime stays selectable even when the server does
+        // not have it — otherwise the <select> renders with no matching option
+        // and the first item silently looks like the current choice. It is
+        // reported honestly as NOT installed: this site is php on a box with no
+        // php, and listing it under "installed" is the lie that hid the problem.
+        $current = (string) ($this->site->runtime ?? '');
+        if ($current !== '' && ! array_key_exists($current, $available)) {
+            $options[] = [
+                'key' => $current,
+                'label' => $labelFor($current),
+                'version' => $this->site->runtime_version !== null ? (string) $this->site->runtime_version : null,
+                'installed' => false,
+                'current_but_missing' => true,
             ];
         }
 
@@ -415,6 +422,7 @@ trait ManagesSiteRuntimeHealth
                 'label' => $labelFor((string) $key),
                 'version' => null,
                 'installed' => false,
+                'current_but_missing' => false,
             ];
         }
 

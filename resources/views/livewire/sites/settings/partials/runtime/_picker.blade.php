@@ -17,7 +17,15 @@
 
     $pickerOptions = $this->siteRuntimeOptions();
     $pickerInstalled = array_values(array_filter($pickerOptions, fn (array $o) => $o['installed']));
-    $pickerMissing = array_values(array_filter($pickerOptions, fn (array $o) => ! $o['installed']));
+    // The site's saved runtime when the server does not actually have it — the
+    // divineiv case: type=php on a box provisioned with php_version=none. Kept
+    // selectable so the <select> has a matching option, but grouped apart so it
+    // is never presented as something this server can run.
+    $pickerOrphan = array_values(array_filter($pickerOptions, fn (array $o) => ! empty($o['current_but_missing'])));
+    $pickerMissing = array_values(array_filter(
+        $pickerOptions,
+        fn (array $o) => ! $o['installed'] && empty($o['current_but_missing'])
+    ));
 
     // Follows the SELECTED runtime, not the saved one — the select is
     // wire:model.live precisely so picking Node on a PHP site reveals the
@@ -57,6 +65,13 @@
                             </option>
                         @endforeach
                     </optgroup>
+                    @if ($pickerOrphan !== [])
+                        <optgroup label="{{ __('Currently set — NOT installed on this server') }}">
+                            @foreach ($pickerOrphan as $option)
+                                <option value="{{ $option['key'] }}">{{ $option['label'] }} — {{ __('not installed') }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
                     @if ($pickerMissing !== [])
                         <optgroup label="{{ __('Not installed on this server') }}">
                             @foreach ($pickerMissing as $option)
@@ -78,6 +93,25 @@
                 <p class="{{ $pickerHelp }}">{{ $pickerHint ?: __('Leave blank to use the server default.') }}</p>
                 <x-input-error :messages="$errors->get('runtime_choice_version')" class="mt-1" />
             </div>
+        </div>
+
+        {{-- What the probe actually found on the box. The page used to assert
+             "PHP" everywhere regardless, which is how a php-less server kept
+             showing PHP-FPM controls. --}}
+        <div class="flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-3">
+            <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Detected on this server') }}</span>
+            @forelse ($pickerInstalled as $option)
+                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                    {{ $option['label'] }}@if ($option['version']) <span class="font-mono font-normal">{{ $option['version'] }}</span>@endif
+                </span>
+            @empty
+                <span class="text-xs text-brand-moss">{{ __('Nothing detected yet — refresh the server inventory.') }}</span>
+            @endforelse
+            @foreach ($pickerOrphan as $option)
+                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-xs font-semibold text-brand-ink ring-1 ring-brand-ink/10">
+                    {{ $option['label'] }} · {{ __('missing') }}
+                </span>
+            @endforeach
         </div>
 
         {{-- Only reverse-proxied runtimes need these. SetSiteRuntime refuses the

@@ -77,3 +77,41 @@ test('the setup card hides "Install an app" when the server has no installer', f
     expect($hasInstallers(catalogKeysFor('8.3')))->toBeTrue()
         ->and($hasInstallers(catalogKeysFor('none')))->toBeFalse();
 });
+
+test('a php site on a php-less server loses the PHP tab and is marked not installed', function () {
+    // divineiv's exact shape: type=php, on a server provisioned php_version=none
+    // with node pinned. The page used to assert PHP everywhere regardless.
+    $server = Server::factory()->ready()->create([
+        'meta' => [
+            'webserver' => 'nginx',
+            'php_version' => 'none',
+            'runtime_defaults' => ['node' => '22'],
+        ],
+    ]);
+
+    $run = ServerProvisionRun::create(['server_id' => $server->id, 'attempt' => 1, 'status' => 'succeeded']);
+    ServerProvisionArtifact::create([
+        'server_provision_run_id' => $run->id,
+        'type' => 'stack_summary',
+        'key' => 'stack-summary',
+        'label' => 'Stack summary',
+        'content' => '',
+        'metadata' => ['webserver' => 'nginx', 'php_version' => 'none'],
+    ]);
+    ServerInstalledServices::forgetStackSummary((string) $server->id);
+
+    $site = \App\Models\Site::factory()->create([
+        'server_id' => $server->id,
+        'type' => \App\Enums\SiteType::Php,
+        'runtime' => 'php',
+    ]);
+
+    // No PHP tab: it offered FPM pools and OPcache for an absent interpreter.
+    expect(\App\Support\SiteSettingsSidebar::runtimeTabsFor($site->fresh()))
+        ->not->toHaveKey('php');
+
+    // And PHP must not be advertised as something this server has.
+    expect(array_keys($server->fresh()->availableSiteRuntimes()))
+        ->toContain('node')
+        ->and(array_keys($server->fresh()->availableSiteRuntimes()))->not->toContain('php');
+});
