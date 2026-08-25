@@ -37,10 +37,15 @@ use RuntimeException;
 trait ManagesDatabaseBindings
 {
     /**
-     * Databases the site can actually reach: those on its own server (over
-     * loopback) plus those on peer servers sharing the same private network
-     * (over the peer's private IP). Each label notes where the DB lives and
-     * flags peers whose remote access isn't open yet.
+     * Databases the site can attach: its own server's (over loopback), a
+     * private-network peer's (over the peer's private IP), and any other
+     * database in the organization (over the endpoint stored on the row).
+     *
+     * The label carries the difference, because the operator is the one who
+     * has to act on it: an org server that is not a network peer says so and
+     * flags remote access when it is still closed. Offering it with a warning
+     * beats hiding it — a database that simply is not in the list gives no
+     * clue that a firewall rule is all that stands between you and it.
      *
      * @return list<array{id: string, label: string}>
      */
@@ -52,7 +57,7 @@ trait ManagesDatabaseBindings
         }
 
         $databases = ServerDatabase::query()
-            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->whereIn('server_id', $this->attachableDatabaseServerIds($server))
             ->with('server:id,name,organization_id,private_ip_address,private_network_id')
             ->orderBy('name')
             ->get();
@@ -66,10 +71,15 @@ trait ManagesDatabaseBindings
         return $databases
             ->map(function (ServerDatabase $db) use ($server, $consumers): array {
                 $sameBox = (string) $db->server_id === (string) $server->id;
+                $isPeer = ! $sameBox
+                    && $db->server !== null
+                    && $this->sharePrivateNetwork($server, $db->server);
+
                 if ($sameBox) {
                     $where = __('this server');
                 } else {
-                    $where = ($db->server?->name ?: __('network peer'))
+                    $where = ($db->server?->name ?: __('another server'))
+                        .($isPeer ? '' : ' — '.__('over public IP'))
                         .($db->remote_access ? '' : ' — '.__('remote access off'));
                 }
                 $used = $consumers[(string) $db->id] ?? 0;
@@ -78,7 +88,11 @@ trait ManagesDatabaseBindings
                     'id' => (string) $db->id,
                     'label' => $db->name.' ('.$db->engine.') · '.$where.$this->usageSuffix($used),
                     'engine' => (string) $db->engine,
-                    'group' => $sameBox ? 'local' : 'peer',
+                    'group' => match (true) {
+                        $sameBox => 'local',
+                        $isPeer => 'peer',
+                        default => 'org',
+                    },
                     'consumers' => $used,
                 ];
             })
@@ -100,13 +114,15 @@ trait ManagesDatabaseBindings
             throw new RuntimeException(__('This site has no server.'));
         }
 
+        // Same set the picker built from — the two must not disagree, or the
+        // modal offers options that saving then rejects.
         $db = ServerDatabase::query()
-            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->whereIn('server_id', $this->attachableDatabaseServerIds($server))
             ->whereKey($databaseId)
             ->first();
 
         if (! $db instanceof ServerDatabase) {
-            throw new InvalidArgumentException(__('That database is not reachable from this site\'s server.'));
+            throw new InvalidArgumentException(__('That database is not in this organization.'));
         }
 
         $crossServer = (string) $db->server_id !== (string) $server->id;

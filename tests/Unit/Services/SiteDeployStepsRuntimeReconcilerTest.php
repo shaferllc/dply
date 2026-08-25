@@ -261,3 +261,52 @@ test('no seeder is ever added automatically', function () {
 
     expect($commands)->not->toContain('seed');
 });
+
+test('a step dply seeded stays updatable after the emitted command changes', function () {
+    // The regression this column exists for: inferring provenance from shape
+    // meant changing an emitted command orphaned every step seeded with the old
+    // one — reclassified as hand-written and protected from updates forever.
+    $site = siteWithBuildSteps([], ['language' => 'node', 'framework' => 'nextjs', 'package_manager' => 'pnpm', 'migration_tool' => 'payload']);
+
+    $pipeline = $site->deployPipelines()->first();
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'step_type' => SiteDeployStep::TYPE_CUSTOM,
+        // A command this service no longer emits — the pre-corepack form.
+        'custom_command' => 'pnpm exec payload migrate',
+        'phase' => SiteDeployStep::PHASE_RELEASE,
+        'sort_order' => 10,
+        'timeout_seconds' => 900,
+        'seeded_by_dply' => true,
+    ]);
+
+    $note = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh());
+
+    $release = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_RELEASE)->pluck('custom_command')->all();
+
+    expect($note)->not->toBeNull()
+        ->and(implode(' ', $release))->toContain('corepack pnpm exec');
+});
+
+test('a hand-written release step is still protected', function () {
+    $site = siteWithBuildSteps([], ['language' => 'node', 'framework' => 'nextjs', 'package_manager' => 'pnpm', 'migration_tool' => 'payload']);
+
+    $pipeline = $site->deployPipelines()->first();
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'step_type' => SiteDeployStep::TYPE_CUSTOM,
+        'custom_command' => './scripts/our-own-migrate.sh',
+        'phase' => SiteDeployStep::PHASE_RELEASE,
+        'sort_order' => 10,
+        'timeout_seconds' => 900,
+        // Not ours: no provenance flag.
+    ]);
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh());
+
+    $release = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_RELEASE)->pluck('custom_command')->all();
+
+    expect($release)->toContain('./scripts/our-own-migrate.sh');
+});

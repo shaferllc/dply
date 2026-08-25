@@ -105,7 +105,17 @@ final class SiteDeployStepsRuntimeReconciler
             }
 
             // A human edited this phase: say so rather than throwing it away.
-            if (! $current->every(fn (SiteDeployStep $step) => in_array($signatureOf($step), $knownSeeded, true))) {
+            //
+            // Provenance first, shape second. seeded_by_dply records that dply
+            // created the step; the signature check is the fallback for rows
+            // written before that column existed. Relying on shape alone meant
+            // that changing an emitted command orphaned every step seeded with
+            // the old one — reclassified as hand-written and never updated
+            // again.
+            $ours = fn (SiteDeployStep $step): bool => (bool) $step->seeded_by_dply
+                || in_array($signatureOf($step), $knownSeeded, true);
+
+            if (! $current->every($ours)) {
                 $notes[] = sprintf(
                     'the %s steps are customised — leaving them untouched',
                     $phase,
@@ -127,6 +137,7 @@ final class SiteDeployStepsRuntimeReconciler
                     'timeout_seconds' => $step['timeout_seconds'] ?? 600,
                     'sort_order' => $step['sort_order'] ?? 10,
                     'managed_by_manifest' => false,
+                    'seeded_by_dply' => true,
                 ]);
             }
 

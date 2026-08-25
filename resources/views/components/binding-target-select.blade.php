@@ -1,7 +1,12 @@
 {{--
     Attach-existing resource picker shared by the database / redis / broadcasting
     binding modals. Splits options into "This server", "Private-network peers",
-    "Dedicated cache servers", and "Managed Redis" optgroups when present.
+    "Elsewhere in this organization", "Dedicated cache servers", and
+    "Managed Redis" optgroups when present.
+
+    The org group is reached over a public endpoint rather than a private IP,
+    so its options carry that in their label — the grouping tells you where a
+    resource lives, the label tells you what it will cost you to use it.
 
     Props:
       targets     list<array{id,label,group?,consumers?}> from SiteBindingManager::attachableTargets()
@@ -24,10 +29,11 @@
     $targets = collect($targets);
     $local = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'local')->values();
     $peers = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'peer')->values();
+    $org = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'org')->values();
     $dedicated = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'dedicated')->values();
     $managed = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'managed')->values();
-    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer', 'dedicated', 'managed'], true))->values();
-    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty() || $dedicated->isNotEmpty() || $managed->isNotEmpty();
+    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer', 'org', 'dedicated', 'managed'], true))->values();
+    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty() || $org->isNotEmpty() || $dedicated->isNotEmpty() || $managed->isNotEmpty();
     $consumerMap = $targets->mapWithKeys(fn ($t) => [(string) $t['id'] => (int) ($t['consumers'] ?? 0)])->all();
     $placeholder ??= __('Choose a service…');
 @endphp
@@ -46,6 +52,13 @@
             @if ($peers->isNotEmpty())
                 <optgroup label="{{ __('Private-network peers') }}">
                     @foreach ($peers as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
+            @if ($org->isNotEmpty())
+                <optgroup label="{{ __('Elsewhere in this organization') }}">
+                    @foreach ($org as $t)
                         <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
                     @endforeach
                 </optgroup>

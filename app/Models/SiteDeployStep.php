@@ -146,6 +146,7 @@ class SiteDeployStep extends Model
         'custom_command',
         'timeout_seconds',
         'managed_by_manifest',
+        'seeded_by_dply',
     ];
 
     /** @return array<string, string> */
@@ -153,6 +154,7 @@ class SiteDeployStep extends Model
     {
         return [
             'managed_by_manifest' => 'boolean',
+            'seeded_by_dply' => 'boolean',
         ];
     }
 

@@ -247,7 +247,9 @@
                                              pointing here" answer lives on the DNS tab. Without this
                                              a freshly added domain gave no hint of what to do next
                                              unless you knew to go looking on another tab. --}}
-                                        @php($dnsHint = $this->dnsRecordHintFor($domain->hostname))
+                                        @php
+                                            $dnsHint = $this->dnsRecordHintFor($domain->hostname);
+                                        @endphp
                                         @if ($dnsHint)
                                             <details class="mt-1.5 w-fit max-w-full rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5">
                                                 <summary class="cursor-pointer list-none text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DNS record') }}</summary>

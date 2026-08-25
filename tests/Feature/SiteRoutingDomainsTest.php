@@ -134,6 +134,38 @@ test('bulk import aborts on invalid hostname', function () {
 /**
  * @return array{0: User, 1: Server, 2: Site}
  */
+// The record shown on each domain row. Registrar forms ask for the
+// zone-relative name, and an apex must not be offered a CNAME.
+test('dns record hint is zone relative and flags the apex', function () {
+    [$user, $server, $site] = makeUserSite();
+    $server->forceFill(['ip_address' => '203.0.113.10'])->save();
+    $site->forceFill(['dns_zone' => 'example.com'])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server->fresh(), 'site' => $site->fresh(), 'section' => 'routing']);
+
+    $apex = $component->instance()->dnsRecordHintFor('example.com');
+    expect($apex)->toMatchArray(['type' => 'A', 'name' => '@', 'value' => '203.0.113.10', 'zone' => 'example.com', 'apex' => true]);
+
+    $sub = $component->instance()->dnsRecordHintFor('www.example.com');
+    expect($sub)->toMatchArray(['name' => 'www', 'apex' => false]);
+
+    // Outside the zone dply knows about: fall back to the FQDN, and never
+    // claim a zone we have not confirmed.
+    $foreign = $component->instance()->dnsRecordHintFor('shop.other.test');
+    expect($foreign)->toMatchArray(['name' => 'shop.other.test', 'zone' => '', 'apex' => false]);
+});
+
+test('dns record hint is absent until the server has an ip', function () {
+    [$user, $server, $site] = makeUserSite();
+    $server->forceFill(['ip_address' => null])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server->fresh(), 'site' => $site->fresh(), 'section' => 'routing']);
+
+    expect($component->instance()->dnsRecordHintFor('example.com'))->toBeNull();
+});
+
 function makeUserSite(): array
 {
     $user = User::factory()->create();

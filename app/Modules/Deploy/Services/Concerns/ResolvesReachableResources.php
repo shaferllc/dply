@@ -31,6 +31,9 @@ trait ResolvesReachableResources
     /** @var array<string, list<string>> */
     private array $attachableCacheServerIdsByServer = [];
 
+    /** @var array<string, list<string>> */
+    private array $attachableDatabaseServerIdsByServer = [];
+
     /** @return Collection<int, PrivateNetwork> */
     private function orgPrivateNetworks(string $organizationId)
     {
@@ -103,6 +106,44 @@ trait ResolvesReachableResources
             ->all();
 
         return $this->reachableServerIdsByServer[(string) $server->id] = array_values(array_unique([...$ids, ...$peers]));
+    }
+
+    /**
+     * Servers whose databases this site may attach: every server in the org.
+     *
+     * Reachability and *offerability* are different questions, and conflating
+     * them is what made "attach a database from another server" impossible
+     * unless a PrivateNetwork row happened to exist. {@see reachableServerIds()}
+     * answers "can these two talk over private IPs", which is the right input
+     * to {@see effectiveDatabaseHost()} — it is not the right input to a
+     * picker, because a database on an unlinked org server is perfectly
+     * attachable over its public endpoint once remote access is open.
+     *
+     * Same posture as {@see attachableCacheServerIds()}, which has always
+     * offered dedicated cache hosts org-wide and fallen back to a public IP.
+     * The label on each option says which case it is, and host resolution
+     * still prefers loopback, then a shared private IP, then the stored host —
+     * widening the picker changes nothing about how a binding actually dials.
+     *
+     * @return list<string>
+     */
+    private function attachableDatabaseServerIds(Server $server): array
+    {
+        $key = (string) $server->id;
+        if (isset($this->attachableDatabaseServerIdsByServer[$key])) {
+            return $this->attachableDatabaseServerIdsByServer[$key];
+        }
+
+        $orgServerIds = Server::query()
+            ->where('organization_id', $server->organization_id)
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return $this->attachableDatabaseServerIdsByServer[$key] = array_values(array_unique([
+            ...$this->reachableServerIds($server),
+            ...$orgServerIds,
+        ]));
     }
 
     /**
