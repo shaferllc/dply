@@ -419,6 +419,9 @@ NGINX;
         }
 
         $tlsBlocks = [];
+        // Hostnames that end up with a real :443 block. Only these may be
+        // redirected to HTTPS — see the plain-HTTP carve-out below.
+        $tlsHostnames = [];
         foreach ($groups as $group) {
             if ($group['hostnames'] === []) {
                 continue;
@@ -448,6 +451,7 @@ NGINX;
                 1
             );
             $tlsBlocks[] = $scoped ?? $block;
+            $tlsHostnames = [...$tlsHostnames, ...$group['hostnames']];
         }
 
         if ($tlsBlocks === []) {
@@ -460,27 +464,81 @@ NGINX;
         // that still serves the ACME http-01 challenge from the document root
         // so certbot renewals keep working. Falls back to serving the app on
         // both :80 and :443 if we can't parse server_name/root out of $config.
-        $http80 = $this->httpsRedirectServerBlock($config);
+        //
+        // The redirect is scoped to hostnames that actually GOT a :443 block.
+        // Redirecting the rest sent them somewhere that does not exist: a
+        // custom domain with no cert of its own has no group, so it got no
+        // TLS block, yet the old redirect covered every name on the site the
+        // moment ANY cert existed (the shared *.testing-zone wildcard is
+        // enough). :80 answered 301 → https, :443 had no matching block, so
+        // nginx served whichever :443 block came first and the browser got a
+        // certificate-name mismatch. The domain was unreachable on both
+        // ports, and it had been fine on plain HTTP before the wildcard
+        // landed.
+        $tlsHostnames = array_values(array_unique($tlsHostnames));
+        $plainNames = $this->serverNamesOutside($config, $tlsHostnames);
+
+        $http80 = $this->httpsRedirectServerBlock($config, $tlsHostnames);
         if ($http80 === null) {
             return $config."\n\n".$tlsConfig;
+        }
+
+        // Uncertificated hostnames keep the full app block on :80. Plain HTTP
+        // is the honest answer for them until a cert is issued — the row in
+        // the routing UI already says "SSL missing".
+        if ($plainNames !== []) {
+            $plainBlock = preg_replace(
+                '/^(\s*server_name\s+)[^;]+;/m',
+                '${1}'.implode(' ', $plainNames).';',
+                $config,
+                1
+            );
+            if (is_string($plainBlock)) {
+                return $plainBlock."\n\n".$http80."\n\n".$tlsConfig;
+            }
         }
 
         return $http80."\n\n".$tlsConfig;
     }
 
     /**
+     * server_name entries in $config that are not in $covered.
+     *
+     * @param  list<string>  $covered
+     * @return list<string>
+     */
+    protected function serverNamesOutside(string $config, array $covered): array
+    {
+        if (! preg_match('/^\s*server_name\s+([^;]+);/m', $config, $sn)) {
+            return [];
+        }
+
+        $names = preg_split('/\s+/', trim($sn[1])) ?: [];
+        $covered = array_map(static fn (string $h): string => strtolower($h), $covered);
+
+        return array_values(array_filter(
+            $names,
+            static fn (string $name): bool => $name !== '' && ! in_array(strtolower($name), $covered, true),
+        ));
+    }
+
+    /**
      * Build a minimal :80 server block that 301-redirects to HTTPS while still
      * serving `/.well-known/acme-challenge/` from the site's document root.
      * Returns null when server_name/root can't be extracted from $config.
+     *
+     * @param  list<string>|null  $names  Restrict the redirect to these hostnames
+     *                                    (those with a :443 block). Null keeps
+     *                                    every name in $config.
      */
-    protected function httpsRedirectServerBlock(string $config): ?string
+    protected function httpsRedirectServerBlock(string $config, ?array $names = null): ?string
     {
         if (! preg_match('/^\s*server_name\s+([^;]+);/m', $config, $sn)
             || ! preg_match('/^\s*root\s+([^;]+);/m', $config, $rt)) {
             return null;
         }
 
-        $serverNames = trim($sn[1]);
+        $serverNames = $names === null || $names === [] ? trim($sn[1]) : implode(' ', $names);
         $root = trim($rt[1]);
 
         return <<<NGINX

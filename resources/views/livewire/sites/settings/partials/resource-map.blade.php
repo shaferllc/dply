@@ -491,14 +491,18 @@
                     // the flag made the Runtime hub read "nothing attached"
                     // directly above a visible Publication card. Identical to the
                     // old count for every other group, where card == attached.
-                    $gAttached = $cardTypes->count();
+                    $gShown = $cardTypes->count();
                 @endphp
 
                 {{-- Group hub --}}
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
+                        {{-- "shown", not "attached": this counts the cards below, and
+                             Publication is always drawn while never being attached —
+                             so "1 attached" would claim an attachment that never
+                             happened on a site with nothing attached at all. --}}
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice('{0}nothing yet|{1}:count resource|[2,*]:count resources', $gShown, ['count' => $gShown]) }}</p>
                     </div>
                 </div>
 
