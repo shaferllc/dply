@@ -4,7 +4,6 @@ namespace Tests\Unit\Services\SiteCloneStrategyResolverTest;
 
 use App\Models\Site;
 use App\Services\Sites\Clone\ContainerSiteCloneStrategy;
-use App\Services\Sites\Clone\ServerlessSiteCloneStrategy;
 use App\Services\Sites\Clone\SiteCloneStrategyResolver;
 use App\Services\Sites\Clone\VmSiteCloneStrategy;
 
@@ -15,19 +14,15 @@ test('selects vm strategy for vm profile', function () {
     expect($resolver->for($site))->toBeInstanceOf(VmSiteCloneStrategy::class);
 });
 
-test('selects serverless strategy for functions runtime', function () {
+test('selects vm strategy for leftover functions profiles', function (string $profile) {
     $resolver = app(SiteCloneStrategyResolver::class);
-    $site = new Site(['meta' => ['runtime_profile' => 'digitalocean_functions_web']]);
+    $site = new Site(['meta' => ['runtime_profile' => $profile]]);
 
-    expect($resolver->for($site))->toBeInstanceOf(ServerlessSiteCloneStrategy::class);
-});
-
-test('selects serverless strategy for aws lambda profile', function () {
-    $resolver = app(SiteCloneStrategyResolver::class);
-    $site = new Site(['meta' => ['runtime_profile' => 'aws_lambda_bref_web']]);
-
-    expect($resolver->for($site))->toBeInstanceOf(ServerlessSiteCloneStrategy::class);
-});
+    expect($resolver->for($site))->toBeInstanceOf(VmSiteCloneStrategy::class);
+})->with([
+    'digitalocean_functions_web',
+    'aws_lambda_bref_web',
+]);
 
 test('selects container strategy for docker', function () {
     $resolver = app(SiteCloneStrategyResolver::class);

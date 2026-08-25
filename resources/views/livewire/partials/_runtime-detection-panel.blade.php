@@ -3,7 +3,7 @@
 
     Keyed entirely off the $detectedPlan array populated by the
     DetectsRepositoryRuntime concern. Rendered identically by the VM site,
-    Cloud container, and serverless function create flows.
+    and Cloud container create flows.
 
     Optional include data:
       - $detectionInstallable (bool) — render the VM-only "install runtime on
@@ -11,7 +11,6 @@
         passes this; defaults to false everywhere else.
 --}}
 @php($detectionInstallable = $detectionInstallable ?? false)
-@php($detectionIsServerless = ($detectedPlan['kind'] ?? '') === 'serverless')
 
 @if (! empty($detectedPlan['error']))
     <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
@@ -21,13 +20,9 @@
 @elseif (! empty($detectedPlan['no_match']))
     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p class="font-medium">{{ __('No runtime detected.') }}</p>
-        @if ($detectionIsServerless)
-            <p class="mt-1">{{ __('No framework markers, no project.yml, and no recognized main() entry file at the repo root. Pick a runtime manually before deploying.') }}</p>
-        @else
-            <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
-        @endif
+        <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
     </div>
-@elseif (! empty($detectedPlan['runtime']) || $detectionIsServerless)
+@elseif (! empty($detectedPlan['runtime']))
     <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-950 space-y-3">
         <div class="flex flex-wrap items-center gap-3">
             <span class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900">
@@ -38,9 +33,6 @@
             </span>
             @if (! empty($detectedPlan['version']))
                 <span class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 font-mono text-xs text-emerald-900">{{ $detectedPlan['version'] }}</span>
-            @endif
-            @if ($detectionIsServerless && ! empty($detectedPlan['deploy_kind']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['deploy_kind'] }} {{ __('action') }}</span>
             @endif
             @if (! empty($detectedPlan['confidence']))
                 <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
@@ -67,12 +59,6 @@
                 <div>
                     <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['start_command'] }}</dd>
-                </div>
-            @endif
-            @if ($detectionIsServerless && ! empty($detectedPlan['entrypoint']))
-                <div>
-                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Entrypoint') }}</dt>
-                    <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['entrypoint'] }}</dd>
                 </div>
             @endif
         </dl>

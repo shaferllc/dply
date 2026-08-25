@@ -24,6 +24,21 @@ test('site create access allows ready server for org owner', function () {
         ->and(SiteCreateAccess::canCreate($server, $user))->toBeTrue();
 });
 
+test('site create access blocks leftover functions hosts', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+    ]);
+
+    expect(SiteCreateAccess::canCreate($server, $user))->toBeFalse()
+        ->and(SiteCreateAccess::blockedBy($server, $user))->toBe(SiteCreateAccess::BLOCKED_BY_HOST);
+});
+
 test('site create access blocks deployer role', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();

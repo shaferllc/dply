@@ -27,6 +27,7 @@ trait ManagesSiteCreateStore
     public function store(SiteProvisioner $siteProvisioner): mixed
     {
         $this->authorize('update', $this->server);
+        abort_if($this->server->isServerlessHost(), 403);
 
         $org = auth()->user()->currentOrganization();
         abort_if($org === null, 403);

@@ -1973,6 +1973,8 @@ test('repair certificate seeds ssl console action before job dispatch', function
     Queue::assertPushed(
         ExecuteSiteCertificateJob::class,
         fn (ExecuteSiteCertificateJob $job): bool => $job->certificateId === (string) $certificate->id,
+    );
+
     $action = ConsoleAction::query()
         ->where('subject_type', $site->getMorphClass())
         ->where('subject_id', $site->id)
