@@ -47,13 +47,13 @@ class RuntimeAwareDeployStepDefaults
      *     sort_order: int,
      * }>
      */
-    public function defaultsFor(?string $runtime, ?string $framework = null): array
+    public function defaultsFor(?string $runtime, ?string $framework = null, ?string $packageManager = null): array
     {
         $framework = self::canonicalFramework($framework);
 
         $steps = match ($runtime) {
             'php' => $this->phpSteps($framework),
-            'node' => $this->nodeSteps($framework),
+            'node' => $this->nodeSteps($framework, $packageManager),
             'python' => $this->pythonSteps($framework),
             'ruby' => $this->rubySteps($framework),
             'go' => $this->goSteps(),
@@ -205,11 +205,19 @@ class RuntimeAwareDeployStepDefaults
         };
     }
 
-    private function nodeSteps(?string $framework): array
+    private function nodeSteps(?string $framework, ?string $packageManager = null): array
     {
+        // Install with the tool the repository actually uses. `npm ci` against a
+        // pnpm project fails outright ("package.json and package-lock.json are
+        // not in sync"), which is what a Next.js + pnpm repo hit here.
         $steps = [
             [
-                'step_type' => SiteDeployStep::TYPE_NPM_CI,
+                'step_type' => match (strtolower((string) $packageManager)) {
+                    'pnpm' => SiteDeployStep::TYPE_PNPM_INSTALL,
+                    'yarn' => SiteDeployStep::TYPE_YARN_INSTALL,
+                    'bun' => SiteDeployStep::TYPE_BUN_INSTALL,
+                    default => SiteDeployStep::TYPE_NPM_CI,
+                },
                 'phase' => SiteDeployStep::PHASE_BUILD,
                 'timeout_seconds' => 900,
             ],

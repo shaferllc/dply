@@ -155,6 +155,23 @@ final class PipelineAnchorScriptRunner
             $hasExistingGit = false;
             $log = "\n[dply] The checkout on disk points at a different repository — re-initialising it against "
                 .self::stripCredentials($repoUrl)."\n";
+
+            // Remove the OLD repository's tracked files before dropping .git.
+            // The init path below hard-resets, which overwrites files the new
+            // repo tracks but leaves everything else in place — so a Laravel
+            // checkout replaced by a Next.js one kept composer.json and artisan
+            // sitting there, and runtime detection went on reporting PHP.
+            //
+            // Deliberately `git ls-files` and not `git clean -fdx`: only files
+            // the previous repo tracked are removed. Anything the deploy or the
+            // operator put there (.env, node_modules, uploads) is untouched.
+            $ssh->exec(sprintf(
+                'cd %1$s && git ls-files -z 2>/dev/null | xargs -0 -r rm -f -- 2>/dev/null; '
+                .'git ls-files -z 2>/dev/null | xargs -0 -r -n1 dirname 2>/dev/null | sort -ru '
+                .'| xargs -r -I{} rmdir -p --ignore-fail-on-non-empty {} 2>/dev/null; true',
+                $releaseEsc
+            ), 120);
+
             $ssh->exec(sprintf('rm -rf %s/.git', $releaseEsc), 60);
         }
 

@@ -91,7 +91,11 @@ final class SiteDeployStepsRuntimeReconciler
         // one vocabulary rather than a translation table per call site.
         $framework = strtolower(trim((string) ($detected['framework'] ?? '')));
 
-        $replacements = $this->defaults->defaultsFor($language, $framework !== '' ? $framework : null);
+        $replacements = $this->defaults->defaultsFor(
+            $language,
+            $framework !== '' ? $framework : null,
+            isset($detected['package_manager']) ? (string) $detected['package_manager'] : null,
+        );
 
         if ($replacements === []) {
             return null;

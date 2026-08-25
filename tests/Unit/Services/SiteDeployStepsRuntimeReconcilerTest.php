@@ -154,3 +154,40 @@ test('a hand-written custom step is never discarded even when it looks like a de
     expect($site->fresh()->deployPipelines()->with('steps')->first()->steps->pluck('custom_command')->all())
         ->toContain('./scripts/our-bespoke-build.sh');
 });
+
+test('a pnpm project installs with pnpm, not npm ci', function () {
+    // `npm ci` against a pnpm repo fails outright: "package.json and
+    // package-lock.json are not in sync".
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'node', 'framework' => 'nextjs', 'package_manager' => 'pnpm'],
+    );
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    $types = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_BUILD)->pluck('step_type')->all();
+
+    expect($types)->toContain(SiteDeployStep::TYPE_PNPM_INSTALL)
+        ->and($types)->not->toContain(SiteDeployStep::TYPE_NPM_CI);
+});
+
+test('yarn and bun pick their own install steps', function () {
+    foreach ([
+        'yarn' => SiteDeployStep::TYPE_YARN_INSTALL,
+        'bun' => SiteDeployStep::TYPE_BUN_INSTALL,
+        'npm' => SiteDeployStep::TYPE_NPM_CI,
+    ] as $manager => $expected) {
+        $site = siteWithBuildSteps(
+            [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+            ['language' => 'node', 'framework' => 'express', 'package_manager' => $manager],
+        );
+
+        app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+        $types = $site->fresh()->deployPipelines()->with('steps')->first()
+            ->steps->where('phase', SiteDeployStep::PHASE_BUILD)->pluck('step_type')->all();
+
+        expect($types)->toContain($expected);
+    }
+});

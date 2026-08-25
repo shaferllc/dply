@@ -102,7 +102,11 @@ final class RepositoryRuntimeDetector
             return $pythonStack;
         }
 
-        $nodeFramework = $this->detectNodeStack($packageJson, $capabilities);
+        $nodeFramework = $this->detectNodeStack(
+            $packageJson,
+            $capabilities,
+            is_array($packageJson) ? $this->jsPackageManager($files, $packageJson) : 'npm',
+        );
         if ($nodeFramework !== null) {
             return $nodeFramework;
         }
@@ -606,7 +610,7 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    public function detectNodeStack(?array $packageJson, array $capabilities): ?array
+    public function detectNodeStack(?array $packageJson, array $capabilities, string $packageManager = 'npm'): ?array
     {
         if ($packageJson === null) {
             return null;
@@ -620,6 +624,10 @@ final class RepositoryRuntimeDetector
 
         $node = fn (string $framework, string $deployKind, string $artifactOutputPath, string $confidence, array $reasons, array $warnings): array => [
             'framework' => $framework,
+            // Carried through so the deploy steps install with the tool the repo
+            // actually uses. Emitting `npm ci` for a pnpm project fails with
+            // "package.json and package-lock.json are not in sync".
+            'package_manager' => $packageManager,
             'deploy_kind' => $deployKind,
             'language' => 'node',
             'runtime' => (string) ($capabilities['default_runtime'] ?? 'nodejs:18'),

@@ -62,6 +62,7 @@ final class VmSiteStackDetectionPersister
                 ? $result['reasons']
                 : ['Detected during deploy from the repository contents.'],
             'build_command' => (string) ($result['build_command'] ?? ''),
+            'package_manager' => (string) ($result['package_manager'] ?? ''),
         ];
 
         // Laravel's per-package flags (octane, horizon, reverb, …) drive the

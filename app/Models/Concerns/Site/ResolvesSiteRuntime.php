@@ -229,6 +229,13 @@ trait ResolvesSiteRuntime
                 'language' => (string) ($blob['language'] ?? 'unknown'),
             ];
 
+            // The JS package manager the repo actually uses (npm/pnpm/yarn/bun).
+            // Carried through because the deploy step defaults pick the install
+            // command from it — `npm ci` on a pnpm repo fails outright.
+            if (isset($blob['package_manager']) && is_string($blob['package_manager']) && $blob['package_manager'] !== '') {
+                $out['package_manager'] = $blob['package_manager'];
+            }
+
             if (isset($blob['confidence']) && is_string($blob['confidence']) && $blob['confidence'] !== '') {
                 $out['confidence'] = $blob['confidence'];
             }
