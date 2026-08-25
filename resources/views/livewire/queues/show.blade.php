@@ -251,10 +251,7 @@
 
                 @if (! $billable)
                     <x-alert tone="success" class="mb-4">
-                        {{ __('This queue serves a dply Serverless site, so it is included at no charge.') }}
-                        @if ($namespace->site !== null)
-                            {{ __('If “:site” moves off Serverless, the queue moves onto its :tier tier and we will tell you before it appears on a bill.', ['site' => $namespace->site->name, 'tier' => $tier->label]) }}
-                        @endif
+                        {{ __('This queue is included at no charge.') }}
                     </x-alert>
                 @endif
 

@@ -4,7 +4,6 @@
     $detectionSourceLabel = match ($resolvedDetection['source'] ?? null) {
         'docker' => __('Docker inspection'),
         'kubernetes' => __('Kubernetes inspection'),
-        'serverless' => __('Serverless target'),
         'vm' => __('VM deploy (composer.json)'),
         default => '',
     };

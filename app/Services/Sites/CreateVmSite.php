@@ -44,7 +44,7 @@ final class CreateVmSite
      */
     public static function supports(Server $server): bool
     {
-        if ($server->hostCapabilities()->supportsFunctionDeploy()
+        if ($server->isServerlessHost()
             || $server->isDockerHost()
             || $server->isKubernetesCluster()) {
             return false;

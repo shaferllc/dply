@@ -259,13 +259,6 @@
                             ['label' => __('Gate a deploy on a healthy site (exits 1 while anything is down)'), 'command' => 'dply deploy --wait && dply uptime '.$cliSite.' --no-prompt'],
                             ['label' => __('Errors raised by these checks'), 'command' => 'dply sites:errors '.$cliSite],
                         ];
-
-                        if ($site->siteKind() === 'serverless') {
-                            $cliCommands[] = [
-                                'label' => __('Function health rollup (24h)'),
-                                'command' => 'dply serverless status '.$cliSite,
-                            ];
-                        }
                     @endphp
 
                     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">

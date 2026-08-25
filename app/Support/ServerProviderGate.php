@@ -37,7 +37,6 @@ final class ServerProviderGate
      */
     private const SERVER_CREATE_ORDER = [
         'digitalocean',
-        'digitalocean_functions',
         'digitalocean_kubernetes',
         'hetzner',
         'vultr',
@@ -48,7 +47,6 @@ final class ServerProviderGate
         'oracle',
         'aws_app_runner',
         'aws_kubernetes',
-        'aws_lambda',
         'custom',
     ];
 

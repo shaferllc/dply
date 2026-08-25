@@ -15,9 +15,6 @@ trait ManagesSiteCreateFormFields
     {
         $this->form->primary_hostname = strtolower(trim($value));
         $this->form->applyPathDefaults();
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->form->applyFunctionsDefaults();
-        }
     }
 
     public function updatedFormCustomizePaths(bool $value): void

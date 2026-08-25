@@ -241,7 +241,7 @@
                     <x-empty-state
                         icon="heroicon-o-queue-list"
                         :title="__('No queues yet')"
-                        :description="__('A queue gives your app a managed place to put background jobs — no Redis to provision, and your worker drains it over the SQS protocol Laravel already speaks. Serverless sites get one automatically, free.')"
+                        :description="__('A queue gives your app a managed place to put background jobs — no Redis to provision, and your worker drains it over the SQS protocol Laravel already speaks.')"
                     >
                         @if ($canManage && $endpointBase !== '')
                             <button
@@ -481,7 +481,6 @@
                         @else
                             {{ __('I understand this queue is free during the beta and will bill at :price/month when dply Queue leaves beta.', ['price' => $chosen ? $money($chosen->priceCents) : '—']) }}
                         @endif
-                        {{ __('Queues attached to a dply Serverless site are always included at no charge.') }}
                     </span>
                 </label>
             </div>

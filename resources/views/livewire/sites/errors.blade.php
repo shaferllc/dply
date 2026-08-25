@@ -146,13 +146,6 @@
                                     ['label' => __('Raw payload for scripts'), 'command' => 'dply sites:errors '.$cliSite.' --json'],
                                     ['label' => __('Gate a deploy on a clean site (exits 1 when any are open)'), 'command' => 'dply deploy --wait && dply errors '.$cliSite.' --no-prompt'],
                                 ];
-
-                                if ($site->siteKind() === 'serverless') {
-                                    $cliCommands[] = [
-                                        'label' => __('Every failed invocation behind these events'),
-                                        'command' => 'dply serverless errors '.$cliSite,
-                                    ];
-                                }
                             @endphp
 
                             <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">

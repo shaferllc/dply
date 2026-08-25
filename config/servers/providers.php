@@ -8,7 +8,7 @@
 return [
     'enabled' => [
         'digitalocean' => true, // https://www.digitalocean.com/
-        'digitalocean_functions' => true, // https://www.digitalocean.com/products/functions/
+        'digitalocean_functions' => false,
         'digitalocean_kubernetes' => true, // https://www.digitalocean.com/products/kubernetes/
         'hetzner' => true, // https://www.hetzner.com/cloud
         'linode' => true, // https://www.linode.com/
@@ -23,7 +23,7 @@ return [
         'gandi' => false, // https://www.gandi.net/
         'namecheap' => false, // https://www.namecheap.com/
         'vercel_dns' => false, // https://vercel.com/docs/projects/domains — DNS only
-        'aws_lambda' => true, // https://aws.amazon.com/lambda/
+        'aws_lambda' => false,
         'ghcr' => false, // GitHub Container Registry — image pull creds for Cloud apps
         'aws_kubernetes' => true, // https://aws.amazon.com/eks/
         'gcp' => false, // DNS only (Cloud DNS); compute removed

@@ -117,7 +117,7 @@
                     </span>
                     <h3 class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No queues yet') }}</h3>
                     <p class="mx-auto mt-1 max-w-lg text-sm leading-relaxed text-brand-moss">
-                        {{ __('Create one for any Laravel app, wherever it runs. Serverless functions dply deploys get one wired automatically when their queue backend can’t work — those show up here too.') }}
+                        {{ __('Create one for any Laravel app, wherever it runs.') }}
                     </p>
                     @if ($featureActive && $canManage)
                         <button

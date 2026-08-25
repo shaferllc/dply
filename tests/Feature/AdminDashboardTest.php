@@ -105,56 +105,23 @@ test('vm sites product line page shows site promote flag', function () {
         ->assertSee('workspace.site_promote');
 });
 
-test('edge product line page shows delivery emergency and surface flags', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)->get(route('admin.flags.edge'))
-        ->assertOk()
-        ->assertSee('global.edge_delivery_enabled')
-        ->assertSee('surface.edge');
-});
-
-test('orgs inherit config defaults for gated surfaces', function () {
+test('orgs inherit config defaults for gated providers', function () {
     $org = Organization::factory()->create();
 
-    // Cloud + Serverless are live (config default on). Edge stays parked.
-    // Hyperscale providers still default off.
-    expect(Feature::for($org)->active('surface.serverless'))->toBeTrue();
-    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
-    expect(Feature::for($org)->active('surface.edge'))->toBeFalse();
     expect(Feature::for($org)->active('provider.aws'))->toBeFalse();
 });
 
-test('cloud nav link is coming soon when surface disabled in config', function () {
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    session(['current_organization_id' => $org->id]);
-
-    config(['features.surface.cloud' => false]);
-    Feature::flushCache();
-
-    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
-
-    $this->actingAs($user)
-        ->get(route('dashboard'))
-        ->assertOk()
-        ->assertSee('Cloud apps')
-        ->assertSee(__('Coming soon'))
-        ->assertDontSee(route('cloud.index'), false);
-});
-
-test('per-org override beats the config default for a surface', function () {
+test('per-org override beats the config default for a workspace flag', function () {
     $org = Organization::factory()->create();
 
-    config(['features.surface.cloud' => false]);
+    config(['features.workspace.ephemeral_credentials' => false]);
     Feature::flushCache();
 
-    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
+    expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeFalse();
 
-    Feature::for($org)->activate('surface.cloud');
+    Feature::for($org)->activate('workspace.ephemeral_credentials');
 
-    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
+    expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeTrue();
 });
 
 test('clear org overrides button removes stored org values', function () {
@@ -162,17 +129,17 @@ test('clear org overrides button removes stored org values', function () {
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
 
-    config(['features.surface.edge' => false]);
+    config(['features.workspace.ephemeral_credentials' => false]);
     Feature::flushCache();
-    Feature::for($org)->activate('surface.edge');
+    Feature::for($org)->activate('workspace.ephemeral_credentials');
 
     Livewire::actingAs($user)
-        ->test(ProductLineFlags::class, ['line' => 'edge'])
-        ->call('requestClearOrgOverridesForFlag', 'surface.edge')
+        ->test(ProductLineFlags::class, ['line' => 'vm-servers'])
+        ->call('requestClearOrgOverridesForFlag', 'workspace.ephemeral_credentials')
         ->call('confirmActionModal')
         ->assertDispatched('notify');
 
-    expect(Feature::for($org)->active('surface.edge'))->toBeFalse();
+    expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeFalse();
 });
 
 test('admin organizations index lists organizations', function () {

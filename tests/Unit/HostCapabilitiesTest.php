@@ -30,7 +30,7 @@ test('digitalocean functions hosts disable machine features', function () {
     expect($capabilities->supportsSsh())->toBeFalse();
     expect($capabilities->supportsWebserverProvisioning())->toBeFalse();
     expect($capabilities->supportsEnvPushToHost())->toBeFalse();
-    expect($capabilities->supportsFunctionDeploy())->toBeTrue();
+    expect($capabilities->supportsFunctionDeploy())->toBeFalse();
     expect($server->providerDisplayLabel())->toBe('Functions');
 });
 

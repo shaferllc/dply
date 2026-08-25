@@ -48,9 +48,6 @@ test('the page leads with the projected total and its two supporting sections', 
  * table, and one because /billing/invoices already is that page.
  */
 test('sections cut in the 2026-08-22 redesign do not come back', function () {
-    Feature::define('surface.edge', fn () => true);
-    Feature::define('surface.cloud', fn () => true);
-    Feature::define('surface.serverless', fn () => true);
     Feature::flushCache();
 
     [$admin, $org] = analyticsAdmin();

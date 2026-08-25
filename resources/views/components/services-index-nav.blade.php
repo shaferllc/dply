@@ -7,12 +7,9 @@
 
     Grouping only. These four do not share a billing shape: Backups does not
     bill at all, Realtime is flat per-app-per-tier, Queue is per-namespace-per-
-    tier and free when it serves Serverless, and Cache is free outright on the
-    shared tier with revenue only from a dedicated cluster. See
-    docs/adr/managed-services-tier.md decision 2, and docs/adr/dply-cache.md
-    decision 7 — which reopens Queue's Serverless-only free tier, since the
-    two products sitting side by side under different rules is an incoherence
-    to resolve rather than to preserve.
+    tier, and Cache is free outright on the shared tier with revenue only
+    from a dedicated cluster. See docs/adr/managed-services-tier.md
+    decision 2, and docs/adr/dply-cache.md decision 7.
 --}}
 
 @php

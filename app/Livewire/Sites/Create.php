@@ -51,18 +51,6 @@ class Create extends Component
     public array $linkedSourceControlAccounts = [];
 
     /**
-     * @var list<array{label: string, url: string, branch: string}>
-     */
-    public array $availableFunctionsRepositories = [];
-
-    /**
-     * @var array<string, mixed>
-     */
-    public array $functionsDetection = [];
-
-    public bool $functionsOverridesTouched = false;
-
-    /**
      * Suggested non-web processes carried forward from the last detection
      * run. The Site::created hook already creates a `web` SiteProcess
      * (with command=null); after store() persists the site, we create
@@ -167,7 +155,6 @@ class Create extends Component
         } else {
             $this->phpVersions = [];
             $this->form->php_version = '';
-            $this->form->applyFunctionsDefaults();
         }
 
         $hostname = request()->query('hostname');

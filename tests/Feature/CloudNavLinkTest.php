@@ -7,56 +7,22 @@ namespace Tests\Feature\CloudNavLinkTest;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
-usesFeatures('surface.cloud', 'surface.edge');
-
-test('authenticated dashboard includes cloud apps link when surface cloud active', function () {
+test('browse dropdown includes compute and org sections', function () {
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
-        ->assertSee('Cloud apps')
-        ->assertSee(route('cloud.index'), escape: false);
-});
-
-test('cloud apps link is coming soon when surface cloud inactive', function () {
-    Feature::define('surface.cloud', fn () => false);
-    Feature::flushCache();
-
-    $user = ownerWithOrg();
-
-    $response = $this->actingAs($user)->get(route('dashboard'));
-
-    // Gated surfaces stay visible with a Coming soon teaser (not hidden).
-    $response->assertOk()
-        ->assertSee('Cloud apps')
-        ->assertSee(__('Coming soon'))
-        ->assertDontSee(route('cloud.index'), false);
-});
-
-test('browse dropdown includes compute apps and org sections', function () {
-    $user = ownerWithOrg();
-
-    $response = $this->actingAs($user)->get(route('dashboard'));
-
-    $response->assertOk()
-        ->assertSee('Compute')
-        ->assertSee('>Apps<', false)
-        ->assertSee('>Org<', false)
         ->assertSee('Servers')
-        ->assertSee('Serverless')
-        ->assertSee('Edge')
         ->assertSee('Sites')
         ->assertSee('Organizations')
         ->assertSee(route('servers.index'), false)
-        ->assertSee(route('serverless.index'), false)
-        ->assertSee(route('edge.index'), false)
         ->assertSee(route('sites.index'), false)
-        ->assertSee(route('organizations.index'), false);
+        ->assertSee(route('organizations.index'), false)
+        ->assertDontSee('Serverless');
 });
 
 test('unauthenticated root does not show cloud apps link', function () {

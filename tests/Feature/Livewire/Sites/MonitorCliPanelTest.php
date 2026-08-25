@@ -66,16 +66,6 @@ it('lists every uptime command for the site, with a real monitor id', function (
         ->assertDontSee('dply serverless status');
 });
 
-it('adds the function rollup for a serverless site', function () {
-    [$user, $server, $site] = monitorPageFixture();
-    $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
-    $site->save();
-
-    Livewire::actingAs($user)
-        ->test(Monitor::class, ['server' => $server, 'site' => $site->fresh()])
-        ->assertSee("dply serverless status {$site->slug}");
-});
-
 it('spells out the routing commands on the alerts sub-tab', function () {
     [$user, $server, $site] = monitorPageFixture();
     $channel = NotificationChannel::factory()->forUser($user)->create(['label' => 'Pager']);

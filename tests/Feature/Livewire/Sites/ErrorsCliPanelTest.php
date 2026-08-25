@@ -72,16 +72,6 @@ it('falls back to a placeholder id when the stream is empty', function () {
         ->assertSee("dply errors dismiss &lt;id&gt; --site {$site->slug}", false);
 });
 
-it('adds the invocation drill-down for a function', function () {
-    [$user, $server, $site] = errorsPageFixture();
-    $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
-    $site->save();
-
-    Livewire::actingAs($user)
-        ->test(Errors::class, ['server' => $server, 'site' => $site->fresh()])
-        ->assertSee("dply serverless errors {$site->slug}");
-});
-
 it('spells out the routing commands on the notifications sub-tab', function () {
     [$user, $server, $site] = errorsPageFixture();
     $channel = NotificationChannel::factory()->forUser($user)->create(['label' => 'Ops Slack']);

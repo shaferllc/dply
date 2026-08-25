@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Gate;
  */
 final class SiteCreateAccess
 {
+    public const BLOCKED_BY_HOST = 'host';
+
     public const BLOCKED_BY_AUTH = 'auth';
 
     public const BLOCKED_BY_ORG = 'org';
@@ -72,6 +74,10 @@ final class SiteCreateAccess
     private static function resolve(Server $server, ?User $user = null): array
     {
         $user ??= auth()->user();
+
+        if ($server->isServerlessHost()) {
+            return [__('This host is a leftover Functions or Lambda target. New sites cannot be created on it.'), self::BLOCKED_BY_HOST];
+        }
 
         if (! $server->isReady()) {
             return [__('This server is still provisioning — site creation unlocks once it reaches the ready state.'), self::BLOCKED_BY_PROVISIONING];

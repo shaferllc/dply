@@ -90,20 +90,3 @@ test('aws lambda, managed container and edge sites also offer no file log source
     Server::HOST_KIND_DPLY_CLOUD,
     Server::HOST_KIND_DPLY_EDGE,
 ]);
-
-test('the serverless logs route never offers nginx file rows', function () {
-    [$user, $server, $site] = siteOnHostKind(Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS);
-    $site->forceFill([
-        'meta' => ['serverless' => ['proxy_slug' => 'orders-api']],
-    ])->save();
-
-    $response = $this->actingAs($user)->get(route('serverless.logs', ['site' => $site]));
-
-    // Deliberately asserts absence, not presence: which panel renders depends on
-    // the `workspace.site_logs` surface flag, but NO configuration may put a
-    // /var/log/nginx path on a function's logs page — there is no disk to read.
-    $response->assertOk();
-    $response->assertDontSee('/var/log/nginx');
-    $response->assertDontSee(__('Site access log'));
-    $response->assertDontSee(__('Site error log'));
-});

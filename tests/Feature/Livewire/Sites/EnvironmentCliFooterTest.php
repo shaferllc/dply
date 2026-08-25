@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 /**
  * @return array{0: User, 1: Server, 2: Site}
  */
-function envFixture(bool $functions): array
+function envFixture(): array
 {
     $user = User::factory()->create();
     $organization = Organization::factory()->create();
@@ -26,33 +26,19 @@ function envFixture(bool $functions): array
     $server = Server::factory()->create([
         'organization_id' => $organization->id,
         'user_id' => $user->id,
-        'meta' => $functions ? ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS] : [],
     ]);
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $organization->id,
         'user_id' => $user->id,
-        'status' => $functions ? Site::STATUS_FUNCTIONS_ACTIVE : Site::STATUS_NGINX_ACTIVE,
-        'meta' => $functions ? ['runtime_profile' => 'digitalocean_functions_web'] : [],
+        'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
     return [$user, $server, $site];
 }
 
-it('offers the serverless env commands on a function site', function () {
-    [$user, $server, $site] = envFixture(functions: true);
-
-    Livewire::actingAs($user)
-        ->test(SiteEnvironment::class, ['server' => $server, 'site' => $site])
-        ->assertSee("dply serverless env {$site->slug} list")
-        ->assertSee("dply serverless env {$site->slug} push --file .env")
-        // The old footer advertised four `dply sites:env:*` commands that the
-        // CLI has never had.
-        ->assertDontSee('sites:env');
-});
-
 it('keeps the site env commands on a VM site', function () {
-    [$user, $server, $site] = envFixture(functions: false);
+    [$user, $server, $site] = envFixture();
 
     Livewire::actingAs($user)
         ->test(SiteEnvironment::class, ['server' => $server, 'site' => $site])

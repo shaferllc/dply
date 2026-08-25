@@ -94,4 +94,14 @@ final class HostCapabilities
     {
         return $this->supportsSsh();
     }
+
+    /**
+     * Function / Lambda deploy is gone. Leftover host rows stay out of the
+     * Servers inventory via {@see Server::isServerlessHost()}; they cannot
+     * mint new sites.
+     */
+    public function supportsFunctionDeploy(): bool
+    {
+        return false;
+    }
 }
