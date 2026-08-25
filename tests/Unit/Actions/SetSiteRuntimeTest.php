@@ -24,6 +24,8 @@ function phpSite(): Site
         'runtime' => 'php',
         'start_command' => null,
         'internal_port' => null,
+        // A deployed site: the app-less guard below is tested separately.
+        'last_deploy_at' => now(),
     ]);
 }
 
@@ -88,4 +90,54 @@ test('every mise runtime maps to a real SiteType', function () {
     }
     expect(SetSiteRuntime::siteTypeFor('php'))->toBe(SiteType::Php)
         ->and(SetSiteRuntime::siteTypeFor('static'))->toBe(SiteType::Static);
+});
+
+test('an app-less site cannot switch to a proxied runtime', function () {
+    Queue::fake();
+    $server = Server::factory()->ready()->create([
+        'meta' => ['runtime_defaults' => ['node' => '22'], 'php_version' => 'none'],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'type' => SiteType::Php,
+        'runtime' => 'php',
+        'git_repository_url' => null,
+        'last_deploy_at' => null,
+    ]);
+
+    // divineiv's exact state. Allowing this removed the splash page that was
+    // serving 200 and published a proxy to a port nothing listens on.
+    expect($site->fresh()->lacksInstalledApp())->toBeTrue();
+
+    expect(fn () => app(SetSiteRuntime::class)->handle($site->fresh(), [
+        'runtime' => 'node',
+        'start_command' => 'npm run start',
+        'internal_port' => 3000,
+    ]))->toThrow(\InvalidArgumentException::class);
+
+    expect($site->fresh()->runtime)->toBe('php');
+    Queue::assertNotPushed(ApplySiteWebserverConfigJob::class);
+});
+
+test('a runtime the server does not have is refused', function () {
+    Queue::fake();
+    $server = Server::factory()->ready()->create([
+        'meta' => ['runtime_defaults' => ['node' => '22'], 'php_version' => 'none'],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'type' => SiteType::Php,
+        'runtime' => 'php',
+        'last_deploy_at' => now(),
+    ]);
+
+    // Go is in the catalog but not on this box. The picker disables it; the CLI
+    // path had no equivalent check.
+    expect(fn () => app(SetSiteRuntime::class)->handle($site->fresh(), [
+        'runtime' => 'go',
+        'start_command' => './server',
+        'internal_port' => 8080,
+    ]))->toThrow(\InvalidArgumentException::class);
+
+    Queue::assertNotPushed(ApplySiteWebserverConfigJob::class);
 });

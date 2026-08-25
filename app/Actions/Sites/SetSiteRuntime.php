@@ -80,6 +80,28 @@ class SetSiteRuntime
 
         $changes['runtime'] = $targetRuntime;
 
+        // The runtime has to actually be on the box. The picker disables
+        // uninstalled options, but that is presentation — the CLI path had no
+        // such check, so `--runtime=go` on a server without Go would save
+        // happily and then publish a vhost proxying to a process that can never
+        // start. Static needs no interpreter; a site keeping its current
+        // runtime is left alone so unrelated edits (version, start command)
+        // don't get blocked by a host we cannot read.
+        $server = $site->server;
+        $changing = $targetRuntime !== (string) ($site->getOriginal('runtime') ?? $site->runtime ?? '');
+
+        if ($server !== null && $changing && $targetRuntime !== 'static') {
+            $available = $server->availableSiteRuntimes();
+
+            if (! array_key_exists($targetRuntime, $available)) {
+                throw new InvalidArgumentException(sprintf(
+                    '%s is not installed on %s. Install it on the server first, then switch this site to it.',
+                    ucfirst($targetRuntime),
+                    $server->name ?: 'this server',
+                ));
+            }
+        }
+
         // Resolve the post-change values before validating, so the check sees
         // what the site WILL look like rather than what it looks like now — a
         // switch that supplies start_command in the same call must pass.
@@ -104,6 +126,20 @@ class SetSiteRuntime
                     'Switching to %s needs %s — the web server has nothing to proxy to without it.',
                     $targetRuntime,
                     implode(' and ', $missing),
+                ));
+            }
+
+            // A start command and a port are not enough: there must be code for
+            // that command to run. installPlaceholderPage() only writes the
+            // splash for Php/Static sites, so switching an app-less site to a
+            // proxied runtime removes the page that was serving 200 and
+            // publishes a proxy to a process that cannot exist — every request
+            // then 502s with no way to tell that from a crashed app.
+            if ($changing && $site->lacksInstalledApp()) {
+                throw new InvalidArgumentException(sprintf(
+                    'This site has no application yet, so nothing would be listening on the port %s proxies to. '
+                    .'Connect a repository (or install an app) first — the runtime is detected from it — then switch.',
+                    $targetRuntime,
                 ));
             }
         }

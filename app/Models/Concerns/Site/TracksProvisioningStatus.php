@@ -559,7 +559,12 @@ trait TracksProvisioningStatus
      * use a repo or have their own create flow. Sites mid-scaffold have
      * their own journey and are excluded too.
      */
-    private function lacksInstalledApp(): bool
+    /**
+     * No application installed yet: no scaffold, no completed choose-app, no
+     * repository, no deploy. Public because the runtime switch has to refuse
+     * proxied runtimes in this state — see {@see \App\Actions\Sites\SetSiteRuntime}.
+     */
+    public function lacksInstalledApp(): bool
     {
         if (! in_array($this->type, [SiteType::Php, SiteType::Node], true)) {
             return false;
