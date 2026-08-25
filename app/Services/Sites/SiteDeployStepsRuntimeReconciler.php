@@ -68,25 +68,6 @@ final class SiteDeployStepsRuntimeReconciler
             $s->custom_command,
         );
 
-        // Already correct for the detected language: leave it alone.
-        if ($buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $signatures[$language], true))) {
-            return null;
-        }
-
-        $knownForeign = array_merge(...array_values(array_diff_key($signatures, [$language => true])));
-
-        // Anything unrecognised means a human edited this pipeline. Say so
-        // rather than throwing their work away. Signature (type + command)
-        // matters here: python/ruby/go/static all emit TYPE_CUSTOM, so the type
-        // alone cannot tell an auto-seeded `go build` from a hand-written one.
-        if (! $buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $knownForeign, true))) {
-            return sprintf(
-                '[dply] Detected a %s project, but the build steps are customised — leaving them untouched. '
-                .'Update them on the site\'s Pipeline tab if the deploy fails.',
-                $language,
-            );
-        }
-
         // Framework names are normalised by defaultsFor() itself, so there is
         // one vocabulary rather than a translation table per call site.
         $framework = strtolower(trim((string) ($detected['framework'] ?? '')));
@@ -99,6 +80,36 @@ final class SiteDeployStepsRuntimeReconciler
 
         if ($replacements === []) {
             return null;
+        }
+
+        // Compare against the EXACT steps this repo should have, not merely
+        // "some step belonging to this language". A pnpm project seeded with
+        // npm_ci is a node step on a node project and still wrong — `npm ci`
+        // fails outright without a package-lock.json.
+        $expected = array_map(
+            fn (array $step): string => RuntimeAwareDeployStepDefaults::signature(
+                (string) $step['step_type'],
+                $step['custom_command'] ?? null,
+            ),
+            $replacements,
+        );
+
+        $current = $buildSteps->map($signatureOf)->all();
+
+        if ($current === $expected) {
+            return null;
+        }
+
+        // Every known auto-seeded signature, across all languages: anything
+        // outside this set was hand-written and must not be discarded.
+        $knownSeeded = array_merge(...array_values($signatures));
+
+        if (! $buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $knownSeeded, true))) {
+            return sprintf(
+                '[dply] Detected a %s project, but the build steps are customised — leaving them untouched. '
+                .'Update them on the site\'s Pipeline tab if the deploy fails.',
+                $language,
+            );
         }
 
         $removed = $buildSteps->pluck('step_type')->all();
