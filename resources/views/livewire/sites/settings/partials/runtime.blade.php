@@ -63,23 +63,23 @@
     };
     $runtimeCliCommands = match ($runtimeKey) {
         'php' => [
-            ['label' => __('Set PHP version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=php --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Set PHP version'), 'command' => 'dply dply:site:set-runtime '.$site->slug.' --runtime=php --runtime-version='.$runtimeCliVersion],
             ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
             ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
         ],
         'ruby' => [
-            ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Set Ruby version'), 'command' => 'dply dply:site:set-runtime '.$site->slug.' --runtime=ruby --runtime-version='.$runtimeCliVersion],
             ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
             ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
         ],
         'static' => [
-            ['label' => __('Set static runtime'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=static'],
+            ['label' => __('Set static runtime'), 'command' => 'dply dply:site:set-runtime '.$site->slug.' --runtime=static'],
             ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
             ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
         ],
         default => [
-            ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime='.($runtimeKey !== '' ? $runtimeKey : 'node').' --runtime-version='.$runtimeCliVersion],
-            ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
+            ['label' => __('Set runtime + version'), 'command' => 'dply dply:site:set-runtime '.$site->slug.' --runtime='.($runtimeKey !== '' ? $runtimeKey : 'node').' --runtime-version='.$runtimeCliVersion],
+            ['label' => __('Set start command + port'), 'command' => 'dply dply:site:set-runtime '.$site->slug.' --start=\'node server.js\' --port=3000'],
             ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
             ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
             ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' '.($runtimeKey !== '' ? $runtimeKey : 'node').' '.$runtimeCliVersion],
@@ -88,6 +88,8 @@
 @endphp
 
 {{-- What it runs: language, detection, path --}}
+@include('livewire.sites.settings.partials.runtime._picker')
+
 <section class="border-b border-brand-ink/10">
     <x-workspace-panel-head
         class="border-b border-brand-ink/10"
