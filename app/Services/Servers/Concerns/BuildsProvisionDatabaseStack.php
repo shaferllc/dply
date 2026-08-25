@@ -336,6 +336,76 @@ trait BuildsProvisionDatabaseStack
      *
      * @return list<string>
      */
+    /**
+     * Point apt at MySQL's own repo when the distro cannot supply the series
+     * the wizard asked for.
+     *
+     * Ubuntu ships exactly one MySQL in `mysql-server` — 8.0.x on noble — so
+     * `mysql84`, `mysql80` and `mysql57` all used to install the same package
+     * and land on whatever the release happened to carry. A 8.4 request came
+     * back as 8.0.46 and only the version field ever said so.
+     *
+     * Mirrors the Postgres branch, which has always pinned via PGDG. Three
+     * deliberate properties:
+     *
+     *  - **Checks first.** `apt-cache policy` decides. On a release where
+     *    mysql-server IS already the requested series this adds nothing, so
+     *    the repo disappears on its own as Ubuntu moves forward.
+     *  - **Never fatal.** A missing key or a codename MySQL does not publish
+     *    for removes the sources file and continues on the distro package.
+     *    A pinned minor is not worth failing a provision over — the marker
+     *    at the end of the branch records what actually landed.
+     *  - **5.7 is not offered.** EOL October 2023 and absent from the repo
+     *    for any codename dply provisions; it stays on the distro path.
+     *
+     * @return list<string>
+     */
+    private function pinMysqlSeries(string $wizardDatabase): array
+    {
+        // Repo component per series. MySQL publishes LTS and innovation
+        // tracks under separate components in the same suite.
+        $component = match ($wizardDatabase) {
+            'mysql84' => 'mysql-8.4-lts',
+            'mysql80' => 'mysql-8.0',
+            default => null,
+        };
+
+        if ($component === null) {
+            return [];
+        }
+
+        $series = $wizardDatabase === 'mysql84' ? '8.4' : '8.0';
+
+        return [
+            // debconf preseed: the community package prompts for a root
+            // password and an auth-plugin choice that the distro package
+            // never asks. Empty root password keeps the socket login the
+            // rest of this branch (and the ping below) already assumes;
+            // bind-address stays 127.0.0.1 either way.
+            'echo "mysql-community-server mysql-community-server/root-pass password " | debconf-set-selections',
+            'echo "mysql-community-server mysql-community-server/re-root-pass password " | debconf-set-selections',
+            'echo "mysql-server mysql-server/default-auth-override select Use Strong Password Encryption (RECOMMENDED)" | debconf-set-selections',
+            'DPLY_MYSQL_CANDIDATE=$(apt-cache policy mysql-server 2>/dev/null | awk \'/Candidate:/ {print $2}\')',
+            'DPLY_MYSQL_PIN=1',
+            'case "${DPLY_MYSQL_CANDIDATE:-}" in '.$series.'*) DPLY_MYSQL_PIN=0; echo "[dply] distro mysql-server is already ${DPLY_MYSQL_CANDIDATE} — no repo needed." ;; esac',
+            'if [ "$DPLY_MYSQL_PIN" = "1" ]; then '
+                .'echo "[dply] distro mysql-server is ${DPLY_MYSQL_CANDIDATE:-unavailable}; adding MySQL apt repo for '.$series.' ('.$component.')."; '
+                .'install -d /usr/share/keyrings; '
+                .'if curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --batch --yes --dearmor -o /usr/share/keyrings/dply-mysql.gpg; then '
+                    .'. /etc/os-release; '
+                    .'echo "deb [signed-by=/usr/share/keyrings/dply-mysql.gpg] https://repo.mysql.com/apt/ubuntu ${VERSION_CODENAME} '.$component.'" > /etc/apt/sources.list.d/dply-mysql.list; '
+                    .'if ! dply_apt_update; then '
+                        .'echo "[dply] WARNING: MySQL apt repo unusable on ${VERSION_CODENAME} — falling back to the distro mysql-server." >&2; '
+                        .'rm -f /etc/apt/sources.list.d/dply-mysql.list; '
+                        .'dply_apt_update || true; '
+                    .'fi; '
+                .'else '
+                    .'echo "[dply] WARNING: could not fetch the MySQL signing key — falling back to the distro mysql-server." >&2; '
+                .'fi; '
+            .'fi',
+        ];
+    }
+
     private function installMysqlSequence(string $wizardDatabase): array
     {
         // Low-memory escape hatch wraps the whole MySQL sequence.
@@ -360,6 +430,7 @@ trait BuildsProvisionDatabaseStack
         ];
 
         $mysqlInstall = [
+            ...$this->pinMysqlSeries($wizardDatabase),
             // Pre-create the runtime dir; ownership is fixed up after the
             // mysql user is created by the package install.
             'install -d -m 0755 /var/run/mysqld',
@@ -427,10 +498,22 @@ trait BuildsProvisionDatabaseStack
                 .'fi; '
                 .'sleep 1; '
             .'done',
-            'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
-            // Reconciliation marker: normal-path mysql install, snapshot
-            // records the wizard-requested engine string verbatim.
-            'export DPLY_INSTALLED_DATABASE='.escapeshellarg($wizardDatabase),
+            // Reconciliation marker. Derived from what mysqld actually
+            // reports, not from the wizard string: when the repo pin above
+            // could not be applied (unsupported codename, key fetch failed)
+            // apt hands back the distro series instead, and recording the
+            // request verbatim would hide that. `divergesFromRequest()`
+            // compares the version, so an unmet pin surfaces in the UI.
+            'DPLY_MYSQL_INSTALLED_VERSION=$(mysqladmin --version 2>/dev/null | sed -n \'s/.*Distrib \\([0-9.]*\\).*/\\1/p\')',
+            'case "${DPLY_MYSQL_INSTALLED_VERSION:-}" in '
+                .'8.4*) export DPLY_INSTALLED_DATABASE="mysql84" ;; '
+                .'8.0*) export DPLY_INSTALLED_DATABASE="mysql80" ;; '
+                .'5.7*) export DPLY_INSTALLED_DATABASE="mysql57" ;; '
+                .'*) export DPLY_INSTALLED_DATABASE='.escapeshellarg($wizardDatabase).' ;; '
+            .'esac',
+            'if [ "$DPLY_INSTALLED_DATABASE" != '.escapeshellarg($wizardDatabase).' ]; then '
+                .'echo "[dply] NOTE: requested '.$wizardDatabase.' but MySQL ${DPLY_MYSQL_INSTALLED_VERSION:-unknown} is what installed." >&2; '
+            .'fi',
         ];
 
         // Wrap both branches in a single conditional. The bash script's

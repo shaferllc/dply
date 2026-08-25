@@ -120,15 +120,44 @@ final readonly class InstalledStack
     }
 
     /**
+     * Version each wizard engine id promises, as a prefix of what the engine's
+     * own CLI reports. Explicit rather than parsed out of the id: "mariadb114"
+     * is 11.4 but "mariadb1011" is 10.11, and no digit-splitting rule gets both.
+     *
+     * @var array<string, string>
+     */
+    private const REQUESTED_VERSIONS = [
+        'mysql84' => '8.4',
+        'mysql80' => '8.0',
+        'mysql57' => '5.7',
+        'mariadb114' => '11.4',
+        'mariadb11' => '11',
+        'mariadb1011' => '10.11',
+        'postgres18' => '18',
+        'postgres17' => '17',
+        'postgres16' => '16',
+        'postgres15' => '15',
+        'postgres14' => '14',
+    ];
+
+    /**
      * True when the wizard-requested database differs from what physically
      * landed. Used by UI panels to render the "Requested vs Installed"
      * divergence section.
      *
-     * Compared by family, not by raw string: the wizard records versioned ids
-     * ("mysql84") while the inventory probe can only observe a family plus a
-     * live version ("mysql" + 8.0.46), so a raw compare flagged every probed
-     * MySQL box as divergent. Real fallbacks (mysql84 -> sqlite3 under
-     * low-memory mode) still cross a family boundary and still fire.
+     * Two comparisons, in order:
+     *
+     *  1. Family. A raw string compare used to be the whole test, which meant
+     *     every probed server looked divergent: the wizard records a versioned
+     *     id ("mysql84") but {@see \App\Services\Servers\ServerInventoryProbeScript}
+     *     can only observe a family plus a live version ("mysql" + "8.0.46"),
+     *     and rewrites the snapshot that way on the first inventory run.
+     *     Family compare keeps the real fallback (mysql84 -> sqlite3 under
+     *     low-memory mode) firing while dropping that noise.
+     *
+     *  2. Version, when the request names one and the snapshot carries one.
+     *     Same family is not the same engine: mysql84 satisfied by 8.0.46 is
+     *     exactly the pin-failed case the banner exists to report.
      */
     public function divergesFromRequest(Server $server): bool
     {
@@ -138,7 +167,18 @@ final readonly class InstalledStack
             return false;
         }
 
-        return DatabaseWorkspaceEngines::family($requested) !== DatabaseWorkspaceEngines::family($this->database);
+        if (DatabaseWorkspaceEngines::family($requested) !== DatabaseWorkspaceEngines::family($this->database)) {
+            return true;
+        }
+
+        $wanted = self::REQUESTED_VERSIONS[$requested] ?? null;
+
+        if ($wanted === null || $this->databaseVersion === null || $this->databaseVersion === '') {
+            return false;
+        }
+
+        return $this->databaseVersion !== $wanted
+            && ! str_starts_with($this->databaseVersion, $wanted.'.');
     }
 
     private static function stringOrNull(mixed $value): ?string

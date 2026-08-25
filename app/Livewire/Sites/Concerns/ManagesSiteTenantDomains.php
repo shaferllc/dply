@@ -89,7 +89,7 @@ trait ManagesSiteTenantDomains
         $this->new_tenant_label = '';
         $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
-        $this->finalizeRoutingMutation('Tenant domain added.');
+        $this->finalizeRoutingMutation('Tenant domain added.', closeModal: 'add-tenant-modal');
 
         // If a connected DNS credential controls this hostname's zone, point it at
         // the server automatically — so the tenant "just works" without the
@@ -320,7 +320,7 @@ trait ManagesSiteTenantDomains
 
         $this->bulk_tenant_input = '';
         $this->site->load('tenantDomains');
-        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
+        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]), closeModal: 'add-tenant-modal');
     }
 
     /**

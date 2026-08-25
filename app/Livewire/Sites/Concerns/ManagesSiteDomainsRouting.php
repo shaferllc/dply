@@ -70,8 +70,17 @@ trait ManagesSiteDomainsRouting
      * config to :host …"). Setting it lets a single shared apply job carry
      * different banner titles depending on which UI path triggered it.
      */
-    protected function finalizeRoutingMutation(string $successMessage, ?string $bannerLabel = null): void
+    protected function finalizeRoutingMutation(string $successMessage, ?string $bannerLabel = null, ?string $closeModal = null): void
     {
+        // Dismiss the modal the mutation was submitted from, before the
+        // auto-reapply branch below returns early. Every add/bulk-import form
+        // in the routing tab lives in a modal that has no other way to close:
+        // the success toast fired over a dialog that stayed open, which reads
+        // as "nothing happened" and invites a duplicate submit.
+        if ($closeModal !== null) {
+            $this->dispatch('close-modal', $closeModal);
+        }
+
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
             $this->toastSuccess($successMessage);
 
@@ -137,7 +146,7 @@ trait ManagesSiteDomainsRouting
 
         $this->new_domain_hostname = '';
         $this->new_domain_comment = '';
-        $this->finalizeRoutingMutation('Domain added.');
+        $this->finalizeRoutingMutation('Domain added.', closeModal: 'add-domain-modal');
     }
 
     public function editDomain(int|string $domainId): void
@@ -401,7 +410,7 @@ trait ManagesSiteDomainsRouting
         }
 
         $this->bulk_domain_input = '';
-        $this->finalizeRoutingMutation(__(':count domain(s) imported.', ['count' => $imported]));
+        $this->finalizeRoutingMutation(__(':count domain(s) imported.', ['count' => $imported]), closeModal: 'add-domain-modal');
     }
 
     public function confirmRemoveDomain(int|string $domainId): void

@@ -1468,7 +1468,7 @@
                                         <p class="mt-1 text-sm text-amber-800">
                                             {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
                                                 'requested' => $requestedDatabase ?? '—',
-                                                'installed' => $installedStack->database ?? '—',
+                                                'installed' => trim(($installedStack->database ?? '—').' '.($installedStack->databaseVersion ?? '')),
                                             ]) }}
                                         </p>
                                     @endif

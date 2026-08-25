@@ -743,6 +743,32 @@ trait ManagesDatabaseBindings
         ])->save();
     }
 
+
+    /**
+     * Extra env names that should carry the primary connection URL, chosen from
+     * the stack detected in the repository.
+     *
+     * Detected, never guessed: an unrecognised stack gets no aliases. Inventing
+     * env names an app does not read is harmless noise at best, and at worst
+     * shadows something the operator set deliberately — which is why the caller
+     * also refuses to overwrite a key that already exists.
+     *
+     * @return list<string>
+     */
+    private static function databaseUrlAliasesFor(Site $site): array
+    {
+        $detected = $site->resolvedRuntimeAppDetection() ?? [];
+
+        return match (strtolower((string) ($detected['migration_tool'] ?? ''))) {
+            // Payload reads DATABASE_URI; @payloadcms/db-postgres will not fall
+            // back to DATABASE_URL.
+            'payload' => ['DATABASE_URI'],
+            // Prisma and Drizzle both read DATABASE_URL, which is already set.
+            'prisma', 'drizzle' => [],
+            default => [],
+        };
+    }
+
     /**
      * Connection variables for a database as seen by $site. The host is
      * resolved relative to where the site runs: loopback when the DB is on the
@@ -809,7 +835,19 @@ trait ManagesDatabaseBindings
             // DB_CONNECTION selects the app's DEFAULT connection — only the
             // primary owns it; a named instance is registered separately.
             $env = ['DB_CONNECTION' => $driver] + $env;
-            $env['DATABASE_URL'] = (string) $db->connectionUrl($host);
+            $url = (string) $db->connectionUrl($host);
+            $env['DATABASE_URL'] = $url;
+
+            // DATABASE_URL is a Laravel/Rails convention. Other stacks read the
+            // same connection string under a different name, so a linked
+            // database produced a correct URL that the app could not see —
+            // Payload looks for DATABASE_URI and its migrate step failed with
+            // no database configured. Alias it for the stack we detected.
+            foreach (self::databaseUrlAliasesFor($site) as $alias) {
+                if ($url !== '' && ! array_key_exists($alias, $env)) {
+                    $env[$alias] = $url;
+                }
+            }
         } elseif (($url = (string) $db->connectionUrl($host)) !== '') {
             $env[$p.'URL'] = $url;
         }

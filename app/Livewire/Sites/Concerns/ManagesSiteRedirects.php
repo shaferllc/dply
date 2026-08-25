@@ -105,7 +105,7 @@ trait ManagesSiteRedirects
         $this->new_redirect_code = 301;
         $this->new_redirect_header_rows = [['name' => '', 'value' => '']];
         $this->new_redirect_comment = '';
-        $this->finalizeRoutingMutation('Redirect added.');
+        $this->finalizeRoutingMutation('Redirect added.', closeModal: 'add-redirect-modal');
     }
 
     /**
@@ -315,7 +315,7 @@ trait ManagesSiteRedirects
         }
 
         $this->bulk_redirect_input = '';
-        $this->finalizeRoutingMutation(__(':count redirect(s) imported.', ['count' => count($parsed)]));
+        $this->finalizeRoutingMutation(__(':count redirect(s) imported.', ['count' => count($parsed)]), closeModal: 'add-redirect-modal');
     }
 
     public function addNewRedirectHeaderRow(): void
