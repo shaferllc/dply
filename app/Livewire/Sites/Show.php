@@ -90,6 +90,16 @@ class Show extends Component
     /** Recorded in site meta for Rails apps (e.g. production, staging). */
     public string $rails_env = 'production';
 
+    /** Runtime picker on Settings -> Runtime. See ManagesSiteRuntimeHealth::switchSiteRuntime(). */
+    public string $runtime_choice = '';
+
+    public string $runtime_choice_version = '';
+
+    /** Required when switching to a reverse-proxied runtime (node/python/go/...). */
+    public string $runtime_start_command = '';
+
+    public string $runtime_internal_port = '';
+
     public string $octane_port = '';
 
     /** Laravel Octane application server: swoole, roadrunner, or frankenphp (stored in meta.laravel_octane). */
@@ -169,6 +179,11 @@ class Show extends Component
             : '';
         $railsRuntime = is_array($dm['rails_runtime'] ?? null) ? $dm['rails_runtime'] : [];
         $this->rails_env = (string) ($railsRuntime['env'] ?? 'production');
+        $this->runtime_choice = (string) ($this->site->runtime ?? '');
+        $this->runtime_choice_version = (string) ($this->site->runtime_version ?? '');
+        $this->runtime_start_command = (string) ($this->site->start_command ?? '');
+        $port = $this->site->internal_port ?? $this->site->app_port;
+        $this->runtime_internal_port = $port !== null ? (string) $port : '';
         $this->releases_to_keep = (int) ($this->site->releases_to_keep ?? 5);
         $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
         $this->engine_http_cache_enabled = (bool) ($this->site->engine_http_cache_enabled ?? false);

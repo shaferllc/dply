@@ -44,3 +44,520 @@
 - **Notification channels** + event routing configurable at **organization**, **user**, **team** levels (w/ **bulk assignment** where UI supports). Types live as `TYPE_*` consts on **`NotificationChannel`** w/ `match` arms in **`sendTest()`** + **`sendOperationalMessage()`** — adding a type means BOTH arms (a test-only arm silently never delivers, which is what `mobile_app` still does) plus the **three** Livewire surfaces (`ManagesNotificationChannels`, `CreatesNotificationChannelInline`, `BulkNotificationAssignments`) — share the per-type field logic via a `Builds<Provider>ChannelInput` concern rather than a 4th copy. **Intercom / PagerDuty / Microsoft Teams** (2026-08-14) are **reimplemented in-repo**, not the `laravel-notification-channels/*` packages (Intercom caps at Laravel 9, PagerDuty at 12; Teams' package targets the **retired** Office 365 connector) — public APIs mirror the packages so their docs still apply. Credentials are **per-channel** in the encrypted `config` blob, never app-level, so each org reaches its own workspace/service; `services.*` keys exist only as a fallback for `$user->notify()` with no channel row. **PagerDuty pages humans**: `DeliversToPagerDuty` defaults to **silence** (`pagerDutySeverity()` returns null) and only 9 incident-shaped notifications opt in — do NOT blanket-apply it like the chat-shaped `DeliversToIntercom` / `DeliversToMicrosoftTeams`; alerts carry a **derived dedup key** (resource + event, never the event id) so a flapping resource updates one incident, and webserver-health recovery sends a **resolve**. **Teams = Power Automate Workflows + Adaptive Cards**, NOT the Incoming Webhook connector Microsoft retired 18–22 May 2026 — `MicrosoftTeamsClient` refuses `*.webhook.office.com` URLs at type-time, save-time, and send-time. **`UniversalEventNotification` deliberately has no provider leg** — the routing resolver already fanned its event out to subscribed channels, so a leg there double-delivers. **BYO pricing** (2026-05-29 rewrite) = **flat plans metered by server + site count** (NOT per-server-size XS–XL tiers, NOT seat-based; team seats always unlimited): **Free $0** (1 server / 1 site) · **Starter $9** (≤3 servers / 10 sites) · **Pro $19** (≤10 servers / 30 sites) · **Business $39** (unlimited) · ~**20% annual** discount. **Ceilings are per product surface, not one shared pool** (2026-08-18, **`App\Enums\QuotaSurface`**: `Site` = VM + Docker/K8s sites, `Cloud`, `Edge`, `Serverless`; `max_sites` / `max_cloud_apps` / `max_edge_apps` / `max_functions` per plan, plus a beta envelope each). They used to share ONE org-wide ceiling, so a Free org with two Edge sites and a function read **"3 / 1"** and was hard-blocked from its first VM site on a server showing "No sites yet". Each create gate now asks its own surface — `QuotaSurface::forServer()` in **`SiteCreateAccess`** / the clone validator, an explicit case in the Cloud / Edge / Serverless create components — and previews still consume nothing. Managed-surface ceilings are **abuse bounds, not revenue levers** (those surfaces bill per app anyway), so they are set generously and every value is ≥ the old shared ceiling: the split can never newly block an org. Plan resolved by whichever dimension (servers **or** sites) needs the higher tier via new **`SubscriptionPlanResolver`** (count → plan → Stripe price); creating a site past the plan cap is **hard-blocked** through **`Organization::canCreateSite()`** (styled upgrade modal/toast, never a browser alert). **No org base fee.** **Managed products** (**Edge**, **Cloud apps**, **Serverless**) bill **à la carte on top of any plan (incl. Free), from unit 1** (Dply-hosted infra at real cost; usage-metered managed products surface **"from $X"** starting prices since real usage varies): **Edge** (managed **`dply_edge` only**) **$2/site** static/hybrid · **$7/site** Worker SSR (not free) + included allowance then **cost-plus overage** (~**40%** markup; **`DPLY_EDGE_USAGE_BILLING_ENABLED`**); **Serverless** $2/fn base + **cost-plus provider usage** (**`serverless_markup_percent`** ~40%, since big apps consume real resources) with an optional **dply-owned/hosted serverless** backend; **Cloud** is now **cost-plus** (not flat $5) = **$5 platform fee + metered DO provider resources × 1.4 markup** (`cloud_markup_percent`=40, `cloud_container_cents`/`cloud_database_cents`/`cloud_bucket_cents`, `cloud_usage` Stripe price). New **`CloudResourceCostCalculator`** sums container (× instances) + workers + attached DBs (billed once even when shared) + buckets; surfaced via **`DesiredBillingState.cloudResourceSubtotalCents`** + a metered "dply Cloud resources" Stripe line (quantity = cents, monthly-only, mirrors Edge usage). **BYO VMs** = customer pays **provider directly** + the plan fee. **dply-hosted (managed) servers** (**`Server::HOSTING_BACKEND_DPLY`** = `dply_managed`, **`surface.managed_servers`**, create at `servers/create/managed`) instead provision **Hetzner** VMs on dply's **platform token** (not a customer credential, via **`ServerHostingPlatformContext`** mirroring `ServerlessPlatformContext`) reusing the full VM provisioning/SSH/workspace stack, and **replace the per-server plan-tier fee with all-in cost-plus** billing (**`ServerResourceCostCalculator`** = Hetzner size → provider cents × **~60% markup**, `managed_server_markup_percent`), metered separately via **`managedServerSubtotalCents`** + **`STRIPE_PRICE_STANDARD_MANAGED_SERVER`** and **excluded from the plan-tier server scan**; **cancellation destroys the dply-owned VM** (platform token) to stop the meter. **Lifecycle**: a Stripe subscription **exists only when the bill > $0** (Stripe rejects $0 subs) — free-zone orgs need no card + are never paused; **`onStandardSubscription()`** matches **any** standard price (not the removed base). Model lives in **`config/subscription.php`**, computed via **`OrganizationBillingStateComputer`** → **`DesiredBillingState`**. The legacy size-tier concept is **fully removed** (2026-08-12): `ServerTier`, `ServerTierClassifier`, `Server::billingTier()`, `subscription.standard.tiers`/`base_cents`/`included_credit_cents`/`per_server_cap_cents`, and the `stripe.tiers*`/`base_*` price IDs are all gone — **server size is not a billing input anywhere**; `DesiredBillingState` carries a plain `billableServerCount`. **Profile, 2FA, OAuth-linked accounts** stay **user-scoped**; users always have org, w/ auto-created defaults **`"<name>'s Workspace"`** + legacy backfill as needed. On **org registration** a **first team auto-creates**; **server + site creation both require an org**. **Referrals** built in (**`app/Services/Referrals/*`**, **`CaptureReferralCode`** middleware, **`ReferralReward`**, **`Profile\Referrals`**, Stripe credit). Notification + preference settings configurable at **org, team, and user** levels. **Billing analytics is customer-facing** (`authorize('update', $organization)`), so it must be written from the **payer's** side: the **vs-Forge cost comparison** and the **MRR / ARR "Recurring revenue"** tiles were **removed 2026-08-14** — the same figure is our revenue and their spend, and a competitor baseline is not a customer metric. What remains is **Cost forecast** (projected month-end + Δ vs 30 days), which answers "what will I be charged". `subscription.observatory.forge_per_server_cents` + `SUBSCRIPTION_FORGE_PER_SERVER_CENTS` are gone; `BillingForecastCalculator` still computes `mrr_cents`/`arr_cents` w/ **no readers** (move to a platform-admin dashboard or delete).
 - BYO **site settings → DNS** lets operators pick **org server-provider credential** for DNS automation (**DigitalOcean**, **Hetzner**, **Linode**, **Vultr**, **AWS Route53**, **GCP Cloud DNS**, **Azure DNS**, **Cloudflare**, or **Namecheap** via **`SiteDnsProviderFactory`** / **`ServerProvider::supportsDns()`**), optional **DNS zone (apex)** validated for that account, uses that choice for **preview/testing hostnames** (falling back to app **testing-domain** pool) + aligned **DNS-01** / cert flows. **Oracle** compute has no DNS automation. Full arbitrary DNS record editing not in scope yet; **Certificates** form still exposes DNS challenge fields when needed. Deploying root app behind nginx: set **`root`** to app's **`public/`** (e.g. `/var/www/dply/public` in release tree). For BYO VM sites, **no-downtime** releases use **`deploy_strategy = atomic`** (release dirs + `current` symlink), toggled from site **Settings → Deploy** as **Zero downtime deployment**; **`simple`** updates live checkout in place. VM sites w/ **managed web server** config can be **suspended** — HTTP serves static page from **`.dply/suspended/`** until resumed (**serverless, Docker, Kubernetes** runtimes excluded).
 - **`dply` CLI** in **`packages/dply-cli/`**, **hosted** at **`/cli/install.sh`**, **`/cli/dply-cli.tgz`**, **`/cli/version.json`** (**`DPLY_CLI_INSTALL_METHOD=tarball`** until **`@dply/cli`** npm). Tarball via **`CliPackageTarballBuilder`**. **`install.sh` must work locally** even when a prebuilt tarball 404s (build-on-demand / npm fallback) — never leave operators blocked on a missing `dply-cli.tgz`. Default origin from **`config/cli.php`** `default_base_url` (**`APP_URL`** / **`DPLY_CLI_DEFAULT_BASE_URL`**; keep install host + device-login API host aligned — local often **`https://dply.test`**, not a divergent `dplyi.test` unless intentional). Device-flow scopes in **`config/cli.php`**: **`sites.*`**, **`commands.run`**, **`insights.read`**, **`network.read/write`**, **`projects.*`**, **`system_users.*`**. Server workspace **CLI** leaf should expose a **searchable, organized command catalog**. **Naming**: **`dply site`** → BYO VM (**`/api/v1/sites/*`**); **`dply sites`** → Edge (**`/edge/sites`**). **Projects CLI** → **`/api/v1/projects`**, backed by **`Workspace`** model. **Link file**: **`.dply/site.json`** for **`dply link`** / **`dply deploy`**.
+
+===
+
+<laravel-boost-guidelines>
+=== .ai/core rules ===
+
+# Laravel Auditor Guidelines
+
+These guidelines apply to any agent performing a Laravel audit with Laravel Auditor. They are intentionally agent-agnostic.
+
+## Purpose
+
+Laravel Auditor equips an AI coding agent with a specialized, evidence-based methodology for auditing Laravel applications. The agent is the reasoning engine; Laravel Auditor provides the methodology, structured context, rules, and tools.
+
+## Working rules
+
+1. **Evidence over guesses.** Every meaningful finding must reference concrete, verifiable project context: a file path and line/range, a symbol, a route, a migration, a query, a configuration key, a dependency, or a test.
+2. **Prefer deterministic facts.** When a fact can be obtained programmatically (via the Laravel Auditor context tools or Artisan), obtain it that way rather than inferring it from raw text.
+3. **Distinguish confirmed findings from hypotheses.** Use the confidence levels precisely. Only `confirmed` findings have full supporting evidence; everything else is labeled by its actual confidence.
+4. **Say when evidence is incomplete.** If you cannot verify a high-severity claim, say so and lower the confidence. Never claim an audit is more certain than the evidence allows.
+5. **Do not invent package or runtime behavior.** Verify against installed packages, their documentation, and the actual application code. Never assert behavior you have not checked.
+6. **Never claim exploitability without sufficient evidence.** A finding is not automatically exploitable because the pattern is unusual.
+7. **Do not recommend upgrades solely because a package is old.** Only flag a dependency when there is a concrete reason (breaking incompatibility, known vulnerability with evidence, EOL with operational impact).
+8. **Style preferences are never high severity.** Keep them at `low` or `info`, or omit them.
+9. **Read-only by default.** Auditing must never modify application code.
+10. **Few high-quality rules over noisy volume.** A focused, trustworthy report is the product.
+
+## Severity and confidence
+
+- **Severity**: `critical`, `high`, `medium`, `low`, `info`.
+- **Confidence**: `confirmed`, `high`, `medium`, `low`.
+
+Use both precisely. A `confirmed` finding has verified evidence. A `high` severity claim with only partial evidence should carry `medium` or `low` confidence.
+
+## Structured findings
+
+Each finding should carry, at minimum:
+
+- `rule_id` — stable rule ID when one matches (e.g. `AUD-SEC-001`).
+- `id`, `rule_id`, `title`, `domain`, `severity`, `confidence`, `status`.
+- `summary`, `why_it_matters`.
+- `evidence` — concrete references.
+- `affected_resources`, `symbol` — where relevant.
+- `recommendation`, optional `remediation`, optional `verification_notes`.
+- `metadata.priority` — `p0`–`p3` when you rank findings.
+
+Write findings to JSON and render them with `php artisan auditor:report --findings=storage/auditor-findings.json`. See `guidelines/findings.md`.
+
+## Using the tools
+
+The Laravel Auditor context tools provide deterministic Laravel context:
+
+- `project_info`, `routes`, `models`, `migrations`, `database_schema`.
+- `dependencies`, `configuration`, `policies_authorization`, `jobs_events_schedules`, `tests`, `subsystems`.
+
+List them with `php artisan auditor:context --list`. Prefer `php artisan auditor:rules --applicable` before investigating ecosystem-specific issues.
+
+`dependencies.composer_audit` is **on by default**. `tests` case listing is **off by default**. Do not treat `composer_audit.available: false` or a file-count test total as proof there are no advisories or that every test case was listed. If `available` is false, read `reason` (or run `composer audit --format=json` yourself). Enable `laravel-auditor.context.test_listing` or run the test runner yourself for accurate case counts.
+
+Prefer these tools over raw file scraping for structured facts. Use file inspection for code-level detail and tracing.
+
+Useful commands: `auditor:status`, `auditor:rules`, `auditor:context`, `auditor:report`, `auditor:ci`, `auditor:mcp`.
+
+## When Boost is present
+
+Laravel Auditor extends Laravel Boost rather than replacing it. Continue using Boost's Laravel documentation search and general context. Use Auditor's audit-specific skills, rules, and context tools for the audit work itself. Do not duplicate what Boost already provides.
+
+=== .ai/dsa rules ===
+
+# DSA / organizing-model audit
+
+When asked for a DSA, data-structure, ownership, or subsystem audit, use the `laravel-audit-dsa` skill.
+
+Rules:
+
+- Read-only. Do not implement fixes during the audit.
+- Inventory subsystems first (`php artisan auditor:context subsystems`).
+- One worker per ownership boundary. At most two findings per subsystem.
+- Skip when the local code is already clear.
+- Verify every finding yourself before it enters the report.
+- Rank P0–P3. Keep P3 small. Set `metadata.priority` to `p0`–`p3` and `metadata.subsystem` to the inventory id.
+- Prefer `AUD-DSA-*` rules when they fit. Otherwise use the six core domains.
+
+Do not recommend a new type just to hide existing branching.
+
+=== .ai/findings rules ===
+
+# Finding schema
+
+Every audit finding should match the Laravel Auditor finding schema (`schema/finding.schema.json`).
+
+Required fields:
+
+- `id` — unique finding instance id (for example `F-2026-0001`)
+- `rule_id` — stable rule id when one matches (for example `AUD-SEC-001`)
+- `title`, `domain`, `severity`, `confidence`
+- `summary`, `why_it_matters`
+
+Include whenever possible:
+
+- `status` — `open` for new findings (`accepted`, `dismissed`, `fixed` later)
+- `evidence` — file, route, symbol, config, migration, query, test, or dependency references
+- `affected_resources`, `symbol`
+- `recommendation`, optional `remediation`, optional `verification_notes`
+- `metadata.priority` — `p0`, `p1`, `p2`, or `p3` when you rank the report
+- `metadata.subsystem` — subsystem id on a DSA pass
+
+Minimal shape:
+
+```json
+{
+  "id": "F-2026-0001",
+  "rule_id": "AUD-SEC-001",
+  "title": "Missing authorization boundary",
+  "domain": "security",
+  "severity": "high",
+  "confidence": "confirmed",
+  "status": "open",
+  "summary": "Any authenticated user can delete another user's post.",
+  "why_it_matters": "The destroy action never authorizes the Post policy.",
+  "evidence": [
+    {
+      "type": "file",
+      "reference": "app/Http/Controllers/PostController.php",
+      "line": 42,
+      "end_line": 48
+    }
+  ],
+  "recommendation": "Authorize the deletion with a PostPolicy or route middleware.",
+  "metadata": { "priority": "p0" }
+}
+```
+
+Write an array of findings (or `{ "findings": [ ... ] }`) to JSON and render:
+
+```bash
+php artisan auditor:report --findings=storage/auditor-findings.json
+php artisan auditor:ci --findings=storage/auditor-findings.json --fail-on=high
+```
+
+An example payload lives in `examples/findings.json`. Preview it with:
+
+```bash
+php artisan auditor:report --example
+```
+
+=== .ai/performance rules ===
+
+# Performance finding contract
+
+These rules govern every `performance`-domain finding, on top of the core guidelines. They exist to keep performance reports trustworthy: verified, mechanistic, and free of micro-optimization noise.
+
+## Report the pipeline, not just the pattern
+
+A performance finding must show that you moved through the full investigation pipeline:
+
+```text
+Signal → Context → Behavior → Verification → Impact → Finding
+```
+
+Findings that skip verification or impact are rejected by this contract even when the underlying pattern is real.
+
+## Semantic equivalence is mandatory
+
+Before recommending any optimization, verify it produces identical observable results **in this exact usage**:
+
+1. Confirm what else consumes the value (collection reuse invalidates most query-side rewrites).
+2. Check accessors, casts, and appended attributes for PHP-only behavior.
+3. Match comparison strictness and null handling between Collection and SQL semantics.
+4. Respect custom collection classes and overridden methods.
+5. Keep model requirements intact (primary/foreign keys for narrowed selects).
+6. Account for side effects (model events on bulk writes, lazy-load timing).
+
+Record what you checked in `verification_notes`. "This is usually faster" is not verification.
+
+## Impact metadata
+
+For performance findings, describe impact structurally in `metadata.impact` using mechanism wording:
+
+```json
+"metadata": {
+    "priority": "p1",
+    "impact": {
+        "resource": "database + memory",
+        "mechanism": "Retrieves every matching order into PHP memory to compute one number; the query-level aggregate returns a single row instead.",
+        "amplification": "Scales with paid-order count; dashboard is rendered on every admin login."
+    }
+}
+```
+
+- `resource` — which cost category applies: database queries, rows transferred, memory, CPU, network, disk I/O.
+- `mechanism` — what the current form wastes and what the replacement avoids.
+- `amplification` — what makes the cost grow: loop counts, table growth, request frequency.
+
+Never invent numeric measurements ("10x faster"). Describe mechanisms; cite numbers only from evidence that actually exists (a logged slow-query entry, an N+1 count from a debugbar capture).
+
+## Severity discipline
+
+Severity follows reach × frequency × amplification, not pattern scariness:
+
+| Severity | Typical confirmed instance |
+| --- | --- |
+| high | Query explosion or heavy amplification on hot/high-volume paths |
+| medium | Clear unnecessary work with real traffic or growth behind it |
+| low | Real but small inefficiency on modest data |
+| info | Worth knowing, not worth acting on |
+
+Do not inflate: a correct but tiny optimization stays out of the report entirely.
+
+## Noise floor
+
+Do not report when any of these hold:
+
+- The materialized collection/result has another consumer.
+- The replacement cannot be shown equivalent for this usage.
+- The dataset is bounded and small.
+- The fix trades real readability or correctness risk for negligible gain.
+
+A developer reading the performance section should believe every line is worth investigating.
+
+=== foundation rules ===
+
+# Laravel Boost Guidelines
+
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
+
+## Foundational Context
+
+This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
+
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
+
+## Skills Activation
+
+This project has domain-specific skills available in `**/skills/**`. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
+
+## Conventions
+
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
+
+## Verification Scripts
+
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+
+## Application Structure & Architecture
+
+- Stick to existing directory structure; don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
+
+## Frontend Bundling
+
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+
+## Documentation Files
+
+- You must only create documentation files if explicitly requested by the user.
+
+## Replies
+
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+
+=== boost rules ===
+
+# Laravel Boost
+
+## Tools
+
+- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
+- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
+- Use `database-schema` to inspect table structure before writing migrations or models.
+- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
+- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
+
+## Searching Documentation (IMPORTANT)
+
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
+- Pass a `packages` array to scope results when you know which packages are relevant.
+- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
+- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
+
+### Search Syntax
+
+1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
+2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
+3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
+4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+- Record durable rules with `record-rule` so the next agent or teammate inherits them instead of working them out again. Pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Always use `record-rule`, never your native memory or notes tool — native memory is personal and session-scoped; only `.ai/rules` is shared with the team and persists in the repo.
+
+## Artisan
+
+- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
+- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
+- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+
+## Tinker
+
+- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
+- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
+  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+
+=== php rules ===
+
+# PHP
+
+- Always use curly braces for control structures, even for single-line bodies.
+- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
+- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
+- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
+- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
+- Use array shape type definitions in PHPDoc blocks.
+
+=== deployments rules ===
+
+# Deployment
+
+- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+
+=== tests rules ===
+
+# Test Enforcement
+
+- Test every code change by adding or updating a test.
+- Run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
+
+=== laravel/core rules ===
+
+# Do Things the Laravel Way
+
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
+- If you're creating a generic PHP class, use `php artisan make:class`.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+
+### Model Creation
+
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+
+## APIs & Eloquent Resources
+
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+
+## URL Generation
+
+- When generating links to other pages, prefer named routes and the `route()` function.
+
+## Testing
+
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+
+## Vite Error
+
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+
+=== laravel-octane/core rules ===
+
+# Laravel Octane
+
+This application uses Laravel Octane, a long-running PHP server. The application bootstraps once and handles many requests within the same process.
+
+- Never store request-specific state in singletons or static properties, because it can leak across requests.
+- Use `config('octane.server')` to detect the active driver (`swoole`, `roadrunner`, or `frankenphp`).
+- Prefer scoped bindings (`$this->app->scoped()`) over singletons for per-request services.
+
+When working on Octane-specific features (concurrency, shared tables, memory, driver configuration, testing), invoke `octane-development` for detailed rules.
+
+=== livewire/core rules ===
+
+# Livewire
+
+- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
+- You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
+- Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
+
+=== pint/core rules ===
+
+# Laravel Pint Code Formatter
+
+- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+
+=== pest/core rules ===
+
+# Pest
+
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
+
+=== mrpunyapal/laravel-auditor/core rules ===
+
+## Laravel Auditor
+
+Laravel Auditor equips an **existing** AI coding agent with an evidence-based Laravel audit methodology. It does not scan the app by itself. Use it when the user asks to audit, review, or assess a Laravel application.
+
+### Relationship to Boost
+
+Laravel Auditor extends Laravel Boost. It does **not** replace Boost's general Laravel context. Continue using Boost's documentation search and general Laravel guidelines. Use Laravel Auditor when asked to audit, review, or assess an existing Laravel application.
+
+### What Laravel Auditor provides
+
+- A structured audit workflow: **Discover** project facts, **Scope** relevant domains, **Investigate** with evidence, **Verify** high-severity findings, and **Report** structured findings.
+- Six audit domains: security, performance, architecture, database, testing, and Laravel conventions.
+- Stable audit rules with rule IDs (e.g. `AUD-SEC-001`), severity, confidence, evidence requirements, and false-positive considerations.
+- Context tools that expose deterministic Laravel facts: project info, routes, models, migrations, database schema, dependencies, configuration, authorization, jobs/events/schedules, tests, and subsystems.
+- A finding schema: id, rule ID, title, domain, severity, confidence, status, summary, why-it-matters, evidence, affected resources, recommendation, remediation, verification notes, and optional `metadata.priority` (`p0`–`p3`).
+
+### Installing
+
+```bash
+composer require --dev mrpunyapal/laravel-auditor
+php artisan boost:install
+```
+
+When Boost is not installed, use the package's own installer instead:
+
+```bash
+php artisan auditor:install --agents=claude_code
+```
+
+Useful commands: `auditor:status`, `auditor:rules` (`--applicable`), `auditor:context`, `auditor:report`, `auditor:ci`, and `auditor:mcp`.
+
+`composer audit` is **on by default**. Test-case listing is **off by default**. Do not treat `composer_audit.available: false` or an empty advisory list as “no vulnerabilities” unless the check actually ran.
+
+### Audit skill
+
+Use the `laravel-audit` skill when asked to audit or review a Laravel application. It contains the full workflow, evidence requirements, and severity/confidence guidance. Domain skills (`laravel-audit-security`, `laravel-audit-performance`, `laravel-audit-architecture`, `laravel-audit-database`, `laravel-audit-testing`, `laravel-audit-conventions`) go deeper once the scope is chosen. Use `laravel-audit-dsa` for a bounded subsystem / data-structure / ownership audit (`auditor:context subsystems`, P0–P3 ranking).
+
+### Key rules
+
+- Evidence first: every meaningful finding cites concrete file paths, lines, routes, or config keys.
+- Prefer deterministic project facts over model guesses.
+- Distinguish confirmed findings from hypotheses.
+- Never claim exploitability without sufficient evidence.
+- Read-only by default: never modify application code during an audit.
+- Few high-quality findings over noisy volume.
+
+=== mrpunyapal/laravel-auditor/dsa rules ===
+
+## Laravel Auditor DSA
+
+When asked for a DSA, data-structure, ownership, or subsystem audit, use the `laravel-audit-dsa` skill.
+
+- Read-only. Do not implement fixes during the audit.
+- Inventory subsystems first (`php artisan auditor:context subsystems`).
+- One worker per ownership boundary. At most two findings per subsystem.
+- Skip when the local code is already clear.
+- Verify every finding yourself before it enters the report.
+- Rank P0–P3. Keep P3 small. Set `metadata.priority` to `p0`–`p3` and `metadata.subsystem` to the inventory id.
+- Prefer `AUD-DSA-*` rules when they fit. Otherwise use the six core domains.
+
+Do not recommend a new type just to hide existing branching.
+
+=== mrpunyapal/laravel-auditor/findings rules ===
+
+## Laravel Auditor findings
+
+Write structured findings, not a chat-only review. Match `schema/finding.schema.json`.
+
+Required: `id`, `rule_id`, `title`, `domain`, `severity`, `confidence`, `summary`, `why_it_matters`.
+
+Include whenever possible: `status` (`open` for new findings), `evidence`, `affected_resources`, `symbol`, `recommendation`, `remediation`, `verification_notes`, and `metadata.priority` (`p0`–`p3`).
+
+Write JSON to `storage/auditor-findings.json` and render:
+
+```bash
+php artisan auditor:report --findings=storage/auditor-findings.json
+php artisan auditor:ci --findings=storage/auditor-findings.json --fail-on=high
+```
+
+Preview the packaged example with `php artisan auditor:report --example`.
+
+=== mrpunyapal/laravel-auditor/performance rules ===
+
+## Laravel Auditor performance findings
+
+Performance findings follow the full pipeline: Signal → Context → Behavior → Verification → Impact → Finding. A suspicious pattern is not automatically a performance bug.
+
+### Before reporting
+
+1. Check what else consumes the value. `$users = User::where(...)->get(); $count = $users->count();` with the collection rendered by the view is **correct code** — do not recommend `->count()`. Only materialize-then-reduce with no other consumer is a finding.
+2. Verify semantic equivalence for this exact usage: accessors/casts, comparison strictness (Collection `where()` is loose, SQL is not), null handling, custom collection classes, primary/foreign keys for narrowed selects, model events on bulk writes.
+3. Describe impact by mechanism — "avoids transferring every matching row into PHP" — never invented multipliers like "10x faster". Cite numbers only from real runtime evidence.
+4. Add `metadata.impact` when evidence allows: `resource` (database/memory/network/IO), `mechanism` (what is wasted and what the fix avoids), `amplification` (loop counts, table growth, request frequency).
+
+### Severity discipline
+
+- `high`: query explosion or heavy amplification on hot paths (data-driven per-row queries, unbounded retrieval on public endpoints).
+- `medium`: clear unnecessary database work, avoidable materialization, repeated queries, rendering-path queries with real traffic.
+- `low`: small inefficiencies on modest data.
+- Correct micro-optimizations on tiny datasets are not findings.
+
+### Noise floor
+
+Do not report: reused collections/results, replacements you cannot show equivalent, bounded small datasets, caching without a key/invalidation story, concurrency for dependent requests, or eager loading "just in case" (over-eager loading is itself waste).
+
+Use `php artisan auditor:rules --domain=performance --applicable` to list the rules (`AUD-PER-*`, plus `AUD-LW-003`/`AUD-FIL-003`/`AUD-IN-003` when those packages are installed). The `laravel-audit-performance` skill contains the full methodology and checklist.
+
+</laravel-boost-guidelines>

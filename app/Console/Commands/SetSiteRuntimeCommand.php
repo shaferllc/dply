@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Actions\Sites\SetSiteRuntime;
 use App\Models\Site;
-use App\Services\Servers\MiseInstallScriptBuilder;
 use Illuminate\Console\Command;
 
 /**
@@ -42,8 +42,6 @@ class SetSiteRuntimeCommand extends Command
 
     protected $description = 'Update a site\'s runtime, version, build/start commands, internal port, or database engine.';
 
-    private const ALLOWED_RUNTIMES = ['php', 'static'];
-
     public function handle(): int
     {
         $needle = (string) $this->argument('site');
@@ -54,7 +52,7 @@ class SetSiteRuntimeCommand extends Command
             return self::FAILURE;
         }
 
-        $allowedRuntimes = array_merge(self::ALLOWED_RUNTIMES, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES);
+        $allowedRuntimes = SetSiteRuntime::allowedRuntimes();
         $changes = [];
 
         $runtime = $this->option('runtime');
@@ -122,7 +120,27 @@ class SetSiteRuntimeCommand extends Command
 
         $dryRun = (bool) $this->option('dry-run');
         if (! $dryRun) {
-            $site->fill($changes)->save();
+            // Route through the shared action, never a bare save: it enforces
+            // the fields the target runtime needs and re-applies the webserver
+            // config. Saving `runtime = node` on its own used to leave nginx
+            // fastcgi_pass-ing to a PHP socket that would never exist.
+            $engineChange = array_key_exists('database_engine', $changes)
+                ? ['database_engine' => $changes['database_engine']]
+                : [];
+            $runtimeChanges = array_diff_key($changes, $engineChange);
+
+            try {
+                if ($runtimeChanges !== []) {
+                    app(SetSiteRuntime::class)->handle($site, $runtimeChanges);
+                }
+                if ($engineChange !== []) {
+                    $site->fill($engineChange)->save();
+                }
+            } catch (\InvalidArgumentException $e) {
+                $this->error($e->getMessage());
+
+                return self::FAILURE;
+            }
         }
 
         $payload = [

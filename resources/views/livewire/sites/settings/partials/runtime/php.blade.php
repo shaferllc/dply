@@ -15,6 +15,27 @@
     $btnOutline = 'dply-btn dply-btn-xs dply-btn-outline';
 @endphp
 
+{{-- A PHP site on a php_version=none host: the controls below tune an
+     interpreter that isn't installed, and the vhost fastcgi_passes to a socket
+     that will never open. Say so instead of rendering FPM knobs silently. --}}
+@if (! \App\Support\Servers\ServerInstalledServices::hasAny($server, ['php', 'unknown']))
+    <section class="border-b border-brand-ink/10">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-exclamation-triangle"
+            :title="__('This server has no PHP')"
+            :note="__('The settings below have nothing to configure until PHP is installed.')"
+        />
+        <div class="{{ $panelBody }}">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss">
+                <span class="font-semibold text-brand-ink">{{ __('This site is set to PHP, but the server was provisioned without it.') }}</span>
+                {{ __('Pick a runtime the server actually has, or install PHP on the server first.') }}
+            </p>
+        </div>
+    </section>
+@endif
+
 @if (! $isPhpSite && ! $showPhpStackDetails)
     <section class="border-b border-brand-ink/10">
         <x-workspace-panel-head

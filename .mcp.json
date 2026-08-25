@@ -1,0 +1,19 @@
+{
+    "mcpServers": {
+        "laravel-auditor": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "auditor:mcp",
+                "-q"
+            ]
+        },
+        "laravel-boost": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}

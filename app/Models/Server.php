@@ -619,6 +619,61 @@ class Server extends Model
     }
 
     /**
+     * Runtimes this server can actually run a site on, keyed by runtime with
+     * the version to offer — the option list behind the site Runtime picker.
+     *
+     * Source order matters. `meta.manage_mise_runtimes` is the real inventory
+     * the probe read off the box (installed versions + the active default), so
+     * it wins. `meta.runtime_defaults` is only operator *intent* — a pin the
+     * wizard wrote, which can name a runtime the probe never confirmed — so it
+     * fills gaps rather than overriding. PHP never comes from mise (it's
+     * ondrej/php apt), so it's resolved from the stack summary instead.
+     *
+     * @return array<string, string|null> runtime key => version (null when unknown)
+     */
+    public function availableSiteRuntimes(): array
+    {
+        $meta = $this->meta ?? [];
+        $available = [];
+
+        $mise = is_array($meta['manage_mise_runtimes'] ?? null) ? $meta['manage_mise_runtimes'] : [];
+        foreach ($mise as $runtime => $data) {
+            if (! is_string($runtime) || $runtime === '' || ! is_array($data)) {
+                continue;
+            }
+            $active = trim((string) ($data['active'] ?? ''));
+            if ($active === '') {
+                $versions = is_array($data['versions'] ?? null) ? $data['versions'] : [];
+                $active = trim((string) (end($versions) ?: ''));
+            }
+            $available[$runtime] = $active !== '' ? $active : null;
+        }
+
+        // Fallback for servers that predate the probe fix that writes
+        // manage_mise_runtimes — never an override, only a gap-filler.
+        foreach ($this->installedRuntimeKeys() as $runtime) {
+            if (array_key_exists($runtime, $available)) {
+                continue;
+            }
+            $version = trim((string) (($meta['runtime_defaults'][$runtime] ?? '')));
+            $available[$runtime] = $version !== '' ? $version : null;
+        }
+
+        // Strict, deliberately unlike the fail-open gate used for the installer
+        // list: selecting php writes a `fastcgi_pass` vhost, so offering it on a
+        // host we cannot confirm has PHP risks pointing nginx at a socket that
+        // never opens. No evidence means not offered.
+        if (ServerInstalledServices::has($this, 'php')) {
+            $available['php'] = ServerInstalledServices::phpVersionFor($this);
+        }
+
+        // Static needs no interpreter, so every web-serving host can offer it.
+        $available['static'] = null;
+
+        return $available;
+    }
+
+    /**
      * Site type a NEW site on this server should default to when nothing else
      * has picked one — a bare create, or "start blank" in the app picker.
      *

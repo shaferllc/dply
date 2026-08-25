@@ -331,11 +331,20 @@ final class SiteSettingsSidebar
     {
         $tabs = ['overview' => __('Overview')];
 
-        $languageTab = match ((string) ($site->runtime ?? '')) {
+        $runtime = (string) ($site->runtime ?? '');
+
+        // php / ruby / static keep bespoke partials — FPM pools and Rails knobs
+        // have nowhere else to live. Every other mise runtime (node, python,
+        // go, bun, deno, java) used to fall through to null, so a Node site got
+        // an Overview tab and nothing else. They now share one generic partial
+        // labelled from the catalog in config/servers/manage.php.
+        $languageTab = match ($runtime) {
             'php' => 'php',
             'ruby' => 'ruby',
             'static' => 'static',
-            default => null,
+            default => $runtime !== '' && array_key_exists($runtime, self::miseCatalog())
+                ? 'generic'
+                : null,
         };
 
         if ($languageTab !== null) {
@@ -343,9 +352,24 @@ final class SiteSettingsSidebar
                 'php' => __('PHP'),
                 'ruby' => __('Ruby'),
                 'static' => __('Static'),
+                default => self::runtimeLabel($runtime),
             };
         }
 
         return $tabs;
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function miseCatalog(): array
+    {
+        return (array) config('server_manage.mise_runtimes', []);
+    }
+
+    /** Display label for a mise-managed runtime, from the shared catalog. */
+    private static function runtimeLabel(string $runtime): string
+    {
+        $label = self::miseCatalog()[$runtime]['label'] ?? '';
+
+        return is_string($label) && $label !== '' ? $label : ucfirst($runtime);
     }
 }

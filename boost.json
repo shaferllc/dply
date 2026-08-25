@@ -1,0 +1,49 @@
+{
+    "agents": [
+        "claude_code",
+        "copilot",
+        "cursor",
+        "amp",
+        "codex",
+        "factory",
+        "opencode",
+        "pi"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "mrpunyapal/laravel-auditor",
+        "livewire/blaze",
+        "barryvdh/laravel-debugbar"
+    ],
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "cashier-stripe-development",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "configuring-horizon",
+        "mcp-development",
+        "octane-development",
+        "pennant-development",
+        "pulse-development",
+        "socialite-development",
+        "livewire-development",
+        "pest-testing",
+        "echo-development",
+        "tailwindcss-development",
+        "blaze-optimize",
+        "debug-using-debugbar",
+        "laravel-audit",
+        "laravel-audit-architecture",
+        "laravel-audit-conventions",
+        "laravel-audit-database",
+        "laravel-audit-dsa",
+        "laravel-audit-performance",
+        "laravel-audit-security",
+        "laravel-audit-testing",
+        "laravel-auditor-development"
+    ]
+}

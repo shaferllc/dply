@@ -96,6 +96,8 @@ final class SiteSettingsViewData
             'php' => 'heroicon-o-command-line',
             'ruby' => 'heroicon-o-command-line',
             'static' => 'heroicon-o-document',
+            // Shared by every mise-managed runtime (node/python/go/bun/deno/java).
+            'generic' => 'heroicon-o-command-line',
         ];
         $previewDomain = $site->primaryPreviewDomain();
         $activeCertificate = $site->certificates->firstWhere('status', SiteCertificate::STATUS_ACTIVE);

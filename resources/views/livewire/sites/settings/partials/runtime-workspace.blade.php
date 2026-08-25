@@ -32,5 +32,7 @@
     @include('livewire.sites.settings.partials.runtime.ruby')
 @elseif ($runtimeTab === 'static')
     @include('livewire.sites.settings.partials.runtime.static')
+@elseif ($runtimeTab === 'generic')
+    @include('livewire.sites.settings.partials.runtime.generic')
 @endif
 </div>
