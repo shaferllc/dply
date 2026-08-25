@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteDnsRecordsJob;
+use App\Services\Sites\Dns\DnsZoneCredentialResolver;
+use App\Services\Sites\TenantDnsProvisioner;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
@@ -146,7 +148,117 @@ trait ManagesSiteDomainsRouting
 
         $this->new_domain_hostname = '';
         $this->new_domain_comment = '';
-        $this->finalizeRoutingMutation('Domain added.', closeModal: 'add-domain-modal');
+
+        $attached = $this->autoAttachDomainDns($newDomain->hostname);
+
+        $this->finalizeRoutingMutation(
+            $attached ?? 'Domain added.',
+            closeModal: 'add-domain-modal',
+        );
+    }
+
+    /**
+     * Point a freshly added hostname at this server without the operator
+     * leaving the tab — if one of the org's connected DNS credentials actually
+     * hosts its zone.
+     *
+     * Zone ownership is *probed* ({@see DnsZoneCredentialResolver}), not
+     * assumed: `Site::dnsAutomationCredential()` returns the most recently
+     * updated DNS credential in the org, which is a fine default for a
+     * single-provider org and the wrong token the moment there are two. A
+     * successful attach backfills the site's saved zone and credential, so
+     * "Apply records" and DNS-01 issuance afterwards use the token that owns
+     * the zone rather than that guess.
+     *
+     * Provider HTTP only, no SSH, and every failure path is soft: when nothing
+     * connected controls the zone the domain is still added and the row shows
+     * the record to enter by hand. Deliberately not wired into bulk import —
+     * 50 hostnames is 50 serial probes, and a DNS export is what someone
+     * pastes when their records already exist.
+     *
+     * @return string|null Success message to toast, or null for the default.
+     */
+    private function autoAttachDomainDns(string $hostname): ?string
+    {
+        if ($this->site->server?->ip_address === null) {
+            return null;
+        }
+
+        try {
+            $result = app(TenantDnsProvisioner::class)->ensureHostname($this->site, $hostname);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+
+        if ($result['status'] !== 'created') {
+            return null;
+        }
+
+        // Only fill blanks. An operator who picked a zone or credential by hand
+        // keeps it; this is for the common case where neither was ever set.
+        $updates = [];
+        if (trim((string) ($this->site->dns_zone ?? '')) === '' && $result['zone'] !== null) {
+            $updates['dns_zone'] = $result['zone'];
+        }
+        if ($this->site->dns_provider_credential_id === null && $result['credential_id'] !== null) {
+            $updates['dns_provider_credential_id'] = $result['credential_id'];
+        }
+        if ($updates !== []) {
+            $this->site->forceFill($updates)->save();
+        }
+
+        // The status rows carry the old answer for this hostname (or none).
+        $this->dnsRecordStatuses = [];
+        $this->dnsRecordsLoaded = false;
+
+        return (string) __('Domain added — A record pointed at :ip via :provider. Allow a few minutes for DNS to propagate.', [
+            'ip' => (string) $this->site->server->ip_address,
+            'provider' => $result['provider'] ?? __('your DNS provider'),
+        ]);
+    }
+
+    /**
+     * The record an operator has to create at their DNS host for one hostname.
+     *
+     * Static — no resolver probe — so it can render on every row of the Domains
+     * tab at first paint. The live "is it actually pointing here" answer is the
+     * DNS tab's job ({@see computeDnsRecordRows()}), which is why that one sits
+     * behind wire:init.
+     *
+     * `name` is zone-relative when the zone is known, because that is what
+     * registrar forms ask for; the full hostname is shown alongside it for the
+     * hosts that want an FQDN instead.
+     *
+     * @return array{type: string, name: string, value: string, zone: string, apex: bool}|null
+     */
+    public function dnsRecordHintFor(string $hostname): ?array
+    {
+        $hostname = strtolower(trim($hostname));
+        $serverIp = trim((string) ($this->site->server->ip_address ?? ''));
+
+        if ($hostname === '' || $serverIp === '') {
+            return null;
+        }
+
+        $zone = strtolower(trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? ''))));
+        $inZone = $zone !== '' && ($hostname === $zone || str_ends_with($hostname, '.'.$zone));
+
+        $name = match (true) {
+            ! $inZone => $hostname,
+            $hostname === $zone => '@',
+            default => rtrim(substr($hostname, 0, -(strlen($zone) + 1)), '.'),
+        };
+
+        return [
+            'type' => 'A',
+            'name' => $name === '' ? '@' : $name,
+            'value' => $serverIp,
+            'zone' => $inZone ? $zone : '',
+            // An apex cannot take a CNAME, so the row must not offer one there.
+            'apex' => $inZone && $hostname === $zone,
+        ];
     }
 
     public function editDomain(int|string $domainId): void

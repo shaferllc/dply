@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteTenantDomain;
 use App\Services\Sites\Dns\DnsZoneCredentialResolver;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 
 /**
- * Points a tenant's custom domain at its site's server by upserting an A record
+ * Points a customer hostname at its site's server by upserting an A record
  * through whichever connected DNS credential actually hosts the hostname's zone.
- * Idempotent — shared by the routing UI (on add/edit) and the scheduled reconcile
- * sweep, so the two never drift.
+ * Idempotent — shared by the routing UI (on add/edit), the scheduled reconcile
+ * sweep, and the Domains tab's auto-attach, so they never drift.
+ *
+ * Named for tenants because that is what it shipped for; {@see ensureHostname()}
+ * is the general entry point and takes any hostname.
  */
 class TenantDnsProvisioner
 {
@@ -22,23 +26,31 @@ class TenantDnsProvisioner
     ) {}
 
     /**
-     * @return array{status: 'created'|'no_credential'|'no_server_ip'|'invalid'|'error', zone: ?string, message: ?string}
+     * @return array{status: 'created'|'no_credential'|'no_server_ip'|'invalid'|'error', zone: ?string, message: ?string, credential_id: ?string, provider: ?string}
      */
     public function ensure(Site $site, SiteTenantDomain $tenant): array
     {
-        $hostname = strtolower(trim((string) $tenant->hostname));
+        return $this->ensureHostname($site, (string) $tenant->hostname);
+    }
+
+    /**
+     * @return array{status: 'created'|'no_credential'|'no_server_ip'|'invalid'|'error', zone: ?string, message: ?string, credential_id: ?string, provider: ?string}
+     */
+    public function ensureHostname(Site $site, string $hostname): array
+    {
+        $hostname = strtolower(trim($hostname));
         if ($hostname === '') {
-            return ['status' => 'invalid', 'zone' => null, 'message' => 'Tenant has no hostname.'];
+            return self::result('invalid', message: 'No hostname to point.');
         }
 
         $serverIp = trim((string) ($site->server->ip_address ?? ''));
         if ($serverIp === '') {
-            return ['status' => 'no_server_ip', 'zone' => null, 'message' => 'The server has no IP address yet.'];
+            return self::result('no_server_ip', message: 'The server has no IP address yet.');
         }
 
         $match = $this->resolver->resolveForHostname($site, $hostname);
         if ($match === null) {
-            return ['status' => 'no_credential', 'zone' => null, 'message' => 'No connected DNS credential controls this zone.'];
+            return self::result('no_credential', message: 'No connected DNS credential controls this zone.');
         }
 
         $zone = $match['zone'];
@@ -48,9 +60,27 @@ class TenantDnsProvisioner
         try {
             SiteDnsProviderFactory::forCredential($match['credential'])->upsertRecord($zone, 'A', $relative, $serverIp);
 
-            return ['status' => 'created', 'zone' => $zone, 'message' => null];
+            return self::result('created', zone: $zone, credential: $match['credential']);
         } catch (\Throwable $e) {
-            return ['status' => 'error', 'zone' => $zone, 'message' => $e->getMessage()];
+            return self::result('error', zone: $zone, message: $e->getMessage(), credential: $match['credential']);
         }
+    }
+
+    /**
+     * Callers backfill the site's saved zone/credential from a successful
+     * attach, so the credential that actually owns the zone wins over
+     * dnsAutomationCredential()'s "most recently updated" guess.
+     *
+     * @return array{status: string, zone: ?string, message: ?string, credential_id: ?string, provider: ?string}
+     */
+    private static function result(string $status, ?string $zone = null, ?string $message = null, ?ProviderCredential $credential = null): array
+    {
+        return [
+            'status' => $status,
+            'zone' => $zone,
+            'message' => $message,
+            'credential_id' => $credential !== null ? (string) $credential->id : null,
+            'provider' => $credential?->dnsProviderLabel(),
+        ];
     }
 }

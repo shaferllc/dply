@@ -242,6 +242,41 @@
                                         @if ($domain->comment)
                                             <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $domain->comment }}</p>
                                         @endif
+                                        {{-- The record to create at the DNS host. Static (no live
+                                             lookup) so it renders on first paint; the "is it actually
+                                             pointing here" answer lives on the DNS tab. Without this
+                                             a freshly added domain gave no hint of what to do next
+                                             unless you knew to go looking on another tab. --}}
+                                        @php($dnsHint = $this->dnsRecordHintFor($domain->hostname))
+                                        @if ($dnsHint)
+                                            <details class="mt-1.5 w-fit max-w-full rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5">
+                                                <summary class="cursor-pointer list-none text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DNS record') }}</summary>
+                                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-brand-ink">
+                                                    <span><span class="text-brand-mist">{{ __('Type') }}</span> {{ $dnsHint['type'] }}</span>
+                                                    <span><span class="text-brand-mist">{{ __('Name') }}</span> {{ $dnsHint['name'] }}</span>
+                                                    <span
+                                                        x-data="{ copied: false, async copyVal() { try { await navigator.clipboard.writeText(@js($dnsHint['value'])); this.copied = true; setTimeout(() => this.copied = false, 1400); } catch (e) {} } }"
+                                                        class="inline-flex items-center gap-1.5"
+                                                    >
+                                                        <span class="text-brand-mist">{{ __('Value') }}</span> {{ $dnsHint['value'] }}
+                                                        <button type="button" x-on:click="copyVal()" class="text-2xs font-semibold uppercase tracking-wide text-brand-sage hover:text-brand-forest">
+                                                            <span x-show="! copied">{{ __('Copy') }}</span>
+                                                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                                <p class="mt-1.5 font-sans text-2xs leading-relaxed text-brand-moss">
+                                                    @if ($dnsHint['zone'] !== '')
+                                                        {{ __('Add this at whoever hosts :zone.', ['zone' => $dnsHint['zone']]) }}
+                                                    @else
+                                                        {{ __('Add this at whoever hosts the domain — use the full hostname if the form wants an FQDN.') }}
+                                                    @endif
+                                                    @unless ($dnsHint['apex'])
+                                                        {{ __('A CNAME to the testing host works too; an A record is simpler.') }}
+                                                    @endunless
+                                                </p>
+                                            </details>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">

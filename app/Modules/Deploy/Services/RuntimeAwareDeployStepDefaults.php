@@ -282,9 +282,13 @@ class RuntimeAwareDeployStepDefaults
      */
     private static function nodeMigrateCommand(?string $migrationTool, ?string $packageManager): ?string
     {
+        // pnpm and yarn are not installed alongside Node — mise installs the
+        // runtime, not the alternate package managers — and this is a CUSTOM
+        // step, so it does not pass through the corepack fallback that the
+        // install step types get. A bare `pnpm exec` here exits 127.
         $runner = match (strtolower((string) $packageManager)) {
-            'pnpm' => 'pnpm exec',
-            'yarn' => 'yarn',
+            'pnpm' => '{ command -v pnpm >/dev/null 2>&1 && pnpm exec || corepack pnpm exec; }',
+            'yarn' => '{ command -v yarn >/dev/null 2>&1 && yarn || corepack yarn; }',
             'bun' => 'bunx',
             default => 'npx --no-install',
         };

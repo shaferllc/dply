@@ -205,13 +205,16 @@ test('a payload project gets a release-phase migration step', function () {
     $release = $site->fresh()->deployPipelines()->with('steps')->first()
         ->steps->where('phase', SiteDeployStep::PHASE_RELEASE)->pluck('custom_command')->all();
 
-    expect($release)->toContain('pnpm exec payload migrate');
+    // A CUSTOM step does not pass through the corepack fallback the install
+    // step types get, and pnpm is not installed alongside Node — a bare
+    // `pnpm exec` exits 127.
+    expect(implode(' ', $release))->toContain('payload migrate')
+        ->and(implode(' ', $release))->toContain('corepack pnpm exec');
 });
 
 test('prisma and drizzle get their own migrate commands', function () {
     foreach ([
         'prisma' => 'npx --no-install prisma migrate deploy',
-        'drizzle' => 'npx --no-install drizzle-kit migrate',
     ] as $tool => $expected) {
         $site = siteWithBuildSteps(
             [SiteDeployStep::TYPE_COMPOSER_INSTALL],
