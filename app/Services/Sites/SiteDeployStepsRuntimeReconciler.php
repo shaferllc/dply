@@ -55,17 +55,9 @@ final class SiteDeployStepsRuntimeReconciler
             return null;
         }
 
-        $buildSteps = $pipeline->steps
-            ->where('phase', SiteDeployStep::PHASE_BUILD)
-            ->values();
-
-        if ($buildSteps->isEmpty()) {
-            return null;
-        }
-
-        $signatureOf = fn (SiteDeployStep $s): string => RuntimeAwareDeployStepDefaults::signature(
-            (string) $s->step_type,
-            $s->custom_command,
+        $signatureOf = fn (SiteDeployStep $step): string => RuntimeAwareDeployStepDefaults::signature(
+            (string) $step->step_type,
+            $step->custom_command,
         );
 
         // Framework names are normalised by defaultsFor() itself, so there is
@@ -76,27 +68,10 @@ final class SiteDeployStepsRuntimeReconciler
             $language,
             $framework !== '' ? $framework : null,
             isset($detected['package_manager']) ? (string) $detected['package_manager'] : null,
+            isset($detected['migration_tool']) ? (string) $detected['migration_tool'] : null,
         );
 
         if ($replacements === []) {
-            return null;
-        }
-
-        // Compare against the EXACT steps this repo should have, not merely
-        // "some step belonging to this language". A pnpm project seeded with
-        // npm_ci is a node step on a node project and still wrong — `npm ci`
-        // fails outright without a package-lock.json.
-        $expected = array_map(
-            fn (array $step): string => RuntimeAwareDeployStepDefaults::signature(
-                (string) $step['step_type'],
-                $step['custom_command'] ?? null,
-            ),
-            $replacements,
-        );
-
-        $current = $buildSteps->map($signatureOf)->all();
-
-        if ($current === $expected) {
             return null;
         }
 
@@ -104,38 +79,74 @@ final class SiteDeployStepsRuntimeReconciler
         // outside this set was hand-written and must not be discarded.
         $knownSeeded = array_merge(...array_values($signatures));
 
-        if (! $buildSteps->every(fn (SiteDeployStep $s) => in_array($signatureOf($s), $knownSeeded, true))) {
-            return sprintf(
-                '[dply] Detected a %s project, but the build steps are customised — leaving them untouched. '
-                .'Update them on the site\'s Pipeline tab if the deploy fails.',
-                $language,
+        $notes = [];
+
+        // Build AND release. Release used to be ignored entirely, so a Node
+        // project never got a migration step and a site switched from PHP kept
+        // its artisan_migrate steps forever.
+        foreach ([SiteDeployStep::PHASE_BUILD, SiteDeployStep::PHASE_RELEASE] as $phase) {
+            $current = $pipeline->steps->where('phase', $phase)->values();
+
+            $expectedSteps = array_values(array_filter(
+                $replacements,
+                fn (array $step): bool => ($step['phase'] ?? null) === $phase,
+            ));
+
+            $expected = array_map(
+                fn (array $step): string => RuntimeAwareDeployStepDefaults::signature(
+                    (string) $step['step_type'],
+                    $step['custom_command'] ?? null,
+                ),
+                $expectedSteps,
+            );
+
+            if ($current->map($signatureOf)->all() === $expected) {
+                continue;
+            }
+
+            // A human edited this phase: say so rather than throwing it away.
+            if (! $current->every(fn (SiteDeployStep $step) => in_array($signatureOf($step), $knownSeeded, true))) {
+                $notes[] = sprintf(
+                    'the %s steps are customised — leaving them untouched',
+                    $phase,
+                );
+
+                continue;
+            }
+
+            $removed = $current->pluck('step_type')->all();
+
+            $pipeline->steps()->where('phase', $phase)->delete();
+
+            foreach ($expectedSteps as $step) {
+                $pipeline->steps()->create([
+                    'site_id' => $site->id,
+                    'step_type' => $step['step_type'],
+                    'phase' => $step['phase'],
+                    'custom_command' => $step['custom_command'] ?? null,
+                    'timeout_seconds' => $step['timeout_seconds'] ?? 600,
+                    'sort_order' => $step['sort_order'] ?? 10,
+                    'managed_by_manifest' => false,
+                ]);
+            }
+
+            $notes[] = sprintf(
+                'replaced %s steps [%s] with [%s]',
+                $phase,
+                $removed === [] ? 'none' : implode(', ', $removed),
+                implode(', ', array_column($expectedSteps, 'step_type')) ?: 'none',
             );
         }
 
-        $removed = $buildSteps->pluck('step_type')->all();
-
-        $pipeline->steps()
-            ->where('phase', SiteDeployStep::PHASE_BUILD)
-            ->delete();
-
-        foreach ($replacements as $step) {
-            $pipeline->steps()->create([
-                'site_id' => $site->id,
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'] ?? 600,
-                'sort_order' => $step['sort_order'] ?? 10,
-                'managed_by_manifest' => false,
-            ]);
+        if ($notes === []) {
+            return null;
         }
 
         return sprintf(
-            '[dply] Detected a %s project (%s) — replaced auto-seeded build steps [%s] with [%s].',
+            '[dply] Detected a %s project (%s) — %s.',
             $language,
             $framework !== '' ? $framework : 'no framework',
-            implode(', ', $removed),
-            implode(', ', array_column($replacements, 'step_type')),
+            implode('; ', $notes),
         );
     }
 }

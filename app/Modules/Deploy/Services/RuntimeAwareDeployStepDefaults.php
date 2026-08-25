@@ -47,13 +47,18 @@ class RuntimeAwareDeployStepDefaults
      *     sort_order: int,
      * }>
      */
-    public function defaultsFor(?string $runtime, ?string $framework = null, ?string $packageManager = null): array
+    public function defaultsFor(
+        ?string $runtime,
+        ?string $framework = null,
+        ?string $packageManager = null,
+        ?string $migrationTool = null,
+    ): array
     {
         $framework = self::canonicalFramework($framework);
 
         $steps = match ($runtime) {
             'php' => $this->phpSteps($framework),
-            'node' => $this->nodeSteps($framework, $packageManager),
+            'node' => $this->nodeSteps($framework, $packageManager, $migrationTool),
             'python' => $this->pythonSteps($framework),
             'ruby' => $this->rubySteps($framework),
             'go' => $this->goSteps(),
@@ -155,12 +160,25 @@ class RuntimeAwareDeployStepDefaults
         foreach (self::FRAMEWORKS_BY_LANGUAGE as $language => $frameworks) {
             $seen = [];
 
+            // Node release steps vary by package manager AND migration tool, so
+            // enumerate those combinations too — otherwise a `pnpm exec payload
+            // migrate` step this service emitted would read as hand-written and
+            // block reconciliation of the pipeline it belongs to.
+            if ($language === 'node') {
+                foreach ([null, 'npm', 'pnpm', 'yarn', 'bun'] as $manager) {
+                    foreach ([null, 'payload', 'prisma', 'drizzle'] as $tool) {
+                        foreach ($this->defaultsFor('node', null, $manager, $tool) as $step) {
+                            $seen[self::signature(
+                                (string) $step['step_type'],
+                                isset($step['custom_command']) ? (string) $step['custom_command'] : null,
+                            )] = true;
+                        }
+                    }
+                }
+            }
+
             foreach ($frameworks as $framework) {
                 foreach ($this->defaultsFor($language, $framework) as $step) {
-                    if (($step['phase'] ?? null) !== SiteDeployStep::PHASE_BUILD) {
-                        continue;
-                    }
-
                     $seen[self::signature(
                         (string) $step['step_type'],
                         isset($step['custom_command']) ? (string) $step['custom_command'] : null,
@@ -205,7 +223,7 @@ class RuntimeAwareDeployStepDefaults
         };
     }
 
-    private function nodeSteps(?string $framework, ?string $packageManager = null): array
+    private function nodeSteps(?string $framework, ?string $packageManager = null, ?string $migrationTool = null): array
     {
         // Install with the tool the repository actually uses. `npm ci` against a
         // pnpm project fails outright ("package.json and package-lock.json are
@@ -235,7 +253,48 @@ class RuntimeAwareDeployStepDefaults
             ];
         }
 
+        // Release-phase migration. Node projects had none at all, so schema
+        // changes simply never applied on deploy — the PHP side has shipped
+        // artisan_migrate since forever.
+        //
+        // Only for a migration tool actually detected in the repo's
+        // dependencies: running the wrong migrate command against a production
+        // database is worse than running none. Seeding is deliberately absent —
+        // it is not idempotent, and running it on every deploy would overwrite
+        // live data.
+        $migrate = self::nodeMigrateCommand($migrationTool, $packageManager);
+
+        if ($migrate !== null) {
+            $steps[] = [
+                'step_type' => SiteDeployStep::TYPE_CUSTOM,
+                'custom_command' => $migrate,
+                'phase' => SiteDeployStep::PHASE_RELEASE,
+                'timeout_seconds' => 900,
+            ];
+        }
+
         return $steps;
+    }
+
+    /**
+     * The migrate command for a detected Node migration tool, run through the
+     * repo's package manager so it resolves the locally-installed binary.
+     */
+    private static function nodeMigrateCommand(?string $migrationTool, ?string $packageManager): ?string
+    {
+        $runner = match (strtolower((string) $packageManager)) {
+            'pnpm' => 'pnpm exec',
+            'yarn' => 'yarn',
+            'bun' => 'bunx',
+            default => 'npx --no-install',
+        };
+
+        return match (strtolower((string) $migrationTool)) {
+            'payload' => $runner.' payload migrate',
+            'prisma' => $runner.' prisma migrate deploy',
+            'drizzle' => $runner.' drizzle-kit migrate',
+            default => null,
+        };
     }
 
     /**

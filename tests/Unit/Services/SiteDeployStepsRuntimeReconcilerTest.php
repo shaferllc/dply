@@ -191,3 +191,70 @@ test('yarn and bun pick their own install steps', function () {
         expect($types)->toContain($expected);
     }
 });
+
+test('a payload project gets a release-phase migration step', function () {
+    // Node projects had no release phase at all, so schema changes never
+    // applied on deploy — the PHP side has had artisan_migrate since forever.
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'node', 'framework' => 'nextjs', 'package_manager' => 'pnpm', 'migration_tool' => 'payload'],
+    );
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    $release = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_RELEASE)->pluck('custom_command')->all();
+
+    expect($release)->toContain('pnpm exec payload migrate');
+});
+
+test('prisma and drizzle get their own migrate commands', function () {
+    foreach ([
+        'prisma' => 'npx --no-install prisma migrate deploy',
+        'drizzle' => 'npx --no-install drizzle-kit migrate',
+    ] as $tool => $expected) {
+        $site = siteWithBuildSteps(
+            [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+            ['language' => 'node', 'framework' => 'express', 'package_manager' => 'npm', 'migration_tool' => $tool],
+        );
+
+        app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+        $release = $site->fresh()->deployPipelines()->with('steps')->first()
+            ->steps->where('phase', SiteDeployStep::PHASE_RELEASE)->pluck('custom_command')->all();
+
+        expect($release)->toContain($expected);
+    }
+});
+
+test('an unrecognised stack gets no migration step at all', function () {
+    // Running the wrong migrate command against a production database is worse
+    // than running none.
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'node', 'framework' => 'express', 'package_manager' => 'npm'],
+    );
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    $release = $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->where('phase', SiteDeployStep::PHASE_RELEASE);
+
+    expect($release)->toBeEmpty();
+});
+
+test('no seeder is ever added automatically', function () {
+    // Seeding is not idempotent; running it on every deploy would overwrite
+    // live data.
+    $site = siteWithBuildSteps(
+        [SiteDeployStep::TYPE_COMPOSER_INSTALL],
+        ['language' => 'node', 'framework' => 'nextjs', 'package_manager' => 'pnpm', 'migration_tool' => 'payload'],
+    );
+
+    app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site);
+
+    $commands = implode(' ', $site->fresh()->deployPipelines()->with('steps')->first()
+        ->steps->pluck('custom_command')->all());
+
+    expect($commands)->not->toContain('seed');
+});

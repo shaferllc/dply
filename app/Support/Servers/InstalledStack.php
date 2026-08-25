@@ -123,12 +123,22 @@ final readonly class InstalledStack
      * True when the wizard-requested database differs from what physically
      * landed. Used by UI panels to render the "Requested vs Installed"
      * divergence section.
+     *
+     * Compared by family, not by raw string: the wizard records versioned ids
+     * ("mysql84") while the inventory probe can only observe a family plus a
+     * live version ("mysql" + 8.0.46), so a raw compare flagged every probed
+     * MySQL box as divergent. Real fallbacks (mysql84 -> sqlite3 under
+     * low-memory mode) still cross a family boundary and still fire.
      */
     public function divergesFromRequest(Server $server): bool
     {
         $requested = $server->meta['database'] ?? null;
 
-        return is_string($requested) && $this->database !== null && $requested !== $this->database;
+        if (! is_string($requested) || $requested === '' || $this->database === null) {
+            return false;
+        }
+
+        return DatabaseWorkspaceEngines::family($requested) !== DatabaseWorkspaceEngines::family($this->database);
     }
 
     private static function stringOrNull(mixed $value): ?string

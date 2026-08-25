@@ -236,6 +236,12 @@ trait ResolvesSiteRuntime
                 $out['package_manager'] = $blob['package_manager'];
             }
 
+            // Which migration tool the repo ships (payload / prisma / drizzle),
+            // so the release phase can apply schema changes on deploy.
+            if (isset($blob['migration_tool']) && is_string($blob['migration_tool']) && $blob['migration_tool'] !== '') {
+                $out['migration_tool'] = $blob['migration_tool'];
+            }
+
             if (isset($blob['confidence']) && is_string($blob['confidence']) && $blob['confidence'] !== '') {
                 $out['confidence'] = $blob['confidence'];
             }

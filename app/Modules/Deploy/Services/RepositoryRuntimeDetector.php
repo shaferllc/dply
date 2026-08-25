@@ -628,6 +628,10 @@ final class RepositoryRuntimeDetector
             // actually uses. Emitting `npm ci` for a pnpm project fails with
             // "package.json and package-lock.json are not in sync".
             'package_manager' => $packageManager,
+            // Which migration tool, if any, the repo ships. Node projects had no
+            // release-phase steps at all, so schema changes never applied on
+            // deploy — the Laravel side has had artisan_migrate since forever.
+            'migration_tool' => self::nodeMigrationTool($dependencies),
             'deploy_kind' => $deployKind,
             'language' => 'node',
             'runtime' => (string) ($capabilities['default_runtime'] ?? 'nodejs:18'),
@@ -674,6 +678,36 @@ final class RepositoryRuntimeDetector
                 ['Detected package.json build scripts suitable for a Node-based build.'],
                 [],
             );
+        }
+
+        return null;
+    }
+
+
+    /**
+     * The migration tool a Node project ships, from its dependencies.
+     *
+     * Detected, never guessed: an unrecognised stack returns null and no
+     * release step is added, because running the wrong migrate command on a
+     * production database is worse than running none.
+     *
+     * @param  list<string>  $dependencies
+     */
+    private static function nodeMigrationTool(array $dependencies): ?string
+    {
+        // Payload ships its own migrate command and owns its schema.
+        foreach ($dependencies as $dependency) {
+            if (str_starts_with($dependency, '@payloadcms/') || $dependency === 'payload') {
+                return 'payload';
+            }
+        }
+
+        if (in_array('prisma', $dependencies, true) || in_array('@prisma/client', $dependencies, true)) {
+            return 'prisma';
+        }
+
+        if (in_array('drizzle-kit', $dependencies, true) || in_array('drizzle-orm', $dependencies, true)) {
+            return 'drizzle';
         }
 
         return null;

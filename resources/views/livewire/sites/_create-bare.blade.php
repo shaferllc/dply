@@ -34,7 +34,7 @@
     <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-12 lg:items-start">
         {{-- Form card --}}
         <form wire:submit="storeBare" class="lg:col-span-7">
-            <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
+            <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                 <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                     <x-icon-badge>
                         <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
