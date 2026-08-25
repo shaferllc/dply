@@ -97,9 +97,3 @@ arch('console commands extend command')
     ->expect('App\Console\Commands')
     ->classes()
     ->toExtend(Command::class);
-
-arch('serverless contracts are interfaces')
-    ->expect('App\Modules\Serverless\Contracts')
-    ->toBeInterfaces()
-    // The capability vocabulary is an enum, not an interface.
-    ->ignoring('App\Modules\Serverless\Contracts\ServerlessFeature');

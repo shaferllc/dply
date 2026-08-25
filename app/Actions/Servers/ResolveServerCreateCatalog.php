@@ -64,9 +64,6 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
-        if (in_array($type, ['digitalocean_functions', 'aws_lambda'], true)) {
-            return array_merge($empty, ['credentials' => $credentials]);
-        }
 
         if (ProviderApiStatus::isUnreachable($type)) {
             return array_merge($empty, [
@@ -200,7 +197,7 @@ final class ResolveServerCreateCatalog
         }
 
         $provider = match ($type) {
-            'digitalocean', 'digitalocean_kubernetes', 'digitalocean_functions' => __('DigitalOcean'),
+            'digitalocean', 'digitalocean_kubernetes' => __('DigitalOcean'),
             'vultr' => __('Vultr'),
             'linode' => __('Linode'),
             'hetzner' => __('Hetzner'),

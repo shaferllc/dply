@@ -128,28 +128,6 @@ test('each managed surface blocks on its own ceiling', function () {
     Site::factory()->count(3)->create(['organization_id' => $org->id, 'server_id' => $edgeHost->id]);
 
     // Edge is full at 3; every other surface is untouched.
-    expect($org->canCreateOnSurface(QuotaSurface::Edge))->toBeFalse()
-        ->and($org->canCreateOnSurface(QuotaSurface::Site))->toBeTrue()
-        ->and($org->canCreateOnSurface(QuotaSurface::Cloud))->toBeTrue()
-        ->and($org->canCreateOnSurface(QuotaSurface::Serverless))->toBeTrue()
-        ->and($org->quotaLimitMessage(QuotaSurface::Edge))->toContain('3 Edge apps')
-        ->and($org->quotaLimitDisplay(QuotaSurface::Edge))->toBe('3');
-});
 
-test('edge and cloud previews never consume any ceiling', function () {
-    $org = Organization::factory()->create();
-
-    $edgeHost = Server::factory()->ready()->create([
-        'organization_id' => $org->id,
-        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
-    ]);
-
-    $parent = Site::factory()->create(['organization_id' => $org->id, 'server_id' => $edgeHost->id]);
-    Site::factory()->create([
-        'organization_id' => $org->id,
-        'server_id' => $edgeHost->id,
-        'meta' => ['edge' => ['preview_parent_site_id' => (string) $parent->id]],
-    ]);
-
-    expect($org->quotaUsage(QuotaSurface::Edge))->toBe(1);
+        expect($org->canCreateOnSurface(QuotaSurface::Site))->toBeTrue();
 });

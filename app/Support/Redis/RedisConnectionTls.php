@@ -73,6 +73,20 @@ final class RedisConnectionTls
         return $url;
     }
 
+    /**
+     * PhpRedis talking plaintext to a TLS-only DigitalOcean/Upstash host.
+     */
+    public static function looksLikeHandshakeFailure(string $output): bool
+    {
+        if (! str_contains($output, 'read error on connection')) {
+            return false;
+        }
+
+        return str_contains($output, '.ondigitalocean.com')
+            || str_contains($output, ':25061')
+            || str_contains($output, '.upstash.io');
+    }
+
     public static function requiresTls(?string $host, int|string|null $port, ?string $url = null): bool
     {
         $fromUrl = self::parseUrl($url);

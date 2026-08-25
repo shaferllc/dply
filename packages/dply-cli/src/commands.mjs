@@ -520,7 +520,7 @@ async function detectSiteProduct(api, siteId) {
 }
 
 /**
- * `dply sites [needle] [--kind vm|edge|serverless]`
+ * `dply sites [needle] [--kind vm|cloud|edge]`
  *
  * Every site the token can see, of every kind — one table, because the platform
  * has one Site model. `--kind` narrows it; a positional filters by name.
@@ -548,7 +548,7 @@ export async function sites(args = [], flags = {}) {
 
   if (rows.length === 0) {
     warn(needle ? `No site matched "${needle}".` : 'No sites visible to this token.');
-    info(c.dim('Missing permissions? Try `dply auth refresh`. Filter with --kind vm|cloud|edge|serverless.'));
+    info(c.dim('Missing permissions? Try `dply auth refresh`. Filter with --kind vm|cloud|edge.'));
 
     return 0;
   }
@@ -565,21 +565,17 @@ export async function sites(args = [], flags = {}) {
   );
 
   info('');
-  info(c.dim('Errors: `dply sites:errors <name>` (any kind) · deploy: `dply site:deploy <name>` · filter: --kind vm|cloud|edge|serverless'));
+  info(c.dim('Errors: `dply sites:errors <name>` (any kind) · deploy: `dply site:deploy <name>` · filter: --kind vm|cloud|edge'));
 
   return 0;
 }
 
 /**
- * @param {'vm'|'cloud'|'edge'|'serverless'} kind
+ * @param {'vm'|'cloud'|'edge'} kind
  */
 function kindCell(kind) {
   if (kind === 'edge') {
     return c.magenta('edge');
-  }
-
-  if (kind === 'serverless') {
-    return c.yellow('serverless');
   }
 
   return kind === 'cloud' ? c.green('cloud') : c.cyan('vm');

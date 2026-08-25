@@ -2,15 +2,9 @@
  * The local half of `dply init` — everything it can work out from the folder
  * alone, with no network and no side effects.
  *
- * Deliberately *not* a second copy of the server's ServerlessRuntimeDetector.
- * That ladder (framework markers → language project → multi-action package →
- * raw action → static → unknown, with lockfile-aware build commands) is subtle,
- * and two implementations of it would drift — at which point init promises
- * Laravel and the deploy builds a raw action, which looks like it worked. The
- * authoritative answer comes back from the create endpoint's dry run.
- *
- * What lives here is only what orders a menu and fills in defaults. Nothing
- * downstream depends on it being right.
+ * Detection here only orders a menu and fills in defaults. The authoritative
+ * answer comes back from the create endpoint's dry run. Nothing downstream
+ * depends on this being right.
  */
 
 /**
@@ -80,12 +74,9 @@ export function rankKinds({ files, packageJson = null }) {
   };
   const dep = (name) => Object.prototype.hasOwnProperty.call(deps, name);
 
-  const hasNode = has('package.json');
   const hasPhp = has('composer.json');
   const hasPython = has('requirements.txt') || has('pyproject.toml') || has('Pipfile');
   const hasGo = has('go.mod');
-  const hasEntry = ['main.js', 'main.mjs', 'main.php', 'main.py', 'main.go', 'index.js', 'index.mjs']
-    .some((f) => has(f));
   const hasDockerfile = has('Dockerfile') || has('dockerfile');
   const staticGenerator = ['astro', 'next', 'nuxt', 'gatsby', '@11ty/eleventy', 'vite', 'vitepress']
     .some(dep) || has('_config.yml') || has('hugo.toml');
@@ -94,11 +85,6 @@ export function rankKinds({ files, packageJson = null }) {
     || dep('express') || dep('fastify') || dep('koa') || dep('@nestjs/core');
 
   const out = [];
-
-  // Serverless — a function needs something to be the function.
-  out.push(hasNode || hasPhp || hasPython || hasGo || hasEntry
-    ? { kind: 'serverless', fits: true, score: 3, reason: describeProject({ hasNode, hasPhp, hasPython, hasGo, hasEntry }) }
-    : { kind: 'serverless', fits: false, score: 0, reason: 'no package manifest or main.{js,php,py,go} found' });
 
   // Edge — static output, or something that builds it.
   if (hasIndexHtml && ! serverSide) {
@@ -117,22 +103,9 @@ export function rankKinds({ files, packageJson = null }) {
   // A server you own runs anything, so this never carries a reason not to.
   out.push({ kind: 'vm', fits: true, score: 1, reason: 'runs on a server you own' });
 
-  const order = ['serverless', 'edge', 'cloud', 'vm'];
+  const order = ['edge', 'cloud', 'vm'];
 
   return out.sort((a, b) => (b.score - a.score) || (order.indexOf(a.kind) - order.indexOf(b.kind)));
-}
-
-/**
- * @param {{hasNode: boolean, hasPhp: boolean, hasPython: boolean, hasGo: boolean, hasEntry: boolean}} f
- */
-function describeProject({ hasNode, hasPhp, hasPython, hasGo, hasEntry }) {
-  if (hasPhp) return 'a PHP project (composer.json)';
-  if (hasNode) return 'a Node project (package.json)';
-  if (hasPython) return 'a Python project';
-  if (hasGo) return 'a Go module';
-  if (hasEntry) return 'a bare function entry point';
-
-  return 'a deployable project';
 }
 
 /**
@@ -263,7 +236,7 @@ export function manifestKind(contents) {
 
     const value = match[1].replace(/^["']|["']$/g, '').trim().toLowerCase();
 
-    return ['vm', 'cloud', 'edge', 'serverless'].includes(value) ? value : null;
+    return ['vm', 'cloud', 'edge'].includes(value) ? value : null;
   }
 
   return null;

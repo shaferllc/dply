@@ -114,7 +114,7 @@ final class CloneServerOnDigitalOcean
         $hostKind = (string) (($source->meta ?? [])['host_kind'] ?? Server::HOST_KIND_VM);
         if ($hostKind !== Server::HOST_KIND_VM) {
             throw ValidationException::withMessages([
-                'source' => __('Only VM-kind servers can be snapshot-cloned. Managed Kubernetes / App Platform / serverless hosts can\'t be duplicated this way.'),
+                'source' => __('Only VM-kind servers can be snapshot-cloned. Managed Kubernetes / App Platform   hosts can\'t be duplicated this way.'),
             ]);
         }
 

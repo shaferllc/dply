@@ -11,51 +11,30 @@
  *    detector the deploy runs. There is no second ladder in JavaScript.
  * 2. Every prompt has a flag, and `--yes` skips the confirmation — so the same
  *    command works in a pipeline. Nothing is inferred silently that spends
- *    money: the summary always names the region, the delivery mode, and where
- *    the function counts against quota.
+ *    money: the summary always names the region and where the site counts
+ *    against quota.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { ApiClient } from './api.mjs';
 import { defaultBaseUrl, instanceKey, listInstances, readGlobalConfig, readSiteLink, writeSiteLink } from './config.mjs';
-import { followSiteDeployment } from './deploy-follow.mjs';
 import { c, info, ok, warn } from './print.mjs';
 import { isInteractive, pickRow } from './pick.mjs';
 import {
-  classifyGitState,
   envKeyNames,
-  filterUploadPaths,
-  humanBytes,
   manifestKind,
   proposeName,
   rankKinds,
 } from './init-detect.mjs';
 
 const KIND_LABELS = {
-  serverless: 'Serverless — a managed function, scaled to zero',
   edge: 'Edge — static and SSG sites on the edge network',
   cloud: 'Cloud — a managed container app',
   vm: 'Server — a site on a server you own',
-};
-
-const HELLO_WORLD = {
-  node: {
-    file: 'main.js',
-    body: `// A dply serverless function. \`main\` is the handler the runtime invokes.\nexport function main(args) {\n  return {\n    body: \`Hello from dply — \${new Date().toISOString()}\`,\n  };\n}\n`,
-  },
-  php: {
-    file: 'main.php',
-    body: `<?php\n\n// A dply serverless function. \`main\` is the handler the runtime invokes.\nfunction main(array $args): array\n{\n    return ['body' => 'Hello from dply — '.date(DATE_ATOM)];\n}\n`,
-  },
-  python: {
-    file: 'main.py',
-    body: `# A dply serverless function. \`main\` is the handler the runtime invokes.\nfrom datetime import datetime, timezone\n\n\ndef main(args):\n    return {"body": f"Hello from dply — {datetime.now(timezone.utc).isoformat()}"}\n`,
-  },
 };
 
 /**
@@ -111,7 +90,7 @@ export async function init(_args, flags) {
     return initVm(client, cwd, capabilities, { flags, noPrompt, assumeYes });
   }
 
-  await initServerless(client, cwd, capabilities, { flags, noPrompt, assumeYes });
+  return openWizardFor(kind, capabilities, cwd, { noPrompt });
 }
 
 /**
@@ -246,9 +225,10 @@ async function handleLinkedFolder(client, linked, capabilities, { noPrompt, flag
     return ! /^y(es)?$/i.test(answer.trim());
   }
 
+  const kind = linked.link?.kind ?? linked.link?.product ?? 'vm';
   let site = null;
   try {
-    site = (await client.get(`/serverless/sites/${encodeURIComponent(siteId)}`))?.data ?? null;
+    site = await fetchLinkedSite(client, siteId, kind);
   } catch (err) {
     if (err?.status === 404) {
       warn('This folder is linked to a site that no longer exists (or belongs to another organization).');
@@ -274,13 +254,13 @@ async function handleLinkedFolder(client, linked, capabilities, { noPrompt, flag
     throw err;
   }
 
+  const url = site.url ?? site.visit_url ?? site.live_url ?? site.primary_hostname;
   info('');
-  info(`${c.bold(site.name)} ${c.dim('· serverless')}`);
-  info(`  status  ${site.is_live ? c.green(site.status) : site.status}`);
-  if (site.url) {
-    info(`  url     ${c.cyan(site.url)}`);
+  info(`${c.bold(site.name)} ${c.dim(`· ${kind === 'byo' ? 'vm' : kind}`)}`);
+  info(`  status  ${site.status ?? '—'}`);
+  if (url) {
+    info(`  url     ${c.cyan(url)}`);
   }
-  info(`  source  ${site.source_kind === 'upload' ? 'uploaded folder' : 'git'}`);
   info('');
 
   if (noPrompt || flags.status) {
@@ -306,7 +286,7 @@ async function handleLinkedFolder(client, linked, capabilities, { noPrompt, flag
 
   if (choice?.id === 'open') {
     const { openInBrowser } = await import('./commands.mjs');
-    await openInBrowser(site.workspace_url ?? `${client.baseUrl}/serverless`);
+    await openInBrowser(site.workspace_url ?? client.baseUrl);
 
     return true;
   }
@@ -327,8 +307,8 @@ async function chooseKind(cwd, capabilities, { flags, noPrompt }) {
   }
 
   if (wanted) {
-    if (! ['vm', 'cloud', 'edge', 'serverless'].includes(wanted)) {
-      throw exit(`Unknown --kind "${wanted}". Use vm, cloud, edge, or serverless.`, 2);
+    if (! ['vm', 'cloud', 'edge'].includes(wanted)) {
+      throw exit(`Unknown --kind "${wanted}". Use vm, cloud, or edge.`, 2);
     }
 
     return wanted;
@@ -397,101 +377,6 @@ async function openWizardFor(kind, capabilities, cwd, { noPrompt }) {
       await openInBrowser(url);
     }
   }
-}
-
-/* --------------------------------------------------------- serverless */
-
-async function initServerless(client, cwd, capabilities, { flags, noPrompt, assumeYes }) {
-  const git = readGitState(cwd);
-  const source = await chooseSource(git, { flags, noPrompt });
-
-  if (source.kind === 'git' && source.action === 'push') {
-    runGit(cwd, ['push']);
-    ok('Pushed.');
-  }
-
-  let folder = readFolder(cwd);
-  if (! folder.files.length || (! folder.files.includes('package.json')
-    && ! folder.files.includes('composer.json') && ! hasEntryFile(folder.files))) {
-    const scaffolded = await offerHelloWorld(cwd, { noPrompt, flags });
-    if (scaffolded) {
-      folder = readFolder(cwd);
-      source.kind = 'upload';
-    }
-  }
-
-  const proposed = proposeName(cwd);
-  const name = String(flags.name ?? proposed.name);
-  const region = String(flags.region ?? capabilities.serverless?.default_region ?? 'nyc1');
-  const deliveryMode = await chooseDeliveryMode(capabilities, { flags, noPrompt });
-
-  // Upload sources are detected on the archive, so it has to exist before the
-  // dry run — which is also why the dry run keeps it and the create consumes
-  // the same bytes.
-  let sourceHandle = null;
-  if (source.kind === 'upload') {
-    sourceHandle = await uploadCurrentFolder(client, cwd, flags, null, capabilities);
-  }
-
-  const payload = {
-    name,
-    source_kind: source.kind,
-    repo: source.kind === 'git' ? git.remoteUrl : '',
-    branch: git.branch || 'main',
-    repository_subdirectory: git.prefix,
-    region,
-    delivery_mode: deliveryMode,
-    runtime: String(flags.runtime ?? 'auto'),
-    source_handle: sourceHandle,
-  };
-
-  const dry = await dryRun(client, payload, { noPrompt });
-  if (dry === null) {
-    return;
-  }
-
-  const envContent = await offerEnvImport(cwd, { noPrompt, flags });
-  if (envContent) {
-    payload.env_file_content = envContent;
-  }
-
-  printSummary({ payload, plan: dry.plan, quota: dry.quota, git, source, proposed });
-
-  if (! assumeYes && ! noPrompt) {
-    const answer = await ask(`${c.bold('Create it?')} [Y/n] `);
-    if (/^n(o)?$/i.test(answer.trim())) {
-      info('Nothing created.');
-
-      return;
-    }
-  }
-
-  const created = await createSite(client, payload);
-  const site = created.data;
-
-  // Written before the deploy, so a failed first deploy still leaves a folder
-  // you can retry from rather than an orphan you cannot address.
-  const linkPath = await writeSiteLink(
-    { siteId: site.id, siteName: site.name, baseUrl: client.baseUrl, kind: 'serverless', product: 'serverless', sourceKind: site.source_kind },
-    cwd,
-  );
-  ok(`Created ${c.bold(site.name)} — linked in ${c.dim(linkPath.replace(`${cwd}/`, ''))}`);
-
-  if (site.push_to_deploy?.enabled) {
-    info(c.dim('  push-to-deploy: on'));
-  } else if (site.push_to_deploy?.message) {
-    info(c.dim(`  push-to-deploy: off — ${site.push_to_deploy.message}`));
-  }
-
-  await offerEngines(client, site, dry.plan, { noPrompt, flags });
-
-  if (flags['no-deploy']) {
-    info(`Run ${c.cyan('dply deploy')} when you are ready.`);
-
-    return;
-  }
-
-  await followInit(client, site, cwd, { noPrompt });
 }
 
 /* ---------------------------------------------------------------- vm */
@@ -603,7 +488,7 @@ async function chooseServer(client, { flags, noPrompt }) {
   if (rows.length === 0) {
     throw exit(
       'This organization has no servers yet. Add one in the dashboard, then run `dply init` again —\n'
-      + 'or run `dply init --kind serverless`, which needs no server at all.',
+      + 'or run `dply init --kind cloud` if you want a managed container app instead.',
       2,
     );
   }

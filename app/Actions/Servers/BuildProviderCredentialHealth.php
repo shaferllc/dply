@@ -84,13 +84,13 @@ final class BuildProviderCredentialHealth
     private function runHealthCheck(string $type, ProviderCredential $credential): void
     {
         match ($type) {
-            'digitalocean', 'digitalocean_functions', 'digitalocean_kubernetes' => (new DigitalOceanService($credential))->validateToken(),
+            'digitalocean', 'digitalocean_kubernetes' => (new DigitalOceanService($credential))->validateToken(),
             'hetzner' => (new HetznerService($credential))->validateToken(),
             'linode' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),
             'ovh' => (new OvhService($credential))->validateToken(),
             'upcloud' => (new UpCloudService($credential))->validateToken(),
-            'aws', 'aws_lambda' => (new AwsEc2Service($credential))->validateCredentials(),
+            'aws' => (new AwsEc2Service($credential))->validateCredentials(),
             'azure' => (new AzureComputeService($credential))->validateCredentials(),
             'oracle' => (new OracleComputeService($credential))->validateCredentials(),
             default => throw new \InvalidArgumentException('Unsupported provider type for health check.'),

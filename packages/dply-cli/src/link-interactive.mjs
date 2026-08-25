@@ -7,13 +7,12 @@ import { c, info, ok, warn } from './print.mjs';
 /**
  * Tag shown against each row. `site-index.mjs` is the one list of sites
  * whatever kind they are — this used to hand-roll /sites + /edge/sites, which
- * meant a serverless or cloud site could not be linked to a folder at all.
+ * meant a Cloud site could not be linked to a folder at all.
  */
 const KIND_TAGS = {
   vm: () => c.cyan('BYO'),
   cloud: () => c.yellow('Cloud'),
   edge: () => c.magenta('Edge'),
-  serverless: () => c.green('Function'),
 };
 
 /**
@@ -85,7 +84,7 @@ export async function interactiveLinkSite(api, ctx, productFilter = null) {
 
 /**
  * @param {{ baseUrl: string }} ctx
- * @param {'byo' | 'vm' | 'edge' | 'cloud' | 'serverless'} kind
+ * @param {'byo' | 'vm' | 'edge' | 'cloud'} kind
  * @param {Record<string, unknown>} site
  */
 export async function writeLinkRecord(ctx, kind, site) {
@@ -104,7 +103,7 @@ export async function writeLinkRecord(ctx, kind, site) {
     return path;
   }
 
-  if (kind === 'serverless' || kind === 'cloud') {
+  if (kind === 'cloud') {
     const path = await writeSiteLink({
       siteId: String(site.id),
       siteName: String(site.name ?? site.id),

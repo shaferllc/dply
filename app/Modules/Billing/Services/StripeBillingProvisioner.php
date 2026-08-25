@@ -19,8 +19,6 @@ use Stripe\StripeClient;
  *   - `dply Starter` / `dply Pro` / `dply Business` — the flat plan fees,
  *     metered by BYO server count (Free has no Stripe object — a $0 plan
  *     never creates a subscription)
- *   - `dply Cloud app` / `dply Edge site` / `dply serverless function` —
- *     managed products billed a la carte
  *   - `dply Enterprise` — sales-led
  */
 class StripeBillingProvisioner
@@ -30,16 +28,6 @@ class StripeBillingProvisioner
     public const ROLE_PLAN_PREFIX = 'standard_plan_';
 
     public const ROLE_PLAN_YEARLY_SUFFIX = '_yearly';
-
-    public const ROLE_SERVERLESS_PRODUCT = 'standard_serverless_product';
-
-    public const ROLE_SERVERLESS_MONTHLY = 'standard_serverless';
-
-    public const ROLE_SERVERLESS_YEARLY = 'standard_serverless_yearly';
-
-    public const ROLE_SERVERLESS_USAGE_PRODUCT = 'standard_serverless_usage_product';
-
-    public const ROLE_SERVERLESS_USAGE_MONTHLY = 'standard_serverless_usage';
 
     public const ROLE_MANAGED_SERVER_PRODUCT = 'standard_managed_server_product';
 

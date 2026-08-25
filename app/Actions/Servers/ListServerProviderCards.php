@@ -130,7 +130,6 @@ final class ListServerProviderCards
     {
         return [
             ['id' => 'digitalocean', 'label' => 'DigitalOcean'],
-            ['id' => 'digitalocean_functions', 'label' => 'DigitalOcean Functions'],
             ['id' => 'digitalocean_kubernetes', 'label' => 'DigitalOcean Kubernetes'],
             ['id' => 'hetzner', 'label' => 'Hetzner Cloud'],
             ['id' => 'vultr', 'label' => 'Vultr'],
@@ -139,7 +138,6 @@ final class ListServerProviderCards
             ['id' => 'aws', 'label' => 'Amazon EC2'],
             ['id' => 'azure', 'label' => 'Azure'],
             ['id' => 'oracle', 'label' => 'Oracle Cloud'],
-            ['id' => 'aws_lambda', 'label' => 'AWS Lambda'],
             ['id' => 'custom', 'label' => __('Custom server')],
         ];
     }

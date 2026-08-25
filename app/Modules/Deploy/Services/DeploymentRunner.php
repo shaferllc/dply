@@ -79,14 +79,12 @@ class DeploymentRunner
             return $this->finalize($deployment, $aggregate, ok: false);
         }
 
-        // Restart phase: FPM reload / systemd restart.
+        // Restart phase: FPM reload / worker bounce. Post-cutover and
+        // best-effort — a horizon:terminate Redis blip must not fail a live release.
         $restart = $this->phaseRunner->runRestart($site, $shellFactory);
         $aggregate['phases'][SiteDeployStep::PHASE_RESTART] = $restart;
         if ($restart !== []) {
             $deployment->recordPhaseResults(SiteDeployStep::PHASE_RESTART, $restart);
-            if (! $this->phaseOk($restart)) {
-                return $this->finalize($deployment, $aggregate, ok: false);
-            }
         }
 
         return $this->finalize($deployment, $aggregate, ok: true);

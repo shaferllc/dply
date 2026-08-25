@@ -8,7 +8,6 @@ import * as errorsCommands from './errors-commands.mjs';
 import * as uptimeCommands from './uptime-commands.mjs';
 import * as notificationsCommands from './notifications-commands.mjs';
 import * as updateCommands from './update-command.mjs';
-import * as serverlessCommands from './serverless-commands.mjs';
 import * as initCommand from './init-command.mjs';
 import * as instanceCommands from './instance-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
@@ -30,14 +29,13 @@ const TOP_LEVEL = {
   init: { handler: initCommand.init, summary: 'Set this folder up on dply — pick a kind, create the site, deploy it.' },
   use: { handler: instanceCommands.useCommand, summary: 'Switch which dply instance the CLI talks to (list, <name>, <url>, forget).' },
   link: { handler: commands.link, summary: 'Link this folder to a site that already exists (.dply/site.json).' },
-  sites: { handler: commands.sites, summary: 'List every site — VM, Edge, serverless (--kind, name filter).' },
+  sites: { handler: commands.sites, summary: 'List every site — VM, Edge (--kind, name filter).' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
   errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
   uptime: { handler: uptimeCommands.uptimeCommand, summary: 'Uptime monitors for a site (history, check, --watch).' },
   monitor: { handler: uptimeCommands.uptimeCommand, summary: 'Alias for `uptime` — the workspace Monitor tab.' },
   notifications: { handler: notificationsCommands.notificationsCommand, summary: 'Channels + event routing for a site or server.' },
   notify: { handler: notificationsCommands.notificationsCommand, summary: 'Alias for `notifications`.' },
-  serverless: { handler: runServerless, summary: 'Managed functions (list, status, errors, logs, invocations).' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
   update: { handler: updateCommands.updateCommand, summary: 'Install the CLI build your instance is serving (--check).' },
@@ -121,10 +119,6 @@ export async function run(argv) {
     return runServer(rest);
   }
 
-  if (command === 'serverless') {
-    return runServerless(rest);
-  }
-
   if (command === 'auth') {
     return runAuth(rest);
   }
@@ -179,16 +173,6 @@ async function runAuth(argv) {
   throw unknown(`auth ${sub}`);
 }
 
-async function runServerless(argv) {
-  if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h' || argv[0] === 'help') {
-    return serverlessCommands.serverlessCommand(['help'], parse(argv.slice(1)).flags);
-  }
-
-  const { args, flags } = parse(argv);
-
-  return serverlessCommands.serverlessCommand(args.length ? args : ['list'], flags);
-}
-
 async function runSite(argv) {
   if (argv.length === 0) {
     const { flags } = parse([]);
@@ -215,33 +199,6 @@ async function runLinkedDeploy(argv) {
 
   if (product === 'edge') {
     return commands.deploy(args, flags);
-  }
-
-  const link = await readSiteLink();
-
-  // A folder set up by `dply init` links a serverless site. For an uploaded
-  // source "deploy" means "send this folder again" — there is no remote to
-  // push to — and for a git one it means confirming that what dply will build
-  // is what the user thinks it is.
-  if (product === 'serverless' || link?.link?.kind === 'serverless') {
-    const { resolveContext } = await import('./config.mjs');
-    const { ApiClient } = await import('./api.mjs');
-    const { prepareServerlessSource } = await import('./deploy-source.mjs');
-
-    const ctx = await resolveContext({ siteFlag: flags.site });
-    const client = new ApiClient({ baseUrl: ctx.baseUrl, token: ctx.token });
-    const { handled } = await prepareServerlessSource(client, ctx.siteId, flags);
-    if (handled) {
-      info(c.dim('Uploaded — deploying.'));
-
-      return 0;
-    }
-
-    // Not via siteCommand: that path requires a BYO link and would refuse a
-    // correctly linked function with "No BYO site specified".
-    const { deployServerlessSite } = await import('./deploy-source.mjs');
-
-    return deployServerlessSite(client, ctx.siteId, flags);
   }
 
   if (flags.site) {
@@ -473,7 +430,7 @@ function printTopLevelHelp() {
   info(`  ${'server system-users'.padEnd(18)} ${c.dim('Manage Linux accounts (see `dply server system-users help`)')}`);
   info('');
   info(c.bold('Sites:'));
-  info(`  ${'sites'.padEnd(18)} ${c.dim('Every site: vm · edge · serverless (--kind X · `sites <name>` filters)')}`);
+  info(`  ${'sites'.padEnd(18)} ${c.dim('Every site: vm · cloud · edge (--kind X · `sites <name>` filters)')}`);
   info(`  ${'site list'.padEnd(18)} ${c.dim('List VM-hosted sites only')}`);
   info(`  ${'site deploy'.padEnd(18)} ${c.dim('Queue a deploy (--site or linked repo)')}`);
   info(`  ${'site logs'.padEnd(18)} ${c.dim('Latest deploy log · --follow to tail')}`);
@@ -484,21 +441,16 @@ function printTopLevelHelp() {
   info(`  ${'deploy'.padEnd(18)} ${c.dim('Deploy linked repo (BYO or Edge via .dply/site.json)')}`);
   info(`  ${'link --byo <id>'.padEnd(18)} ${c.dim('Link repo for bare `dply deploy`')}`);
   info('');
-  info(c.bold('Serverless (functions):'));
-  for (const [name, summary] of Object.entries(serverlessCommands.SERVERLESS_COMMANDS)) {
-    info(`  serverless ${name.padEnd(11)} ${c.dim(summary)}`);
-  }
-  info('');
   info(c.bold('Edge:'));
   for (const [name, { summary }] of Object.entries(EDGE_COMMANDS)) {
     info(`  edge ${name.padEnd(12)} ${c.dim(summary)}`);
   }
   info('');
-  info(c.dim('One model, one noun: `dply sites` spans vm/edge/serverless · product verbs stay under `edge` / `serverless`'));
+  info(c.dim('One model, one noun: `dply sites` spans vm/cloud/edge · product verbs stay under `edge`'));
   info(c.dim('Site context: BYO `--site` / $DPLY_SITE / link --byo · Edge `--site` / $DPLY_EDGE_SITE / link --edge'));
   info(c.dim('Shortcuts: projects · site · deploy · me · r · `dply ls shortcuts`'));
   info(c.dim('Colon form: any `dply a b` also works as `dply a:b` — e.g. `dply sites:errors acme`'));
-  info(c.dim('Leave the site off and you get a picker: `dply errors` · `dply serverless errors`'));
+  info(c.dim('Leave the site off and you get a picker: `dply errors`'));
   info(c.dim('Act on what you see: `dply errors dismiss|retry|fix` — or pick an action from the list on a TTY'));
   info(c.dim('Interactive mode: run `dply` with no args · `dply menu` · `dply ls` · `dply help`'));
 
@@ -536,7 +488,6 @@ export function allCommandLines() {
     'uptime',
     'monitor',
     'notifications',
-    'serverless',
     'billing',
     'server',
     'edge',
@@ -570,11 +521,6 @@ export function allCommandLines() {
     lines.push(`notifications ${name}`);
   }
   lines.push('notifications', 'notify');
-
-  for (const name of serverlessCommands.SERVERLESS_SUBCOMMANDS) {
-    lines.push(`serverless ${name}`);
-  }
-  lines.push('serverless help');
 
   for (const name of Object.keys(SERVER_COMMANDS)) {
     lines.push(`server ${name}`);
@@ -629,7 +575,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge', 'serverless');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge');
   }
 
   if (!normalized || normalized === 'account') {
@@ -651,15 +597,8 @@ function printCommandList(scope) {
     }
   }
 
-  if (!normalized || normalized === 'serverless' || normalized === 'functions') {
-    for (const name of serverlessCommands.SERVERLESS_SUBCOMMANDS) {
-      lines.push(`serverless ${name}`);
-    }
-    lines.push('serverless help');
-  }
-
   if (!normalized || normalized === 'site' || normalized === 'byo') {
-    lines.push('sites', 'sites --kind vm', 'sites --kind edge', 'sites --kind serverless', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors', 'errors dismiss', 'errors retry', 'errors fix', 'uptime', 'uptime history', 'uptime check', 'notifications', 'notifications channels', 'notifications events', 'notifications subscribe', 'notifications test');
+    lines.push('sites', 'sites --kind vm', 'sites --kind edge', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors', 'errors dismiss', 'errors retry', 'errors fix', 'uptime', 'uptime history', 'uptime check', 'notifications', 'notifications channels', 'notifications events', 'notifications subscribe', 'notifications test');
   }
 
   if (!normalized || normalized === 'project' || normalized === 'projects') {
@@ -670,7 +609,7 @@ function printCommandList(scope) {
     lines.push(...shortcutCommandLines());
   }
 
-  if (normalized && !['top', 'account', 'billing', 'server', 'edge', 'serverless', 'functions', 'project', 'projects', 'shortcuts', 'site', 'byo'].includes(normalized)) {
+  if (normalized && !['top', 'account', 'billing', 'server', 'edge', 'project', 'projects', 'shortcuts', 'site', 'byo'].includes(normalized)) {
     throw unknown(`ls ${scope}`);
   }
 
@@ -680,7 +619,7 @@ function printCommandList(scope) {
     info(`  ${line}`);
   }
   info('');
-  info(c.dim('Scoped: dply ls account · dply ls site · dply ls project · dply ls shortcuts · dply ls server · dply ls edge · dply ls serverless'));
+  info(c.dim('Scoped: dply ls account · dply ls site · dply ls project · dply ls shortcuts · dply ls server · dply ls edge'));
   info(c.dim('Details: dply help'));
 
   return 0;

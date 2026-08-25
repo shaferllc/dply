@@ -83,12 +83,10 @@ async function wrongKindError(client, candidate, partialCount) {
       const site = elsewhere[0];
       const noun = {
         edge: 'an Edge site',
-        serverless: 'a serverless function',
         cloud: 'a Cloud container app',
       }[site.kind];
       const hint = {
         edge: `\`dply edge status --site ${site.name}\``,
-        serverless: `\`dply serverless status ${site.name}\``,
         // Cloud has no CLI namespace of its own yet — errors is what works.
         cloud: `\`dply errors ${site.name}\``,
       }[site.kind];
@@ -107,7 +105,7 @@ async function wrongKindError(client, candidate, partialCount) {
 }
 
 /**
- * Resolve a site of ANY kind — VM, Edge, or serverless. What `dply errors`
+ * Resolve a site of ANY kind — VM, Cloud, or Edge. What `dply errors`
  * uses, because an error event belongs to a site regardless of where it runs.
  *
  * @param {import('./api.mjs').ApiClient} client
@@ -212,11 +210,11 @@ export async function linkedSiteProduct() {
     return 'byo';
   }
 
-  // `dply init` links serverless and cloud sites too. Before it existed every
-  // non-BYO link was an Edge one, and falling through to 'edge' for a function
-  // would send its deploy down the Edge path.
+  // `dply init` links cloud sites too. Before it existed every non-BYO link
+  // was an Edge one, and falling through to 'edge' for a Cloud app would send
+  // its deploy down the Edge path.
   const kind = link.link.kind ?? link.link.product;
-  if (kind === 'serverless' || kind === 'cloud') {
+  if (kind === 'cloud') {
     return kind;
   }
 

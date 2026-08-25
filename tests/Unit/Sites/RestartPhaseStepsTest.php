@@ -38,6 +38,8 @@ test('horizon:terminate only runs when laravel/horizon is installed', function (
     expect($cmd)->toContain('not installed');
     // Retains the post-restart supervisor verification.
     expect($cmd)->toContain('did not restart after horizon:terminate');
+    // A Redis blip on terminate must not fail the deploy.
+    expect($cmd)->toContain('continuing');
 });
 
 test('queue:restart / horizon:terminate are no longer release-phase types', function () {

@@ -24,6 +24,17 @@ test('plaintext redis url to a managed host is rewritten to rediss', function ()
     expect(RedisConnectionTls::url($url, null, null))->toBe('rediss://default:secret@example.db.ondigitalocean.com:25061');
 });
 
+test('plaintext handshake failures on managed hosts are recognized', function () {
+    $output = <<<'TXT'
+In PhpRedisConnector.php line 111:
+  read error on connection to dply-dply-io-redis-zrjg7a-do-user-145132-0.k.db.ondigitalocean.com:25061
+DPLY_STEP_EXIT:1
+TXT;
+
+    expect(RedisConnectionTls::looksLikeHandshakeFailure($output))->toBeTrue()
+        ->and(RedisConnectionTls::looksLikeHandshakeFailure('Class "Redis" not found'))->toBeFalse();
+});
+
 test('local loopback stays tcp even on 25061', function () {
     expect(RedisConnectionTls::scheme(null, '127.0.0.1', 25061))->toBe('tcp')
         ->and(RedisConnectionTls::scheme(null, '127.0.0.1', 6379))->toBe('tcp')

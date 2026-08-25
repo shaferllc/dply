@@ -80,14 +80,8 @@ return [
          * read as "enable DigitalOcean testing hostnames" on a setup with no
          * DigitalOcean involvement at all.
          */
-        'testing_hostnames_enabled' => filter_var(
-            env('CLOUDFLARE_TESTING_HOSTNAMES_ENABLED', true),
-            FILTER_VALIDATE_BOOL,
-        ),
         'provider' => 'cloudflare',
         'vm_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_VM_APEX', 'on-dply.cc'),
-        'edge_apex' => $testing ? 'edge.test' : env('CLOUDFLARE_EDGE_APEX', 'on-dply.site'),
-        'serverless_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_SERVERLESS_APEX', 'dply-serverless.cloud'),
         'vm' => env('CLOUDFLARE_VM_TESTING_DOMAINS', ['on-dply.cc']),
     ],
 

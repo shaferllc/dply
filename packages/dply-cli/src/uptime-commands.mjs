@@ -1,6 +1,6 @@
 /**
  * `dply uptime` (alias `dply monitor`) — the workspace Monitor tab from a
- * terminal, for every kind of site: VM, Cloud app, Edge site, function.
+ * terminal, for every kind of site: VM, Cloud app, or Edge site.
  *
  * Backed by GET /v1/sites/{site}/uptime (current state per monitor),
  * GET …/uptime/history (24h/7d/30d percentages + recent incidents) and
@@ -384,7 +384,7 @@ function printUptimeHelp() {
   info(`  ${'uptime history [site]'.padEnd(26)} ${c.dim('24h / 7d / 30d uptime + recent incidents')}`);
   info(`  ${'uptime check [id]'.padEnd(26)} ${c.dim('Probe now · --all for every monitor (sites.write)')}`);
   info('');
-  info(c.dim('Works for every kind of site — vm, cloud, edge, serverless.'));
+  info(c.dim('Works for every kind of site — vm, cloud, edge.'));
   info(c.dim('Flags: --json · --watch [--interval ms] · --monitor <id> (history) · --no-prompt'));
   info(c.dim('Exit code is 1 while any monitor is down — usable as a CI gate.'));
 

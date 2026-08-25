@@ -149,3 +149,36 @@ test('unrelated restart commands are untouched', function () {
 
     expect($out)->toBe($cmd)->and($log)->toBe('');
 });
+
+test('a remote horizon:terminate is wrapped so a Redis blip cannot fail the deploy', function () {
+    $runner = new class extends SiteDeployPipelineRunner
+    {
+        public function __construct() {}
+
+        public function publicFailSoft(string $cmd): string
+        {
+            return $this->failSoftWorkerRestart($cmd);
+        }
+    };
+
+    expect($runner->publicFailSoft('php artisan horizon:terminate'))
+        ->toContain('php artisan horizon:terminate')
+        ->toContain('continuing')
+        ->and($runner->publicFailSoft('php artisan migrate --force'))->toBe('php artisan migrate --force');
+});
+
+test('the self-deploy rewrite is not wrapped again', function () {
+    $runner = new class extends SiteDeployPipelineRunner
+    {
+        public function __construct() {}
+
+        public function publicFailSoft(string $cmd): string
+        {
+            return $this->failSoftWorkerRestart($cmd);
+        }
+    };
+
+    $rewritten = 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then setsid true; fi';
+
+    expect($runner->publicFailSoft($rewritten))->toBe($rewritten);
+});

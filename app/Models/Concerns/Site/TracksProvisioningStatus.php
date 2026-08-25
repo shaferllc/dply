@@ -37,8 +37,7 @@ trait TracksProvisioningStatus
      */
     public function supportsSshFileArchive(): bool
     {
-        if ($this->usesFunctionsRuntime()
-            || $this->usesDockerRuntime()
+        if ($this->usesDockerRuntime()
             || $this->usesKubernetesRuntime()) {
             return false;
         }
@@ -566,8 +565,7 @@ trait TracksProvisioningStatus
             return false;
         }
 
-        if ($this->usesFunctionsRuntime()
-            || $this->usesDockerRuntime()
+        if ($this->usesDockerRuntime()
             || $this->usesKubernetesRuntime()
             || $this->usesContainerRuntime()
             || $this->usesEdgeRuntime()) {

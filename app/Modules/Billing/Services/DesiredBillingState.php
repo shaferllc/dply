@@ -11,8 +11,8 @@ namespace App\Modules\Billing\Services;
  * - A single flat **plan** chosen by billable BYO server *count* (Free /
  *   Starter / Pro / Business). Server size no longer affects the dply fee.
  * - **Managed products** billed a la carte per unit on top of the plan,
- *   regardless of which plan (including Free): serverless functions, dply
- *   Cloud apps, dply Edge sites.
+ *   regardless of which plan (including Free): dply Cloud apps, dply Edge
+ *   sites.
  * - **dply Cloud resources** — metered cost-plus for the DigitalOcean
  *   containers, workers, databases, and buckets backing Cloud apps. Billed on
  *   top of the flat per-app platform fee, not plan-eligible.
@@ -32,9 +32,6 @@ class DesiredBillingState
         public readonly int $planPriceCents,
         /** Billable BYO servers. Was an xs/s/m/l/xl breakdown that only ever got summed. */
         public readonly int $billableServerCount,
-        public readonly int $serverlessCount,
-        public readonly int $serverlessSubtotalCents,
-        public readonly int $serverlessUsageSubtotalCents,
         public readonly int $managedServerCount,
         public readonly int $managedServerSubtotalCents,
         public readonly int $cloudCount,
@@ -58,8 +55,6 @@ class DesiredBillingState
         public readonly int $queueSubtotalCents,
         /**
          * Billable dply Queue namespace counts keyed by capacity-tier slug.
-         * Serverless-attached namespaces are already excluded upstream — they
-         * ride free (docs/adr/managed-services-tier.md, decision 4).
          *
          * @var array<string, int>
          */

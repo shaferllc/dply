@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\File;
  * These are local files (no SSH), so the command does the work inline rather
  * than dispatching per-server jobs. Deletion is age-based.
  *
- * The serverless artifact and repository-cache sweeps lived here until that
+ * The repository-cache sweeps lived here until that
  * product moved to its own app.
  *
  * Split-deployment caveat: the scheduler pins this to onOneServer(), but the

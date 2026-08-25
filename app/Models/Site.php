@@ -158,47 +158,6 @@ class Site extends Model
     public const STATUS_EDGE_FAILED = 'edge_failed';
 
     /**
-     * Serverless function resource limits. These map onto the OpenWhisk
-     * action `limits` block DigitalOcean Functions is built on, and are
-     * applied to the action on the next deploy.
-     *
-     * @var array<int, int>
-     */
-    /**
-     * Runtime profiles that make a Site a serverless function rather than a VM
-     * site. The `meta->runtime_profile` value is the only thing distinguishing
-     * the two, so both the row predicate ({@see usesFunctionsRuntime()}) and
-     * every `whereIn` that scopes a function list read this one list.
-     *
-     * @var list<string>
-     */
-    public const SERVERLESS_RUNTIME_PROFILES = ['digitalocean_functions_web', 'aws_lambda_bref_web'];
-
-    public const SERVERLESS_MEMORY_OPTIONS_MB = [128, 256, 512, 1024];
-
-    public const SERVERLESS_DEFAULT_MEMORY_MB = 512;
-
-    public const SERVERLESS_DEFAULT_TIMEOUT_MS = 60000;
-
-    public const SERVERLESS_MIN_TIMEOUT_MS = 1000;
-
-    public const SERVERLESS_MAX_TIMEOUT_MS = 900000;
-
-    public const SERVERLESS_DEFAULT_CONCURRENCY = 1;
-
-    public const SERVERLESS_MAX_CONCURRENCY = 50;
-
-    /**
-     * DigitalOcean Functions stores `limits.logs` in kilobytes and caps
-     * captured console output at 256 KB per invocation.
-     */
-    public const SERVERLESS_DEFAULT_LOGS_KB = 256;
-
-    public const SERVERLESS_MIN_LOGS_KB = 1;
-
-    public const SERVERLESS_MAX_LOGS_KB = 256;
-
-    /**
      * Site row exists, scaffold pipeline (PR 5/6) is in flight.
      * Distinct from container_provisioning so Container vs Scaffold
      * journeys don't share states or audit shapes.
@@ -458,12 +417,6 @@ class Site extends Model
             }
         });
     }
-
-    /** dply runs the function on its own managed FaaS account (dply pays the provider). */
-    public const SERVERLESS_BACKEND_DPLY = 'dply_serverless';
-
-    /** The customer's connected provider account runs (and is billed for) the function. */
-    public const SERVERLESS_BACKEND_BYO = 'org_digitalocean';
 
     /**
      * URL the container deployment is reachable at, set by the

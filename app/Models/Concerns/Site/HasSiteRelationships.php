@@ -66,7 +66,6 @@ use Illuminate\Support\Collection;
  * @property-read ?Project $project
  * @property-read ?ProviderCredential $dnsProviderCredential
  * @property-read ?ProviderCredential $edgeProviderCredential
- * @property-read ?ProviderCredential $serverlessProviderCredential
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomain> $domains
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SitePreviewDomain> $previewDomains
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomainAlias> $domainAliases
@@ -233,12 +232,6 @@ trait HasSiteRelationships
     public function edgeProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
-    }
-
-    /** @return BelongsTo<ProviderCredential, $this> */
-    public function serverlessProviderCredential(): BelongsTo
-    {
-        return $this->belongsTo(ProviderCredential::class, 'serverless_provider_credential_id');
     }
 
     /**

@@ -24,7 +24,7 @@ class ServerController extends Controller
 
         // Machines only, same as the /servers UI. Edge apps, function
         // namespaces and Cloud containers are placeholder host rows belonging
-        // to /edge, /serverless and /cloud; shipping them here put "servers" in
+        // to /edge and /cloud; shipping them here put "servers" in
         // a consumer's fleet that can't be SSHed into, sized, or provisioned —
         // and the local production mirror then materialized them as if they
         // were VMs.

@@ -91,7 +91,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
+        if (! in_array($form->type, ['custom', 'digitalocean_kubernetes', 'aws_kubernetes'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
             Validator::make(
                 [
@@ -107,10 +107,8 @@ final class StoreServerFromCreateForm
 
         $server = match ($form->type) {
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
-            'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
             'aws_kubernetes' => $this->storeAwsKubernetes($user, $org, $form),
-            'aws_lambda' => $this->storeAwsLambda($user, $org, $form),
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
             'vultr' => $this->storeVultr($user, $org, $form, $scriptKeys),

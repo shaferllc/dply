@@ -154,14 +154,6 @@ trait ResolvesSiteRuntime
             return (string) $profile;
         }
 
-        if ($this->server?->isDigitalOceanFunctionsHost()) {
-            return 'digitalocean_functions_web';
-        }
-
-        if ($this->server?->isAwsLambdaHost()) {
-            return 'aws_lambda_bref_web';
-        }
-
         if ($this->server?->isDockerHost()) {
             return 'docker_web';
         }
@@ -178,8 +170,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeProfile()) {
             'docker_web' => __('Docker'),
             'kubernetes_web' => __('Kubernetes'),
-            'digitalocean_functions_web' => __('Functions'),
-            'aws_lambda_bref_web' => __('AWS Lambda'),
             'vm_web' => __('BYO VM'),
             default => (string) str($this->runtimeProfile())->replace('_', ' ')->title(),
         };
@@ -190,7 +180,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeTargetMode()) {
             'docker' => __('Container'),
             'kubernetes' => __('Kubernetes'),
-            'serverless' => __('Serverless'),
             default => __('VM'),
         };
     }
@@ -198,10 +187,10 @@ trait ResolvesSiteRuntime
     /**
      * App/stack detection from persisted meta. Priority matches
      * {@see DeploymentSecretInventory::detectedFramework}:
-     * Docker → Kubernetes → serverless → VM (composer.json on deploy).
+     * Docker → Kubernetes → VM (composer.json on deploy).
      *
      * @return array{
-     *     source: 'docker'|'kubernetes'|'serverless'|'vm',
+     *     source: 'docker'|'kubernetes'|'vm',
      *     framework: string,
      *     language: string,
      *     confidence?: string,
@@ -220,7 +209,6 @@ trait ResolvesSiteRuntime
         $candidates = [
             ['source' => 'docker', 'blob' => data_get($meta, 'docker_runtime.detected')],
             ['source' => 'kubernetes', 'blob' => data_get($meta, 'kubernetes_runtime.detected')],
-            ['source' => 'serverless', 'blob' => data_get($meta, 'serverless.detected_runtime') ?: data_get($meta, 'serverless.detected')],
             ['source' => 'vm', 'blob' => data_get($meta, 'vm_runtime.detected')],
         ];
 
@@ -333,30 +321,13 @@ trait ResolvesSiteRuntime
     }
 
     /**
-     * Which product this site is, as one word: `serverless` or `vm`.
-     *
-     * Callers keep re-deriving this from the runtime profile, and API payloads
-     * expose it so the CLI (`dply sites`) and other clients can say what a site
-     * IS without knowing the column layout.
-     *
-     * Lived on the ManagesEdgeHosting concern and was deleted with it
-     * (remove-cloud-edge-serverless), which broke the sites index, the sites
-     * API, the MCP list-sites tool and notification scoping — none of them edge
-     * features. The `edge` and `cloud` branches are gone with those surfaces.
+     * Which product this site is, as one word. API payloads expose it so the
+     * CLI (`dply sites`) and other clients can say what a site IS without
+     * knowing the column layout.
      */
     public function siteKind(): string
     {
-        return $this->usesFunctionsRuntime() ? 'serverless' : 'vm';
-    }
-
-    public function usesFunctionsRuntime(): bool
-    {
-        return in_array($this->runtimeProfile(), Site::SERVERLESS_RUNTIME_PROFILES, true);
-    }
-
-    public function usesAwsLambdaRuntime(): bool
-    {
-        return $this->runtimeProfile() === 'aws_lambda_bref_web';
+        return 'vm';
     }
 
     public function usesDockerRuntime(): bool
@@ -417,7 +388,7 @@ trait ResolvesSiteRuntime
      * Which live runtime-health probe the Runtime → Overview card should run:
      * 'fpm' for a dedicated PHP-FPM pool, 'port' for a long-running app server
      * that listens on {@see $app_port}, or null when there's nothing cheap to
-     * probe (static, Docker/Kubernetes/serverless — those have their own
+     * probe (static, Docker/Kubernetes — those have their own
      * discovery surfaces). Used by both the Livewire loader and the blade so the
      * deferred probe and the rendered card always agree.
      */
@@ -427,7 +398,7 @@ trait ResolvesSiteRuntime
             return 'fpm';
         }
 
-        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime() || $this->usesFunctionsRuntime()) {
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
             return null;
         }
 
@@ -440,7 +411,7 @@ trait ResolvesSiteRuntime
 
     /**
      * Whether this site can use the site-scoped systemd Services workspace
-     * (dply-site-{id}[-{name}].service). PHP/static and container/serverless
+     * (dply-site-{id}[-{name}].service). PHP/static and container
      * workloads use FPM, nginx, or Supervisor (Daemons) instead.
      */
     public static function supportsSystemdServices(Site $site, Server $server): bool
@@ -449,8 +420,7 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        if ($site->usesFunctionsRuntime()
-            || $site->usesDockerRuntime()
+        if ($site->usesDockerRuntime()
             || $site->usesKubernetesRuntime()) {
             return false;
         }
@@ -643,7 +613,6 @@ trait ResolvesSiteRuntime
         $this->loadMissing('server');
 
         return (bool) $this->server?->hostCapabilities()->supportsSsh()
-            && ! $this->usesFunctionsRuntime()
             && ! $this->usesDockerRuntime()
             && ! $this->usesKubernetesRuntime();
     }
@@ -923,14 +892,6 @@ trait ResolvesSiteRuntime
             };
         }
 
-        if ($this->usesAwsLambdaRuntime()) {
-            return 'aws_lambda';
-        }
-
-        if ($this->usesFunctionsRuntime()) {
-            return 'digitalocean_functions';
-        }
-
         return 'byo_vm';
     }
 
@@ -938,8 +899,8 @@ trait ResolvesSiteRuntime
     {
         return match ($this->runtimeTargetFamily()) {
             'local_orbstack_docker', 'local_orbstack_kubernetes' => 'local',
-            'digitalocean_docker', 'digitalocean_kubernetes', 'digitalocean_functions' => 'digitalocean',
-            'aws_docker', 'aws_kubernetes', 'aws_lambda' => 'aws',
+            'digitalocean_docker', 'digitalocean_kubernetes' => 'digitalocean',
+            'aws_docker', 'aws_kubernetes' => 'aws',
             default => 'byo',
         };
     }
@@ -959,7 +920,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeTargetFamily()) {
             'local_orbstack_kubernetes', 'digitalocean_kubernetes', 'aws_kubernetes', 'kubernetes' => 'kubernetes',
             'local_orbstack_docker', 'digitalocean_docker', 'aws_docker', 'docker', 'byo_vm_docker' => 'docker',
-            'digitalocean_functions', 'aws_lambda' => 'serverless',
             default => 'vm',
         };
     }
@@ -981,8 +941,6 @@ trait ResolvesSiteRuntime
             'digitalocean_kubernetes' => 'DigitalOcean Kubernetes',
             'aws_docker' => 'AWS Docker',
             'aws_kubernetes' => 'AWS Kubernetes',
-            'digitalocean_functions' => 'Functions',
-            'aws_lambda' => 'AWS Lambda',
             default => 'BYO runtime',
         };
     }

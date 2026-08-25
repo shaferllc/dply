@@ -377,7 +377,10 @@ class SiteGitDeployer
         $log .= $restart['log'];
         $deployment?->recordPhaseResults('restart', $restart['steps']);
         if (! $restart['ok']) {
-            throw new \RuntimeException('Deploy failed during the restart phase. See the deployment log for details.');
+            // Cutover already happened. A worker bounce (horizon:terminate talking
+            // to a flaky TLS Redis, a missing daemon) must not mark a live
+            // release as a failed deploy — same contract as AtomicSiteDeployer.
+            $log .= "\n[dply] restart phase reported a failure — continuing because the release is already live.\n";
         }
 
         $syncResult = app(ByoRepoConfigSync::class)->syncAfterDeploy($site, $ssh, $path);

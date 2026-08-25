@@ -5,9 +5,7 @@
  * excluded server-side). The endpoint has no `since` cursor, so `--watch`
  * re-reads the window each tick and dedupes on event id.
  *
- * This is the triage stream: failed deploys, failed operations, swept 5xx, and
- * — folded to one open event per site — broken serverless functions. The raw
- * per-invocation record behind that last one is `dply serverless errors`.
+ * This is the triage stream: failed deploys, failed operations, and swept 5xx.
  */
 import { requireClient } from './server-context.mjs';
 import { resolveAnySiteId } from './site-context.mjs';
@@ -479,8 +477,6 @@ function printErrorsHelp() {
   info(c.dim('Leave the id off on a TTY and you get a picker · listing on a TTY offers the same actions'));
   info(c.dim(`Flags: --full · --json · --limit N (max ${MAX_LIMIT}) · --category a,b · --watch [--interval ms] · --no-prompt`));
   info(c.dim('Exit code is 1 when any open error is reported — usable as a CI gate.'));
-  info(c.dim('Serverless functions fold to one event here; `dply serverless errors` lists each.'));
-
   return 0;
 }
 

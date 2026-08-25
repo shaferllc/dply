@@ -107,9 +107,6 @@ export function shortcutCommandLines() {
     'site:errors',
     'site:logs',
     'site:deploy',
-    'serverless:errors',
-    'serverless:logs',
-    'serverless:status',
   ];
 }
 

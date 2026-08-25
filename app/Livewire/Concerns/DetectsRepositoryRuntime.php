@@ -11,7 +11,7 @@ use Throwable;
 /**
  * Shared URL-first runtime detection for the create flows.
  *
- * The VM site, Cloud container, and serverless function create forms all want
+ * The VM site, Cloud container, and function create forms all want
  * the same "paste a repo, see what dply detected" affordance. This concern
  * carries the detection state + the two detector entry points + the panel's
  * input shape so each flow renders an identical detection panel instead of
@@ -21,11 +21,11 @@ use Throwable;
  *
  *   - {@see runDetection} — the general {@see RepositoryRuntimePreview}
  *     (dply.yaml manifest + runtime-detection engine). Used by VM + Cloud.
- *     (framework vs. raw-action). Used by serverless create + the VM
+ *     (framework vs. raw-action). Used by function create + the VM
  *     functions-host path.
  *
- * Both normalize into the same {@see $detectedPlan} array; serverless results
- * carry `kind => 'serverless'` so the panel can branch on it.
+ * Both normalize into the same {@see $detectedPlan} array; function results
+ * carry `kind => 'function'` so the panel can branch on it.
  *
  * The host component implements {@see applyDetectedRuntimePrefills} to copy
  * the result into its own (differently-named) form fields. Detection is always

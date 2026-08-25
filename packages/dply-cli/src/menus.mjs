@@ -3,7 +3,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { ApiClient } from './api.mjs';
 import { readGlobalConfig, resolveContext } from './config.mjs';
 import { requireClient } from './server-context.mjs';
-import { fetchByoSitesSafe, fetchEdgeSitesSafe, fetchProjectsSafe, fetchServersSafe, fetchServerlessSitesSafe, offerEmptyProjects, runSmartShellCommand } from './smart-shell.mjs';
+import { fetchByoSitesSafe, fetchEdgeSitesSafe, fetchProjectsSafe, fetchServersSafe, offerEmptyProjects, runSmartShellCommand } from './smart-shell.mjs';
 import { expandArgv } from './shortcuts.mjs';
 import { c, info, warn } from './print.mjs';
 
@@ -340,8 +340,6 @@ async function buildMenu(menuId, ctx) {
       return await buildSiteMenu(ctx);
     case 'edge':
       return await buildEdgeMenu(ctx);
-    case 'serverless':
-      return await buildServerlessMenu(ctx);
     default:
       return null;
   }
@@ -375,7 +373,6 @@ async function buildRootMenu(loggedIn, cfg, ctx) {
       { label: 'Servers', hint: 'VM list, Linux system users', submenu: 'servers' },
       { label: 'Sites (BYO)', hint: 'VM site deploys', submenu: 'site', keywords: ['site', 'bysites'] },
       { label: 'Edge', hint: 'sites, deploy, logs', submenu: 'edge' },
-      { label: 'Serverless', hint: 'functions, errors, logs', submenu: 'serverless', keywords: ['functions', 'faas'] },
       { label: 'Command index', hint: 'full list of commands', argv: ['ls'], keywords: ['ls', 'commands'] },
       { label: 'Help', hint: 'detailed command reference', argv: ['help'], keywords: ['help', '?'] },
       {
@@ -770,87 +767,6 @@ async function buildServersMenu(ctx) {
     subtitle: rows.length === 0 ? 'No VM servers in this org yet' : 'BYO VM servers in your organization',
     items,
   };
-}
-
-/**
- * @param {{ rl: import('node:readline/promises').Interface, run: (argv: string[]) => Promise<number | void> }} ctx
- */
-async function buildServerlessMenu(ctx) {
-  const rows = await fetchServerlessSitesSafe();
-  /** @type {MenuItem[]} */
-  const items = [];
-
-  if (rows.length === 0) {
-    items.push({
-      label: 'No functions visible',
-      hint: 'create one in the web app',
-      argv: ['serverless', 'list'],
-    });
-    items.push({
-      label: 'Refresh permissions',
-      hint: 'need the serverless.read scope?',
-      argv: ['auth', 'refresh'],
-    });
-  } else {
-    items.push({ label: 'List all functions', hint: `${rows.length} visible`, argv: ['serverless', 'list'] });
-    items.push({
-      label: 'Function status',
-      hint: 'limits + 24h health',
-      action: async () => runWithServerlessSite(ctx, ['serverless', 'status']),
-    });
-    items.push({
-      label: 'Failed invocations',
-      hint: 'why the function is broken',
-      keywords: ['errors', 'failures'],
-      action: async () => runWithServerlessSite(ctx, ['serverless', 'errors']),
-    });
-    items.push({
-      label: 'Recent invocations',
-      action: async () => runWithServerlessSite(ctx, ['serverless', 'invocations']),
-    });
-    items.push({
-      label: 'Application logs',
-      hint: 'last hour · --follow in shell',
-      action: async () => runWithServerlessSite(ctx, ['serverless', 'logs']),
-    });
-  }
-
-  items.push({ label: 'Serverless command help', argv: ['serverless', 'help'] });
-
-  return {
-    title: 'Serverless',
-    subtitle: rows.length === 0 ? 'No functions visible to this token' : 'Functions, failures, and logs',
-    items,
-  };
-}
-
-/**
- * @param {{ rl: import('node:readline/promises').Interface, run: (argv: string[]) => Promise<number | void> }} ctx
- * @param {string[]} commandPrefix
- */
-async function runWithServerlessSite(ctx, commandPrefix) {
-  const rows = await fetchServerlessSitesSafe();
-
-  if (rows.length === 0) {
-    warn('No functions visible to this token.');
-
-    return;
-  }
-
-  const choice = await promptMenu(ctx.rl, {
-    title: 'Select a function',
-    items: rows.map((row) => ({
-      label: row.name,
-      hint: [row.runtime, row.is_live ? 'live' : row.status].filter(Boolean).join(' \u00b7 '),
-      value: row.id,
-    })),
-  });
-
-  if (!choice?.value) {
-    return;
-  }
-
-  await ctx.run([...commandPrefix, '--site', choice.value]);
 }
 
 async function buildEdgeMenu(ctx) {

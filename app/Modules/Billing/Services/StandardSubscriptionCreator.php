@@ -115,13 +115,6 @@ class StandardSubscriptionCreator
             }
         }
 
-        if ($interval === self::INTERVAL_MONTH && $desired->serverlessUsageSubtotalCents > 0) {
-            $serverlessUsagePriceId = $this->serverlessUsagePriceId();
-            if ($serverlessUsagePriceId !== '') {
-                $items[] = ['price' => $serverlessUsagePriceId, 'quantity' => $desired->serverlessUsageSubtotalCents];
-            }
-        }
-
         if ($interval === self::INTERVAL_MONTH && $desired->managedServerSubtotalCents > 0) {
             $managedServerPriceId = $this->managedServerPriceId();
             if ($managedServerPriceId !== '') {

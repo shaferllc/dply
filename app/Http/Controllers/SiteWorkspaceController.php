@@ -79,7 +79,7 @@ class SiteWorkspaceController
         }
 
         // Edge sites rendered Livewire\Sites\EdgeSettings here; that component
-        // went with the surface (remove-cloud-edge-serverless), so every site
+        // went with the surface (remove-cloud-edge), so every site
         // gets the standard settings workspace.
         return RendersLivewirePage::render(Settings::class, [
             'server' => $server,

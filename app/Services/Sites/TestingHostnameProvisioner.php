@@ -434,10 +434,6 @@ class TestingHostnameProvisioner
      */
     public function disabledReason(Site $site): ?string
     {
-        if (! (bool) config('services.cloudflare.testing_hostnames_enabled', true)) {
-            return 'disabled_by_flag';
-        }
-
         if (! $this->hasAvailableToken()) {
             return 'missing_cloudflare_token';
         }

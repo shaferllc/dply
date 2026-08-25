@@ -92,20 +92,6 @@ final class TestingDomains
         return $apex !== '' ? $apex : 'on-dply.cc';
     }
 
-    public static function edgeApex(): string
-    {
-        $apex = strtolower(trim((string) config('services.cloudflare.edge_apex', 'on-dply.site')));
-
-        return $apex !== '' ? $apex : 'on-dply.site';
-    }
-
-    public static function serverlessApex(): string
-    {
-        $apex = strtolower(trim((string) config('services.cloudflare.serverless_apex', 'dply-serverless.cloud')));
-
-        return $apex !== '' ? $apex : 'dply-serverless.cloud';
-    }
-
     /**
      * @return list<string>
      */
@@ -117,28 +103,10 @@ final class TestingDomains
     /**
      * @return list<string>
      */
-    public static function edge(): array
-    {
-        return self::normalize((array) config('services.cloudflare.edge', []));
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function serverless(): array
-    {
-        return self::normalize((array) config('services.cloudflare.serverless', []));
-    }
-
-    /**
-     * @return list<string>
-     */
     public static function all(): array
     {
         return array_values(array_unique(array_merge(
             self::vm(),
-            self::edge(),
-            self::serverless(),
         )));
     }
 

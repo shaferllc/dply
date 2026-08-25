@@ -8,6 +8,7 @@ use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
 use App\Modules\Deploy\Services\DeployPhaseRunner;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Support\Redis\RedisConnectionTls;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
@@ -136,6 +137,20 @@ class SiteDeployPipelineRunner
             ."via `dply:self-horizon-restart`.\n";
 
         return $cmd;
+    }
+
+    /**
+     * horizon:terminate / queue:restart need Redis. A TLS miss or blip on a
+     * managed DigitalOcean host must not fail a deploy whose release is already
+     * live. Leave rewritten self-deploy shells alone — they already fail-soft.
+     */
+    protected function failSoftWorkerRestart(string $cmd): string
+    {
+        if (preg_match('/^\s*(?:php\s+)?artisan\s+(?:horizon:terminate|queue:restart)\s*$/', $cmd) !== 1) {
+            return $cmd;
+        }
+
+        return '{ '.$cmd.'; } || { echo "[dply] '.$cmd.' failed (continuing — the release is already live)"; true; }';
     }
 
     public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
@@ -350,6 +365,9 @@ class SiteDeployPipelineRunner
             $cmd = $this->resolveShellCommand($step);
             if ($cmd !== null && $cmd !== '') {
                 $cmd = $this->guardSelfDeployHorizonTerminate($site, $cmd, $log);
+                if ($phase === SiteDeployStep::PHASE_RESTART) {
+                    $cmd = $this->failSoftWorkerRestart($cmd);
+                }
             }
             if ($cmd === null || $cmd === '') {
                 // A step with no resolvable command (e.g. an empty custom
@@ -393,6 +411,14 @@ class SiteDeployPipelineRunner
             $log .= $hookLog;
 
             $stepOk = $this->outputSucceeded($stepOut) && $this->outputSucceeded($hookLog);
+            if (RedisConnectionTls::looksLikeHandshakeFailure($stepOut.$hookLog)) {
+                $hint = "[dply] DigitalOcean managed Redis on :25061 is TLS-only. "
+                    ."A plaintext dial fails as \"read error on connection\". "
+                    ."Set REDIS_SCHEME=tls (or REDIS_URL=rediss://…) in the live .env "
+                    ."and run `php artisan config:clear`.\n";
+                $log .= $hint;
+                $stepOut .= $hint;
+            }
             $steps[] = [
                 'step_id' => (string) $step->id,
                 'step_type' => (string) $step->step_type,

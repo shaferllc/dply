@@ -57,7 +57,7 @@ trait ManagesSiteRuntimeHealth
 
     /**
      * Whether the worker-mode toggle is offered for this site. It's a VM
-     * webserver concern only — container/serverless/edge sites don't serve from
+     * webserver concern only — container/function/edge sites don't serve from
      * a Caddy vhost, and headless (webserver=none) sites have no web front at
      * all. Worker hosts default the toggle ON; any VM site can opt in.
      */
@@ -327,7 +327,7 @@ trait ManagesSiteRuntimeHealth
     }
 
     /**
-     * VM-hosted sites have a real filesystem to measure; container/edge/serverless
+     * VM-hosted sites have a real filesystem to measure; container/edge/function
      * apps run off-box and have no deploy path to `du`.
      */
     #[Computed]
@@ -363,7 +363,7 @@ trait ManagesSiteRuntimeHealth
         $this->authorize('update', $this->site);
 
         if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->toastError(__('Runtime preferences apply to VM and container sites. Use Deploy for function and serverless targets.'));
+            $this->toastError(__('Runtime preferences apply to VM and container sites. Use Deploy for function targets.'));
 
             return;
         }

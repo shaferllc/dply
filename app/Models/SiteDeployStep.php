@@ -266,7 +266,7 @@ class SiteDeployStep extends Model
             // (skips a false alarm on first deploy) and only WARN — never fail.
             self::TYPE_ARTISAN_HORIZON_TERMINATE => 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
                 .'BEFORE=$(pgrep -fc "artisan horizon" 2>/dev/null || echo 0); '
-                .'php artisan horizon:terminate; '
+                .'php artisan horizon:terminate || echo "[dply] horizon:terminate failed (continuing — the release is already live)"; '
                 .'if [ "$BEFORE" -gt 0 ] 2>/dev/null; then '
                 .'for _i in 1 2 3 4 5 6 7 8; do sleep 1; pgrep -f "artisan horizon" >/dev/null 2>&1 && break; done; '
                 .'pgrep -f "artisan horizon" >/dev/null 2>&1 '

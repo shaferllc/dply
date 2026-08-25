@@ -11,7 +11,7 @@ use App\Models\Site;
  * The product surfaces that carry their own plan ceiling.
  *
  * Every managed thing dply runs is a `Site` row and counts against one
- * ceiling. The Edge, Cloud and Serverless surfaces lived here until those
+ * ceiling. The Edge, Cloud surfaces lived here until those
  * products moved to their own app; `Site` covers container (Docker/Kubernetes)
  * apps too, since those live on a real machine host.
  */

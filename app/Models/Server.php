@@ -887,13 +887,11 @@ class Server extends Model
     /**
      * Real machines only — every surface that says "servers" wants this.
      *
-     * Edge apps, function namespaces, and Cloud containers are all backed by
-     * placeholder host rows so their Sites can share the workspace URL shape.
-     * They aren't machines: you don't provision, SSH into, or spec-tier them,
-     * and {@see WorkspaceOverview} bounces you to /edge,
-     * /serverless or /cloud if you open one. Listing them made "8 servers"
-     * count two Edge apps, each with a "Provisioning…" label and an empty
-     * metrics row that will never fill in.
+     * Edge apps, leftover function namespaces, and Cloud containers are all
+     * backed by placeholder host rows so their Sites can share the workspace
+     * URL shape. They aren't machines: you don't provision, SSH into, or
+     * spec-tier them. Listing them made "8 servers" count two Edge apps,
+     * each with a "Provisioning…" label and an empty metrics row.
      *
      * Allowlisted rather than subtractive on purpose. This replaced a pair of
      * scopes (withoutEdgeHosts / withoutServerlessHosts) that each excluded
@@ -938,7 +936,7 @@ class Server extends Model
 
     /**
      * A real dply-managed VM (the free-CX22 grant counter), as opposed to a
-     * managed-product logical host (Cloud/Edge/serverless).
+     * managed-product logical host (Cloud/Edge).
      */
     public function isManagedVm(): bool
     {

@@ -19,74 +19,8 @@ import { spawnSync } from 'node:child_process';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
-import { c, info, ok, warn } from './print.mjs';
+import { c, info, warn } from './print.mjs';
 import { isInteractive } from './pick.mjs';
-import {
-  deployFollowIntervalMs,
-  deployFollowRequested,
-  followSiteDeployment,
-  waitForLatestDeployment,
-} from './deploy-follow.mjs';
-
-/**
- * Queue a deploy for a serverless site.
- *
- * `POST /sites/{id}/deploy` is generic across products, but the BYO deploy
- * command that wraps it insists on a BYO link — so routing a function through
- * it answered "No BYO site specified" for a folder that was correctly linked.
- * This talks to the endpoint directly.
- *
- * @param {import('./api.mjs').ApiClient} client
- * @param {string} siteId
- * @param {Record<string, any>} flags
- */
-export async function deployServerlessSite(client, siteId, flags) {
-  /** @type {Record<string, string>} */
-  const headers = {};
-  const idempotencyKey = flags['idempotency-key'] || flags.idempotency;
-  if (idempotencyKey) {
-    headers['Idempotency-Key'] = String(idempotencyKey);
-  }
-
-  await client.post(`/sites/${encodeURIComponent(siteId)}/deploy`, {}, { headers });
-  ok('Deployment queued.');
-
-  if (! deployFollowRequested(flags)) {
-    info(c.dim('Follow it with `dply deploy --follow`.'));
-
-    return 0;
-  }
-
-  const latest = await waitForLatestDeployment(client, siteId);
-  if (latest?.id) {
-    await followSiteDeployment(client, siteId, String(latest.id), {
-      intervalMs: deployFollowIntervalMs(flags),
-    });
-  }
-
-  return 0;
-}
-
-/**
- * @param {import('./api.mjs').ApiClient} client
- * @param {string} siteId
- * @param {Record<string, any>} flags
- * @returns {Promise<{ handled: boolean }>} handled = the deploy was already queued here
- */
-export async function prepareServerlessSource(client, siteId, flags) {
-  const site = (await client.get(`/serverless/sites/${encodeURIComponent(siteId)}`))?.data ?? {};
-
-  if ((site.source_kind ?? 'git') === 'upload') {
-    const { uploadCurrentFolder } = await import('./init-command.mjs');
-    await uploadCurrentFolder(client, process.cwd(), flags, siteId);
-
-    return { handled: true };
-  }
-
-  await confirmGitStateOrThrow(flags);
-
-  return { handled: false };
-}
 
 /**
  * Blocks only on unpushed commits, and only on a terminal.

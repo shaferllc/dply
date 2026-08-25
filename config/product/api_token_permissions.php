@@ -176,67 +176,6 @@ return [
         'projects.runbooks_destroy' => 'projects.write',
         'projects.destroy' => 'projects.delete',
         'projects.deploy' => 'projects.deploy',
-
-        'edge.sites.index' => 'edge.read',
-        'edge.sites.show' => 'edge.read',
-        'edge.deployments.index' => 'edge.read',
-        'edge.deployments.show' => 'edge.read',
-        'edge.deployments.store' => 'edge.deploy',
-        'edge.deployments.rollback' => 'edge.deploy',
-        'edge.previews.index' => 'edge.read',
-        'edge.previews.store' => 'edge.deploy',
-        'edge.previews.destroy' => 'edge.deploy',
-        'edge.previews.promote' => 'edge.deploy',
-        'edge.domains.index' => 'edge.read',
-        'edge.domains.store' => 'edge.write',
-        'edge.domains.verify' => 'edge.write',
-        'edge.domains.destroy' => 'edge.write',
-        'edge.aliases.index' => 'edge.read',
-        'edge.access.show' => 'edge.read',
-        'edge.access.update' => 'edge.write',
-        'edge.cache.purge' => 'edge.write',
-        'edge.usage.show' => 'edge.read',
-        'edge.logs.index' => 'edge.read',
-        'edge.lint.store' => 'edge.read',
-        'edge.env.index' => 'edge.env.read',
-        'edge.env.update' => 'edge.env.write',
-        'edge.env.upsert' => 'edge.env.write',
-        'edge.env.destroy' => 'edge.env.write',
-
-        'serverless.sites.index' => 'serverless.read',
-        'serverless.sites.show' => 'serverless.read',
-        'serverless.invocations.index' => 'serverless.read',
-        'serverless.invocations.show' => 'serverless.read',
-        'serverless.logs.index' => 'serverless.read',
-        'serverless.platform.show' => 'serverless.read',
-        'serverless.platform.schedules' => 'serverless.read',
-        // Invoking runs the customer's code and bills an invocation, so it is
-        // its own ability rather than folded into serverless.read.
-        'serverless.invoke' => 'serverless.invoke',
-        'serverless.credentials.show' => 'serverless.read',
-        // Replacing the stored namespace key is a credential write.
-        'serverless.credentials.update' => 'serverless.write',
-        'serverless.workers.show' => 'serverless.read',
-        'serverless.workers.update' => 'serverless.write',
-        // Ticking the queue runs the customer's code, so it rides the same
-        // ability as a test invocation rather than the write scope.
-        'serverless.workers.tick' => 'serverless.invoke',
-        'serverless.schedule.show' => 'serverless.read',
-        'serverless.schedule.update' => 'serverless.write',
-        'serverless.schedule.tick' => 'serverless.invoke',
-        'serverless.runtime.show' => 'serverless.read',
-        // Limits, HTTP exposure, parameters, maintenance, warm start — and
-        // rotating the endpoint secret, which breaks every existing caller.
-        'serverless.runtime.update' => 'serverless.write',
-
-        // Creation is a separate authority from `serverless.write`: write
-        // reconfigures a function that exists, create provisions a namespace
-        // that bills. Destroy shares it because it is only ever init's undo —
-        // the endpoint refuses any site that has deployed successfully.
-        'cloud.sites.store' => 'cloud.create',
-        'serverless.sites.store' => 'serverless.create',
-        'serverless.sites.source' => 'serverless.create',
-        'serverless.sites.destroy' => 'serverless.create',
     ],
 
     'categories' => [
@@ -416,31 +355,6 @@ return [
             'label' => 'Server sites',
             'permissions' => [
                 ['ability' => 'sites.create', 'label' => 'Create sites on servers you own'],
-            ],
-        ],
-        [
-            'id' => 'cloud',
-            'label' => 'Cloud apps',
-            'permissions' => [
-                ['ability' => 'cloud.create', 'label' => 'Create container apps (provisions billable infrastructure)'],
-            ],
-        ],
-        [
-            'id' => 'serverless',
-            'label' => 'Serverless',
-            'permissions' => [
-                ['ability' => 'serverless.read', 'label' => 'Read functions, invocations, and logs'],
-                ['ability' => 'serverless.invoke', 'label' => 'Send test requests at a function'],
-                ['ability' => 'serverless.write', 'label' => 'Update function runtime, credentials, workers, and schedule'],
-                ['ability' => 'serverless.create', 'label' => 'Create and tear down functions (provisions billable infrastructure)'],
-            ],
-        ],
-        [
-            'id' => 'edge_env',
-            'label' => 'Edge env vars',
-            'permissions' => [
-                ['ability' => 'edge.env.read', 'label' => 'Read (keys only)'],
-                ['ability' => 'edge.env.write', 'label' => 'Write'],
             ],
         ],
     ],

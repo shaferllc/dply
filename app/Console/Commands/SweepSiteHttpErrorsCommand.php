@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
  * Tier-2 5xx auto-capture: dispatch a {@see SweepSiteHttpErrorsJob} for every
  * eligible site so application 500s surface on the Errors tab on their own. Only
  * PHP-FPM sites on SSH-managed, ready servers have the per-pool access log this
- * reads — container/serverless/worker/Apache/OLS sites are skipped.
+ * reads — container/worker/Apache/OLS sites are skipped.
  */
 class SweepSiteHttpErrorsCommand extends Command
 {

@@ -2,27 +2,25 @@
  * One list of sites, whatever kind they are.
  *
  * `Site` is a single table on the platform — a VM site, a Cloud container app,
- * an Edge site and a serverless function differ by attributes, not by model —
- * but the API exposes three list endpoints (`/sites` returns every
- * server-backed site and self-reports each row's `kind`; `/edge/sites` and
- * `/serverless/sites` are the scope-gated, product-specific views). The CLI's
- * `sites` noun should mean what the model means, so the union happens here and
- * every caller works in normalized rows.
+ * and an Edge site differ by attributes, not by model — but the API exposes
+ * two list endpoints (`/sites` returns every server-backed site and
+ * self-reports each row's `kind`; `/edge/sites` is the scope-gated Edge view).
+ * The CLI's `sites` noun should mean what the model means, so the union happens
+ * here and every caller works in normalized rows.
  *
  * Cloud has no list endpoint of its own — it does not need one now that `/sites`
- * carries `kind`. That is also the fallback for the other three: a row is only
- * classified locally when the server did not say.
+ * carries `kind`. A row is only classified locally when the server did not say.
  *
  * Each endpoint is fetched independently and a failure yields no rows: a token
- * without `serverless.read` should still be able to list its VM and Cloud apps.
+ * without `edge.read` should still be able to list its VM and Cloud apps.
  */
 import { matchRows } from './pick.mjs';
 
-/** @typedef {'vm'|'cloud'|'edge'|'serverless'} SiteKind */
+/** @typedef {'vm'|'cloud'|'edge'} SiteKind */
 /** @typedef {{ id: string, name: string, kind: SiteKind, status: string, url: string, hint: string, raw: Record<string, any> }} SiteRow */
 
-/** Display order: the two you run code on, then the two you publish to. */
-export const SITE_KINDS = ['vm', 'cloud', 'edge', 'serverless'];
+/** Display order: the two you run code on, then the one you publish to. */
+export const SITE_KINDS = ['vm', 'cloud', 'edge'];
 
 /**
  * @param {import('./api.mjs').ApiClient} client
@@ -32,24 +30,21 @@ export const SITE_KINDS = ['vm', 'cloud', 'edge', 'serverless'];
 export async function fetchAllSites(client, options = {}) {
   const wanted = normalizeKind(options.kind);
 
-  // /sites covers vm and cloud (and reports edge/serverless rows for what they
-  // are), so it is skipped only when the wanted kind has its own endpoint.
-  const [general, edge, serverless] = await Promise.all([
-    wanted === 'edge' || wanted === 'serverless' ? [] : safeGet(client, '/sites'),
+  // /sites covers vm and cloud (and reports edge rows for what they are), so
+  // it is skipped only when the wanted kind has its own endpoint.
+  const [general, edge] = await Promise.all([
+    wanted === 'edge' ? [] : safeGet(client, '/sites'),
     wanted && wanted !== 'edge' ? [] : safeGet(client, '/edge/sites'),
-    wanted && wanted !== 'serverless' ? [] : safeGet(client, '/serverless/sites'),
   ]);
 
   const rows = [
-    ...general.map(toGeneralRow),
+    ...general.map(toGeneralRow).filter(Boolean),
     ...edge.map(toEdgeRow),
-    ...serverless.map(toServerlessRow),
   ];
 
-  // Every kind is a server-backed Site row, so /sites returns Edge sites and
-  // functions too. Both sources agree on `kind` now; when an old instance's
-  // /sites omits it the row falls back to `vm`, and the product-specific
-  // endpoint's row is the one that wins.
+  // Every kind is a server-backed Site row, so /sites returns Edge sites too.
+  // Both sources agree on `kind` now; when an old instance's /sites omits it
+  // the row falls back to `vm`, and the product-specific endpoint's row wins.
   const byId = new Map();
   for (const row of rows) {
     const existing = byId.get(row.id);
@@ -80,7 +75,7 @@ export function matchSites(rows, needle) {
 
 /**
  * @param {unknown} value
- * @returns {'vm'|'edge'|'serverless'|null}
+ * @returns {'vm'|'cloud'|'edge'|null}
  */
 export function normalizeKind(value) {
   const kind = String(value ?? '').trim().toLowerCase();
@@ -99,10 +94,6 @@ export function normalizeKind(value) {
 
   if (['edge', 'static', 'ssg'].includes(kind)) {
     return 'edge';
-  }
-
-  if (['serverless', 'fn', 'function', 'functions', 'faas'].includes(kind)) {
-    return 'serverless';
   }
 
   const err = new Error(`Unknown --kind "${value}". Use ${SITE_KINDS.join(', ')}.`);
@@ -130,6 +121,10 @@ async function safeGet(client, path) {
  * @param {Record<string, any>} row
  */
 function toGeneralRow(row) {
+  if (row.kind === 'serverless') {
+    return null;
+  }
+
   const kind = SITE_KINDS.includes(row.kind) ? row.kind : 'vm';
 
   return {
@@ -159,15 +154,3 @@ function toEdgeRow(row) {
   };
 }
 
-/** @param {Record<string, any>} row */
-function toServerlessRow(row) {
-  return {
-    id: String(row.id),
-    name: String(row.name ?? row.id),
-    kind: /** @type {'serverless'} */ ('serverless'),
-    status: row.is_live ? 'live' : String(row.status ?? '—'),
-    url: String(row.url ?? '—'),
-    hint: String(row.runtime ?? ''),
-    raw: row,
-  };
-}

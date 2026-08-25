@@ -255,20 +255,3 @@ async function fetchEdgeSitesSafe() {
 }
 
 export { fetchEdgeSitesSafe };
-
-/**
- * Serverless functions visible to this token. Swallows errors the same way the
- * Edge fetch does — a token without `serverless.read` should render an empty
- * menu with a "refresh permissions" nudge, not blow up the shell.
- */
-async function fetchServerlessSitesSafe() {
-  try {
-    const client = await requireClient({});
-
-    return (await client.get('/serverless/sites'))?.data ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export { fetchServerlessSitesSafe };

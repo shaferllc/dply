@@ -293,7 +293,7 @@ function printNotificationsHelp() {
   info(`  ${'notifications unsubscribe <event…>'.padEnd(34)} ${c.dim('Stop routing them')}`);
   info(`  ${'notifications test <channel>'.padEnd(34)} ${c.dim('Send the channel a test message')}`);
   info('');
-  info(c.dim('Works for every kind of site — vm, cloud, edge, serverless — plus servers.'));
+  info(c.dim('Works for every kind of site — vm, cloud, edge — plus servers.'));
   info(c.dim('Reading needs notifications.read; changing routing or testing needs notifications.write.'));
 
   return 0;

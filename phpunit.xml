@@ -89,8 +89,6 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DPLY_FAKE_EDGE" value="true"/>
-        <!-- Serverless checkout tests clone from local fixture repositories;
-             GitCloneUrl refuses bare filesystem paths everywhere else. -->
         <env name="DPLY_GIT_CLONE_ALLOW_LOCAL_PATHS" value="true"/>
         <env name="DPLY_CHOOSE_APP_ENABLED" value="false"/>
         <!-- Slack "Add to Slack" off by default: with a client id present the

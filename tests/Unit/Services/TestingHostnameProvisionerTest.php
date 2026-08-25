@@ -175,13 +175,12 @@ test('each disabled condition reports itself distinctly', function () {
     $site = new Site(['name' => 'x', 'slug' => 'x']);
 
     config([
-        'services.cloudflare.testing_hostnames_enabled' => false,
         'services.cloudflare.key' => 'tok',
         'services.cloudflare.vm' => ['on-dply.cc'],
     ]);
-    expect($provisioner->disabledReason($site))->toBe('disabled_by_flag');
+    expect($provisioner->disabledReason($site))->toBeNull();
 
-    config(['services.cloudflare.testing_hostnames_enabled' => true, 'services.cloudflare.key' => '']);
+    config(['services.cloudflare.key' => '']);
     expect($provisioner->disabledReason($site))->toBe('missing_cloudflare_token');
 
     config(['services.cloudflare.key' => 'tok', 'services.cloudflare.vm' => []]);

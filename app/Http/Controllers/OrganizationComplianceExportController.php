@@ -71,7 +71,7 @@ class OrganizationComplianceExportController extends Controller
             '',
             'Files in this archive:',
             '  audit_log.csv         — every audited event for this organization (full history).',
-            '  deploys.csv           — site deployment history across BYO + Cloud + Serverless surfaces.',
+            '  deploys.csv           — site deployment history across BYO + Cloud surfaces.',
             '  certificates.csv      — TLS certificate inventory with expiry dates.',
             '',
             'Timestamps are ISO 8601 UTC. JSON-valued columns are rendered as compact JSON.',
